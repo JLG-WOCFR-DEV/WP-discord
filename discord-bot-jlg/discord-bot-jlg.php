@@ -192,8 +192,11 @@ class DiscordServerStats {
         $sanitized = [];
 
         // IDs and tokens
-        $sanitized['server_id']    = isset($input['server_id']) ? (string) absint($input['server_id']) : '';
-        $sanitized['bot_token']    = isset($input['bot_token']) ? sanitize_text_field($input['bot_token']) : '';
+        $server_id = isset($input['server_id']) ? absint($input['server_id']) : 0;
+        $sanitized['server_id'] = $server_id > 0 ? (string) $server_id : '';
+
+        $bot_token = isset($input['bot_token']) ? sanitize_text_field($input['bot_token']) : '';
+        $sanitized['bot_token'] = $bot_token;
 
         // Booleans
         $sanitized['demo_mode']    = isset($input['demo_mode']) ? wp_validate_boolean($input['demo_mode']) : false;
@@ -650,21 +653,24 @@ class DiscordServerStats {
         if (!empty($options['demo_mode'])) {
             return $this->get_demo_stats();
         }
-        
+
         // Vérifier le cache
         $cached_stats = get_transient($this->cache_key);
         if ($cached_stats !== false) {
             return $cached_stats;
         }
-        
-        if (empty($options['server_id']) || empty($options['bot_token'])) {
+
+        $server_id = isset($options['server_id']) ? absint($options['server_id']) : 0;
+        $bot_token = isset($options['bot_token']) ? sanitize_text_field($options['bot_token']) : '';
+
+        if (empty($server_id) || empty($bot_token)) {
             // Si pas configuré, retourner les stats de démo
             return $this->get_demo_stats();
         }
-        
+
         // Utiliser l'API Discord via widget.json (méthode publique)
         // Alternative : utiliser l'API REST avec le bot token
-        $widget_url = 'https://discord.com/api/guilds/' . $options['server_id'] . '/widget.json';
+        $widget_url = 'https://discord.com/api/guilds/' . $server_id . '/widget.json';
         
         $response = wp_remote_get($widget_url, array(
             'timeout' => 10,
@@ -706,17 +712,20 @@ class DiscordServerStats {
     private function get_discord_stats_via_bot() {
         $options = get_option($this->option_name);
         
-        if (empty($options['bot_token'])) {
+        $server_id = isset($options['server_id']) ? absint($options['server_id']) : 0;
+        $bot_token = isset($options['bot_token']) ? sanitize_text_field($options['bot_token']) : '';
+
+        if (empty($bot_token) || empty($server_id)) {
             return $this->get_demo_stats();
         }
-        
+
         // API endpoint pour obtenir les infos du serveur
-        $api_url = 'https://discord.com/api/v10/guilds/' . $options['server_id'] . '?with_counts=true';
-        
+        $api_url = 'https://discord.com/api/v10/guilds/' . $server_id . '?with_counts=true';
+
         $response = wp_remote_get($api_url, array(
             'timeout' => 10,
             'headers' => array(
-                'Authorization' => 'Bot ' . $options['bot_token'],
+                'Authorization' => 'Bot ' . $bot_token,
                 'User-Agent' => 'WordPress Discord Stats Plugin'
             )
         ));
