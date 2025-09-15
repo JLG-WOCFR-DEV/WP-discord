@@ -102,7 +102,9 @@ class DiscordServerStats {
     
     // Initialisation des paramètres
     public function settings_init() {
-        register_setting('discord_stats_settings', $this->option_name);
+        register_setting('discord_stats_settings', $this->option_name, [
+            'sanitize_callback' => [ $this, 'sanitize_options' ],
+        ]);
         
         // Section API
         add_settings_section(
@@ -184,7 +186,30 @@ class DiscordServerStats {
             'discord_stats_display_section'
         );
     }
-    
+
+    // Sanitize and validate options
+    public function sanitize_options($input) {
+        $sanitized = [];
+
+        // IDs and tokens
+        $sanitized['server_id']    = isset($input['server_id']) ? (string) absint($input['server_id']) : '';
+        $sanitized['bot_token']    = isset($input['bot_token']) ? sanitize_text_field($input['bot_token']) : '';
+
+        // Booleans
+        $sanitized['demo_mode']    = isset($input['demo_mode']) ? wp_validate_boolean($input['demo_mode']) : false;
+        $sanitized['show_online']  = isset($input['show_online']) ? wp_validate_boolean($input['show_online']) : false;
+        $sanitized['show_total']   = isset($input['show_total']) ? wp_validate_boolean($input['show_total']) : false;
+
+        // Texte et entiers
+        $sanitized['widget_title']  = isset($input['widget_title']) ? sanitize_text_field($input['widget_title']) : '';
+        $sanitized['cache_duration'] = isset($input['cache_duration']) ? absint($input['cache_duration']) : 300;
+
+        // CSS personnalisé
+        $sanitized['custom_css'] = isset($input['custom_css']) ? wp_strip_all_tags($input['custom_css']) : '';
+
+        return $sanitized;
+    }
+
     // Callbacks pour les sections
     public function api_section_callback() {
         ?>
