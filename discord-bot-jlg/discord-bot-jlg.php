@@ -568,7 +568,7 @@ class DiscordServerStats {
 [discord_stats compact="true" show_discord_icon="true" discord_icon_position="left" theme="light"]
 
 // FONCTIONNALITÉS SPÉCIALES
-// Auto-refresh toutes les 30 secondes
+// Auto-refresh toutes les 30 secondes (minimum 10 secondes)
 [discord_stats refresh="true" refresh_interval="30" show_discord_icon="true"]
 
 // Afficher seulement les membres en ligne avec logo
@@ -577,6 +577,8 @@ class DiscordServerStats {
 // MODE DÉMO (pour tester l'apparence)
 [discord_stats demo="true" show_discord_icon="true" theme="dark" layout="vertical"]
                 </pre>
+
+                <p style="margin-top: 10px;"><em>ℹ️ L'auto-refresh nécessite un intervalle d'au moins 10&nbsp;secondes (10 000&nbsp;ms).</em></p>
                 
                 <h4>Tous les paramètres disponibles :</h4>
                 <div style="background: white; padding: 15px; border-radius: 4px;">
@@ -618,7 +620,7 @@ class DiscordServerStats {
                     <h5>⚙️ Paramètres techniques :</h5>
                     <ul style="columns: 2; column-gap: 30px;">
                         <li><strong>refresh</strong> : true/false (auto-actualisation)</li>
-                        <li><strong>refresh_interval</strong> : secondes (min 10)</li>
+                        <li><strong>refresh_interval</strong> : secondes (minimum 10&nbsp;secondes / 10 000&nbsp;ms)</li>
                         <li><strong>demo</strong> : true/false (mode démonstration)</li>
                         <li><strong>border_radius</strong> : pixels (coins arrondis)</li>
                         <li><strong>gap</strong> : pixels (espace entre éléments)</li>
@@ -939,7 +941,7 @@ class DiscordServerStats {
 
         $refresh_interval = 0;
         if ($refresh && empty($stats['is_demo'])) {
-            $refresh_interval = max(0, intval($atts['refresh_interval']));
+            $refresh_interval = max(10, intval($atts['refresh_interval']));
         }
 
         if ($refresh_interval > 0) {

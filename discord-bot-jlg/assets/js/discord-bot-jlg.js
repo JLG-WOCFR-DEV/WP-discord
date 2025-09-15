@@ -66,13 +66,19 @@
             }
 
             var interval = parseInt(container.dataset.refresh, 10);
-            if (!interval || interval <= 0) {
+            if (isNaN(interval) || interval <= 0) {
+                return;
+            }
+
+            // L'attribut data-refresh est exprimé en secondes côté PHP.
+            var intervalMs = interval * 1000;
+            if (intervalMs < 10000) {
                 return;
             }
 
             setInterval(function () {
                 updateStats(container, config, formatter);
-            }, interval * 1000);
+            }, intervalMs);
         });
     }
 
