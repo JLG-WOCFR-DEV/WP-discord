@@ -1,0 +1,649 @@
+<?php
+// Exit if accessed directly.
+if ( ! defined( 'ABSPATH' ) ) {
+    exit;
+}
+
+class Discord_Server_Stats_Admin {
+
+    /**
+     * @var DiscordServerStats
+     */
+    private $plugin;
+
+    public function __construct( DiscordServerStats $plugin ) {
+        $this->plugin = $plugin;
+
+        add_action( 'admin_menu', array( $this, 'add_admin_menu' ) );
+        add_action( 'admin_init', array( $this, 'settings_init' ) );
+        add_action( 'admin_enqueue_scripts', array( $this, 'enqueue_admin_styles' ) );
+    }
+
+    public function add_admin_menu() {
+        // Icône Discord en base64 (version simplifiée pour le menu)
+        $discord_icon = 'data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2Z3MiPjxwYXRoIGZpbGw9IiNhNGFhYjgiIGQ9Ik0yMC4zMTcgNC4zN2ExOS44IDE5LjggMCAwMC00Ljg4NS0xLjUxNS4wNzQuMDc0IDAgMDAtLjA3OS4wMzdjLS4yMS4zNzUtLjQ0NC44NjQtLjYwOCAxLjI1YTE4LjI3IDE4LjI3IDAgMDAtNS40ODcgMGMtLjE2NS0uMzk3LS40MDQtLjg4NS0uNjE4LTEuMjVhLjA3Ny4wNzcgMCAwMC0uMDc5LS4wMzdBMTkuNzQgMTkuNzQgMCAwMDMuNjc3IDQuMzdhLjA3LjA3IDAgMDAtLjAzMi4wMjdDLjUzMyA5LjA0Ni0uMzIgMTMuNTguMDk5IDE4LjA1N2EuMDguMDggMCAwMC4wMzEgMS4wNTdBMTkuOSAxOS45IDAgMDA2LjA3MyAyMWEuMDc4LjA3OCAwIDAwLjA4NC0uMDI4IDEzLjQgMTMuNCAwIDAwMS4xNTUtMi4xLjA3Ni4wNzYgMCAwMC0uMDQxLS4xMDYgMTMuMSAxMy4xIDAgMDEtMS44NzItLjg5Mi4wNzcuMDc3IDAgMDEtLjAwOC0uMTI4IDE0IDE0IDAgMDAuMzctLjI5Mi4wNzQuMDc0IDAgMDEuMDc3LS4wMWMzLjkyNyAxLjc5MyA4LjE4IDEuNzkzIDEyLjA2IDAgYS4wNzQuMDc0IDAgMDEuMDc4LjAwOWMuMTE5LjA5OS4yNDYuMTk4LjM3My4yOTJhLjA3Ny4wNzcgMCAwMS0uMDA2LjEyNyAxMi4zIDEyLjMgMCAwMS0xLjg3My44OTIuMDc3LjA3NyAwIDAwLS4wNDEuMTA3YzMuMzg3NDQgMS40MDMgMS4xNTUgMi4xLS4wODQuMDI4YS4wNzguMDc4IDAgMDAxOS45MDItMS45MDMuMDc2LjA3NiAwIDAwLjAzLS4wNTdjLjUzNy00LjU4LS45MDQtOC41NTMtMy44MjMtMTIuMDU3YS4wNi4wNiAwIDAwLS4wMzEtLjAyOHpNOC4wMiAxNS4yNzhjLTEuMTgzIDAtMi4xNTctMS4wODUtMi4xNTctMi40MiAwLTEuMzMzLjk1Ni0yLjQxOSAyLjE1Ny0yLjQxOSAxLjIxIDAgMi4xNzYgMS4wOTYgMi4xNTcgMi40MiAwIDEuMzM0LS45NTYgMi40MTktMi4xNTcgMi40MTl6bTcuOTc1IDBjLTEuMTgzIDAtMi4xNTctMS4wODUtMi4xNTctMi40MiAwLTEuMzMzLjk1NS0yLjQxOSAyLjE1Ny0yLjQxOXMyLjE1NyAxLjA5NiAyLjE1NyAyLjQyYzAgMS4zMzQtLjk1NiAyLjQxOS0yLjE1NyAyLjQxOXoiLz48L3N2Zz4=';
+
+        add_menu_page(
+            'Discord Bot - JLG',
+            'Discord Bot',
+            'manage_options',
+            'discord-bot-jlg',
+            array( $this, 'options_page' ),
+            $discord_icon,
+            30
+        );
+
+        add_submenu_page(
+            'discord-bot-jlg',
+            'Configuration',
+            'Configuration',
+            'manage_options',
+            'discord-bot-jlg',
+            array( $this, 'options_page' )
+        );
+
+        add_submenu_page(
+            'discord-bot-jlg',
+            'Guide & Démo',
+            'Guide & Démo',
+            'manage_options',
+            'discord-bot-demo',
+            array( $this, 'demo_page' )
+        );
+    }
+
+    public function settings_init() {
+        register_setting(
+            'discord_stats_settings',
+            $this->plugin->get_option_name(),
+            array(
+                'sanitize_callback' => array( $this, 'sanitize_options' ),
+            )
+        );
+
+        add_settings_section(
+            'discord_stats_api_section',
+            'Configuration Discord API',
+            array( $this, 'api_section_callback' ),
+            'discord_stats_settings'
+        );
+
+        add_settings_field(
+            'server_id',
+            'ID du Serveur Discord',
+            array( $this, 'server_id_render' ),
+            'discord_stats_settings',
+            'discord_stats_api_section'
+        );
+
+        add_settings_field(
+            'bot_token',
+            'Token du Bot Discord',
+            array( $this, 'bot_token_render' ),
+            'discord_stats_settings',
+            'discord_stats_api_section'
+        );
+
+        add_settings_section(
+            'discord_stats_display_section',
+            'Options d\'affichage',
+            array( $this, 'display_section_callback' ),
+            'discord_stats_settings'
+        );
+
+        add_settings_field(
+            'demo_mode',
+            'Mode démonstration',
+            array( $this, 'demo_mode_render' ),
+            'discord_stats_settings',
+            'discord_stats_display_section'
+        );
+
+        add_settings_field(
+            'show_online',
+            'Afficher les membres en ligne',
+            array( $this, 'show_online_render' ),
+            'discord_stats_settings',
+            'discord_stats_display_section'
+        );
+
+        add_settings_field(
+            'show_total',
+            'Afficher le total des membres',
+            array( $this, 'show_total_render' ),
+            'discord_stats_settings',
+            'discord_stats_display_section'
+        );
+
+        add_settings_field(
+            'widget_title',
+            'Titre du widget',
+            array( $this, 'widget_title_render' ),
+            'discord_stats_settings',
+            'discord_stats_display_section'
+        );
+
+        add_settings_field(
+            'cache_duration',
+            'Durée du cache (secondes)',
+            array( $this, 'cache_duration_render' ),
+            'discord_stats_settings',
+            'discord_stats_display_section'
+        );
+
+        add_settings_field(
+            'custom_css',
+            'CSS personnalisé',
+            array( $this, 'custom_css_render' ),
+            'discord_stats_settings',
+            'discord_stats_display_section'
+        );
+    }
+
+    public function sanitize_options( $input ) {
+        if ( ! is_array( $input ) ) {
+            $input = array();
+        }
+
+        $sanitized = array(
+            'server_id'     => '',
+            'bot_token'     => '',
+            'demo_mode'     => 0,
+            'show_online'   => 0,
+            'show_total'    => 0,
+            'widget_title'  => '',
+            'cache_duration'=> 300,
+            'custom_css'    => '',
+        );
+
+        if ( isset( $input['server_id'] ) ) {
+            $server_id = trim( $input['server_id'] );
+            $sanitized['server_id'] = '' === $server_id ? '' : absint( $server_id );
+        }
+
+        if ( isset( $input['bot_token'] ) ) {
+            $sanitized['bot_token'] = sanitize_text_field( $input['bot_token'] );
+        }
+
+        $sanitized['demo_mode']   = ! empty( $input['demo_mode'] ) ? 1 : 0;
+        $sanitized['show_online'] = ! empty( $input['show_online'] ) ? 1 : 0;
+        $sanitized['show_total']  = ! empty( $input['show_total'] ) ? 1 : 0;
+
+        if ( isset( $input['widget_title'] ) ) {
+            $sanitized['widget_title'] = sanitize_text_field( $input['widget_title'] );
+        }
+
+        if ( isset( $input['cache_duration'] ) ) {
+            $cache_duration = absint( $input['cache_duration'] );
+            $sanitized['cache_duration'] = max( 60, min( 3600, $cache_duration ) );
+        }
+
+        if ( isset( $input['custom_css'] ) ) {
+            $sanitized['custom_css'] = sanitize_textarea_field( $input['custom_css'] );
+        }
+
+        return $sanitized;
+    }
+
+    public function api_section_callback() {
+        ?>
+        <div style="background: #f0f4ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
+            <h3 style="margin-top: 0;">📚 Guide étape par étape</h3>
+
+            <h4>Étape 1 : Créer un Bot Discord</h4>
+            <ol>
+                <li>Rendez-vous sur <a href="https://discord.com/developers/applications" target="_blank" style="color: #5865F2;">Discord Developer Portal</a></li>
+                <li>Cliquez sur <strong>"New Application"</strong> en haut à droite</li>
+                <li>Donnez un nom à votre application (ex: "Stats Bot")</li>
+                <li>Dans le menu de gauche, cliquez sur <strong>"Bot"</strong></li>
+                <li>Cliquez sur <strong>"Add Bot"</strong></li>
+                <li>Sous "Token", cliquez sur <strong>"Copy"</strong> pour copier le token du bot</li>
+                <li>⚠️ <strong>Important :</strong> Gardez ce token secret et ne le partagez jamais !</li>
+            </ol>
+
+            <h4>Étape 2 : Inviter le Bot sur votre serveur</h4>
+            <ol>
+                <li>Dans le menu de gauche, allez dans <strong>"OAuth2"</strong> > <strong>"URL Generator"</strong></li>
+                <li>Dans "Scopes", cochez <strong>"bot"</strong></li>
+                <li>Dans "Bot Permissions", sélectionnez :
+                    <ul>
+                        <li>✅ View Channels</li>
+                        <li>✅ Read Messages</li>
+                        <li>✅ Send Messages (optionnel)</li>
+                    </ul>
+                </li>
+                <li>Copiez l'URL générée en bas de la page</li>
+                <li>Ouvrez cette URL dans votre navigateur</li>
+                <li>Sélectionnez votre serveur et cliquez sur <strong>"Autoriser"</strong></li>
+            </ol>
+
+            <h4>Étape 3 : Obtenir l'ID de votre serveur</h4>
+            <ol>
+                <li>Ouvrez Discord (application ou web)</li>
+                <li>Allez dans <strong>Paramètres utilisateur</strong> (engrenage en bas)</li>
+                <li>Dans <strong>"Avancés"</strong>, activez <strong>"Mode développeur"</strong></li>
+                <li>Retournez sur votre serveur</li>
+                <li>Faites un <strong>clic droit sur le nom du serveur</strong></li>
+                <li>Cliquez sur <strong>"Copier l'ID"</strong></li>
+            </ol>
+
+            <h4>Étape 4 : Activer le Widget (optionnel mais recommandé)</h4>
+            <ol>
+                <li>Dans Discord, allez dans <strong>Paramètres du serveur</strong></li>
+                <li>Dans <strong>"Widget"</strong>, activez <strong>"Activer le widget du serveur"</strong></li>
+                <li>Cela permet une méthode de fallback si le bot a des problèmes</li>
+            </ol>
+
+            <div style="background: #fff3cd; padding: 10px; border-radius: 4px; margin-top: 15px;">
+                <strong>💡 Conseil :</strong> Après avoir rempli les champs ci-dessous, utilisez le bouton "Tester la connexion" pour vérifier que tout fonctionne !
+                <div style="margin: 20px 0;">
+                    <h4>Avec logo Discord officiel :</h4>
+                    <?php echo do_shortcode('[discord_stats demo="true" show_discord_icon="true" discord_icon_position="left"]'); ?>
+                </div>
+
+                <div style="margin: 20px 0;">
+                    <h4>Logo Discord centré en haut :</h4>
+                    <?php echo do_shortcode('[discord_stats demo="true" show_discord_icon="true" discord_icon_position="top" align="center" theme="dark"]'); ?>
+                </div>
+            </div>
+        </div>
+        <?php
+    }
+
+    public function display_section_callback() {
+        echo '<p>Personnalisez l\'affichage des statistiques Discord.</p>';
+    }
+
+    public function server_id_render() {
+        $options = $this->plugin->get_options();
+        ?>
+        <input type="text" name="<?php echo esc_attr( $this->plugin->get_option_name() ); ?>[server_id]"
+               value="<?php echo esc_attr( $options['server_id'] ?? '' ); ?>"
+               class="regular-text" />
+        <p class="description">L'ID de votre serveur Discord</p>
+        <?php
+    }
+
+    public function bot_token_render() {
+        $options = $this->plugin->get_options();
+        ?>
+        <input type="password" name="<?php echo esc_attr( $this->plugin->get_option_name() ); ?>[bot_token]"
+               value="<?php echo esc_attr( $options['bot_token'] ?? '' ); ?>"
+               class="regular-text" />
+        <p class="description">Le token de votre bot Discord (gardez-le secret !)</p>
+        <?php
+    }
+
+    public function demo_mode_render() {
+        $options   = $this->plugin->get_options();
+        $demo_mode = $options['demo_mode'] ?? 0;
+        ?>
+        <input type="checkbox" name="<?php echo esc_attr( $this->plugin->get_option_name() ); ?>[demo_mode]"
+               value="1" <?php checked( $demo_mode, 1 ); ?> />
+        <label>Activer le mode démonstration (affiche des données fictives pour tester l'apparence)</label>
+        <p class="description">🎨 Parfait pour tester les styles et dispositions sans configuration Discord</p>
+        <?php
+    }
+
+    public function show_online_render() {
+        $options = $this->plugin->get_options();
+        ?>
+        <input type="checkbox" name="<?php echo esc_attr( $this->plugin->get_option_name() ); ?>[show_online]"
+               value="1" <?php checked( $options['show_online'] ?? 0, 1 ); ?> />
+        <label>Afficher le nombre d'utilisateurs en ligne</label>
+        <?php
+    }
+
+    public function show_total_render() {
+        $options = $this->plugin->get_options();
+        ?>
+        <input type="checkbox" name="<?php echo esc_attr( $this->plugin->get_option_name() ); ?>[show_total]"
+               value="1" <?php checked( $options['show_total'] ?? 0, 1 ); ?> />
+        <label>Afficher le nombre total de membres</label>
+        <?php
+    }
+
+    public function widget_title_render() {
+        $options = $this->plugin->get_options();
+        ?>
+        <input type="text" name="<?php echo esc_attr( $this->plugin->get_option_name() ); ?>[widget_title]"
+               value="<?php echo esc_attr( $options['widget_title'] ?? '' ); ?>"
+               class="regular-text" />
+        <?php
+    }
+
+    public function cache_duration_render() {
+        $options = $this->plugin->get_options();
+        ?>
+        <input type="number" name="<?php echo esc_attr( $this->plugin->get_option_name() ); ?>[cache_duration]"
+               value="<?php echo esc_attr( $options['cache_duration'] ?? '' ); ?>"
+               min="60" max="3600" class="small-text" />
+        <p class="description">Minimum 60 secondes, maximum 3600 secondes (1 heure)</p>
+        <?php
+    }
+
+    public function custom_css_render() {
+        $options = $this->plugin->get_options();
+        ?>
+        <textarea name="<?php echo esc_attr( $this->plugin->get_option_name() ); ?>[custom_css]"
+                  rows="5" cols="50"><?php echo esc_textarea( $options['custom_css'] ?? '' ); ?></textarea>
+        <p class="description">CSS personnalisé pour styliser l'affichage</p>
+        <?php
+    }
+
+    public function options_page() {
+        ?>
+        <div class="wrap">
+            <h1>🎮 Discord Bot - JLG - Configuration</h1>
+
+            <?php $this->handle_test_connection_request(); ?>
+
+            <div style="display: flex; gap: 20px; margin-top: 20px;">
+                <!-- Colonne principale -->
+                <div style="flex: 1;">
+                    <form action="options.php" method="post">
+                        <?php
+                        settings_fields('discord_stats_settings');
+                        do_settings_sections('discord_stats_settings');
+                        submit_button();
+                        ?>
+                    </form>
+                </div>
+
+                <!-- Colonne latérale -->
+                <div style="width: 300px;">
+                    <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
+                        <h3 style="margin-top: 0;">🔧 Test de connexion</h3>
+                        <p>Vérifiez que votre configuration fonctionne :</p>
+                        <form method="get" action="<?php echo esc_url(admin_url('admin.php')); ?>">
+                            <input type="hidden" name="page" value="discord-bot-jlg" />
+                            <input type="hidden" name="test_connection" value="1" />
+                            <?php wp_nonce_field('discord_test_connection'); ?>
+                            <p>
+                                <button type="submit" class="button button-secondary" style="width: 100%;">Tester la connexion</button>
+                            </p>
+                        </form>
+                    </div>
+
+                    <div style="background: #e8f5e9; padding: 20px; border-radius: 8px;">
+                        <h3 style="margin-top: 0;">🚀 Liens rapides</h3>
+                        <ul style="list-style: none; padding: 0;">
+                            <li style="margin-bottom: 10px;">
+                                <a href="<?php echo esc_url(admin_url('admin.php?page=discord-bot-demo')); ?>" class="button button-primary" style="width: 100%;">
+                                    📖 Guide & Démo
+                                </a>
+                            </li>
+                            <li style="margin-bottom: 10px;">
+                                <a href="https://discord.com/developers/applications" target="_blank" class="button" style="width: 100%;">
+                                    🔗 Discord Developer Portal
+                                </a>
+                            </li>
+                            <li>
+                                <a href="<?php echo esc_url(admin_url('widgets.php')); ?>" class="button" style="width: 100%;">
+                                    📐 Gérer les Widgets
+                                </a>
+                            </li>
+                        </ul>
+                    </div>
+                </div>
+            </div>
+
+            <div style="margin-top: 30px; padding: 15px; background: #f0f0f0; border-radius: 8px; text-align: center;">
+                <p style="margin: 0;">Discord Bot - JLG v1.0 | Développé par Jérôme Le Gousse</p>
+            </div>
+        </div>
+        <?php
+    }
+
+    public function demo_page() {
+        ?>
+        <div class="wrap">
+            <h1>📖 Guide & Démonstration</h1>
+
+            <div style="background: #fff3cd; padding: 10px 20px; border-radius: 8px; margin: 20px 0;">
+                <p><strong>💡 Astuce :</strong> Tous les exemples ci-dessous utilisent le mode démo. Vous pouvez les copier-coller directement !</p>
+            </div>
+
+            <hr style="margin: 30px 0;">
+
+            <div style="background: #e3f2fd; padding: 20px; border-radius: 8px;">
+                <h2>🎨 Prévisualisation en direct</h2>
+                <p>Testez différentes configurations visuelles :</p>
+
+                <div style="margin: 20px 0;">
+                    <h4>Standard horizontal :</h4>
+                    <?php echo do_shortcode('[discord_stats demo="true"]'); ?>
+                </div>
+
+                <div style="margin: 20px 0;">
+                    <h4>Vertical pour sidebar :</h4>
+                    <div style="max-width: 300px;">
+                        <?php echo do_shortcode('[discord_stats demo="true" layout="vertical" theme="minimal"]'); ?>
+                    </div>
+                </div>
+
+                <div style="margin: 20px 0;">
+                    <h4>Compact mode sombre :</h4>
+                    <?php echo do_shortcode('[discord_stats demo="true" compact="true" theme="dark"]'); ?>
+                </div>
+
+                <div style="margin: 20px 0;">
+                    <h4>Avec titre personnalisé :</h4>
+                    <?php echo do_shortcode('[discord_stats demo="true" show_title="true" title="🎮 Notre Communauté Gaming" align="center"]'); ?>
+                </div>
+
+                <div style="margin: 20px 0;">
+                    <h4>Icônes personnalisées :</h4>
+                    <?php echo do_shortcode('[discord_stats demo="true" icon_online="🔥" label_online="Actifs" icon_total="⚔️" label_total="Guerriers"]'); ?>
+                </div>
+
+                <div style="margin: 20px 0;">
+                    <h4>Minimaliste (nombres uniquement) :</h4>
+                    <?php echo do_shortcode('[discord_stats demo="true" hide_labels="true" hide_icons="true" theme="minimal"]'); ?>
+                </div>
+            </div>
+
+            <hr style="margin: 30px 0;">
+
+            <div style="background: #f8f9fa; padding: 20px; border-radius: 8px;">
+                <h2>🔧 Test de connexion</h2>
+                <p>Vérifiez que votre configuration fonctionne correctement :</p>
+                <p>
+                    <a href="<?php echo esc_url(admin_url('admin.php?page=discord-bot-jlg&test_connection=1')); ?>"
+                       class="button button-secondary">Tester la connexion Discord</a>
+                </p>
+            </div>
+
+            <hr style="margin: 30px 0;">
+
+            <div style="background: #e8f5e9; padding: 20px; border-radius: 8px;">
+                <h2>📖 Guide d'utilisation</h2>
+
+                <h3>Option 1 : Shortcode (avec paramètres)</h3>
+                <p>Copiez ce code dans n'importe quelle page ou article :</p>
+                <code style="background: white; padding: 10px; display: inline-block; border-radius: 4px;">[discord_stats]</code>
+
+                <h4>Exemples avec paramètres :</h4>
+                <pre style="background: white; padding: 15px; border-radius: 4px; overflow-x: auto;">
+// BASIQUES
+// Layout vertical pour sidebar
+[discord_stats layout="vertical"]
+
+// Compact avec titre
+[discord_stats compact="true" show_title="true" title="Rejoignez-nous !"]
+
+// Theme sombre centré
+[discord_stats theme="dark" align="center"]
+
+// AVEC LOGO DISCORD
+// Logo à gauche (classique)
+[discord_stats show_discord_icon="true"]
+
+// Logo à droite avec thème sombre
+[discord_stats show_discord_icon="true" discord_icon_position="right" theme="dark"]
+
+// Logo centré en haut (parfait pour widgets)
+[discord_stats show_discord_icon="true" discord_icon_position="top" align="center"]
+
+// PERSONNALISATION AVANCÉE
+// Bannière complète pour header
+[discord_stats show_discord_icon="true" show_title="true" title="🎮 Rejoignez notre Discord !" width="100%" align="center" theme="discord"]
+
+// Sidebar élégante avec logo
+[discord_stats layout="vertical" show_discord_icon="true" discord_icon_position="top" theme="minimal" compact="true"]
+
+// Gaming style avec icônes custom
+[discord_stats show_discord_icon="true" icon_online="🎮" label_online="Joueurs actifs" icon_total="⚔️" label_total="Guerriers" theme="dark"]
+
+// Minimaliste avec logo seul
+[discord_stats hide_labels="true" hide_icons="true" show_discord_icon="true" discord_icon_position="top" align="center" theme="minimal"]
+
+// Footer discret
+[discord_stats compact="true" show_discord_icon="true" discord_icon_position="left" theme="light"]
+
+// FONCTIONNALITÉS SPÉCIALES
+// Auto-refresh toutes les 30 secondes
+[discord_stats refresh="true" refresh_interval="30" show_discord_icon="true"]
+
+// Afficher seulement les membres en ligne avec logo
+[discord_stats show_online="true" show_total="false" show_discord_icon="true"]
+
+// MODE DÉMO (pour tester l'apparence)
+[discord_stats demo="true" show_discord_icon="true" theme="dark" layout="vertical"]
+                </pre>
+
+                <h4>Tous les paramètres disponibles :</h4>
+                <div style="background: white; padding: 15px; border-radius: 4px;">
+                    <h5>🎨 Apparence & Layout :</h5>
+                    <ul style="columns: 2; column-gap: 30px;">
+                        <li><strong>layout</strong> : horizontal, vertical, compact</li>
+                        <li><strong>theme</strong> : discord, dark, light, minimal</li>
+                        <li><strong>align</strong> : left, center, right</li>
+                        <li><strong>width</strong> : largeur CSS (ex: "300px", "100%")</li>
+                        <li><strong>compact</strong> : true/false (version réduite)</li>
+                        <li><strong>animated</strong> : true/false (animations hover)</li>
+                        <li><strong>class</strong> : classes CSS additionnelles</li>
+                    </ul>
+
+                    <h5>🎯 Logo Discord :</h5>
+                    <ul>
+                        <li><strong>show_discord_icon</strong> : true/false (afficher le logo officiel)</li>
+                        <li><strong>discord_icon_position</strong> : left, right, top (position du logo)</li>
+                    </ul>
+
+                    <h5>📊 Données affichées :</h5>
+                    <ul style="columns: 2; column-gap: 30px;">
+                        <li><strong>show_online</strong> : true/false</li>
+                        <li><strong>show_total</strong> : true/false</li>
+                        <li><strong>show_title</strong> : true/false</li>
+                        <li><strong>title</strong> : texte du titre</li>
+                        <li><strong>hide_labels</strong> : true/false</li>
+                        <li><strong>hide_icons</strong> : true/false</li>
+                    </ul>
+
+                    <h5>✏️ Personnalisation textes/icônes :</h5>
+                    <ul style="columns: 2; column-gap: 30px;">
+                        <li><strong>icon_online</strong> : emoji/texte (défaut: 🟢)</li>
+                        <li><strong>icon_total</strong> : emoji/texte (défaut: 👥)</li>
+                        <li><strong>label_online</strong> : texte personnalisé</li>
+                        <li><strong>label_total</strong> : texte personnalisé</li>
+                    </ul>
+
+                    <h5>⚙️ Paramètres techniques :</h5>
+                    <ul style="columns: 2; column-gap: 30px;">
+                        <li><strong>refresh</strong> : true/false (auto-actualisation)</li>
+                        <li><strong>refresh_interval</strong> : secondes (min 10)</li>
+                        <li><strong>demo</strong> : true/false (mode démonstration)</li>
+                        <li><strong>border_radius</strong> : pixels (coins arrondis)</li>
+                        <li><strong>gap</strong> : pixels (espace entre éléments)</li>
+                        <li><strong>padding</strong> : pixels (espacement interne)</li>
+                    </ul>
+                </div>
+
+                <h3>Option 2 : Widget</h3>
+                <p>Allez dans <strong>Apparence > Widgets</strong> et ajoutez le widget <strong>"Discord Bot - JLG"</strong> dans votre sidebar</p>
+
+                <h3>Option 3 : Code PHP</h3>
+                <p>Pour les développeurs, dans vos templates PHP :</p>
+                <code style="background: white; padding: 10px; display: block; border-radius: 4px;">
+                    &lt;?php echo do_shortcode('[discord_stats show_discord_icon="true"]'); ?&gt;
+                </code>
+
+                <h3>💡 Configurations recommandées</h3>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-top: 15px;">
+                    <div style="background: white; padding: 15px; border-radius: 4px;">
+                        <strong>Pour une sidebar :</strong><br>
+                        <code style="font-size: 12px;">[discord_stats layout="vertical" show_discord_icon="true" discord_icon_position="top" compact="true"]</code>
+                    </div>
+                    <div style="background: white; padding: 15px; border-radius: 4px;">
+                        <strong>Pour un header :</strong><br>
+                        <code style="font-size: 12px;">[discord_stats show_discord_icon="true" show_title="true" title="Join us!" align="center" width="100%"]</code>
+                    </div>
+                    <div style="background: white; padding: 15px; border-radius: 4px;">
+                        <strong>Pour un footer :</strong><br>
+                        <code style="font-size: 12px;">[discord_stats theme="dark" show_discord_icon="true" compact="true"]</code>
+                    </div>
+                    <div style="background: white; padding: 15px; border-radius: 4px;">
+                        <strong>Style gaming :</strong><br>
+                        <code style="font-size: 12px;">[discord_stats theme="dark" icon_online="🎮" label_online="Players" show_discord_icon="true"]</code>
+                    </div>
+                </div>
+            </div>
+
+            <hr style="margin: 30px 0;">
+
+            <div style="background: #fff8e1; padding: 20px; border-radius: 8px;">
+                <h2>❓ Dépannage</h2>
+                <ul>
+                    <li><strong>Erreur de connexion ?</strong> Vérifiez que le bot est bien sur votre serveur</li>
+                    <li><strong>Stats à 0 ?</strong> Assurez-vous que le widget est activé dans les paramètres Discord</li>
+                    <li><strong>Token invalide ?</strong> Régénérez le token dans le Developer Portal</li>
+                    <li><strong>Cache ?</strong> Les stats sont mises à jour toutes les 5 minutes par défaut</li>
+                </ul>
+            </div>
+
+            <div style="margin-top: 30px; padding: 15px; background: #f0f0f0; border-radius: 8px; text-align: center;">
+                <p style="margin: 0;">Discord Bot - JLG v1.0 | Développé par Jérôme Le Gousse |
+                   <a href="https://discord.com/developers/docs/intro" target="_blank">Documentation Discord API</a> |
+                   <a href="#" onclick="return false;">Besoin d'aide ?</a>
+                </p>
+            </div>
+        </div>
+        <?php
+    }
+
+    public function enqueue_admin_styles() {
+        wp_enqueue_style(
+            'discord-bot-jlg-admin',
+            $this->plugin->get_plugin_url() . 'assets/css/discord-bot-jlg-admin.css',
+            array(),
+            '1.0'
+        );
+    }
+
+    private function handle_test_connection_request() {
+        if ( isset( $_GET['test_connection'] ) && check_admin_referer( 'discord_test_connection' ) ) {
+            $this->test_discord_connection();
+        }
+    }
+
+    private function test_discord_connection() {
+        $options = $this->plugin->get_options();
+
+        if ( ! empty( $options['demo_mode'] ) ) {
+            echo '<div class="notice notice-info"><p>🎨 Mode démonstration activé - Les données affichées sont fictives</p></div>';
+            return;
+        }
+
+        $this->plugin->clear_cache();
+        $stats = $this->plugin->get_discord_stats( true );
+
+        if ( $stats && empty( $stats['is_demo'] ) ) {
+            echo '<div class="notice notice-success"><p>✅ Connexion réussie ! Serveur : ' . esc_html( $stats['server_name'] ) . ' - ' . $stats['online'] . ' en ligne / ' . $stats['total'] . ' membres</p></div>';
+        } elseif ( $stats && ! empty( $stats['is_demo'] ) ) {
+            echo '<div class="notice notice-warning"><p>⚠️ Pas de configuration Discord détectée. Mode démo actif.</p></div>';
+        } else {
+            echo '<div class="notice notice-error"><p>❌ Échec de la connexion. Vérifiez vos identifiants.</p></div>';
+        }
+    }
+}
