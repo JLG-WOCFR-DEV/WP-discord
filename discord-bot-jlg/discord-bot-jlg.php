@@ -316,76 +316,76 @@ class DiscordServerStats {
     public function server_id_render() {
         $options = get_option($this->option_name);
         ?>
-        <input type="text" name="<?php echo $this->option_name; ?>[server_id]" 
-               value="<?php echo esc_attr($options['server_id']); ?>" 
+        <input type="text" name="<?php echo $this->option_name; ?>[server_id]"
+               value="<?php echo esc_attr($options['server_id'] ?? ''); ?>"
                class="regular-text" />
         <p class="description">L'ID de votre serveur Discord</p>
         <?php
     }
-    
+
     public function bot_token_render() {
         $options = get_option($this->option_name);
         ?>
-        <input type="password" name="<?php echo $this->option_name; ?>[bot_token]" 
-               value="<?php echo esc_attr($options['bot_token']); ?>" 
+        <input type="password" name="<?php echo $this->option_name; ?>[bot_token]"
+               value="<?php echo esc_attr($options['bot_token'] ?? ''); ?>"
                class="regular-text" />
         <p class="description">Le token de votre bot Discord (gardez-le secret !)</p>
         <?php
     }
-    
+
     public function demo_mode_render() {
         $options = get_option($this->option_name);
-        $demo_mode = isset($options['demo_mode']) ? $options['demo_mode'] : false;
+        $demo_mode = $options['demo_mode'] ?? 0;
         ?>
-        <input type="checkbox" name="<?php echo $this->option_name; ?>[demo_mode]" 
+        <input type="checkbox" name="<?php echo $this->option_name; ?>[demo_mode]"
                value="1" <?php checked($demo_mode, 1); ?> />
         <label>Activer le mode démonstration (affiche des données fictives pour tester l'apparence)</label>
         <p class="description">🎨 Parfait pour tester les styles et dispositions sans configuration Discord</p>
         <?php
     }
-    
+
     public function show_online_render() {
         $options = get_option($this->option_name);
         ?>
-        <input type="checkbox" name="<?php echo $this->option_name; ?>[show_online]" 
-               value="1" <?php checked($options['show_online'], 1); ?> />
+        <input type="checkbox" name="<?php echo $this->option_name; ?>[show_online]"
+               value="1" <?php checked($options['show_online'] ?? 0, 1); ?> />
         <label>Afficher le nombre d'utilisateurs en ligne</label>
         <?php
     }
-    
+
     public function show_total_render() {
         $options = get_option($this->option_name);
         ?>
-        <input type="checkbox" name="<?php echo $this->option_name; ?>[show_total]" 
-               value="1" <?php checked($options['show_total'], 1); ?> />
+        <input type="checkbox" name="<?php echo $this->option_name; ?>[show_total]"
+               value="1" <?php checked($options['show_total'] ?? 0, 1); ?> />
         <label>Afficher le nombre total de membres</label>
         <?php
     }
-    
+
     public function widget_title_render() {
         $options = get_option($this->option_name);
         ?>
-        <input type="text" name="<?php echo $this->option_name; ?>[widget_title]" 
-               value="<?php echo esc_attr($options['widget_title']); ?>" 
+        <input type="text" name="<?php echo $this->option_name; ?>[widget_title]"
+               value="<?php echo esc_attr($options['widget_title'] ?? ''); ?>"
                class="regular-text" />
         <?php
     }
-    
+
     public function cache_duration_render() {
         $options = get_option($this->option_name);
         ?>
-        <input type="number" name="<?php echo $this->option_name; ?>[cache_duration]" 
-               value="<?php echo esc_attr($options['cache_duration']); ?>" 
+        <input type="number" name="<?php echo $this->option_name; ?>[cache_duration]"
+               value="<?php echo esc_attr($options['cache_duration'] ?? ''); ?>"
                min="60" max="3600" class="small-text" />
         <p class="description">Minimum 60 secondes, maximum 3600 secondes (1 heure)</p>
         <?php
     }
-    
+
     public function custom_css_render() {
         $options = get_option($this->option_name);
         ?>
-        <textarea name="<?php echo $this->option_name; ?>[custom_css]" 
-                  rows="5" cols="50"><?php echo esc_textarea($options['custom_css']); ?></textarea>
+        <textarea name="<?php echo $this->option_name; ?>[custom_css]"
+                  rows="5" cols="50"><?php echo esc_textarea($options['custom_css'] ?? ''); ?></textarea>
         <p class="description">CSS personnalisé pour styliser l'affichage</p>
         <?php
     }
