@@ -1,0 +1,8 @@
+#adminmenu .toplevel_page_discord-bot-jlg .wp-menu-image img {
+    opacity: 1 !important;
+}
+
+#adminmenu .toplevel_page_discord-bot-jlg.current .wp-menu-image img,
+#adminmenu .toplevel_page_discord-bot-jlg:hover .wp-menu-image img {
+    opacity: 1 !important;
+}
