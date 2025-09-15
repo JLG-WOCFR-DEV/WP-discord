@@ -23,7 +23,15 @@ Accédez à la page **Discord Bot** dans l’administration pour :
 ```
 [discord_stats]
 ```
-Options disponibles : `layout`, `theme`, `demo`, etc.
+Options disponibles : `layout`, `theme`, `demo`, `refresh`, etc.
+
+Pour activer l'auto-actualisation, utilisez par exemple :
+
+```
+[discord_stats refresh="true" refresh_interval="60"]
+```
+
+Le paramètre `refresh_interval` est exprimé en secondes et doit être d'au moins 10 secondes (10 000 ms).
 
 ### Widget
 Un widget « Discord Bot - JLG » est disponible via le menu « Widgets ».
