@@ -672,15 +672,20 @@ class DiscordServerStats {
                 'User-Agent' => 'WordPress Discord Stats Plugin'
             )
         ));
-        
+
         if (is_wp_error($response)) {
             // Essayer avec l'API Bot si le widget échoue
             return $this->get_discord_stats_via_bot();
         }
-        
+
+        $code = wp_remote_retrieve_response_code($response);
+        if (200 !== $code) {
+            return $this->get_discord_stats_via_bot();
+        }
+
         $body = wp_remote_retrieve_body($response);
         $data = json_decode($body, true);
-        
+
         if (!$data || !isset($data['presence_count'])) {
             return $this->get_discord_stats_via_bot();
         }
@@ -715,14 +720,19 @@ class DiscordServerStats {
                 'User-Agent' => 'WordPress Discord Stats Plugin'
             )
         ));
-        
+
         if (is_wp_error($response)) {
             return $this->get_demo_stats();
         }
-        
+
+        $code = wp_remote_retrieve_response_code($response);
+        if (200 !== $code) {
+            return $this->get_demo_stats();
+        }
+
         $body = wp_remote_retrieve_body($response);
         $data = json_decode($body, true);
-        
+
         if (!$data || !isset($data['approximate_presence_count'])) {
             return $this->get_demo_stats();
         }
