@@ -400,7 +400,7 @@ class DiscordServerStats {
                         <h3 style="margin-top: 0;">🔧 Test de connexion</h3>
                         <p>Vérifiez que votre configuration fonctionne :</p>
                         <p>
-                            <a href="<?php echo admin_url('admin.php?page=discord-bot-jlg&test_connection=1'); ?>" 
+                            <a href="<?php echo esc_url(admin_url('admin.php?page=discord-bot-jlg&test_connection=1')); ?>"
                                class="button button-secondary" style="width: 100%;">Tester la connexion</a>
                         </p>
                     </div>
@@ -409,7 +409,7 @@ class DiscordServerStats {
                         <h3 style="margin-top: 0;">🚀 Liens rapides</h3>
                         <ul style="list-style: none; padding: 0;">
                             <li style="margin-bottom: 10px;">
-                                <a href="<?php echo admin_url('admin.php?page=discord-bot-demo'); ?>" class="button button-primary" style="width: 100%;">
+                                <a href="<?php echo esc_url(admin_url('admin.php?page=discord-bot-demo')); ?>" class="button button-primary" style="width: 100%;">
                                     📖 Guide & Démo
                                 </a>
                             </li>
@@ -419,7 +419,7 @@ class DiscordServerStats {
                                 </a>
                             </li>
                             <li>
-                                <a href="<?php echo admin_url('widgets.php'); ?>" class="button" style="width: 100%;">
+                                <a href="<?php echo esc_url(admin_url('widgets.php')); ?>" class="button" style="width: 100%;">
                                     📐 Gérer les Widgets
                                 </a>
                             </li>
@@ -490,7 +490,7 @@ class DiscordServerStats {
                 <h2>🔧 Test de connexion</h2>
                 <p>Vérifiez que votre configuration fonctionne correctement :</p>
                 <p>
-                    <a href="<?php echo admin_url('admin.php?page=discord-bot-jlg&test_connection=1'); ?>" 
+                    <a href="<?php echo esc_url(admin_url('admin.php?page=discord-bot-jlg&test_connection=1')); ?>"
                        class="button button-secondary">Tester la connexion Discord</a>
                 </p>
             </div>
@@ -1157,7 +1157,7 @@ class DiscordServerStats {
             var nonce = '<?php echo wp_create_nonce('refresh_discord_stats'); ?>';
 
             function updateStats() {
-                fetch('<?php echo admin_url('admin-ajax.php'); ?>?action=refresh_discord_stats&_ajax_nonce=' + nonce)
+                fetch('<?php echo esc_url(admin_url('admin-ajax.php')); ?>?action=refresh_discord_stats&_ajax_nonce=' + nonce)
                     .then(response => response.json())
                     .then(data => {
                         if (data.success) {
@@ -1266,7 +1266,7 @@ class Discord_Stats_Widget extends WP_Widget {
     public function form($instance) {
         ?>
         <p>
-            Configurez les options dans le menu principal <a href="<?php echo admin_url('admin.php?page=discord-bot-jlg'); ?>">
+            Configurez les options dans le menu principal <a href="<?php echo esc_url(admin_url('admin.php?page=discord-bot-jlg')); ?>">
             Discord Bot</a>
         </p>
         <?php
