@@ -40,7 +40,6 @@ class DiscordServerStats {
         
         // AJAX pour refresh manuel
         add_action('wp_ajax_refresh_discord_stats', array($this, 'ajax_refresh_stats'));
-        add_action('wp_ajax_nopriv_refresh_discord_stats', array($this, 'ajax_refresh_stats'));
     }
     
     // Activation du plugin
@@ -1126,9 +1125,10 @@ class DiscordServerStats {
         (function() {
             var container = document.getElementById('<?php echo $unique_id; ?>');
             var interval = parseInt(container.dataset.refresh) * 1000;
-            
+            var nonce = '<?php echo wp_create_nonce('refresh_discord_stats'); ?>';
+
             function updateStats() {
-                fetch('<?php echo admin_url('admin-ajax.php'); ?>?action=refresh_discord_stats')
+                fetch('<?php echo admin_url('admin-ajax.php'); ?>?action=refresh_discord_stats&_ajax_nonce=' + nonce)
                     .then(response => response.json())
                     .then(data => {
                         if (data.success) {
@@ -1163,6 +1163,7 @@ class DiscordServerStats {
     
     // AJAX refresh
     public function ajax_refresh_stats() {
+        check_ajax_referer('refresh_discord_stats');
         $options = get_option($this->option_name);
         
         // Ne pas rafraîchir si mode démo
