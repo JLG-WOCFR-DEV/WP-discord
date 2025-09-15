@@ -949,7 +949,7 @@ class DiscordServerStats {
                         <?php if (!$hide_icons): ?>
                         <span class="discord-icon"><?php echo esc_html($atts['icon_online']); ?></span>
                         <?php endif; ?>
-                        <span class="discord-number"><?php echo number_format($stats['online']); ?></span>
+                        <span class="discord-number"><?php echo esc_html(number_format_i18n((int) $stats['online'])); ?></span>
                         <?php if (!$hide_labels): ?>
                         <span class="discord-label"><?php echo esc_html($atts['label_online']); ?></span>
                         <?php endif; ?>
@@ -961,7 +961,7 @@ class DiscordServerStats {
                         <?php if (!$hide_icons): ?>
                         <span class="discord-icon"><?php echo esc_html($atts['icon_total']); ?></span>
                         <?php endif; ?>
-                        <span class="discord-number"><?php echo number_format($stats['total']); ?></span>
+                        <span class="discord-number"><?php echo esc_html(number_format_i18n((int) $stats['total'])); ?></span>
                         <?php if (!$hide_labels): ?>
                         <span class="discord-label"><?php echo esc_html($atts['label_total']); ?></span>
                         <?php endif; ?>
