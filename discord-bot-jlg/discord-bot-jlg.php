@@ -102,7 +102,13 @@ class DiscordServerStats {
     
     // Initialisation des paramètres
     public function settings_init() {
-        register_setting('discord_stats_settings', $this->option_name, array('sanitize_callback' => array($this, 'sanitize_options')));
+        register_setting(
+            'discord_stats_settings',
+            $this->option_name,
+            array(
+                'sanitize_callback' => array($this, 'sanitize_options'),
+            )
+        );
         
         // Section API
         add_settings_section(
@@ -187,17 +193,30 @@ class DiscordServerStats {
 
     // Sanitize and validate options
     public function sanitize_options($input) {
-        $sanitized = array();
+        if (!is_array($input)) {
+            $input = array();
+        }
+
+        $sanitized = array(
+            'server_id' => '',
+            'bot_token' => '',
+            'demo_mode' => 0,
+            'show_online' => 0,
+            'show_total' => 0,
+            'widget_title' => '',
+            'cache_duration' => 300,
+            'custom_css' => '',
+        );
 
         // IDs et tokens
         if (isset($input['server_id'])) {
             $server_id = trim($input['server_id']);
             $sanitized['server_id'] = '' === $server_id ? '' : absint($server_id);
-        } else {
-            $sanitized['server_id'] = '';
         }
 
-        $sanitized['bot_token'] = isset($input['bot_token']) ? sanitize_text_field($input['bot_token']) : '';
+        if (isset($input['bot_token'])) {
+            $sanitized['bot_token'] = sanitize_text_field($input['bot_token']);
+        }
 
         // Cases à cocher
         $sanitized['demo_mode'] = !empty($input['demo_mode']) ? 1 : 0;
@@ -205,18 +224,19 @@ class DiscordServerStats {
         $sanitized['show_total'] = !empty($input['show_total']) ? 1 : 0;
 
         // Champs texte et numériques
-        $sanitized['widget_title'] = isset($input['widget_title']) ? sanitize_text_field($input['widget_title']) : '';
+        if (isset($input['widget_title'])) {
+            $sanitized['widget_title'] = sanitize_text_field($input['widget_title']);
+        }
 
         if (isset($input['cache_duration'])) {
             $cache_duration = absint($input['cache_duration']);
-            $cache_duration = max(60, min(3600, $cache_duration));
-            $sanitized['cache_duration'] = $cache_duration;
-        } else {
-            $sanitized['cache_duration'] = 300;
+            $sanitized['cache_duration'] = max(60, min(3600, $cache_duration));
         }
 
         // CSS personnalisé
-        $sanitized['custom_css'] = isset($input['custom_css']) ? sanitize_textarea_field($input['custom_css']) : '';
+        if (isset($input['custom_css'])) {
+            $sanitized['custom_css'] = sanitize_textarea_field($input['custom_css']);
+        }
 
         return $sanitized;
     }
