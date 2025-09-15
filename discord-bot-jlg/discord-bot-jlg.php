@@ -38,9 +38,10 @@ class DiscordServerStats {
         // Styles
         add_action('wp_enqueue_scripts', array($this, 'enqueue_styles'));
         add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_styles'));
-        
+
         // AJAX pour refresh manuel
         add_action('wp_ajax_refresh_discord_stats', array($this, 'ajax_refresh_stats'));
+        add_action('wp_ajax_nopriv_refresh_discord_stats', array($this, 'ajax_refresh_stats'));
     }
     
     // Activation du plugin
