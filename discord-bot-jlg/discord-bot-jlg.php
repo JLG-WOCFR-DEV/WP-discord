@@ -398,7 +398,7 @@ class DiscordServerStats {
             
             <?php
             // Test de connexion
-            if (isset($_GET['test_connection'])) {
+            if (isset($_GET['test_connection']) && check_admin_referer('discord_test_connection')) {
                 $this->test_discord_connection();
             }
             ?>
@@ -420,10 +420,14 @@ class DiscordServerStats {
                     <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
                         <h3 style="margin-top: 0;">🔧 Test de connexion</h3>
                         <p>Vérifiez que votre configuration fonctionne :</p>
-                        <p>
-                            <a href="<?php echo esc_url(admin_url('admin.php?page=discord-bot-jlg&test_connection=1')); ?>"
-                               class="button button-secondary" style="width: 100%;">Tester la connexion</a>
-                        </p>
+                        <form method="get" action="<?php echo esc_url(admin_url('admin.php')); ?>">
+                            <input type="hidden" name="page" value="discord-bot-jlg" />
+                            <input type="hidden" name="test_connection" value="1" />
+                            <?php wp_nonce_field('discord_test_connection'); ?>
+                            <p>
+                                <button type="submit" class="button button-secondary" style="width: 100%;">Tester la connexion</button>
+                            </p>
+                        </form>
                     </div>
                     
                     <div style="background: #e8f5e9; padding: 20px; border-radius: 8px;">
