@@ -1,0 +1,184 @@
+.discord-stats-container {
+    position: relative;
+    --discord-gap: 20px;
+    --discord-padding: 15px;
+    --discord-radius: 8px;
+}
+
+.discord-stats-container .discord-stats-wrapper {
+    gap: var(--discord-gap, 20px);
+}
+
+.discord-stats-container .discord-stat {
+    padding: var(--discord-padding, 15px) calc(var(--discord-padding, 15px) * 1.33);
+    border-radius: var(--discord-radius, 8px);
+}
+
+.discord-stats-container .discord-stats-main {
+    display: flex;
+    align-items: center;
+    gap: 20px;
+}
+
+.discord-stats-container .discord-logo-container {
+    flex-shrink: 0;
+}
+
+.discord-stats-container .discord-logo-svg {
+    width: 40px;
+    height: 30px;
+    fill: #5865F2;
+    transition: all 0.3s ease;
+}
+
+.discord-stats-container.discord-compact .discord-logo-svg {
+    width: 30px;
+    height: 23px;
+}
+
+.discord-stats-container.discord-logo-top .discord-stats-main {
+    flex-direction: column;
+}
+
+.discord-stats-container.discord-logo-top .discord-logo-container {
+    margin-bottom: 15px;
+}
+
+.discord-stats-container.discord-theme-discord .discord-logo-svg,
+.discord-stats-container.discord-theme-dark .discord-logo-svg {
+    fill: #ffffff;
+}
+
+.discord-stats-container.discord-theme-light .discord-logo-svg {
+    fill: #5865F2;
+}
+
+.discord-stats-container.discord-theme-minimal .discord-logo-svg {
+    fill: currentColor;
+}
+
+.discord-stats-container.discord-animated .discord-logo-svg:hover {
+    transform: scale(1.1) rotate(-5deg);
+}
+
+.discord-stats-container .discord-demo-badge {
+    position: absolute;
+    top: -10px;
+    right: -10px;
+    background: linear-gradient(45deg, #ff6b6b, #f06292);
+    color: #ffffff;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 10px;
+    font-weight: bold;
+    text-transform: uppercase;
+    z-index: 10;
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% {
+        opacity: 1;
+        transform: scale(1);
+    }
+    50% {
+        opacity: 0.8;
+        transform: scale(1.05);
+    }
+}
+
+.discord-stats-container.discord-demo-mode .discord-online .discord-number {
+    animation: demo-variation 10s ease-in-out infinite;
+}
+
+@keyframes demo-variation {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+.discord-stats-container.discord-layout-vertical .discord-stats-wrapper {
+    flex-direction: column;
+}
+
+.discord-stats-container.discord-layout-vertical .discord-stat {
+    width: 100%;
+    justify-content: center;
+}
+
+.discord-stats-container.discord-layout-vertical.discord-logo-left .discord-stats-main,
+.discord-stats-container.discord-layout-vertical.discord-logo-right .discord-stats-main {
+    flex-direction: column;
+}
+
+.discord-stats-container.discord-compact .discord-stat {
+    padding: 8px 12px;
+}
+
+.discord-stats-container.discord-compact .discord-number {
+    font-size: 18px;
+}
+
+.discord-stats-container.discord-compact .discord-icon {
+    font-size: 16px;
+}
+
+.discord-stats-container.discord-theme-dark .discord-stat {
+    background: #2c2f33;
+    color: #ffffff;
+}
+
+.discord-stats-container.discord-theme-light .discord-stat {
+    background: #f6f6f6;
+    color: #2c2f33;
+    border: 1px solid #e3e5e8;
+}
+
+.discord-stats-container.discord-theme-minimal .discord-stat {
+    background: transparent;
+    color: inherit;
+    box-shadow: none;
+    border: 1px solid currentColor;
+}
+
+.discord-stats-container.discord-align-center .discord-stats-main {
+    justify-content: center;
+}
+
+.discord-stats-container.discord-align-right .discord-stats-main {
+    justify-content: flex-end;
+}
+
+.discord-stats-container.discord-align-center .discord-stats-wrapper {
+    justify-content: center;
+}
+
+.discord-stats-container.discord-align-right .discord-stats-wrapper {
+    justify-content: flex-end;
+}
+
+.discord-stats-container.discord-animated .discord-number {
+    transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.discord-stats-container.discord-animated .discord-stat:hover .discord-number {
+    transform: scale(1.1);
+}
+
+.discord-stats-container .discord-stats-title {
+    font-size: 18px;
+    font-weight: bold;
+    margin-bottom: 15px;
+    text-align: left;
+}
+
+.discord-stats-container.discord-align-center .discord-stats-title {
+    text-align: center;
+}
+
+.discord-stats-container.discord-align-right .discord-stats-title {
+    text-align: right;
+}
