@@ -205,7 +205,9 @@ class DiscordServerStats {
         $sanitized['cache_duration'] = isset($input['cache_duration']) ? absint($input['cache_duration']) : 300;
 
         // CSS personnalisé
-        $sanitized['custom_css'] = isset($input['custom_css']) ? wp_strip_all_tags($input['custom_css']) : '';
+        $sanitized['custom_css'] = isset($input['custom_css'])
+            ? wp_strip_all_tags(wp_unslash($input['custom_css']))
+            : '';
 
         return $sanitized;
     }
@@ -1152,7 +1154,7 @@ class DiscordServerStats {
         
         <?php if (!empty($options['custom_css'])) : ?>
         <style type="text/css">
-            <?php echo $options['custom_css']; ?>
+            <?php echo wp_strip_all_tags($options['custom_css']); ?>
         </style>
         <?php endif; ?>
         
