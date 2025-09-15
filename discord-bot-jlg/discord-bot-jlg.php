@@ -916,38 +916,64 @@ class DiscordServerStats {
         if (!empty($atts['class'])) {
             $container_classes[] = esc_attr($atts['class']);
         }
+
+        $style_declarations = array(
+            '--discord-gap: ' . intval($atts['gap']) . 'px',
+            '--discord-padding: ' . intval($atts['padding']) . 'px',
+            '--discord-radius: ' . intval($atts['border_radius']) . 'px',
+        );
+
+        if (!empty($atts['width'])) {
+            $style_declarations[] = 'width: ' . sanitize_text_field($atts['width']);
+        }
+
+        $attributes = array(
+            'id="' . esc_attr($unique_id) . '"',
+            'class="' . esc_attr(implode(' ', $container_classes)) . '"',
+            'data-demo="' . (!empty($stats['is_demo']) ? 'true' : 'false') . '"',
+        );
+
+        if (!empty($style_declarations)) {
+            $attributes[] = 'style="' . esc_attr(implode('; ', $style_declarations)) . '"';
+        }
+
+        $refresh_interval = 0;
+        if ($refresh && empty($stats['is_demo'])) {
+            $refresh_interval = max(0, intval($atts['refresh_interval']));
+        }
+
+        if ($refresh_interval > 0) {
+            $attributes[] = 'data-refresh="' . esc_attr($refresh_interval) . '"';
+        }
         
         // SVG Discord Icon
         $discord_svg = '<svg class="discord-logo-svg" viewBox="0 0 127.14 96.36" xmlns="http://www.w3.org/2000/svg"><path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.25,105.25,0,0,0,126.6,80.22h0C129.24,52.84,122.09,29.11,107.7,8.07ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.25,60,73.25,53s5-12.74,11.44-12.74S96.23,46,96.12,53,91.08,65.69,84.69,65.69Z"/></svg>';
         
         ob_start();
         ?>
-        <div id="<?php echo $unique_id; ?>" 
-             class="<?php echo implode(' ', $container_classes); ?>"
-             <?php if (!empty($atts['width'])): ?>style="width: <?php echo esc_attr($atts['width']); ?>;"<?php endif; ?>
-             <?php if ($refresh && empty($stats['is_demo'])): ?>data-refresh="<?php echo esc_attr($atts['refresh_interval']); ?>"<?php endif; ?>>
-            
+        <div <?php echo implode(' ', $attributes); ?>>
+
             <?php if (!empty($stats['is_demo'])): ?>
             <div class="discord-demo-badge">Mode Démo</div>
             <?php endif; ?>
-            
+
             <?php if ($show_title): ?>
             <div class="discord-stats-title"><?php echo esc_html($atts['title']); ?></div>
             <?php endif; ?>
-            
+
             <div class="discord-stats-main">
                 <?php if ($show_discord_icon && $atts['discord_icon_position'] === 'left'): ?>
                 <div class="discord-logo-container">
                     <?php echo $discord_svg; ?>
                 </div>
                 <?php endif; ?>
-                
+
                 <?php if ($show_discord_icon && $atts['discord_icon_position'] === 'top'): ?>
                 <div class="discord-logo-container discord-logo-top">
                     <?php echo $discord_svg; ?>
                 </div>
                 <?php endif; ?>
-                
+
                 <div class="discord-stats-wrapper">
                     <?php if ($show_online) : ?>
                     <div class="discord-stat discord-online" data-value="<?php echo $stats['online']; ?>">
@@ -960,7 +986,7 @@ class DiscordServerStats {
                         <?php endif; ?>
                     </div>
                     <?php endif; ?>
-                    
+
                     <?php if ($show_total) : ?>
                     <div class="discord-stat discord-total" data-value="<?php echo $stats['total']; ?>">
                         <?php if (!$hide_icons): ?>
@@ -973,7 +999,7 @@ class DiscordServerStats {
                     </div>
                     <?php endif; ?>
                 </div>
-                
+
                 <?php if ($show_discord_icon && $atts['discord_icon_position'] === 'right'): ?>
                 <div class="discord-logo-container">
                     <?php echo $discord_svg; ?>
@@ -981,239 +1007,7 @@ class DiscordServerStats {
                 <?php endif; ?>
             </div>
         </div>
-        
-        <style type="text/css">
-            #<?php echo $unique_id; ?> {
-                --discord-gap: <?php echo intval($atts['gap']); ?>px;
-                --discord-padding: <?php echo intval($atts['padding']); ?>px;
-                --discord-radius: <?php echo intval($atts['border_radius']); ?>px;
-                position: relative;
-            }
-            
-            #<?php echo $unique_id; ?>.discord-stats-container .discord-stats-wrapper {
-                gap: var(--discord-gap);
-            }
-            
-            #<?php echo $unique_id; ?> .discord-stat {
-                padding: var(--discord-padding) calc(var(--discord-padding) * 1.33);
-                border-radius: var(--discord-radius);
-            }
-            
-            /* Discord Logo Styles */
-            #<?php echo $unique_id; ?> .discord-stats-main {
-                display: flex;
-                align-items: center;
-                gap: 20px;
-            }
-            
-            #<?php echo $unique_id; ?> .discord-logo-container {
-                flex-shrink: 0;
-            }
-            
-            #<?php echo $unique_id; ?> .discord-logo-svg {
-                width: 40px;
-                height: 30px;
-                fill: #5865F2;
-                transition: all 0.3s ease;
-            }
-            
-            #<?php echo $unique_id; ?>.discord-compact .discord-logo-svg {
-                width: 30px;
-                height: 23px;
-            }
-            
-            /* Logo position variations */
-            #<?php echo $unique_id; ?>.discord-logo-top .discord-stats-main {
-                flex-direction: column;
-            }
-            
-            #<?php echo $unique_id; ?>.discord-logo-top .discord-logo-container {
-                margin-bottom: 15px;
-            }
-            
-            /* Theme-based logo colors */
-            #<?php echo $unique_id; ?>.discord-theme-discord .discord-logo-svg {
-                fill: white;
-            }
-            
-            #<?php echo $unique_id; ?>.discord-theme-dark .discord-logo-svg {
-                fill: white;
-            }
-            
-            #<?php echo $unique_id; ?>.discord-theme-light .discord-logo-svg {
-                fill: #5865F2;
-            }
-            
-            #<?php echo $unique_id; ?>.discord-theme-minimal .discord-logo-svg {
-                fill: currentColor;
-            }
-            
-            /* Hover effect on logo */
-            #<?php echo $unique_id; ?>.discord-animated .discord-logo-svg:hover {
-                transform: scale(1.1) rotate(-5deg);
-            }
-            
-            /* Badge Mode Démo */
-            #<?php echo $unique_id; ?> .discord-demo-badge {
-                position: absolute;
-                top: -10px;
-                right: -10px;
-                background: linear-gradient(45deg, #ff6b6b, #f06292);
-                color: white;
-                padding: 2px 8px;
-                border-radius: 10px;
-                font-size: 10px;
-                font-weight: bold;
-                text-transform: uppercase;
-                z-index: 10;
-                animation: pulse 2s infinite;
-            }
-            
-            @keyframes pulse {
-                0%, 100% { opacity: 1; transform: scale(1); }
-                50% { opacity: 0.8; transform: scale(1.05); }
-            }
-            
-            /* Animation pour mode démo */
-            #<?php echo $unique_id; ?>.discord-demo-mode .discord-online .discord-number {
-                animation: demo-variation 10s ease-in-out infinite;
-            }
-            
-            @keyframes demo-variation {
-                0%, 100% { opacity: 1; }
-                50% { opacity: 0.7; }
-            }
-            
-            /* Layout Vertical */
-            #<?php echo $unique_id; ?>.discord-layout-vertical .discord-stats-wrapper {
-                flex-direction: column;
-            }
-            
-            #<?php echo $unique_id; ?>.discord-layout-vertical .discord-stat {
-                width: 100%;
-                justify-content: center;
-            }
-            
-            #<?php echo $unique_id; ?>.discord-layout-vertical.discord-logo-left .discord-stats-main,
-            #<?php echo $unique_id; ?>.discord-layout-vertical.discord-logo-right .discord-stats-main {
-                flex-direction: column;
-            }
-            
-            /* Layout Compact */
-            #<?php echo $unique_id; ?>.discord-compact .discord-stat {
-                padding: 8px 12px;
-            }
-            
-            #<?php echo $unique_id; ?>.discord-compact .discord-number {
-                font-size: 18px;
-            }
-            
-            #<?php echo $unique_id; ?>.discord-compact .discord-icon {
-                font-size: 16px;
-            }
-            
-            /* Theme Dark */
-            #<?php echo $unique_id; ?>.discord-theme-dark .discord-stat {
-                background: #2c2f33;
-                color: white;
-            }
-            
-            /* Theme Light */
-            #<?php echo $unique_id; ?>.discord-theme-light .discord-stat {
-                background: #f6f6f6;
-                color: #2c2f33;
-                border: 1px solid #e3e5e8;
-            }
-            
-            /* Theme Minimal */
-            #<?php echo $unique_id; ?>.discord-theme-minimal .discord-stat {
-                background: transparent;
-                color: inherit;
-                box-shadow: none;
-                border: 1px solid currentColor;
-            }
-            
-            /* Alignements */
-            #<?php echo $unique_id; ?>.discord-align-center {
-                justify-content: center;
-            }
-            
-            #<?php echo $unique_id; ?>.discord-align-center .discord-stats-wrapper {
-                justify-content: center;
-            }
-            
-            #<?php echo $unique_id; ?>.discord-align-right {
-                justify-content: flex-end;
-            }
-            
-            #<?php echo $unique_id; ?>.discord-align-right .discord-stats-wrapper {
-                justify-content: flex-end;
-            }
-            
-            /* Animations améliorées */
-            #<?php echo $unique_id; ?>.discord-animated .discord-number {
-                transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-            }
-            
-            #<?php echo $unique_id; ?>.discord-animated .discord-stat:hover .discord-number {
-                transform: scale(1.1);
-            }
-            
-            /* Titre */
-            #<?php echo $unique_id; ?> .discord-stats-title {
-                font-size: 18px;
-                font-weight: bold;
-                margin-bottom: 15px;
-                text-align: <?php echo esc_attr($atts['align']); ?>;
-            }
-        </style>
-        
-        <?php if (!empty($options['custom_css'])) : ?>
-        <style type="text/css">
-            <?php
-            // Output sanitized custom CSS.
-            echo esc_html( $options['custom_css'] );
-            ?>
-        </style>
-        <?php endif; ?>
-        
-        <?php if ($refresh): ?>
-        <script type="text/javascript">
-        (function() {
-            var container = document.getElementById('<?php echo $unique_id; ?>');
-            var interval = parseInt(container.dataset.refresh) * 1000;
-            var nonce = '<?php echo wp_create_nonce('refresh_discord_stats'); ?>';
 
-            function updateStats() {
-                fetch('<?php echo esc_url(admin_url('admin-ajax.php')); ?>?action=refresh_discord_stats&_ajax_nonce=' + nonce)
-                    .then(response => response.json())
-                    .then(data => {
-                        if (data.success) {
-                            var online = container.querySelector('.discord-online .discord-number');
-                            var total = container.querySelector('.discord-total .discord-number');
-                            
-                            if (online) {
-                                online.textContent = new Intl.NumberFormat('fr-FR').format(data.data.online);
-                                online.style.transform = 'scale(1.2)';
-                                setTimeout(() => online.style.transform = 'scale(1)', 300);
-                            }
-                            
-                            if (total) {
-                                total.textContent = new Intl.NumberFormat('fr-FR').format(data.data.total);
-                                total.style.transform = 'scale(1.2)';
-                                setTimeout(() => total.style.transform = 'scale(1)', 300);
-                            }
-                        }
-                    });
-            }
-            
-            if (interval > 0) {
-                setInterval(updateStats, interval);
-            }
-        })();
-        </script>
-        <?php endif; ?>
-        
         <?php
         return ob_get_clean();
     }
@@ -1239,14 +1033,50 @@ class DiscordServerStats {
         }
     }
     
-    // Styles par défaut
+    // Styles et scripts frontaux
     public function enqueue_styles() {
+        $plugin_url = plugin_dir_url(__FILE__);
+
         wp_enqueue_style(
             'discord-bot-jlg',
-            plugin_dir_url(__FILE__) . 'assets/css/discord-bot-jlg.css',
+            $plugin_url . 'assets/css/discord-bot-jlg.css',
             array(),
             '1.0'
         );
+
+        wp_enqueue_style(
+            'discord-bot-jlg-inline',
+            $plugin_url . 'assets/css/discord-bot-jlg-inline.css',
+            array('discord-bot-jlg'),
+            '1.0'
+        );
+
+        $options = get_option($this->option_name);
+        if (is_array($options) && !empty($options['custom_css'])) {
+            wp_add_inline_style('discord-bot-jlg-inline', $options['custom_css']);
+        }
+
+        wp_register_script(
+            'discord-bot-jlg-frontend',
+            $plugin_url . 'assets/js/discord-bot-jlg.js',
+            array(),
+            '1.0',
+            true
+        );
+
+        $locale = str_replace('_', '-', get_locale());
+
+        wp_localize_script(
+            'discord-bot-jlg-frontend',
+            'discordBotJlg',
+            array(
+                'ajaxUrl' => admin_url('admin-ajax.php'),
+                'nonce'   => wp_create_nonce('refresh_discord_stats'),
+                'locale'  => $locale,
+            )
+        );
+
+        wp_enqueue_script('discord-bot-jlg-frontend');
     }
 
     // Styles pour l'admin
