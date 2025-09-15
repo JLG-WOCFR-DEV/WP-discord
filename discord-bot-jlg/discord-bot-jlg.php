@@ -1165,7 +1165,10 @@ class DiscordServerStats {
         
         <?php if (!empty($options['custom_css'])) : ?>
         <style type="text/css">
-            <?php echo esc_html( $options['custom_css'] ); ?>
+            <?php
+            // Output sanitized custom CSS.
+            echo esc_html( $options['custom_css'] );
+            ?>
         </style>
         <?php endif; ?>
         
