@@ -34,9 +34,10 @@ class DiscordServerStats {
         
         // Widget
         add_action('widgets_init', array($this, 'register_widget'));
-        
+
         // Styles
         add_action('wp_enqueue_scripts', array($this, 'enqueue_styles'));
+        add_action('admin_enqueue_scripts', array($this, 'enqueue_admin_styles'));
         
         // AJAX pour refresh manuel
         add_action('wp_ajax_refresh_discord_stats', array($this, 'ajax_refresh_stats'));
@@ -1183,82 +1184,22 @@ class DiscordServerStats {
     
     // Styles par défaut
     public function enqueue_styles() {
-        // Styles pour l'admin
-        if (is_admin()) {
-            wp_add_inline_style('wp-admin', '
-                #adminmenu .toplevel_page_discord-bot-jlg .wp-menu-image img {
-                    opacity: 1 !important;
-                }
-                #adminmenu .toplevel_page_discord-bot-jlg.current .wp-menu-image img,
-                #adminmenu .toplevel_page_discord-bot-jlg:hover .wp-menu-image img {
-                    opacity: 1 !important;
-                }
-            ');
-        }
-        
-        // Styles pour le frontend
-        wp_add_inline_style('wp-block-library', '
-            .discord-stats-container {
-                margin: 20px 0;
-            }
-            
-            .discord-stats-wrapper {
-                display: flex;
-                gap: 20px;
-                flex-wrap: wrap;
-            }
-            
-            .discord-stat {
-                background: #5865F2;
-                color: white;
-                padding: 15px 20px;
-                border-radius: 8px;
-                display: flex;
-                align-items: center;
-                gap: 10px;
-                font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-                box-shadow: 0 2px 4px rgba(0,0,0,0.1);
-                transition: transform 0.2s;
-            }
-            
-            .discord-stat:hover {
-                transform: translateY(-2px);
-                box-shadow: 0 4px 8px rgba(0,0,0,0.15);
-            }
-            
-            .discord-icon {
-                font-size: 20px;
-            }
-            
-            .discord-number {
-                font-size: 24px;
-                font-weight: bold;
-            }
-            
-            .discord-label {
-                font-size: 14px;
-                opacity: 0.9;
-                margin-left: 5px;
-            }
-            
-            .discord-stats-error {
-                background: #f44336;
-                color: white;
-                padding: 10px;
-                border-radius: 4px;
-                margin: 10px 0;
-            }
-            
-            /* Widget styles */
-            .widget .discord-stats-wrapper {
-                flex-direction: column;
-                gap: 10px;
-            }
-            
-            .widget .discord-stat {
-                justify-content: center;
-            }
-        ');
+        wp_enqueue_style(
+            'discord-bot-jlg',
+            plugin_dir_url(__FILE__) . 'assets/css/discord-bot-jlg.css',
+            array(),
+            '1.0'
+        );
+    }
+
+    // Styles pour l'admin
+    public function enqueue_admin_styles() {
+        wp_enqueue_style(
+            'discord-bot-jlg-admin',
+            plugin_dir_url(__FILE__) . 'assets/css/discord-bot-jlg-admin.css',
+            array(),
+            '1.0'
+        );
     }
     
     // Enregistrer le widget
