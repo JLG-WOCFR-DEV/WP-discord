@@ -1142,24 +1142,6 @@ class DiscordServerStats {
                 text-align: <?php echo esc_attr($atts['align']); ?>;
             }
         </style>
-            
-            /* Animations améliorées */
-            #<?php echo $unique_id; ?>.discord-animated .discord-number {
-                transition: all 0.5s cubic-bezier(0.4, 0, 0.2, 1);
-            }
-            
-            #<?php echo $unique_id; ?>.discord-animated .discord-stat:hover .discord-number {
-                transform: scale(1.1);
-            }
-            
-            /* Titre */
-            #<?php echo $unique_id; ?> .discord-stats-title {
-                font-size: 18px;
-                font-weight: bold;
-                margin-bottom: 15px;
-                text-align: <?php echo esc_attr($atts['align']); ?>;
-            }
-        </style>
         
         <?php if (!empty($options['custom_css'])) : ?>
         <style type="text/css">
