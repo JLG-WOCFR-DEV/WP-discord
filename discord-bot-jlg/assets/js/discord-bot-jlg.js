@@ -4,9 +4,15 @@
     var ERROR_CLASS = 'discord-stats-error';
 
     function updateStats(container, config, formatter) {
-        var url = config.ajaxUrl + '?action=refresh_discord_stats&_ajax_nonce=' + encodeURIComponent(config.nonce);
+        var formData = new FormData();
+        formData.append('action', config.action || 'refresh_discord_stats');
+        formData.append('_ajax_nonce', config.nonce);
 
-        fetch(url)
+        fetch(config.ajaxUrl, {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin'
+        })
             .then(function (response) {
                 return response.json();
             })
@@ -47,7 +53,7 @@
     }
 
     function initializeDiscordBot() {
-        if (typeof window.fetch !== 'function') {
+        if (typeof window.fetch !== 'function' || typeof window.FormData !== 'function') {
             return;
         }
 
