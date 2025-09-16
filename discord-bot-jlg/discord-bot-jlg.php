@@ -68,8 +68,6 @@ class DiscordServerStats {
 
         add_shortcode('discord_stats', array($this->shortcode, 'render_shortcode'));
 
-        add_action('wp_enqueue_scripts', array($this->shortcode, 'enqueue_styles'));
-
         add_action('widgets_init', array($this->widget, 'register_widget'));
 
         add_action('wp_ajax_refresh_discord_stats', array($this->api, 'ajax_refresh_stats'));

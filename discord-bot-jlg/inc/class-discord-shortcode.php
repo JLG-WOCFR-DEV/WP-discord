@@ -9,6 +9,10 @@ class Discord_Bot_JLG_Shortcode {
     private $option_name;
     private $api;
 
+    private static $assets_registered   = false;
+    private static $inline_css_added    = false;
+    private static $footer_hook_added   = false;
+
     public function __construct($option_name, Discord_Bot_JLG_API $api) {
         $this->option_name = $option_name;
         $this->api         = $api;
@@ -72,6 +76,8 @@ class Discord_Bot_JLG_Shortcode {
         if (!is_array($stats)) {
             return '<div class="discord-stats-error">Impossible de récupérer les stats Discord</div>';
         }
+
+        $this->enqueue_assets($options);
 
         $unique_id = 'discord-stats-' . wp_rand(1000, 9999);
 
@@ -197,25 +203,42 @@ class Discord_Bot_JLG_Shortcode {
         return ob_get_clean();
     }
 
-    public function enqueue_styles() {
-        wp_enqueue_style(
+    private function enqueue_assets($options) {
+        $this->register_assets();
+
+        if (!self::$inline_css_added && is_array($options) && !empty($options['custom_css'])) {
+            wp_add_inline_style('discord-bot-jlg-inline', $options['custom_css']);
+            self::$inline_css_added = true;
+        }
+
+        wp_enqueue_style('discord-bot-jlg');
+        wp_enqueue_style('discord-bot-jlg-inline');
+        wp_enqueue_script('discord-bot-jlg-frontend');
+
+        if (!self::$footer_hook_added) {
+            add_action('wp_footer', array($this, 'print_late_styles'), 1);
+            self::$footer_hook_added = true;
+        }
+    }
+
+    private function register_assets() {
+        if (self::$assets_registered) {
+            return;
+        }
+
+        wp_register_style(
             'discord-bot-jlg',
             DISCORD_BOT_JLG_PLUGIN_URL . 'assets/css/discord-bot-jlg.css',
             array(),
             '1.0'
         );
 
-        wp_enqueue_style(
+        wp_register_style(
             'discord-bot-jlg-inline',
             DISCORD_BOT_JLG_PLUGIN_URL . 'assets/css/discord-bot-jlg-inline.css',
             array('discord-bot-jlg'),
             '1.0'
         );
-
-        $options = get_option($this->option_name);
-        if (is_array($options) && !empty($options['custom_css'])) {
-            wp_add_inline_style('discord-bot-jlg-inline', $options['custom_css']);
-        }
 
         wp_register_script(
             'discord-bot-jlg-frontend',
@@ -238,6 +261,14 @@ class Discord_Bot_JLG_Shortcode {
             )
         );
 
-        wp_enqueue_script('discord-bot-jlg-frontend');
+        self::$assets_registered = true;
+    }
+
+    public function print_late_styles() {
+        if (wp_style_is('discord-bot-jlg-inline', 'enqueued')) {
+            wp_print_styles('discord-bot-jlg-inline');
+        } elseif (wp_style_is('discord-bot-jlg', 'enqueued')) {
+            wp_print_styles('discord-bot-jlg');
+        }
     }
 }
