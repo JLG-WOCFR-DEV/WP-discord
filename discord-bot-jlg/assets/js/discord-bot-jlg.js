@@ -17,7 +17,36 @@
                 return response.json();
             })
             .then(function (data) {
-                if (!data || !data.success || !data.data) {
+                if (!data || typeof data !== 'object') {
+                    return;
+                }
+
+                if (!data.success) {
+                    if (data.data && data.data.message) {
+                        console.warn(data.data.message);
+                    } else if (typeof data.data === 'string') {
+                        console.warn(data.data);
+                    }
+
+                    if (container && container.classList) {
+                        container.classList.add(ERROR_CLASS);
+                    }
+
+                    return;
+                }
+
+                if (!data.data || data.data.rate_limited) {
+                    if (data.data && data.data.message) {
+                        console.warn(data.data.message);
+                    }
+
+                    return;
+                }
+
+                var onlineValue = typeof data.data.online === 'number' ? data.data.online : null;
+                var totalValue = typeof data.data.total === 'number' ? data.data.total : null;
+
+                if (onlineValue === null && totalValue === null) {
                     return;
                 }
 
@@ -26,8 +55,8 @@
                 }
 
                 var online = container.querySelector('.discord-online .discord-number');
-                if (online) {
-                    online.textContent = formatter.format(data.data.online);
+                if (online && onlineValue !== null) {
+                    online.textContent = formatter.format(onlineValue);
                     online.style.transform = 'scale(1.2)';
                     setTimeout(function () {
                         online.style.transform = 'scale(1)';
@@ -35,8 +64,8 @@
                 }
 
                 var total = container.querySelector('.discord-total .discord-number');
-                if (total) {
-                    total.textContent = formatter.format(data.data.total);
+                if (total && totalValue !== null) {
+                    total.textContent = formatter.format(totalValue);
                     total.style.transform = 'scale(1.2)';
                     setTimeout(function () {
                         total.style.transform = 'scale(1)';

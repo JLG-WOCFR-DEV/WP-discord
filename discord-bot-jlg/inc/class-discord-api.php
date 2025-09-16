@@ -80,14 +80,73 @@ class Discord_Bot_JLG_API {
             wp_send_json_error('Mode démo actif');
         }
 
+        $current_action = current_action();
+        $is_public_request = ('wp_ajax_nopriv_refresh_discord_stats' === $current_action);
+
+        $rate_limit_key = $this->cache_key . '_refresh_lock';
+        $cache_duration = $this->get_cache_duration($options);
+        $rate_limit_window = (int) apply_filters('discord_bot_jlg_public_refresh_interval', $cache_duration, $options);
+        if ($rate_limit_window < 30) {
+            $rate_limit_window = 30;
+        }
+
+        if ($is_public_request) {
+            $cached_stats = get_transient($this->cache_key);
+            if (is_array($cached_stats) && empty($cached_stats['is_demo'])) {
+                wp_send_json_success($cached_stats);
+            }
+
+            $last_refresh = get_transient($rate_limit_key);
+            if (false !== $last_refresh) {
+                $elapsed = time() - (int) $last_refresh;
+                if ($elapsed < $rate_limit_window) {
+                    $retry_after = max(0, $rate_limit_window - $elapsed);
+                    $message = sprintf(
+                        __('Veuillez patienter %d secondes avant la prochaine actualisation.', 'discord-bot-jlg'),
+                        $retry_after
+                    );
+
+                    wp_send_json_error(
+                        array(
+                            'rate_limited' => true,
+                            'message'      => $message,
+                            'retry_after'  => $retry_after,
+                        ),
+                        429
+                    );
+                }
+            }
+
+            set_transient($rate_limit_key, time(), $rate_limit_window);
+        }
+
         $stats = $this->get_stats(
             array(
-                'bypass_cache' => true,
+                'bypass_cache' => !$is_public_request,
             )
         );
 
+        if ($is_public_request) {
+            set_transient($rate_limit_key, time(), $rate_limit_window);
+        }
+
         if (is_array($stats) && empty($stats['is_demo'])) {
             wp_send_json_success($stats);
+        }
+
+        if ($is_public_request) {
+            $cached_stats = get_transient($this->cache_key);
+            if (is_array($cached_stats) && empty($cached_stats['is_demo'])) {
+                wp_send_json_success($cached_stats);
+            }
+
+            wp_send_json_error(
+                array(
+                    'rate_limited' => true,
+                    'message'      => __('Actualisation en cours, veuillez réessayer dans quelques instants.', 'discord-bot-jlg'),
+                ),
+                503
+            );
         }
 
         wp_send_json_error('Impossible de récupérer les stats');
