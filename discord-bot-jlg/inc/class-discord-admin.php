@@ -151,8 +151,13 @@ class Discord_Bot_JLG_Admin {
         );
 
         if (isset($input['server_id'])) {
-            $server_id              = trim($input['server_id']);
-            $sanitized['server_id'] = '' === $server_id ? '' : absint($server_id);
+            $server_id = sanitize_text_field($input['server_id']);
+
+            if ('' === $server_id) {
+                $sanitized['server_id'] = '';
+            } elseif (preg_match('/^\d+$/', $server_id)) {
+                $sanitized['server_id'] = $server_id;
+            }
         }
 
         if (isset($input['bot_token'])) {

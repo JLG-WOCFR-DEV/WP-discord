@@ -110,7 +110,7 @@ class Discord_Bot_JLG_API {
     }
 
     private function get_stats_from_widget($options) {
-        $widget_url = 'https://discord.com/api/guilds/' . trim($options['server_id']) . '/widget.json';
+        $widget_url = 'https://discord.com/api/guilds/' . $options['server_id'] . '/widget.json';
 
         $response = wp_remote_get(
             $widget_url,
@@ -149,7 +149,7 @@ class Discord_Bot_JLG_API {
             return false;
         }
 
-        $api_url = 'https://discord.com/api/v10/guilds/' . trim($options['server_id']) . '?with_counts=true';
+        $api_url = 'https://discord.com/api/v10/guilds/' . $options['server_id'] . '?with_counts=true';
 
         $response = wp_remote_get(
             $api_url,
