@@ -80,7 +80,6 @@ class Discord_Bot_JLG_API {
             wp_send_json_error('Mode démo actif');
         }
 
-        $this->clear_cache();
         $stats = $this->get_stats(
             array(
                 'bypass_cache' => true,
