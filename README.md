@@ -41,6 +41,9 @@ Un widget « Discord Bot - JLG » est disponible via le menu « Widgets ».
 - Mise en cache des statistiques ;
 - Page de démonstration intégrée.
 
+## Désinstallation
+La suppression du plugin depuis WordPress efface automatiquement l’option `discord_server_stats_options` et le transient `discord_server_stats_cache` associés aux statistiques du serveur.
+
 ## Support
 - Portail développeur Discord : https://discord.com/developers/applications
 - Notes de version disponibles dans l’interface du plugin.
