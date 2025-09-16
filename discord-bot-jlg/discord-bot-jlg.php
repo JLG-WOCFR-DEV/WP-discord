@@ -978,7 +978,7 @@ class DiscordServerStats {
 
                 <div class="discord-stats-wrapper">
                     <?php if ($show_online) : ?>
-                    <div class="discord-stat discord-online" data-value="<?php echo $stats['online']; ?>">
+                    <div class="discord-stat discord-online" data-value="<?php echo esc_attr( (int) $stats['online'] ); ?>">
                         <?php if (!$hide_icons): ?>
                         <span class="discord-icon"><?php echo esc_html($atts['icon_online']); ?></span>
                         <?php endif; ?>
@@ -990,7 +990,7 @@ class DiscordServerStats {
                     <?php endif; ?>
 
                     <?php if ($show_total) : ?>
-                    <div class="discord-stat discord-total" data-value="<?php echo $stats['total']; ?>">
+                    <div class="discord-stat discord-total" data-value="<?php echo esc_attr( (int) $stats['total'] ); ?>">
                         <?php if (!$hide_icons): ?>
                         <span class="discord-icon"><?php echo esc_html($atts['icon_total']); ?></span>
                         <?php endif; ?>
