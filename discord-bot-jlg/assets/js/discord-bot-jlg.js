@@ -1,6 +1,8 @@
 (function () {
     'use strict';
 
+    var ERROR_CLASS = 'discord-stats-error';
+
     function updateStats(container, config, formatter) {
         var url = config.ajaxUrl + '?action=refresh_discord_stats&_ajax_nonce=' + encodeURIComponent(config.nonce);
 
@@ -11,6 +13,10 @@
             .then(function (data) {
                 if (!data || !data.success || !data.data) {
                     return;
+                }
+
+                if (container && container.classList) {
+                    container.classList.remove(ERROR_CLASS);
                 }
 
                 var online = container.querySelector('.discord-online .discord-number');
@@ -31,8 +37,12 @@
                     }, 300);
                 }
             })
-            .catch(function () {
-                // Ignorer les erreurs réseau afin de ne pas casser l'interface.
+            .catch(function (error) {
+                console.error('Erreur lors de la mise à jour des statistiques Discord :', error);
+
+                if (container && container.classList) {
+                    container.classList.add(ERROR_CLASS);
+                }
             });
     }
 
