@@ -112,7 +112,7 @@ class Discord_Bot_JLG_API {
     private function get_stats_from_widget($options) {
         $widget_url = 'https://discord.com/api/guilds/' . $options['server_id'] . '/widget.json';
 
-        $response = wp_remote_get(
+        $response = wp_safe_remote_get(
             $widget_url,
             array(
                 'timeout' => 10,
@@ -151,7 +151,7 @@ class Discord_Bot_JLG_API {
 
         $api_url = 'https://discord.com/api/v10/guilds/' . $options['server_id'] . '?with_counts=true';
 
-        $response = wp_remote_get(
+        $response = wp_safe_remote_get(
             $api_url,
             array(
                 'timeout' => 10,
