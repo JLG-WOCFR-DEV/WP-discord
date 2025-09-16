@@ -65,7 +65,11 @@ class Discord_Bot_JLG_API {
     }
 
     public function ajax_refresh_stats() {
-        check_ajax_referer('refresh_discord_stats');
+        $nonce = isset($_POST['_ajax_nonce']) ? sanitize_text_field(wp_unslash($_POST['_ajax_nonce'])) : '';
+
+        if (empty($nonce) || !wp_verify_nonce($nonce, 'refresh_discord_stats')) {
+            wp_send_json_error('Nonce invalide', 403);
+        }
 
         $options = get_option($this->option_name);
         if (!is_array($options)) {

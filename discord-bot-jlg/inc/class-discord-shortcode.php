@@ -232,6 +232,7 @@ class Discord_Bot_JLG_Shortcode {
             'discordBotJlg',
             array(
                 'ajaxUrl' => admin_url('admin-ajax.php'),
+                'action'  => 'refresh_discord_stats',
                 'nonce'   => wp_create_nonce('refresh_discord_stats'),
                 'locale'  => $locale,
             )
