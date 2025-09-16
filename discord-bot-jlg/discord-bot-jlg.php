@@ -296,12 +296,12 @@ class DiscordServerStats {
                 <strong>💡 Conseil :</strong> Après avoir rempli les champs ci-dessous, utilisez le bouton "Tester la connexion" pour vérifier que tout fonctionne !
                 <div style="margin: 20px 0;">
                     <h4>Avec logo Discord officiel :</h4>
-                    <?php echo do_shortcode('[discord_stats demo="true" show_discord_icon="true" discord_icon_position="left"]'); ?>
+                    <?php echo $this->get_admin_shortcode_preview('[discord_stats demo="true" show_discord_icon="true" discord_icon_position="left"]'); ?>
                 </div>
                 
                 <div style="margin: 20px 0;">
                     <h4>Logo Discord centré en haut :</h4>
-                    <?php echo do_shortcode('[discord_stats demo="true" show_discord_icon="true" discord_icon_position="top" align="center" theme="dark"]'); ?>
+                    <?php echo $this->get_admin_shortcode_preview('[discord_stats demo="true" show_discord_icon="true" discord_icon_position="top" align="center" theme="dark"]'); ?>
                 </div>
             </div>
         </div>
@@ -478,34 +478,34 @@ class DiscordServerStats {
                 
                 <div style="margin: 20px 0;">
                     <h4>Standard horizontal :</h4>
-                    <?php echo do_shortcode('[discord_stats demo="true"]'); ?>
+                    <?php echo $this->get_admin_shortcode_preview('[discord_stats demo="true"]'); ?>
                 </div>
                 
                 <div style="margin: 20px 0;">
                     <h4>Vertical pour sidebar :</h4>
                     <div style="max-width: 300px;">
-                        <?php echo do_shortcode('[discord_stats demo="true" layout="vertical" theme="minimal"]'); ?>
+                        <?php echo $this->get_admin_shortcode_preview('[discord_stats demo="true" layout="vertical" theme="minimal"]'); ?>
                     </div>
                 </div>
                 
                 <div style="margin: 20px 0;">
                     <h4>Compact mode sombre :</h4>
-                    <?php echo do_shortcode('[discord_stats demo="true" compact="true" theme="dark"]'); ?>
+                    <?php echo $this->get_admin_shortcode_preview('[discord_stats demo="true" compact="true" theme="dark"]'); ?>
                 </div>
                 
                 <div style="margin: 20px 0;">
                     <h4>Avec titre personnalisé :</h4>
-                    <?php echo do_shortcode('[discord_stats demo="true" show_title="true" title="🎮 Notre Communauté Gaming" align="center"]'); ?>
+                    <?php echo $this->get_admin_shortcode_preview('[discord_stats demo="true" show_title="true" title="🎮 Notre Communauté Gaming" align="center"]'); ?>
                 </div>
                 
                 <div style="margin: 20px 0;">
                     <h4>Icônes personnalisées :</h4>
-                    <?php echo do_shortcode('[discord_stats demo="true" icon_online="🔥" label_online="Actifs" icon_total="⚔️" label_total="Guerriers"]'); ?>
+                    <?php echo $this->get_admin_shortcode_preview('[discord_stats demo="true" icon_online="🔥" label_online="Actifs" icon_total="⚔️" label_total="Guerriers"]'); ?>
                 </div>
                 
                 <div style="margin: 20px 0;">
                     <h4>Minimaliste (nombres uniquement) :</h4>
-                    <?php echo do_shortcode('[discord_stats demo="true" hide_labels="true" hide_icons="true" theme="minimal"]'); ?>
+                    <?php echo $this->get_admin_shortcode_preview('[discord_stats demo="true" hide_labels="true" hide_icons="true" theme="minimal"]'); ?>
                 </div>
             </div>
             
@@ -820,9 +820,16 @@ class DiscordServerStats {
         $stats = $this->get_discord_stats();
         
         if ($stats && empty($stats['is_demo'])) {
-            echo '<div class="notice notice-success"><p>✅ Connexion réussie ! Serveur : ' . 
-                 esc_html($stats['server_name']) . ' - ' .
-                 $stats['online'] . ' en ligne / ' . $stats['total'] . ' membres</p></div>';
+            $server_name = isset($stats['server_name']) ? $stats['server_name'] : '';
+            $online_count = isset($stats['online']) ? (int) $stats['online'] : 0;
+            $total_count = isset($stats['total']) ? (int) $stats['total'] : 0;
+
+            printf(
+                '<div class="notice notice-success"><p>✅ Connexion réussie ! Serveur : %1$s - %2$s en ligne / %3$s membres</p></div>',
+                esc_html($server_name),
+                esc_html(number_format_i18n($online_count)),
+                esc_html(number_format_i18n($total_count))
+            );
         } elseif ($stats && !empty($stats['is_demo'])) {
             echo '<div class="notice notice-warning"><p>⚠️ Pas de configuration Discord détectée. Mode démo actif.</p></div>';
         } else {
@@ -932,7 +939,7 @@ class DiscordServerStats {
         $attributes = array(
             'id="' . esc_attr($unique_id) . '"',
             'class="' . esc_attr(implode(' ', $container_classes)) . '"',
-            'data-demo="' . (!empty($stats['is_demo']) ? 'true' : 'false') . '"',
+            'data-demo="' . esc_attr(!empty($stats['is_demo']) ? 'true' : 'false') . '"',
         );
 
         if (!empty($style_declarations)) {
@@ -1013,7 +1020,58 @@ class DiscordServerStats {
         <?php
         return ob_get_clean();
     }
-    
+
+    private function get_admin_shortcode_preview($shortcode) {
+        $output = do_shortcode($shortcode);
+
+        if (!is_string($output)) {
+            return '';
+        }
+
+        return wp_kses($output, $this->get_admin_preview_allowed_html());
+    }
+
+    private function get_admin_preview_allowed_html() {
+        $allowed_tags = wp_kses_allowed_html('post');
+
+        $div_attributes = isset($allowed_tags['div']) ? $allowed_tags['div'] : array();
+        $div_attributes = array_merge(
+            $div_attributes,
+            array(
+                'style' => true,
+                'data-demo' => true,
+                'data-refresh' => true,
+                'data-value' => true,
+            )
+        );
+        $allowed_tags['div'] = $div_attributes;
+
+        $span_attributes = isset($allowed_tags['span']) ? $allowed_tags['span'] : array();
+        $span_attributes = array_merge(
+            $span_attributes,
+            array(
+                'style' => true,
+                'data-value' => true,
+            )
+        );
+        $allowed_tags['span'] = $span_attributes;
+
+        $allowed_tags['svg'] = array(
+            'class' => true,
+            'viewbox' => true,
+            'xmlns' => true,
+            'role' => true,
+            'aria-hidden' => true,
+        );
+
+        $allowed_tags['path'] = array(
+            'd' => true,
+            'fill' => true,
+        );
+
+        return $allowed_tags;
+    }
+
     // AJAX refresh
     public function ajax_refresh_stats() {
         check_ajax_referer('refresh_discord_stats');
