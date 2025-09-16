@@ -18,6 +18,18 @@ define('DISCORD_BOT_JLG_OPTION_NAME', 'discord_server_stats_options');
 define('DISCORD_BOT_JLG_CACHE_KEY', 'discord_server_stats_cache');
 define('DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION', 300);
 
+/**
+ * Supprime les données enregistrées par le plugin lors de la désinstallation.
+ *
+ * @return void
+ */
+function discord_bot_jlg_uninstall() {
+    delete_option(DISCORD_BOT_JLG_OPTION_NAME);
+    delete_transient(DISCORD_BOT_JLG_CACHE_KEY);
+}
+
+register_uninstall_hook(__FILE__, 'discord_bot_jlg_uninstall');
+
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-api.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-admin.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-shortcode.php';
