@@ -93,6 +93,7 @@ class Discord_Bot_JLG_API {
         if ($is_public_request) {
             $cached_stats = get_transient($this->cache_key);
             if (is_array($cached_stats) && empty($cached_stats['is_demo'])) {
+                set_transient($rate_limit_key, time(), $rate_limit_window);
                 wp_send_json_success($cached_stats);
             }
 
@@ -117,7 +118,6 @@ class Discord_Bot_JLG_API {
                 }
             }
 
-            set_transient($rate_limit_key, time(), $rate_limit_window);
         }
 
         $stats = $this->get_stats(
@@ -126,28 +126,32 @@ class Discord_Bot_JLG_API {
             )
         );
 
-        if ($is_public_request) {
-            set_transient($rate_limit_key, time(), $rate_limit_window);
-        }
-
         if (is_array($stats) && empty($stats['is_demo'])) {
+            if ($is_public_request) {
+                set_transient($rate_limit_key, time(), $rate_limit_window);
+            }
             wp_send_json_success($stats);
         }
 
         if ($is_public_request) {
             $cached_stats = get_transient($this->cache_key);
             if (is_array($cached_stats) && empty($cached_stats['is_demo'])) {
+                set_transient($rate_limit_key, time(), $rate_limit_window);
                 wp_send_json_success($cached_stats);
             }
 
+            delete_transient($rate_limit_key);
+
             wp_send_json_error(
                 array(
-                    'rate_limited' => true,
+                    'rate_limited' => false,
                     'message'      => __('Actualisation en cours, veuillez réessayer dans quelques instants.', 'discord-bot-jlg'),
                 ),
                 503
             );
         }
+
+        delete_transient($rate_limit_key);
 
         wp_send_json_error('Impossible de récupérer les stats');
     }
