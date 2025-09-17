@@ -615,7 +615,7 @@ class Discord_Bot_JLG_Admin {
 // MODE DÉMO (pour tester l'apparence)
 [discord_stats demo="true" show_discord_icon="true" theme="dark" layout="vertical"]</pre>
 
-            <p style="margin-top: 10px;"><em>ℹ️ L'auto-refresh nécessite un intervalle d'au moins 10&nbsp;secondes (10 000&nbsp;ms).</em></p>
+            <p style="margin-top: 10px;"><em>ℹ️ L'auto-refresh nécessite un intervalle d'au moins 10&nbsp;secondes (10 000&nbsp;ms). Toute valeur inférieure est automatiquement ajustée pour éviter les erreurs 429.</em></p>
 
             <h4>Tous les paramètres disponibles :</h4>
             <div style="background: white; padding: 15px; border-radius: 4px;">
