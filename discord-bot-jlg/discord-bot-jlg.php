@@ -64,7 +64,7 @@ class DiscordServerStats {
 
         add_action('admin_menu', array($this->admin, 'add_admin_menu'));
         add_action('admin_init', array($this->admin, 'settings_init'));
-        add_action('admin_enqueue_scripts', array($this->admin, 'enqueue_admin_styles'));
+        add_action('admin_enqueue_scripts', array($this->admin, 'enqueue_admin_styles'), 10, 1);
 
         add_shortcode('discord_stats', array($this->shortcode, 'render_shortcode'));
 

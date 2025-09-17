@@ -728,7 +728,16 @@ class Discord_Bot_JLG_Admin {
         <?php
     }
 
-    public function enqueue_admin_styles() {
+    public function enqueue_admin_styles($hook_suffix) {
+        $allowed_hooks = array(
+            'toplevel_page_discord-bot-jlg',
+            'discord-bot_page_discord-bot-demo',
+        );
+
+        if (!in_array($hook_suffix, $allowed_hooks, true)) {
+            return;
+        }
+
         wp_enqueue_style(
             'discord-bot-jlg-admin',
             DISCORD_BOT_JLG_PLUGIN_URL . 'assets/css/discord-bot-jlg-admin.css',
