@@ -3,6 +3,23 @@
 
     var ERROR_CLASS = 'discord-stats-error';
 
+    function updateStatElement(container, selector, value, formatter) {
+        if (value === null) {
+            return;
+        }
+
+        var element = container.querySelector(selector);
+        if (!element) {
+            return;
+        }
+
+        element.textContent = formatter.format(value);
+        element.style.transform = 'scale(1.2)';
+        setTimeout(function () {
+            element.style.transform = 'scale(1)';
+        }, 300);
+    }
+
     function updateStats(container, config, formatter) {
         var formData = new FormData();
         formData.append('action', config.action || 'refresh_discord_stats');
@@ -54,23 +71,8 @@
                     container.classList.remove(ERROR_CLASS);
                 }
 
-                var online = container.querySelector('.discord-online .discord-number');
-                if (online && onlineValue !== null) {
-                    online.textContent = formatter.format(onlineValue);
-                    online.style.transform = 'scale(1.2)';
-                    setTimeout(function () {
-                        online.style.transform = 'scale(1)';
-                    }, 300);
-                }
-
-                var total = container.querySelector('.discord-total .discord-number');
-                if (total && totalValue !== null) {
-                    total.textContent = formatter.format(totalValue);
-                    total.style.transform = 'scale(1.2)';
-                    setTimeout(function () {
-                        total.style.transform = 'scale(1)';
-                    }, 300);
-                }
+                updateStatElement(container, '.discord-online .discord-number', onlineValue, formatter);
+                updateStatElement(container, '.discord-total .discord-number', totalValue, formatter);
             })
             .catch(function (error) {
                 console.error('Erreur lors de la mise à jour des statistiques Discord :', error);
