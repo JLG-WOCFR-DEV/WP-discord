@@ -70,7 +70,7 @@ class Discord_Bot_JLG_API {
         $nonce = isset($_POST['_ajax_nonce']) ? sanitize_text_field(wp_unslash($_POST['_ajax_nonce'])) : '';
 
         if (empty($nonce) || !wp_verify_nonce($nonce, 'refresh_discord_stats')) {
-            wp_send_json_error('Nonce invalide', 403);
+            wp_send_json_error(esc_html__('Nonce invalide', 'discord-bot-jlg'), 403);
         }
 
         $options = get_option($this->option_name);
@@ -79,7 +79,7 @@ class Discord_Bot_JLG_API {
         }
 
         if (!empty($options['demo_mode'])) {
-            wp_send_json_error('Mode démo actif');
+            wp_send_json_error(esc_html__('Mode démo actif', 'discord-bot-jlg'));
         }
 
         $current_action = current_action();
@@ -156,7 +156,7 @@ class Discord_Bot_JLG_API {
 
         delete_transient($rate_limit_key);
 
-        wp_send_json_error('Impossible de récupérer les stats');
+        wp_send_json_error(esc_html__('Impossible de récupérer les stats', 'discord-bot-jlg'));
     }
 
     public function clear_cache() {
@@ -173,7 +173,7 @@ class Discord_Bot_JLG_API {
         return array(
             'online'    => (int) round($base_online + $variation),
             'total'     => (int) $base_total,
-            'server_name' => 'Serveur Démo',
+            'server_name' => __('Serveur Démo', 'discord-bot-jlg'),
             'is_demo'   => true,
         );
     }

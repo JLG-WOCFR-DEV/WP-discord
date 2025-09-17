@@ -1,0 +1,708 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the discord-bot-jlg package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: discord-bot-jlg 1.0\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2025-09-17 21:47+0000\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: discord-bot-jlg/inc/class-discord-api.php:73
+msgid "Nonce invalide"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-api.php:82
+msgid "Mode démo actif"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-api.php:109
+#, php-format
+msgid "Veuillez patienter %d secondes avant la prochaine actualisation."
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-api.php:151
+msgid "Actualisation en cours, veuillez réessayer dans quelques instants."
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-api.php:159
+msgid "Impossible de récupérer les stats"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-api.php:176
+msgid "Serveur Démo"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-shortcode.php:44
+msgid "En ligne"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-shortcode.php:45
+msgid "Membres"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-shortcode.php:77
+msgid "Impossible de récupérer les stats Discord"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-shortcode.php:152
+msgid "Mode Démo"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:21
+msgid "Discord Bot - JLG"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:22
+msgid "Discord Bot"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:32
+#: discord-bot-jlg/inc/class-discord-admin.php:33
+msgid "Configuration"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:41
+#: discord-bot-jlg/inc/class-discord-admin.php:42
+msgid "Guide & Démo"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:60
+msgid "Configuration Discord API"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:67
+msgid "ID du Serveur Discord"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:75
+msgid "Token du Bot Discord"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:83
+msgid "Options d'affichage"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:90
+msgid "Mode démonstration"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:98
+msgid "Afficher les membres en ligne"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:106
+msgid "Afficher le total des membres"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:114
+msgid "Titre du widget"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:122
+msgid "Durée du cache (secondes)"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:130
+msgid "CSS personnalisé"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:190
+msgid "📚 Guide étape par étape"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:213
+msgid "Étape 1 : Créer un Bot Discord"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:220
+#, php-format
+msgid ""
+"Rendez-vous sur <a href=\"%s\" target=\"_blank\" style=\"color: #5865F2;"
+"\">Discord Developer Portal</a>"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:227
+msgid "Cliquez sur <strong>\"New Application\"</strong> en haut à droite"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:228
+msgid "Donnez un nom à votre application (ex: \"Stats Bot\")"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:229
+msgid "Dans le menu de gauche, cliquez sur <strong>\"Bot\"</strong>"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:230
+msgid "Cliquez sur <strong>\"Add Bot\"</strong>"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:231
+msgid ""
+"Sous \"Token\", cliquez sur <strong>\"Copy\"</strong> pour copier le token "
+"du bot"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:232
+msgid ""
+"⚠️ <strong>Important :</strong> Gardez ce token secret et ne le partagez "
+"jamais !"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:235
+msgid "Étape 2 : Inviter le Bot sur votre serveur"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:237
+msgid ""
+"Dans le menu de gauche, allez dans <strong>\"OAuth2\"</strong> &gt; "
+"<strong>\"URL Generator\"</strong>"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:238
+msgid "Dans \"Scopes\", cochez <strong>\"bot\"</strong>"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:239
+msgid "Dans \"Bot Permissions\", sélectionnez :"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:241
+msgid "✅ View Channels"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:242
+msgid "✅ Read Messages"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:243
+msgid "✅ Send Messages (optionnel)"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:245
+msgid "Copiez l’URL générée en bas de la page"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:246
+msgid "Ouvrez cette URL dans votre navigateur"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:247
+msgid ""
+"Sélectionnez votre serveur et cliquez sur <strong>\"Autoriser\"</strong>"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:250
+msgid "Étape 3 : Obtenir l’ID de votre serveur"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:252
+msgid "Ouvrez Discord (application ou web)"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:253
+msgid "Allez dans <strong>Paramètres utilisateur</strong> (engrenage en bas)"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:254
+msgid ""
+"Dans <strong>\"Avancés\"</strong>, activez <strong>\"Mode développeur\"</"
+"strong>"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:255
+msgid "Retournez sur votre serveur"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:256
+msgid "Faites un <strong>clic droit sur le nom du serveur</strong>"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:257
+msgid "Cliquez sur <strong>\"Copier l’ID\"</strong>"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:260
+msgid "Étape 4 : Activer le Widget (optionnel mais recommandé)"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:262
+msgid "Dans Discord, allez dans <strong>Paramètres du serveur</strong>"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:263
+msgid ""
+"Dans <strong>\"Widget\"</strong>, activez <strong>\"Activer le widget du "
+"serveur\"</strong>"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:264
+msgid "Cela permet une méthode de secours si le bot a des problèmes"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:279
+msgid "💡 Conseil :"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:280
+msgid ""
+"Après avoir rempli les champs ci-dessous, utilisez le bouton « Tester la "
+"connexion » pour vérifier que tout fonctionne !"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:289
+msgid "Avec logo Discord officiel :"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:297
+msgid "Logo Discord centré en haut :"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:309
+msgid "Personnalisez l'affichage des statistiques Discord."
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:318
+msgid "L'ID de votre serveur Discord"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:328
+msgid "Le token de votre bot Discord (gardez-le secret !)"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:338
+msgid ""
+"Activer le mode démonstration (affiche des données fictives pour tester "
+"l'apparence)"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:339
+msgid ""
+"🎨 Parfait pour tester les styles et dispositions sans configuration Discord"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:349
+msgid "Afficher le nombre d'utilisateurs en ligne"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:359
+msgid "Afficher le nombre total de membres"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:378
+msgid "Minimum 60 secondes, maximum 3600 secondes (1 heure)"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:386
+msgid "CSS personnalisé pour styliser l'affichage"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:393
+msgid "🎮 Discord Bot - JLG - Configuration"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:454
+msgid "🔧 Test de connexion"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:455
+msgid "Vérifiez que votre configuration fonctionne :"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:461
+msgid "Tester la connexion"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:474
+msgid "🚀 Liens rapides"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:478
+msgid "📖 Guide & Démo"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:483
+msgid "🔗 Discord Developer Portal"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:488
+msgid "📐 Gérer les Widgets"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:502
+msgid "Discord Bot - JLG v1.0 | Développé par Jérôme Le Gousse"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:510
+msgid "📖 Guide & Démonstration"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:541
+msgid "💡 Astuce :"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:542
+msgid ""
+"Tous les exemples ci-dessous utilisent le mode démo. Vous pouvez les copier-"
+"coller directement !"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:560
+msgid "Standard horizontal :"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:564
+msgid "Vertical pour sidebar :"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:569
+msgid "Compact mode sombre :"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:573
+msgid "Avec titre personnalisé :"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:577
+msgid "Icônes personnalisées :"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:581
+msgid "Minimaliste (nombres uniquement) :"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:587
+msgid "🎨 Prévisualisation en direct"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:588
+msgid "Testez différentes configurations visuelles :"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:620
+msgid "📖 Guide d’utilisation"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:622
+msgid "Option 1 : Shortcode (avec paramètres)"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:623
+msgid "Copiez ce code dans n’importe quelle page ou article :"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:625
+msgid "[discord_stats]"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:628
+msgid "Exemples avec paramètres :"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:631
+msgid ""
+"// BASIQUES\n"
+"// Layout vertical pour sidebar\n"
+"[discord_stats layout=\"vertical\"]\n"
+"\n"
+"// Compact avec titre\n"
+"[discord_stats compact=\"true\" show_title=\"true\" title=\"Rejoignez-nous !"
+"\"]\n"
+"\n"
+"// Theme sombre centré\n"
+"[discord_stats theme=\"dark\" align=\"center\"]\n"
+"\n"
+"// AVEC LOGO DISCORD\n"
+"// Logo à gauche (classique)\n"
+"[discord_stats show_discord_icon=\"true\"]\n"
+"\n"
+"// Logo à droite avec thème sombre\n"
+"[discord_stats show_discord_icon=\"true\" discord_icon_position=\"right\" "
+"theme=\"dark\"]\n"
+"\n"
+"// Logo centré en haut (parfait pour widgets)\n"
+"[discord_stats show_discord_icon=\"true\" discord_icon_position=\"top\" "
+"align=\"center\"]\n"
+"\n"
+"// PERSONNALISATION AVANCÉE\n"
+"// Bannière complète pour header\n"
+"[discord_stats show_discord_icon=\"true\" show_title=\"true\" title=\"🎮 "
+"Rejoignez notre Discord !\" width=\"100%\" align=\"center\" "
+"theme=\"discord\"]\n"
+"\n"
+"// Sidebar élégante avec logo\n"
+"[discord_stats layout=\"vertical\" show_discord_icon=\"true\" "
+"discord_icon_position=\"top\" theme=\"minimal\" compact=\"true\"]\n"
+"\n"
+"// Gaming style avec icônes custom\n"
+"[discord_stats show_discord_icon=\"true\" icon_online=\"🎮\" "
+"label_online=\"Joueurs actifs\" icon_total=\"⚔️\" label_total=\"Guerriers\" "
+"theme=\"dark\"]\n"
+"\n"
+"// Minimaliste avec logo seul\n"
+"[discord_stats hide_labels=\"true\" hide_icons=\"true\" "
+"show_discord_icon=\"true\" discord_icon_position=\"top\" align=\"center\" "
+"theme=\"minimal\"]\n"
+"\n"
+"// Footer discret\n"
+"[discord_stats compact=\"true\" show_discord_icon=\"true\" "
+"discord_icon_position=\"left\" theme=\"light\"]\n"
+"\n"
+"// FONCTIONNALITÉS SPÉCIALES\n"
+"// Auto-refresh toutes les 30 secondes (minimum 10 secondes)\n"
+"[discord_stats refresh=\"true\" refresh_interval=\"30\" "
+"show_discord_icon=\"true\"]\n"
+"\n"
+"// Afficher seulement les membres en ligne avec logo\n"
+"[discord_stats show_online=\"true\" show_total=\"false\" "
+"show_discord_icon=\"true\"]\n"
+"\n"
+"// MODE DÉMO (pour tester l’apparence)\n"
+"[discord_stats demo=\"true\" show_discord_icon=\"true\" theme=\"dark\" "
+"layout=\"vertical\"]"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:684
+msgid ""
+"ℹ️ L’auto-refresh nécessite un intervalle d’au moins 10 secondes (10 000 ms). "
+"Toute valeur inférieure est automatiquement ajustée pour éviter les erreurs "
+"429."
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:692
+msgid "Tous les paramètres disponibles :"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:694
+msgid "🎨 Apparence & Layout :"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:698
+msgid "&lt;strong&gt;layout&lt;/strong&gt; : horizontal, vertical, compact"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:699
+msgid "&lt;strong&gt;theme&lt;/strong&gt; : discord, dark, light, minimal"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:700
+msgid "&lt;strong&gt;align&lt;/strong&gt; : left, center, right"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:701
+msgid ""
+"&lt;strong&gt;width&lt;/strong&gt; : largeur CSS (ex: \"300px\", \"100%\")"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:702
+msgid "&lt;strong&gt;compact&lt;/strong&gt; : true/false (version réduite)"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:703
+msgid "&lt;strong&gt;animated&lt;/strong&gt; : true/false (animations hover)"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:704
+msgid "&lt;strong&gt;class&lt;/strong&gt; : classes CSS additionnelles"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:712
+msgid "🎯 Logo Discord :"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:716
+msgid ""
+"&lt;strong&gt;show_discord_icon&lt;/strong&gt; : true/false (afficher le "
+"logo officiel)"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:717
+msgid ""
+"&lt;strong&gt;discord_icon_position&lt;/strong&gt; : left, right, top "
+"(position du logo)"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:725
+msgid "📊 Données affichées :"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:729
+msgid "&lt;strong&gt;show_online&lt;/strong&gt; : true/false"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:730
+msgid "&lt;strong&gt;show_total&lt;/strong&gt; : true/false"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:731
+msgid "&lt;strong&gt;show_title&lt;/strong&gt; : true/false"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:732
+msgid "&lt;strong&gt;title&lt;/strong&gt; : texte du titre"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:733
+msgid "&lt;strong&gt;hide_labels&lt;/strong&gt; : true/false"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:734
+msgid "&lt;strong&gt;hide_icons&lt;/strong&gt; : true/false"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:742
+msgid "✏️ Personnalisation textes/icônes :"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:746
+msgid "&lt;strong&gt;icon_online&lt;/strong&gt; : emoji/texte (défaut: 🟢)"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:747
+msgid "&lt;strong&gt;icon_total&lt;/strong&gt; : emoji/texte (défaut: 👥)"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:748
+msgid "&lt;strong&gt;label_online&lt;/strong&gt; : texte personnalisé"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:749
+msgid "&lt;strong&gt;label_total&lt;/strong&gt; : texte personnalisé"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:757
+msgid "⚙️ Paramètres techniques :"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:761
+msgid "&lt;strong&gt;refresh&lt;/strong&gt; : true/false (auto-actualisation)"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:762
+msgid ""
+"&lt;strong&gt;refresh_interval&lt;/strong&gt; : secondes (minimum "
+"10 secondes / 10 000 ms)"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:763
+msgid "&lt;strong&gt;demo&lt;/strong&gt; : true/false (mode démonstration)"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:764
+msgid "&lt;strong&gt;border_radius&lt;/strong&gt; : pixels (coins arrondis)"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:765
+msgid "&lt;strong&gt;gap&lt;/strong&gt; : pixels (espace entre éléments)"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:766
+msgid "&lt;strong&gt;padding&lt;/strong&gt; : pixels (espacement interne)"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:775
+msgid "Option 2 : Widget"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:779
+msgid ""
+"Allez dans <strong>Apparence &gt; Widgets</strong> et ajoutez le widget "
+"<strong>\"Discord Bot - JLG\"</strong> dans votre sidebar"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:785
+msgid "Option 3 : Code PHP"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:786
+msgid "Pour les développeurs, dans vos templates PHP :"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:788
+msgid "[discord_stats show_discord_icon=\"true\"]"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:791
+msgid "💡 Configurations recommandées"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:796
+msgid "Pour une sidebar :"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:800
+msgid "Pour un header :"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:804
+msgid "Pour un footer :"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:808
+msgid "Style gaming :"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:833
+msgid "❓ Dépannage"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:835
+msgid ""
+"<strong>Erreur de connexion ?</strong> Vérifiez que le bot est bien sur "
+"votre serveur"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:836
+msgid ""
+"<strong>Stats à 0 ?</strong> Assurez-vous que le widget est activé dans les "
+"paramètres Discord"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:837
+msgid ""
+"<strong>Token invalide ?</strong> Régénérez le token dans le Developer Portal"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:838
+msgid ""
+"<strong>Cache ?</strong> Les stats sont mises à jour toutes les 5 minutes "
+"par défaut"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:851
+msgid "Discord Bot - JLG v1.0 | Développé par Jérôme Le Gousse |"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:852
+msgid "Documentation Discord API"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:854
+msgid "Besoin d’aide ?"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:893
+msgid "🎨 Mode démonstration activé - Les données affichées sont fictives"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:913
+#, php-format
+msgid "✅ Connexion réussie ! Serveur : %1$s – %2$s en ligne / %3$s membres"
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:922
+msgid "⚠️ Pas de configuration Discord détectée. Mode démo actif."
+msgstr ""
+
+#: discord-bot-jlg/inc/class-discord-admin.php:927
+msgid "❌ Échec de la connexion. Vérifiez vos identifiants."
+msgstr ""
