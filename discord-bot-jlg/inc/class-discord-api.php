@@ -1,6 +1,6 @@
 <?php
 
-if (!defined('ABSPATH')) {
+if (false === defined('ABSPATH')) {
     exit;
 }
 
@@ -27,12 +27,12 @@ class Discord_Bot_JLG_API {
             )
         );
 
-        if ($args['force_demo']) {
+        if (true === $args['force_demo']) {
             return $this->get_demo_stats();
         }
 
         $options = get_option($this->option_name);
-        if (!is_array($options)) {
+        if (false === is_array($options)) {
             $options = array();
         }
 
@@ -40,7 +40,7 @@ class Discord_Bot_JLG_API {
             return $this->get_demo_stats();
         }
 
-        if (!$args['bypass_cache']) {
+        if (false === $args['bypass_cache']) {
             $cached_stats = get_transient($this->cache_key);
             if (false !== $cached_stats) {
                 return $cached_stats;
@@ -53,11 +53,11 @@ class Discord_Bot_JLG_API {
 
         $stats = $this->get_stats_from_widget($options);
 
-        if (!$stats) {
+        if (false === $stats || !is_array($stats)) {
             $stats = $this->get_stats_from_bot($options);
         }
 
-        if (!$stats) {
+        if (false === $stats || !is_array($stats)) {
             return $this->get_demo_stats();
         }
 
@@ -74,7 +74,7 @@ class Discord_Bot_JLG_API {
         }
 
         $options = get_option($this->option_name);
-        if (!is_array($options)) {
+        if (false === is_array($options)) {
             $options = array();
         }
 
@@ -93,7 +93,7 @@ class Discord_Bot_JLG_API {
             $rate_limit_window = self::MIN_PUBLIC_REFRESH_INTERVAL;
         }
 
-        if ($is_public_request) {
+        if (true === $is_public_request) {
             $cached_stats = get_transient($this->cache_key);
             if (is_array($cached_stats) && empty($cached_stats['is_demo'])) {
                 set_transient($rate_limit_key, time(), $rate_limit_window);
@@ -125,18 +125,18 @@ class Discord_Bot_JLG_API {
 
         $stats = $this->get_stats(
             array(
-                'bypass_cache' => !$is_public_request,
+                'bypass_cache' => (false === $is_public_request),
             )
         );
 
         if (is_array($stats) && empty($stats['is_demo'])) {
-            if ($is_public_request) {
+            if (true === $is_public_request) {
                 set_transient($rate_limit_key, time(), $rate_limit_window);
             }
             wp_send_json_success($stats);
         }
 
-        if ($is_public_request) {
+        if (true === $is_public_request) {
             $cached_stats = get_transient($this->cache_key);
             if (is_array($cached_stats) && empty($cached_stats['is_demo'])) {
                 set_transient($rate_limit_key, time(), $rate_limit_window);
@@ -202,7 +202,11 @@ class Discord_Bot_JLG_API {
         $body = wp_remote_retrieve_body($response);
         $data = json_decode($body, true);
 
-        if (!is_array($data) || !isset($data['presence_count'])) {
+        if (false === is_array($data)) {
+            return false;
+        }
+
+        if (false === isset($data['presence_count'])) {
             return false;
         }
 
@@ -260,7 +264,11 @@ class Discord_Bot_JLG_API {
         $body = wp_remote_retrieve_body($response);
         $data = json_decode($body, true);
 
-        if (!is_array($data) || !isset($data['approximate_presence_count'], $data['approximate_member_count'])) {
+        if (false === is_array($data)) {
+            return false;
+        }
+
+        if (false === isset($data['approximate_presence_count'], $data['approximate_member_count'])) {
             return false;
         }
 
