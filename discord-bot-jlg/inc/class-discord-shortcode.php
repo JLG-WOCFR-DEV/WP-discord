@@ -4,6 +4,9 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+/**
+ * Implémente le shortcode `[discord_stats]` et gère les assets associés côté public.
+ */
 class Discord_Bot_JLG_Shortcode {
 
     private $option_name;
@@ -13,11 +16,26 @@ class Discord_Bot_JLG_Shortcode {
     private static $inline_css_added    = false;
     private static $footer_hook_added   = false;
 
+    /**
+     * Conserve la clé d'option et le service API utilisés lors du rendu du shortcode.
+     *
+     * @param string              $option_name Nom de l'option stockant les réglages d'affichage.
+     * @param Discord_Bot_JLG_API $api         Service fournissant les statistiques Discord.
+     *
+     * @return void
+     */
     public function __construct($option_name, Discord_Bot_JLG_API $api) {
         $this->option_name = $option_name;
         $this->api         = $api;
     }
 
+    /**
+     * Génère l'affichage du shortcode avec les options fusionnées entre réglages et attributs.
+     *
+     * @param array|string $atts Attributs reçus du shortcode WordPress.
+     *
+     * @return string HTML du composant de statistiques prêt à être inséré dans la page.
+     */
     public function render_shortcode($atts) {
         $options = get_option($this->option_name);
         if (!is_array($options)) {
@@ -271,6 +289,11 @@ class Discord_Bot_JLG_Shortcode {
         self::$assets_registered = true;
     }
 
+    /**
+     * Force l'impression tardive des feuilles de style si elles sont encore en file d'attente.
+     *
+     * @return void
+     */
     public function print_late_styles() {
         if (wp_style_is('discord-bot-jlg-inline', 'enqueued')) {
             wp_print_styles('discord-bot-jlg-inline');

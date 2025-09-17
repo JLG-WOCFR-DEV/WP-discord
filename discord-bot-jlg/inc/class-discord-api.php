@@ -4,6 +4,9 @@ if (false === defined('ABSPATH')) {
     exit;
 }
 
+/**
+ * Fournit les appels à l'API Discord ainsi que la gestion du cache et des données de démonstration.
+ */
 class Discord_Bot_JLG_API {
 
     const MIN_PUBLIC_REFRESH_INTERVAL = 10;
@@ -12,12 +15,33 @@ class Discord_Bot_JLG_API {
     private $cache_key;
     private $default_cache_duration;
 
+    /**
+     * Prépare le service d'accès aux statistiques avec les clés et durées nécessaires.
+     *
+     * @param string $option_name            Nom de l'option contenant la configuration du plugin.
+     * @param string $cache_key              Clef de cache utilisée pour mémoriser les statistiques.
+     * @param int    $default_cache_duration Durée du cache utilisée à défaut (en secondes).
+     *
+     * @return void
+     */
     public function __construct($option_name, $cache_key, $default_cache_duration = 300) {
         $this->option_name = $option_name;
         $this->cache_key = $cache_key;
         $this->default_cache_duration = (int) $default_cache_duration;
     }
 
+    /**
+     * Récupère les statistiques du serveur en tenant compte du cache, du mode démo ou d'un forçage explicite.
+     *
+     * @param array $args {
+     *     Arguments permettant de modifier le comportement de récupération.
+     *
+     *     @type bool $force_demo   Si vrai, renvoie systématiquement les statistiques de démonstration.
+     *     @type bool $bypass_cache Si vrai, ignore la valeur mise en cache et interroge l'API directement.
+     * }
+     *
+     * @return array Statistiques du serveur (clés `online`, `total`, `server_name`, éventuellement `is_demo`).
+     */
     public function get_stats($args = array()) {
         $args = wp_parse_args(
             $args,
@@ -66,6 +90,11 @@ class Discord_Bot_JLG_API {
         return $stats;
     }
 
+    /**
+     * Gère la requête AJAX d'actualisation des statistiques et renvoie une réponse JSON.
+     *
+     * @return void
+     */
     public function ajax_refresh_stats() {
         $nonce = isset($_POST['_ajax_nonce']) ? sanitize_text_field(wp_unslash($_POST['_ajax_nonce'])) : '';
 
@@ -159,10 +188,20 @@ class Discord_Bot_JLG_API {
         wp_send_json_error('Impossible de récupérer les stats');
     }
 
+    /**
+     * Supprime les statistiques mises en cache pour forcer une prochaine récupération.
+     *
+     * @return void
+     */
     public function clear_cache() {
         delete_transient($this->cache_key);
     }
 
+    /**
+     * Génère des statistiques fictives pour la démonstration ou en cas d'absence de configuration.
+     *
+     * @return array Statistiques de démonstration comprenant les clés `online`, `total`, `server_name` et `is_demo`.
+     */
     public function get_demo_stats() {
         $base_online = 42;
         $base_total  = 256;

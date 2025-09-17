@@ -4,16 +4,32 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+/**
+ * Gère l'intégration du plugin dans l'administration WordPress (menus, pages, formulaires et assets).
+ */
 class Discord_Bot_JLG_Admin {
 
     private $option_name;
     private $api;
 
+    /**
+     * Initialise l'instance avec la clé d'option et le client API utilisé pour les vérifications.
+     *
+     * @param string              $option_name Nom de l'option stockant la configuration du plugin.
+     * @param Discord_Bot_JLG_API $api         Service d'accès aux statistiques Discord.
+     *
+     * @return void
+     */
     public function __construct($option_name, Discord_Bot_JLG_API $api) {
         $this->option_name = $option_name;
         $this->api         = $api;
     }
 
+    /**
+     * Enregistre le menu principal et les sous-menus du plugin dans l'administration WordPress.
+     *
+     * @return void
+     */
     public function add_admin_menu() {
         $discord_icon = 'data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZmlsbD0iI2E0YWFiOCIgZD0iTTIwLjMxNyA0LjM3YTE5LjggMTkuOCAwIDAwLTQuODg1LTEuNTE1LjA3NC4wNzQgMCAwMC0uMDc5LjAzN2MtLjIxLjM3NS0uNDQ0Ljg2NC0uNjA4IDEuMjVhMTguMjcgMTguMjcgMCAwMC01LjQ4NyAwYy0uMTY1LS4zOTctLjQwNC0uODg1LS42MTgtMS4yNWEuMDc3LjA3NyAwIDAwLS4wNzktLjAzN0ExOS43NCAxOS43NCAwIDAwMy42NzcgNC4zN2EuMDcuMDcgMCAwMC0uMDMyLjAyN0MuNTMzIDkuMDQ2LS4zMiAxMy41OC4wOTkgMTguMDU3YS4wOC4wOCAwIDAwLjAzMS4wNTdBMTkuOSAxOS45IDAgMDA2LjA3MyAyMWEuMDc4LjA3OCAwIDAwLjA4NC0uMDI4IDEzLjQgMTMuNCAwIDAwMS4xNTUtMi4xLjA3Ni4wNzYgMCAwMC0uMDQxLS4xMDYgMTMuMSAxMy4xIDAgMDEtMS44NzItLjg5Mi4wNzcuMDc3IDAgMDEtLjAwOC0uMTI4IDE0IDE0IDAgMDAuMzctLjI5Mi4wNzQuMDc0IDAgMDEuMDc3LS4wMWMzLjkyNyAxLjc5MyA4LjE4IDEuNzkzIDEyLjA2IDAgYS4wNzQuMDc0IDAgMDEuMDc4LjAwOS4xMTkuMDk5LjI0Ni4xOTguMzczLjI5MmEuMDc3LjA3NyAwIDAxLS4wMDYuMTI3IDEyLjMgMTIuMyAwIDAxLTEuODczLjg5Mi4wNzcuMDc3IDAgMDAtLjA0MS4xMDdjMy43NDQgMS40MDMgMS4xNTUgMi4xLS4wODQuMDI4YS4wNzguMDc4IDAgMDAxOS45MDItMS45MDMuMDc2LjA3NiAwIDAwLjAzLS4wNTdjLjUzNy00LjU4LS45MDQtOC41NTMtMy44MjMtMTIuMDU3YS4wNi4wNiAwIDAwLS4wMzEtLjAyOHpNOC4wMiAxNS4yNzhjLTEuMTgzIDAtMi4xNTctMS4wODUtMi4xNTctMi40MiAwLTEuMzMzLjk1Ni0yLjQxOSAyLjE1Ny0yLjQxOSAxLjIxIDAgMi4xNzYgMS4wOTYgMi4xNTcgMi40MiAwIDEuMzM0LS45NTYgMi40MTktMi4xNTcgMi40MTl6bTcuOTc1IDBjLTEuMTgzIDAtMi4xNTctMS4wODUtMi4xNTctMi40MiAwLTEuMzMzLjk1NS0yLjQxOSAyLjE1Ny0yLjQxOXMyLjE1NyAxLjA5NiAyLjE1NyAyLjQyYzAgMS4zMzQtLjk1NiAyLjQxOS0yLjE1NyAyLjQxOXoiLz48L3N2Zz4=';
 
@@ -46,6 +62,11 @@ class Discord_Bot_JLG_Admin {
         );
     }
 
+    /**
+     * Enregistre les sections, champs et options nécessaires pour la configuration du plugin.
+     *
+     * @return void
+     */
     public function settings_init() {
         register_setting(
             'discord_stats_settings',
@@ -134,6 +155,13 @@ class Discord_Bot_JLG_Admin {
         );
     }
 
+    /**
+     * Valide et nettoie les options soumises depuis le formulaire d'administration.
+     *
+     * @param mixed $input Valeurs brutes envoyées par WordPress lors de l'enregistrement des options.
+     *
+     * @return array Options validées et normalisées prêtes à être stockées.
+     */
     public function sanitize_options($input) {
         if (!is_array($input)) {
             $input = array();
@@ -184,6 +212,11 @@ class Discord_Bot_JLG_Admin {
         return $sanitized;
     }
 
+    /**
+     * Affiche la section d'aide dédiée à la configuration de l'API Discord.
+     *
+     * @return void
+     */
     public function api_section_callback() {
         ?>
         <div style="background: #f0f4ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
@@ -274,10 +307,20 @@ class Discord_Bot_JLG_Admin {
         <?php
     }
 
+    /**
+     * Affiche un rappel concernant la personnalisation de l'affichage des statistiques.
+     *
+     * @return void
+     */
     public function display_section_callback() {
         echo '<p>Personnalisez l\'affichage des statistiques Discord.</p>';
     }
 
+    /**
+     * Rend le champ permettant de saisir l'identifiant du serveur Discord.
+     *
+     * @return void
+     */
     public function server_id_render() {
         $options = get_option($this->option_name);
         ?>
@@ -288,6 +331,11 @@ class Discord_Bot_JLG_Admin {
         <?php
     }
 
+    /**
+     * Rend le champ de saisie du token du bot Discord.
+     *
+     * @return void
+     */
     public function bot_token_render() {
         $options = get_option($this->option_name);
         ?>
@@ -298,6 +346,11 @@ class Discord_Bot_JLG_Admin {
         <?php
     }
 
+    /**
+     * Rend la case à cocher activant le mode démonstration.
+     *
+     * @return void
+     */
     public function demo_mode_render() {
         $options   = get_option($this->option_name);
         $demo_mode = isset($options['demo_mode']) ? (int) $options['demo_mode'] : 0;
@@ -309,6 +362,11 @@ class Discord_Bot_JLG_Admin {
         <?php
     }
 
+    /**
+     * Rend la case à cocher contrôlant l'affichage du nombre d'utilisateurs en ligne.
+     *
+     * @return void
+     */
     public function show_online_render() {
         $options = get_option($this->option_name);
         $value   = isset($options['show_online']) ? (int) $options['show_online'] : 0;
@@ -319,6 +377,11 @@ class Discord_Bot_JLG_Admin {
         <?php
     }
 
+    /**
+     * Rend la case à cocher contrôlant l'affichage du nombre total de membres.
+     *
+     * @return void
+     */
     public function show_total_render() {
         $options = get_option($this->option_name);
         $value   = isset($options['show_total']) ? (int) $options['show_total'] : 0;
@@ -329,6 +392,11 @@ class Discord_Bot_JLG_Admin {
         <?php
     }
 
+    /**
+     * Rend le champ texte permettant de définir le titre du widget.
+     *
+     * @return void
+     */
     public function widget_title_render() {
         $options = get_option($this->option_name);
         ?>
@@ -338,6 +406,11 @@ class Discord_Bot_JLG_Admin {
         <?php
     }
 
+    /**
+     * Rend le champ numérique dédié au réglage de la durée du cache.
+     *
+     * @return void
+     */
     public function cache_duration_render() {
         $options = get_option($this->option_name);
         ?>
@@ -348,6 +421,11 @@ class Discord_Bot_JLG_Admin {
         <?php
     }
 
+    /**
+     * Rend la zone de texte pour ajouter du CSS personnalisé.
+     *
+     * @return void
+     */
     public function custom_css_render() {
         $options = get_option($this->option_name);
         ?>
@@ -356,6 +434,11 @@ class Discord_Bot_JLG_Admin {
         <?php
     }
 
+    /**
+     * Affiche la page principale de configuration du plugin.
+     *
+     * @return void
+     */
     public function options_page() {
         ?>
         <div class="wrap">
@@ -473,6 +556,11 @@ class Discord_Bot_JLG_Admin {
         <?php
     }
 
+    /**
+     * Affiche la page de guide et de démonstration du plugin.
+     *
+     * @return void
+     */
     public function demo_page() {
         ?>
         <div class="wrap">
@@ -728,6 +816,13 @@ class Discord_Bot_JLG_Admin {
         <?php
     }
 
+    /**
+     * Enfile les feuilles de style nécessaires sur les écrans d'administration du plugin.
+     *
+     * @param string $hook_suffix Identifiant du hook fourni par WordPress pour la page courante.
+     *
+     * @return void
+     */
     public function enqueue_admin_styles($hook_suffix) {
         $allowed_ids = array(
             'toplevel_page_discord-bot-jlg',
@@ -752,6 +847,11 @@ class Discord_Bot_JLG_Admin {
         );
     }
 
+    /**
+     * Teste la connexion à l'API Discord et affiche un message selon le résultat obtenu.
+     *
+     * @return void
+     */
     public function test_discord_connection() {
         $options = get_option($this->option_name);
         if (!is_array($options)) {
