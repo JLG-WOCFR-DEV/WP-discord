@@ -31,7 +31,7 @@ Pour activer l'auto-actualisation, utilisez par exemple :
 [discord_stats refresh="true" refresh_interval="60"]
 ```
 
-Le paramètre `refresh_interval` est exprimé en secondes et doit être d'au moins 10 secondes (10 000 ms).
+Le paramètre `refresh_interval` est exprimé en secondes et doit être d'au moins 10 secondes (10 000 ms). Toute valeur plus basse est automatiquement portée à 10 secondes pour éviter les erreurs 429 de Discord.
 
 ### Widget
 Un widget « Discord Bot - JLG » est disponible via le menu « Widgets ».

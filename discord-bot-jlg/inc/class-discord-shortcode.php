@@ -130,8 +130,12 @@ class Discord_Bot_JLG_Shortcode {
         }
 
         $refresh_interval = 0;
+        $min_refresh_interval = defined('Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL')
+            ? Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL
+            : 10;
+
         if ($refresh && empty($stats['is_demo'])) {
-            $refresh_interval = max(10, intval($atts['refresh_interval']));
+            $refresh_interval = max($min_refresh_interval, intval($atts['refresh_interval']));
         }
 
         if ($refresh_interval > 0) {
@@ -258,6 +262,9 @@ class Discord_Bot_JLG_Shortcode {
                 'action'  => 'refresh_discord_stats',
                 'nonce'   => wp_create_nonce('refresh_discord_stats'),
                 'locale'  => $locale,
+                'minRefreshInterval' => defined('Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL')
+                    ? Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL
+                    : 10,
             )
         );
 

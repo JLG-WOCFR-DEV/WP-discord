@@ -6,6 +6,8 @@ if (!defined('ABSPATH')) {
 
 class Discord_Bot_JLG_API {
 
+    const MIN_PUBLIC_REFRESH_INTERVAL = 10;
+
     private $option_name;
     private $cache_key;
     private $default_cache_duration;
@@ -85,9 +87,10 @@ class Discord_Bot_JLG_API {
 
         $rate_limit_key = $this->cache_key . '_refresh_lock';
         $cache_duration = $this->get_cache_duration($options);
-        $rate_limit_window = (int) apply_filters('discord_bot_jlg_public_refresh_interval', $cache_duration, $options);
-        if ($rate_limit_window < 30) {
-            $rate_limit_window = 30;
+        $default_public_refresh = max(self::MIN_PUBLIC_REFRESH_INTERVAL, (int) $cache_duration);
+        $rate_limit_window = (int) apply_filters('discord_bot_jlg_public_refresh_interval', $default_public_refresh, $options);
+        if ($rate_limit_window < self::MIN_PUBLIC_REFRESH_INTERVAL) {
+            $rate_limit_window = self::MIN_PUBLIC_REFRESH_INTERVAL;
         }
 
         if ($is_public_request) {

@@ -94,6 +94,12 @@
         var locale = config.locale || 'fr-FR';
         var formatter;
 
+        var minIntervalSeconds = parseInt(config.minRefreshInterval, 10);
+        if (isNaN(minIntervalSeconds) || minIntervalSeconds <= 0) {
+            minIntervalSeconds = 10;
+        }
+        var minIntervalMs = minIntervalSeconds * 1000;
+
         try {
             formatter = new Intl.NumberFormat(locale);
         } catch (error) {
@@ -116,9 +122,13 @@
             }
 
             // L'attribut data-refresh est exprimé en secondes côté PHP.
+            if (interval < minIntervalSeconds) {
+                interval = minIntervalSeconds;
+            }
+
             var intervalMs = interval * 1000;
-            if (intervalMs < 10000) {
-                return;
+            if (intervalMs < minIntervalMs) {
+                intervalMs = minIntervalMs;
             }
 
             setInterval(function () {
