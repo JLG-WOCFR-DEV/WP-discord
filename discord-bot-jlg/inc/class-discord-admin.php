@@ -729,12 +729,19 @@ class Discord_Bot_JLG_Admin {
     }
 
     public function enqueue_admin_styles($hook_suffix) {
-        $allowed_hooks = array(
+        $allowed_ids = array(
             'toplevel_page_discord-bot-jlg',
             'discord-bot_page_discord-bot-demo',
         );
 
-        if (!in_array($hook_suffix, $allowed_hooks, true)) {
+        $current_screen = function_exists('get_current_screen') ? get_current_screen() : null;
+        $screen_id      = $current_screen ? $current_screen->id : '';
+
+        if ('' !== $screen_id) {
+            if (!in_array($screen_id, $allowed_ids, true)) {
+                return;
+            }
+        } elseif (!in_array($hook_suffix, $allowed_ids, true)) {
             return;
         }
 
