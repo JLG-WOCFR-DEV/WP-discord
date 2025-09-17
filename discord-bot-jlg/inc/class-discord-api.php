@@ -195,13 +195,30 @@ class Discord_Bot_JLG_API {
         $body = wp_remote_retrieve_body($response);
         $data = json_decode($body, true);
 
-        if (!is_array($data) || !isset($data['presence_count'], $data['member_count'])) {
+        if (!is_array($data) || !isset($data['presence_count'])) {
             return false;
         }
 
+        $online = absint($data['presence_count']);
+
+        if (isset($data['member_count'])) {
+            $total = absint($data['member_count']);
+        } elseif (isset($data['members']) && is_array($data['members'])) {
+            // La réponse du widget ne renvoie qu'un échantillon (limité) des membres :
+            // on se rabat sur cette valeur lorsque le total global n'est pas exposé.
+            $total = count($data['members']);
+        } else {
+            // En dernier recours, on s'assure de renvoyer au moins le nombre de membres connectés.
+            $total = $online;
+        }
+
+        if ($total < $online) {
+            $total = $online;
+        }
+
         return array(
-            'online'      => (int) $data['presence_count'],
-            'total'       => (int) $data['member_count'],
+            'online'      => $online,
+            'total'       => (int) $total,
             'server_name' => isset($data['name']) ? $data['name'] : '',
         );
     }
