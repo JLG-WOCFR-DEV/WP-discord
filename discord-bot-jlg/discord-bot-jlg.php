@@ -5,6 +5,8 @@
  * Description: Affiche les statistiques de votre serveur Discord (membres en ligne et total)
  * Version: 1.0
  * Author: Jérôme Le Gousse
+ * Text Domain: discord-bot-jlg
+ * Domain Path: /languages
  * License: GPL v2 or later
  */
 
@@ -34,6 +36,12 @@ require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-api.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-admin.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-shortcode.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-widget.php';
+
+function discord_bot_jlg_load_textdomain() {
+    load_plugin_textdomain('discord-bot-jlg', false, dirname(plugin_basename(__FILE__)) . '/languages');
+}
+
+add_action('plugins_loaded', 'discord_bot_jlg_load_textdomain');
 
 class DiscordServerStats {
 
