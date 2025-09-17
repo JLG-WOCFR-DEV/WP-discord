@@ -734,11 +734,10 @@ class Discord_Bot_JLG_Admin {
             'discord-bot_page_discord-bot-demo',
         );
 
-        $current_screen = function_exists('get_current_screen') ? get_current_screen() : null;
-        $screen_id      = $current_screen ? $current_screen->id : '';
+        if (function_exists('get_current_screen')) {
+            $current_screen = get_current_screen();
 
-        if ('' !== $screen_id) {
-            if (!in_array($screen_id, $allowed_ids, true)) {
+            if ($current_screen && !in_array($current_screen->id, $allowed_ids, true)) {
                 return;
             }
         } elseif (!in_array($hook_suffix, $allowed_ids, true)) {
