@@ -122,11 +122,15 @@ class Discord_Bot_JLG_API {
             $rate_limit_window = self::MIN_PUBLIC_REFRESH_INTERVAL;
         }
 
+        $should_update_rate_limit = false;
+
         if (true === $is_public_request) {
             $cached_stats = get_transient($this->cache_key);
             if (is_array($cached_stats) && empty($cached_stats['is_demo'])) {
                 wp_send_json_success($cached_stats);
             }
+
+            $should_update_rate_limit = true;
 
             $last_refresh = get_transient($rate_limit_key);
             if (false !== $last_refresh) {
@@ -158,7 +162,7 @@ class Discord_Bot_JLG_API {
         );
 
         if (is_array($stats) && empty($stats['is_demo'])) {
-            if (true === $is_public_request) {
+            if (true === $is_public_request && !empty($should_update_rate_limit)) {
                 set_transient($rate_limit_key, time(), $rate_limit_window);
             }
             wp_send_json_success($stats);
