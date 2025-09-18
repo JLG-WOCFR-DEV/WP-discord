@@ -71,17 +71,40 @@ class Discord_Bot_JLG_API {
             }
         }
 
-        if (empty($options['server_id']) || empty($options['bot_token'])) {
+        if (empty($options['server_id'])) {
             return $this->get_demo_stats();
         }
 
-        $stats = $this->get_stats_from_widget($options);
+        $stats = false;
+        $widget_stats = $this->get_stats_from_widget($options);
 
-        if (false === $stats || !is_array($stats)) {
-            $stats = $this->get_stats_from_bot($options);
+        if (is_array($widget_stats)) {
+            $stats = $widget_stats;
         }
 
-        if (false === $stats || !is_array($stats)) {
+        $widget_incomplete = $this->stats_need_completion($widget_stats);
+
+        $bot_stats = false;
+
+        if (!empty($options['bot_token'])) {
+            $bot_stats = $this->get_stats_from_bot($options);
+
+            if (is_array($bot_stats)) {
+                if (true === $widget_incomplete && is_array($widget_stats)) {
+                    $stats = array(
+                        'online'      => (int) $widget_stats['online'],
+                        'total'       => isset($bot_stats['total']) ? (int) $bot_stats['total'] : (isset($widget_stats['total']) ? (int) $widget_stats['total'] : null),
+                        'server_name' => !empty($widget_stats['server_name'])
+                            ? $widget_stats['server_name']
+                            : (isset($bot_stats['server_name']) ? $bot_stats['server_name'] : ''),
+                    );
+                } elseif (false === $stats) {
+                    $stats = $bot_stats;
+                }
+            }
+        }
+
+        if (false === $this->has_usable_stats($stats)) {
             return $this->get_demo_stats();
         }
 
@@ -270,22 +293,6 @@ class Discord_Bot_JLG_API {
         $server_name = isset($data['name']) ? $data['name'] : '';
 
         if (null === $total || $total === $online) {
-            $bot_stats = $this->get_stats_from_bot($options);
-
-            if (false === $bot_stats || !is_array($bot_stats)) {
-                return false;
-            }
-
-            if (isset($bot_stats['total'])) {
-                $total = (int) $bot_stats['total'];
-            }
-
-            if (empty($server_name) && !empty($bot_stats['server_name'])) {
-                $server_name = $bot_stats['server_name'];
-            }
-        }
-
-        if (null === $total || $total === $online) {
             return false;
         }
 
@@ -338,6 +345,34 @@ class Discord_Bot_JLG_API {
             'total'       => (int) $data['approximate_member_count'],
             'server_name' => isset($data['name']) ? $data['name'] : '',
         );
+    }
+
+    private function has_usable_stats($stats) {
+        return (
+            is_array($stats)
+            && isset($stats['online'], $stats['total'])
+            && null !== $stats['total']
+        );
+    }
+
+    private function stats_need_completion($stats) {
+        if (false === is_array($stats)) {
+            return false;
+        }
+
+        if (!isset($stats['total']) || null === $stats['total']) {
+            return true;
+        }
+
+        if ((int) $stats['total'] === (int) $stats['online']) {
+            return true;
+        }
+
+        if (empty($stats['server_name'])) {
+            return true;
+        }
+
+        return false;
     }
 
     private function get_cache_duration($options) {
