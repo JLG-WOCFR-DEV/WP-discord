@@ -71,18 +71,69 @@ class Discord_Bot_JLG_API {
             }
         }
 
-        if (empty($options['server_id']) || empty($options['bot_token'])) {
+        if (empty($options['server_id'])) {
             return $this->get_demo_stats();
         }
 
         $stats = $this->get_stats_from_widget($options);
+        $widget_stats = $stats;
 
-        if (false === $stats || !is_array($stats)) {
-            $stats = $this->get_stats_from_bot($options);
+        $widget_incomplete = (
+            false === $widget_stats
+            || !is_array($widget_stats)
+            || !array_key_exists('online', $widget_stats)
+            || !array_key_exists('total', $widget_stats)
+            || null === $widget_stats['total']
+            || (!empty($widget_stats['_total_is_partial']))
+        );
+
+        if (true === $widget_incomplete) {
+            $stats = false;
         }
 
-        if (false === $stats || !is_array($stats)) {
+        if (!empty($options['bot_token']) && true === $widget_incomplete) {
+            $bot_stats = $this->get_stats_from_bot($options);
+
+            if (is_array($bot_stats)) {
+                if (!is_array($widget_stats)) {
+                    $stats = $bot_stats;
+                } else {
+                    $stats = $widget_stats;
+
+                    if (!array_key_exists('online', $stats) && array_key_exists('online', $bot_stats)) {
+                        $stats['online'] = $bot_stats['online'];
+                    }
+
+                    if (!array_key_exists('total', $stats) || null === $stats['total']) {
+                        $stats['total'] = $bot_stats['total'];
+                    }
+
+                    $has_server_name = isset($stats['server_name']) && '' !== $stats['server_name'];
+
+                    if (false === $has_server_name && !empty($bot_stats['server_name'])) {
+                        $stats['server_name'] = $bot_stats['server_name'];
+                    }
+
+                    if (isset($stats['_total_is_partial'])) {
+                        unset($stats['_total_is_partial']);
+                    }
+                }
+            }
+        }
+
+        if (!is_array($stats) || !array_key_exists('online', $stats) || !array_key_exists('total', $stats) || null === $stats['total']) {
             return $this->get_demo_stats();
+        }
+
+        $stats['online'] = (int) $stats['online'];
+        $stats['total']  = (int) $stats['total'];
+
+        if (!array_key_exists('server_name', $stats)) {
+            $stats['server_name'] = '';
+        }
+
+        if (isset($stats['_total_is_partial'])) {
+            unset($stats['_total_is_partial']);
         }
 
         set_transient($this->cache_key, $stats, $this->get_cache_duration($options));
@@ -260,40 +311,32 @@ class Discord_Bot_JLG_API {
 
         $total = null;
 
+        $total_is_partial = false;
+
         if (isset($data['member_count'])) {
             $total = (int) $data['member_count'];
         } elseif (isset($data['members']) && is_array($data['members'])) {
             // The widget exposes the list of displayed members (usually online ones) but not the full roster.
             $total = count($data['members']);
+            $total_is_partial = true;
         }
 
         $server_name = isset($data['name']) ? $data['name'] : '';
 
-        if (null === $total || $total === $online) {
-            $bot_stats = $this->get_stats_from_bot($options);
-
-            if (false === $bot_stats || !is_array($bot_stats)) {
-                return false;
-            }
-
-            if (isset($bot_stats['total'])) {
-                $total = (int) $bot_stats['total'];
-            }
-
-            if (empty($server_name) && !empty($bot_stats['server_name'])) {
-                $server_name = $bot_stats['server_name'];
-            }
-        }
-
-        if (null === $total || $total === $online) {
-            return false;
-        }
-
-        return array(
+        $stats = array(
             'online'      => $online,
-            'total'       => $total,
             'server_name' => $server_name,
         );
+
+        if (null !== $total) {
+            $stats['total'] = $total;
+
+            if (true === $total_is_partial) {
+                $stats['_total_is_partial'] = true;
+            }
+        }
+
+        return $stats;
     }
 
     private function get_stats_from_bot($options) {
