@@ -280,8 +280,8 @@ class Discord_Bot_JLG_API {
             }
         }
 
-        if (null === $total || $total < $online) {
-            $total = $online;
+        if (null === $total || $total === $online) {
+            return false;
         }
 
         return array(
