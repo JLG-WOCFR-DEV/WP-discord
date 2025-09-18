@@ -260,17 +260,32 @@ class Discord_Bot_JLG_API {
             $total = count($data['members']);
         }
 
-        if (null === $total) {
-            // Public widget payload lacks the total member count; fall back to online users to keep data usable.
-            $total = $online;
-        } elseif ($total < $online) {
+        $server_name = isset($data['name']) ? $data['name'] : '';
+
+        if (null === $total || $total === $online) {
+            $bot_stats = $this->get_stats_from_bot($options);
+
+            if (false === $bot_stats || !is_array($bot_stats)) {
+                return false;
+            }
+
+            if (isset($bot_stats['total'])) {
+                $total = (int) $bot_stats['total'];
+            }
+
+            if (empty($server_name) && !empty($bot_stats['server_name'])) {
+                $server_name = $bot_stats['server_name'];
+            }
+        }
+
+        if (null === $total || $total < $online) {
             $total = $online;
         }
 
         return array(
             'online'      => $online,
             'total'       => $total,
-            'server_name' => isset($data['name']) ? $data['name'] : '',
+            'server_name' => $server_name,
         );
     }
 
