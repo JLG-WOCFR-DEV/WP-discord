@@ -125,7 +125,6 @@ class Discord_Bot_JLG_API {
         if (true === $is_public_request) {
             $cached_stats = get_transient($this->cache_key);
             if (is_array($cached_stats) && empty($cached_stats['is_demo'])) {
-                set_transient($rate_limit_key, time(), $rate_limit_window);
                 wp_send_json_success($cached_stats);
             }
 
@@ -168,7 +167,6 @@ class Discord_Bot_JLG_API {
         if (true === $is_public_request) {
             $cached_stats = get_transient($this->cache_key);
             if (is_array($cached_stats) && empty($cached_stats['is_demo'])) {
-                set_transient($rate_limit_key, time(), $rate_limit_window);
                 wp_send_json_success($cached_stats);
             }
 
