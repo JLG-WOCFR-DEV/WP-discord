@@ -80,6 +80,7 @@ class DiscordServerStats {
 
         add_action('wp_ajax_refresh_discord_stats', array($this->api, 'ajax_refresh_stats'));
         add_action('wp_ajax_nopriv_refresh_discord_stats', array($this->api, 'ajax_refresh_stats'));
+        add_action('update_option_' . DISCORD_BOT_JLG_OPTION_NAME, array($this, 'handle_settings_update'), 10, 2);
     }
 
     public function activate() {
@@ -87,6 +88,10 @@ class DiscordServerStats {
     }
 
     public function deactivate() {
+        $this->api->clear_cache();
+    }
+
+    public function handle_settings_update($old_value, $value) {
         $this->api->clear_cache();
     }
 }
