@@ -39,6 +39,22 @@
                 }
 
                 if (!data.success) {
+                    if (data.data && data.data.nonce_expired) {
+                        if (data.data.new_nonce) {
+                            config.nonce = data.data.new_nonce;
+                        }
+
+                        if (container && container.classList) {
+                            container.classList.remove(ERROR_CLASS);
+                        }
+
+                        // Les caches frontaux peuvent invalider les requêtes POST :
+                        // en cas de nonce expiré on relance immédiatement avec le nouveau jeton.
+                        updateStats(container, config, formatter);
+
+                        return;
+                    }
+
                     if (data.data && data.data.message) {
                         console.warn(data.data.message);
                     } else if (typeof data.data === 'string') {
