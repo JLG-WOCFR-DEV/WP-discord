@@ -99,6 +99,9 @@ class Discord_Bot_JLG_Shortcode {
 
         $unique_id = 'discord-stats-' . wp_rand(1000, 9999);
 
+        $has_total            = !empty($stats['has_total']) && isset($stats['total']) && null !== $stats['total'];
+        $total_is_approximate = !empty($stats['total_is_approximate']);
+
         $container_classes = array(
             'discord-stats-container',
             'discord-layout-' . esc_attr($atts['layout']),
@@ -121,6 +124,10 @@ class Discord_Bot_JLG_Shortcode {
         if ($show_discord_icon) {
             $container_classes[] = 'discord-with-logo';
             $container_classes[] = 'discord-logo-' . esc_attr($atts['discord_icon_position']);
+        }
+
+        if (!$has_total) {
+            $container_classes[] = 'discord-total-missing';
         }
 
         if (!empty($atts['class'])) {
@@ -200,14 +207,22 @@ class Discord_Bot_JLG_Shortcode {
                     </div>
                     <?php endif; ?>
 
-                    <?php if ($show_total) : ?>
-                    <div class="discord-stat discord-total" data-value="<?php echo esc_attr((int) $stats['total']); ?>">
+                    <?php if ($show_total && $has_total) : ?>
+                    <div class="discord-stat discord-total<?php echo $total_is_approximate ? ' discord-total-approximate' : ''; ?>" data-value="<?php echo esc_attr((int) $stats['total']); ?>">
                         <?php if (!$hide_icons): ?>
                         <span class="discord-icon"><?php echo esc_html($atts['icon_total']); ?></span>
                         <?php endif; ?>
                         <span class="discord-number"><?php echo esc_html(number_format_i18n((int) $stats['total'])); ?></span>
+                        <?php if ($total_is_approximate): ?>
+                        <span class="discord-approx-indicator" aria-hidden="true">≈</span>
+                        <?php endif; ?>
                         <?php if (!$hide_labels): ?>
-                        <span class="discord-label"><?php echo esc_html($atts['label_total']); ?></span>
+                        <span class="discord-label">
+                            <?php echo esc_html($atts['label_total']); ?>
+                            <?php if ($total_is_approximate): ?>
+                            <span class="screen-reader-text"><?php esc_html_e('approx.', 'discord-bot-jlg'); ?></span>
+                            <?php endif; ?>
+                        </span>
                         <?php endif; ?>
                     </div>
                     <?php endif; ?>

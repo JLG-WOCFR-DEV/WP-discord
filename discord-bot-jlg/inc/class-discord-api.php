@@ -79,7 +79,8 @@ class Discord_Bot_JLG_API {
         $widget_stats = $this->get_stats_from_widget($options);
 
         if (is_array($widget_stats)) {
-            $stats = $widget_stats;
+            $widget_stats = $this->normalize_stats($widget_stats);
+            $stats        = $widget_stats;
         }
 
         $widget_incomplete = $this->stats_need_completion($widget_stats);
@@ -90,18 +91,40 @@ class Discord_Bot_JLG_API {
             $bot_stats = $this->get_stats_from_bot($options);
 
             if (is_array($bot_stats)) {
+                $bot_stats = $this->normalize_stats($bot_stats);
+
                 if (true === $widget_incomplete && is_array($widget_stats)) {
+                    $total             = null;
+                    $has_total         = false;
+                    $total_approximate = false;
+
+                    if (!empty($bot_stats['has_total'])) {
+                        $total             = $bot_stats['total'];
+                        $has_total         = true;
+                        $total_approximate = !empty($bot_stats['total_is_approximate']);
+                    } elseif (!empty($widget_stats['has_total'])) {
+                        $total             = $widget_stats['total'];
+                        $has_total         = true;
+                        $total_approximate = !empty($widget_stats['total_is_approximate']);
+                    }
+
                     $stats = array(
-                        'online'      => (int) $widget_stats['online'],
-                        'total'       => isset($bot_stats['total']) ? (int) $bot_stats['total'] : (isset($widget_stats['total']) ? (int) $widget_stats['total'] : null),
-                        'server_name' => !empty($widget_stats['server_name'])
+                        'online'               => isset($widget_stats['online']) ? (int) $widget_stats['online'] : (isset($bot_stats['online']) ? (int) $bot_stats['online'] : 0),
+                        'total'                => $has_total ? $total : null,
+                        'server_name'          => !empty($widget_stats['server_name'])
                             ? $widget_stats['server_name']
                             : (isset($bot_stats['server_name']) ? $bot_stats['server_name'] : ''),
+                        'has_total'            => $has_total,
+                        'total_is_approximate' => $total_approximate,
                     );
                 } elseif (false === $stats) {
                     $stats = $bot_stats;
                 }
             }
+        }
+
+        if (is_array($stats)) {
+            $stats = $this->normalize_stats($stats);
         }
 
         if (false === $this->has_usable_stats($stats)) {
@@ -240,10 +263,12 @@ class Discord_Bot_JLG_API {
         $variation = sin($hour * 0.26) * 10;
 
         return array(
-            'online'    => (int) round($base_online + $variation),
-            'total'     => (int) $base_total,
-            'server_name' => 'Serveur Démo',
-            'is_demo'   => true,
+            'online'               => (int) round($base_online + $variation),
+            'total'                => (int) $base_total,
+            'server_name'          => 'Serveur Démo',
+            'is_demo'              => true,
+            'has_total'            => true,
+            'total_is_approximate' => false,
         );
     }
 
@@ -281,28 +306,29 @@ class Discord_Bot_JLG_API {
 
         $online = (int) $data['presence_count'];
 
-        $total = null;
-        $total_comes_from_fallback = false;
-
-        if (isset($data['member_count'])) {
-            $total = (int) $data['member_count'];
-        } elseif (isset($data['members']) && is_array($data['members'])) {
-            // The widget exposes the list of displayed members (usually online ones) but not the full roster.
-            $total = count($data['members']);
-            $total_comes_from_fallback = true;
-        }
-
         $server_name = isset($data['name']) ? $data['name'] : '';
 
-        if (null === $total || true === $total_comes_from_fallback) {
-            return false;
+        $stats = array(
+            'online'               => $online,
+            'total'                => null,
+            'server_name'          => $server_name,
+            'has_total'            => false,
+            'total_is_approximate' => false,
+        );
+
+        if (isset($data['member_count'])) {
+            $stats['total']     = (int) $data['member_count'];
+            $stats['has_total'] = true;
+        } elseif (isset($data['members']) && is_array($data['members'])) {
+            // The widget exposes the list of displayed members (usually online ones) but not the full roster.
+            $stats['total']                = (int) count($data['members']);
+            $stats['has_total']            = true;
+            $stats['total_is_approximate'] = true;
+        } else {
+            $stats['total_is_approximate'] = true;
         }
 
-        return array(
-            'online'      => $online,
-            'total'       => $total,
-            'server_name' => $server_name,
-        );
+        return $stats;
     }
 
     private function get_stats_from_bot($options) {
@@ -343,17 +369,19 @@ class Discord_Bot_JLG_API {
         }
 
         return array(
-            'online'      => (int) $data['approximate_presence_count'],
-            'total'       => (int) $data['approximate_member_count'],
-            'server_name' => isset($data['name']) ? $data['name'] : '',
+            'online'               => (int) $data['approximate_presence_count'],
+            'total'                => (int) $data['approximate_member_count'],
+            'server_name'          => isset($data['name']) ? $data['name'] : '',
+            'has_total'            => true,
+            'total_is_approximate' => false,
         );
     }
 
     private function has_usable_stats($stats) {
         return (
             is_array($stats)
-            && isset($stats['online'], $stats['total'])
-            && null !== $stats['total']
+            && isset($stats['online'])
+            && is_numeric($stats['online'])
         );
     }
 
@@ -362,7 +390,11 @@ class Discord_Bot_JLG_API {
             return false;
         }
 
-        if (!isset($stats['total']) || null === $stats['total']) {
+        if (empty($stats['has_total'])) {
+            return true;
+        }
+
+        if (!empty($stats['total_is_approximate'])) {
             return true;
         }
 
@@ -386,5 +418,29 @@ class Discord_Bot_JLG_API {
         }
 
         return $this->default_cache_duration;
+    }
+
+    private function normalize_stats($stats) {
+        if (!is_array($stats)) {
+            return $stats;
+        }
+
+        if (!array_key_exists('total', $stats)) {
+            $stats['total'] = null;
+        }
+
+        if (!isset($stats['server_name'])) {
+            $stats['server_name'] = '';
+        }
+
+        if (!isset($stats['has_total'])) {
+            $stats['has_total'] = (null !== $stats['total']);
+        }
+
+        if (!isset($stats['total_is_approximate'])) {
+            $stats['total_is_approximate'] = false;
+        }
+
+        return $stats;
     }
 }
