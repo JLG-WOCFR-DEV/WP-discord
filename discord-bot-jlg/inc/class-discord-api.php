@@ -282,17 +282,19 @@ class Discord_Bot_JLG_API {
         $online = (int) $data['presence_count'];
 
         $total = null;
+        $total_comes_from_fallback = false;
 
         if (isset($data['member_count'])) {
             $total = (int) $data['member_count'];
         } elseif (isset($data['members']) && is_array($data['members'])) {
             // The widget exposes the list of displayed members (usually online ones) but not the full roster.
             $total = count($data['members']);
+            $total_comes_from_fallback = true;
         }
 
         $server_name = isset($data['name']) ? $data['name'] : '';
 
-        if (null === $total || $total === $online) {
+        if (null === $total || true === $total_comes_from_fallback) {
             return false;
         }
 
