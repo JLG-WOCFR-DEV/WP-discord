@@ -300,11 +300,16 @@ class Discord_Bot_JLG_API {
             return false;
         }
 
-        if (false === isset($data['presence_count'])) {
+        $has_presence_count = isset($data['presence_count']);
+        $has_members_list   = isset($data['members']) && is_array($data['members']);
+
+        if (false === $has_presence_count && false === $has_members_list) {
             return false;
         }
 
-        $online = (int) $data['presence_count'];
+        $online = $has_presence_count
+            ? (int) $data['presence_count']
+            : (int) count($data['members']);
 
         $server_name = isset($data['name']) ? $data['name'] : '';
 
@@ -319,10 +324,10 @@ class Discord_Bot_JLG_API {
         if (isset($data['member_count'])) {
             $stats['total']     = (int) $data['member_count'];
             $stats['has_total'] = true;
-        } elseif (isset($data['members']) && is_array($data['members'])) {
+        } elseif ($has_members_list) {
             // The widget exposes the list of displayed members (usually online ones) but not the full roster.
-            $stats['total']                = (int) count($data['members']);
-            $stats['has_total']            = true;
+            $stats['total']                = null;
+            $stats['has_total']            = false;
             $stats['total_is_approximate'] = true;
         } else {
             $stats['total_is_approximate'] = true;
