@@ -225,6 +225,18 @@ class Discord_Bot_JLG_Shortcode {
                         </span>
                         <?php endif; ?>
                     </div>
+                    <?php elseif ($show_total): ?>
+                    <div class="discord-stat discord-total discord-total-unavailable">
+                        <?php if (!$hide_icons): ?>
+                        <span class="discord-icon"><?php echo esc_html($atts['icon_total']); ?></span>
+                        <?php endif; ?>
+                        <span class="discord-number">&mdash;</span>
+                        <?php if (!$hide_labels): ?>
+                        <span class="discord-label"><?php esc_html_e('Total indisponible', 'discord-bot-jlg'); ?></span>
+                        <?php else: ?>
+                        <span class="screen-reader-text"><?php esc_html_e('Total indisponible', 'discord-bot-jlg'); ?></span>
+                        <?php endif; ?>
+                    </div>
                     <?php endif; ?>
                 </div>
 
