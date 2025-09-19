@@ -873,13 +873,19 @@ class Discord_Bot_JLG_Admin {
         if (is_array($stats) && empty($stats['is_demo'])) {
             $server_name = isset($stats['server_name']) ? $stats['server_name'] : '';
             $online_count = isset($stats['online']) ? (int) $stats['online'] : 0;
-            $total_count  = isset($stats['total']) ? (int) $stats['total'] : 0;
+            $has_total    = !empty($stats['has_total']) && isset($stats['total']) && null !== $stats['total'];
+
+            if ($has_total) {
+                $total_display = esc_html(number_format_i18n((int) $stats['total']));
+            } else {
+                $total_display = esc_html__('Total indisponible', 'discord-bot-jlg');
+            }
 
             printf(
                 '<div class="notice notice-success"><p>✅ Connexion réussie ! Serveur : %1$s - %2$s en ligne / %3$s membres</p></div>',
                 esc_html($server_name),
                 esc_html(number_format_i18n($online_count)),
-                esc_html(number_format_i18n($total_count))
+                $total_display
             );
         } elseif (is_array($stats) && !empty($stats['is_demo'])) {
             echo '<div class="notice notice-warning"><p>⚠️ Pas de configuration Discord détectée. Mode démo actif.</p></div>';
