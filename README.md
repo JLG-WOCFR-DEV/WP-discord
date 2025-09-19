@@ -39,6 +39,7 @@ Un widget « Discord Bot - JLG » est disponible via le menu « Widgets ».
 ## Fonctionnalités
 - Affichage du nombre de membres en ligne et du total ;
 - Mise en cache des statistiques ;
+- Journalisation des erreurs de communication avec l'API Discord (accessible via `WP_DEBUG_LOG`) ;
 - Page de démonstration intégrée.
 
 ## Désinstallation
