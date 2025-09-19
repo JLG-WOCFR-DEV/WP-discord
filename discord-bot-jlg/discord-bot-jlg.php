@@ -83,7 +83,10 @@ class DiscordServerStats {
     }
 
     public function activate() {
-        add_option(DISCORD_BOT_JLG_OPTION_NAME, $this->default_options);
+        $defaults = $this->default_options;
+        $defaults['widget_title'] = esc_html__('Discord Server', 'discord-bot-jlg');
+
+        add_option(DISCORD_BOT_JLG_OPTION_NAME, $defaults);
     }
 
     public function deactivate() {

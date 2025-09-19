@@ -21,6 +21,7 @@
     }
 
     function updateStats(container, config, formatter) {
+        var messages = config.messages || {};
         var formData = new FormData();
         formData.append('action', config.action || 'refresh_discord_stats');
         formData.append('_ajax_nonce', config.nonce);
@@ -91,7 +92,8 @@
                 updateStatElement(container, '.discord-total .discord-number', totalValue, formatter);
             })
             .catch(function (error) {
-                console.error('Erreur lors de la mise à jour des statistiques Discord :', error);
+                var errorMessage = messages.updateError || 'Erreur lors de la mise à jour des statistiques Discord :';
+                console.error(errorMessage, error);
 
                 if (container && container.classList) {
                     container.classList.add(ERROR_CLASS);
