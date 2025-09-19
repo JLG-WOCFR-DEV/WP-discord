@@ -294,10 +294,13 @@ class Discord_Bot_JLG_API {
         );
 
         if (is_wp_error($response)) {
+            error_log('Discord API error (widget): ' . $response->get_error_message());
             return false;
         }
 
-        if (200 !== (int) wp_remote_retrieve_response_code($response)) {
+        $response_code = (int) wp_remote_retrieve_response_code($response);
+        if (200 !== $response_code) {
+            error_log('Discord API error (widget): HTTP ' . $response_code);
             return false;
         }
 
@@ -363,10 +366,13 @@ class Discord_Bot_JLG_API {
         );
 
         if (is_wp_error($response)) {
+            error_log('Discord API error (bot): ' . $response->get_error_message());
             return false;
         }
 
-        if (200 !== (int) wp_remote_retrieve_response_code($response)) {
+        $response_code = (int) wp_remote_retrieve_response_code($response);
+        if (200 !== $response_code) {
+            error_log('Discord API error (bot): HTTP ' . $response_code);
             return false;
         }
 
