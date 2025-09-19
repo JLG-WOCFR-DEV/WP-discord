@@ -142,9 +142,20 @@ class Discord_Bot_JLG_API {
      * @return void
      */
     public function ajax_refresh_stats() {
-        $nonce = isset($_POST['_ajax_nonce']) ? sanitize_text_field(wp_unslash($_POST['_ajax_nonce'])) : '';
+        $current_action     = current_action();
+        $is_public_request  = ('wp_ajax_nopriv_refresh_discord_stats' === $current_action);
+        $nonce              = isset($_POST['_ajax_nonce']) ? sanitize_text_field(wp_unslash($_POST['_ajax_nonce'])) : '';
 
         if (empty($nonce) || !wp_verify_nonce($nonce, 'refresh_discord_stats')) {
+            if (true === $is_public_request) {
+                wp_send_json_error(
+                    array(
+                        'nonce_expired' => true,
+                        'new_nonce'     => wp_create_nonce('refresh_discord_stats'),
+                    )
+                );
+            }
+
             wp_send_json_error('Nonce invalide', 403);
         }
 
@@ -156,9 +167,6 @@ class Discord_Bot_JLG_API {
         if (!empty($options['demo_mode'])) {
             wp_send_json_error('Mode démo actif');
         }
-
-        $current_action = current_action();
-        $is_public_request = ('wp_ajax_nopriv_refresh_discord_stats' === $current_action);
 
         $rate_limit_key = $this->cache_key . '_refresh_lock';
         $cache_duration = $this->get_cache_duration($options);
