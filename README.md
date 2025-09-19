@@ -18,6 +18,10 @@ Accédez à la page **Discord Bot** dans l’administration pour :
 - Définir la durée du cache des statistiques ;
 - Ajouter du CSS personnalisé.
 
+### Définir le token via une constante
+
+Il est possible de forcer l'utilisation d'un token spécifique en définissant la constante `DISCORD_BOT_JLG_TOKEN` dans votre fichier `wp-config.php` ou dans un plugin mu. Lorsque cette constante est présente (et non vide), elle est utilisée à la place de la valeur enregistrée dans l'administration et le champ correspondant devient en lecture seule.
+
 ## Utilisation
 ### Shortcode
 ```

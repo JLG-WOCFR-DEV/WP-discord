@@ -85,9 +85,10 @@ class Discord_Bot_JLG_API {
 
         $widget_incomplete = $this->stats_need_completion($widget_stats);
 
-        $bot_stats = false;
+        $bot_stats  = false;
+        $bot_token = $this->get_bot_token($options);
 
-        if (!empty($options['bot_token'])) {
+        if (!empty($bot_token)) {
             $bot_stats = $this->get_stats_from_bot($options);
 
             if (is_array($bot_stats)) {
@@ -348,7 +349,9 @@ class Discord_Bot_JLG_API {
     }
 
     private function get_stats_from_bot($options) {
-        if (empty($options['bot_token'])) {
+        $bot_token = $this->get_bot_token($options);
+
+        if (empty($bot_token)) {
             return false;
         }
 
@@ -359,7 +362,7 @@ class Discord_Bot_JLG_API {
             array(
                 'timeout' => 10,
                 'headers' => array(
-                    'Authorization' => 'Bot ' . $options['bot_token'],
+                    'Authorization' => 'Bot ' . $bot_token,
                     'User-Agent'    => 'WordPress Discord Stats Plugin',
                 ),
             )
@@ -426,6 +429,14 @@ class Discord_Bot_JLG_API {
         }
 
         return false;
+    }
+
+    private function get_bot_token($options) {
+        if (defined('DISCORD_BOT_JLG_TOKEN') && '' !== DISCORD_BOT_JLG_TOKEN) {
+            return DISCORD_BOT_JLG_TOKEN;
+        }
+
+        return isset($options['bot_token']) ? $options['bot_token'] : '';
     }
 
     private function get_cache_duration($options) {

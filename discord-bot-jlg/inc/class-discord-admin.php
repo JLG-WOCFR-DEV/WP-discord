@@ -338,11 +338,20 @@ class Discord_Bot_JLG_Admin {
      */
     public function bot_token_render() {
         $options = get_option($this->option_name);
+        $constant_overridden = (defined('DISCORD_BOT_JLG_TOKEN') && '' !== DISCORD_BOT_JLG_TOKEN);
         ?>
         <input type="password" name="<?php echo esc_attr($this->option_name); ?>[bot_token]"
                value="<?php echo esc_attr(isset($options['bot_token']) ? $options['bot_token'] : ''); ?>"
-               class="regular-text" />
-        <p class="description">Le token de votre bot Discord (gardez-le secret !)</p>
+               class="regular-text" <?php echo $constant_overridden ? 'readonly' : ''; ?> />
+        <p class="description">
+            <?php
+            if ($constant_overridden) {
+                echo 'Le token est actuellement défini via la constante <code>DISCORD_BOT_JLG_TOKEN</code> et remplace cette valeur.';
+            } else {
+                echo 'Le token de votre bot Discord (gardez-le secret !).';
+            }
+            ?>
+        </p>
         <?php
     }
 
