@@ -147,6 +147,18 @@ class Discord_Bot_JLG_API {
         $is_public_request  = ('wp_ajax_nopriv_refresh_discord_stats' === $current_action);
         $nonce              = isset($_POST['_ajax_nonce']) ? sanitize_text_field(wp_unslash($_POST['_ajax_nonce'])) : '';
 
+        $force_refresh_requested = false;
+        if (isset($_POST['force_refresh'])) {
+            $force_refresh_requested = filter_var(
+                wp_unslash($_POST['force_refresh']),
+                FILTER_VALIDATE_BOOLEAN
+            );
+        }
+
+        $can_force_refresh  = current_user_can('manage_options');
+        $should_bypass_cache = ($force_refresh_requested && $can_force_refresh);
+        $is_front_request   = ($is_public_request || false === $should_bypass_cache);
+
         if (empty($nonce) || !wp_verify_nonce($nonce, 'refresh_discord_stats')) {
             if (true === $is_public_request) {
                 wp_send_json_error(
@@ -179,7 +191,7 @@ class Discord_Bot_JLG_API {
 
         $refresh_requires_remote_call = false;
 
-        if (true === $is_public_request) {
+        if (true === $is_front_request) {
             $cached_stats = get_transient($this->cache_key);
             if (is_array($cached_stats) && empty($cached_stats['is_demo'])) {
                 wp_send_json_success($cached_stats);
@@ -211,12 +223,12 @@ class Discord_Bot_JLG_API {
 
         $stats = $this->get_stats(
             array(
-                'bypass_cache' => (false === $is_public_request),
+                'bypass_cache' => $should_bypass_cache,
             )
         );
 
         if (
-            true === $is_public_request
+            true === $is_front_request
             && true === $refresh_requires_remote_call
             && is_array($stats)
             && empty($stats['is_demo'])
@@ -228,7 +240,7 @@ class Discord_Bot_JLG_API {
             wp_send_json_success($stats);
         }
 
-        if (true === $is_public_request) {
+        if (true === $is_front_request) {
             $cached_stats = get_transient($this->cache_key);
             if (is_array($cached_stats) && empty($cached_stats['is_demo'])) {
                 wp_send_json_success($cached_stats);
