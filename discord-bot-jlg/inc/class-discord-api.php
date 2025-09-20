@@ -99,14 +99,14 @@ class Discord_Bot_JLG_API {
                     $has_total         = false;
                     $total_approximate = false;
 
-                    if (!empty($bot_stats['has_total'])) {
-                        $total             = $bot_stats['total'];
-                        $has_total         = true;
-                        $total_approximate = !empty($bot_stats['total_is_approximate']);
-                    } elseif (!empty($widget_stats['has_total'])) {
+                    if (!empty($widget_stats['has_total'])) {
                         $total             = $widget_stats['total'];
                         $has_total         = true;
                         $total_approximate = !empty($widget_stats['total_is_approximate']);
+                    } elseif (!empty($bot_stats['has_total'])) {
+                        $total             = $bot_stats['total'];
+                        $has_total         = true;
+                        $total_approximate = !empty($bot_stats['total_is_approximate']);
                     }
 
                     $stats = array(
@@ -395,7 +395,8 @@ class Discord_Bot_JLG_API {
             'total'                => (int) $data['approximate_member_count'],
             'server_name'          => isset($data['name']) ? $data['name'] : '',
             'has_total'            => true,
-            'total_is_approximate' => false,
+            // Discord renvoie uniquement un total approximatif via approximate_member_count.
+            'total_is_approximate' => true,
         );
     }
 
