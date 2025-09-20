@@ -560,7 +560,13 @@ class Discord_Bot_JLG_Admin {
     private function render_admin_footer_note() {
         ?>
         <div style="margin-top: 30px; padding: 15px; background: #f0f0f0; border-radius: 8px; text-align: center;">
-            <p style="margin: 0;"><?php printf('Discord Bot - JLG v%s | Développé par Jérôme Le Gousse', esc_html(DISCORD_BOT_JLG_VERSION)); ?></p>
+            <p style="margin: 0;">
+                <?php
+                $version_text = sprintf('Discord Bot - JLG v%s', DISCORD_BOT_JLG_VERSION);
+
+                printf('%s | Développé par Jérôme Le Gousse', esc_html($version_text));
+                ?>
+            </p>
         </div>
         <?php
     }
@@ -817,7 +823,12 @@ class Discord_Bot_JLG_Admin {
     private function render_demo_footer_note() {
         ?>
         <div style="margin-top: 30px; padding: 15px; background: #f0f0f0; border-radius: 8px; text-align: center;">
-            <p style="margin: 0;"><?php printf('Discord Bot - JLG v%s | Développé par Jérôme Le Gousse |', esc_html(DISCORD_BOT_JLG_VERSION)); ?>
+            <p style="margin: 0;">
+                <?php
+                $version_text = sprintf('Discord Bot - JLG v%s', DISCORD_BOT_JLG_VERSION);
+
+                printf('%s | Développé par Jérôme Le Gousse |', esc_html($version_text));
+                ?>
                <a href="https://discord.com/developers/docs/intro" target="_blank">Documentation Discord API</a> |
                <a href="#" onclick="return false;">Besoin d'aide ?</a>
             </p>
