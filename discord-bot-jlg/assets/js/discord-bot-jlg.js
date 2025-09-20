@@ -76,10 +76,11 @@
                     return;
                 }
 
+                var hasTotalInfo = data.data && typeof data.data.has_total !== 'undefined';
                 var onlineValue = typeof data.data.online === 'number' ? data.data.online : null;
                 var totalValue = typeof data.data.total === 'number' ? data.data.total : null;
 
-                if (onlineValue === null && totalValue === null) {
+                if (onlineValue === null && totalValue === null && !hasTotalInfo) {
                     return;
                 }
 
@@ -88,7 +89,71 @@
                 }
 
                 updateStatElement(container, '.discord-online .discord-number', onlineValue, formatter);
-                updateStatElement(container, '.discord-total .discord-number', totalValue, formatter);
+
+                var totalElement = container.querySelector('.discord-total');
+                if (totalElement) {
+                    var placeholder = totalElement.dataset && totalElement.dataset.placeholder ? totalElement.dataset.placeholder : '—';
+                    var totalLabel = totalElement.dataset && totalElement.dataset.labelTotal ? totalElement.dataset.labelTotal : '';
+                    var totalUnavailableLabel = totalElement.dataset && totalElement.dataset.labelUnavailable ? totalElement.dataset.labelUnavailable : totalLabel;
+                    var approxLabel = totalElement.dataset && totalElement.dataset.labelApprox ? totalElement.dataset.labelApprox : '';
+                    var labelTextElement = totalElement.querySelector('.discord-label-text');
+                    var labelExtraElement = totalElement.querySelector('.discord-label-extra');
+                    var indicatorElement = totalElement.querySelector('.discord-approx-indicator');
+                    var numberElement = totalElement.querySelector('.discord-number');
+                    var hasTotal = !!(data.data && data.data.has_total) && totalValue !== null;
+                    var isApproximate = !!(data.data && data.data.total_is_approximate) && hasTotal;
+
+                    if (container && container.classList) {
+                        container.classList.toggle('discord-total-missing', !hasTotal);
+                    }
+
+                    if (!hasTotal) {
+                        totalElement.classList.add('discord-total-unavailable');
+                        totalElement.classList.remove('discord-total-approximate');
+
+                        if (numberElement) {
+                            numberElement.textContent = placeholder;
+                            numberElement.style.transform = 'scale(1)';
+                        }
+
+                        if (labelTextElement) {
+                            labelTextElement.textContent = totalUnavailableLabel;
+                        }
+
+                        if (labelExtraElement) {
+                            labelExtraElement.textContent = '';
+                        }
+
+                        if (indicatorElement) {
+                            indicatorElement.hidden = true;
+                        }
+
+                        if (totalElement.dataset) {
+                            delete totalElement.dataset.value;
+                        }
+                    } else {
+                        totalElement.classList.remove('discord-total-unavailable');
+                        totalElement.classList.toggle('discord-total-approximate', isApproximate);
+
+                        updateStatElement(container, '.discord-total .discord-number', totalValue, formatter);
+
+                        if (labelTextElement) {
+                            labelTextElement.textContent = totalLabel;
+                        }
+
+                        if (labelExtraElement) {
+                            labelExtraElement.textContent = isApproximate ? approxLabel : '';
+                        }
+
+                        if (indicatorElement) {
+                            indicatorElement.hidden = !isApproximate;
+                        }
+
+                        if (totalElement.dataset) {
+                            totalElement.dataset.value = totalValue;
+                        }
+                    }
+                }
             })
             .catch(function (error) {
                 console.error('Erreur lors de la mise à jour des statistiques Discord :', error);

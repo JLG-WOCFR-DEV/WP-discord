@@ -207,35 +207,40 @@ class Discord_Bot_JLG_Shortcode {
                     </div>
                     <?php endif; ?>
 
-                    <?php if ($show_total && $has_total) : ?>
-                    <div class="discord-stat discord-total<?php echo $total_is_approximate ? ' discord-total-approximate' : ''; ?>" data-value="<?php echo esc_attr((int) $stats['total']); ?>">
+                    <?php if ($show_total) : ?>
+                    <?php
+                    $total_classes = array('discord-stat', 'discord-total');
+                    if ($has_total) {
+                        if ($total_is_approximate) {
+                            $total_classes[] = 'discord-total-approximate';
+                        }
+                    } else {
+                        $total_classes[] = 'discord-total-unavailable';
+                    }
+
+                    $label_unavailable = __('Total indisponible', 'discord-bot-jlg');
+                    $label_classes    = array('discord-label');
+                    if ($hide_labels) {
+                        $label_classes[] = 'screen-reader-text';
+                    }
+                    ?>
+                    <div class="<?php echo esc_attr(implode(' ', $total_classes)); ?>"
+                        <?php if ($has_total): ?>
+                        data-value="<?php echo esc_attr((int) $stats['total']); ?>"
+                        <?php endif; ?>
+                        data-label-total="<?php echo esc_attr($atts['label_total']); ?>"
+                        data-label-unavailable="<?php echo esc_attr($label_unavailable); ?>"
+                        data-label-approx="<?php echo esc_attr__('approx.', 'discord-bot-jlg'); ?>"
+                        data-placeholder="<?php echo esc_attr('—'); ?>">
                         <?php if (!$hide_icons): ?>
                         <span class="discord-icon"><?php echo esc_html($atts['icon_total']); ?></span>
                         <?php endif; ?>
-                        <span class="discord-number"><?php echo esc_html(number_format_i18n((int) $stats['total'])); ?></span>
-                        <?php if ($total_is_approximate): ?>
-                        <span class="discord-approx-indicator" aria-hidden="true">≈</span>
-                        <?php endif; ?>
-                        <?php if (!$hide_labels): ?>
-                        <span class="discord-label">
-                            <?php echo esc_html($atts['label_total']); ?>
-                            <?php if ($total_is_approximate): ?>
-                            <span class="screen-reader-text"><?php esc_html_e('approx.', 'discord-bot-jlg'); ?></span>
-                            <?php endif; ?>
+                        <span class="discord-number"><?php echo $has_total ? esc_html(number_format_i18n((int) $stats['total'])) : '&mdash;'; ?></span>
+                        <span class="discord-approx-indicator" aria-hidden="true"<?php echo $total_is_approximate ? '' : ' hidden'; ?>>≈</span>
+                        <span class="<?php echo esc_attr(implode(' ', $label_classes)); ?>">
+                            <span class="discord-label-text"><?php echo esc_html($has_total ? $atts['label_total'] : $label_unavailable); ?></span>
+                            <span class="discord-label-extra screen-reader-text"><?php echo $total_is_approximate ? esc_html__('approx.', 'discord-bot-jlg') : ''; ?></span>
                         </span>
-                        <?php endif; ?>
-                    </div>
-                    <?php elseif ($show_total): ?>
-                    <div class="discord-stat discord-total discord-total-unavailable">
-                        <?php if (!$hide_icons): ?>
-                        <span class="discord-icon"><?php echo esc_html($atts['icon_total']); ?></span>
-                        <?php endif; ?>
-                        <span class="discord-number">&mdash;</span>
-                        <?php if (!$hide_labels): ?>
-                        <span class="discord-label"><?php esc_html_e('Total indisponible', 'discord-bot-jlg'); ?></span>
-                        <?php else: ?>
-                        <span class="screen-reader-text"><?php esc_html_e('Total indisponible', 'discord-bot-jlg'); ?></span>
-                        <?php endif; ?>
                     </div>
                     <?php endif; ?>
                 </div>
