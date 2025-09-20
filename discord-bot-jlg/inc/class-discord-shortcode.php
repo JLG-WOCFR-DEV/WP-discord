@@ -97,7 +97,7 @@ class Discord_Bot_JLG_Shortcode {
 
         $this->enqueue_assets($options);
 
-        $unique_id = 'discord-stats-' . wp_rand(1000, 9999);
+        $unique_id = wp_unique_id('discord-stats-');
 
         $has_total            = !empty($stats['has_total']) && isset($stats['total']) && null !== $stats['total'];
         $total_is_approximate = !empty($stats['total_is_approximate']);
