@@ -209,19 +209,23 @@ class Discord_Bot_JLG_API {
             $refresh_requires_remote_call = true;
         }
 
-        $force_refresh = false;
+        $bypass_cache = false;
 
-        if (
-            false === $is_public_request
-            && isset($_POST['force_refresh'])
-            && current_user_can('manage_options')
-        ) {
+        if (isset($_POST['force_refresh'])) {
             $force_refresh = wp_validate_boolean(wp_unslash($_POST['force_refresh']));
+
+            if (
+                true === $force_refresh
+                && false === $is_public_request
+                && current_user_can('manage_options')
+            ) {
+                $bypass_cache = true;
+            }
         }
 
         $stats = $this->get_stats(
             array(
-                'bypass_cache' => $force_refresh,
+                'bypass_cache' => $bypass_cache,
             )
         );
 
