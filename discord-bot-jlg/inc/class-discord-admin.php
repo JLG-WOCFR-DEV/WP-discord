@@ -852,7 +852,7 @@ class Discord_Bot_JLG_Admin {
             'discord-bot-jlg-admin',
             DISCORD_BOT_JLG_PLUGIN_URL . 'assets/css/discord-bot-jlg-admin.css',
             array(),
-            '1.0'
+            DISCORD_BOT_JLG_VERSION
         );
     }
 

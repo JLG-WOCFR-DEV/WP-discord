@@ -279,21 +279,21 @@ class Discord_Bot_JLG_Shortcode {
             'discord-bot-jlg',
             DISCORD_BOT_JLG_PLUGIN_URL . 'assets/css/discord-bot-jlg.css',
             array(),
-            '1.0'
+            DISCORD_BOT_JLG_VERSION
         );
 
         wp_register_style(
             'discord-bot-jlg-inline',
             DISCORD_BOT_JLG_PLUGIN_URL . 'assets/css/discord-bot-jlg-inline.css',
             array('discord-bot-jlg'),
-            '1.0'
+            DISCORD_BOT_JLG_VERSION
         );
 
         wp_register_script(
             'discord-bot-jlg-frontend',
             DISCORD_BOT_JLG_PLUGIN_URL . 'assets/js/discord-bot-jlg.js',
             array(),
-            '1.0',
+            DISCORD_BOT_JLG_VERSION,
             true
         );
 
