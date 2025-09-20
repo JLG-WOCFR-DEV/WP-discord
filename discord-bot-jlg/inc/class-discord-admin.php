@@ -960,10 +960,14 @@ class Discord_Bot_JLG_Admin {
         $div_attributes = array_merge(
             $div_attributes,
             array(
-                'style'       => true,
-                'data-demo'   => true,
-                'data-refresh'=> true,
-                'data-value'  => true,
+                'style'                 => true,
+                'data-demo'             => true,
+                'data-refresh'          => true,
+                'data-value'            => true,
+                'data-label-total'      => true,
+                'data-label-unavailable'=> true,
+                'data-label-approx'     => true,
+                'data-placeholder'      => true,
             )
         );
         $allowed_tags['div'] = $div_attributes;
