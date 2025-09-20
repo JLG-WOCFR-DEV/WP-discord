@@ -236,7 +236,7 @@ class Discord_Bot_JLG_Admin {
         ?>
         <h4>Étape 1 : Créer un Bot Discord</h4>
         <ol>
-            <li>Rendez-vous sur <a href="https://discord.com/developers/applications" target="_blank" style="color: #5865F2;">Discord Developer Portal</a></li>
+            <li>Rendez-vous sur <a href="https://discord.com/developers/applications" target="_blank" rel="noopener noreferrer" style="color: #5865F2;">Discord Developer Portal</a></li>
             <li>Cliquez sur <strong>"New Application"</strong> en haut à droite</li>
             <li>Donnez un nom à votre application (ex: "Stats Bot")</li>
             <li>Dans le menu de gauche, cliquez sur <strong>"Bot"</strong></li>
@@ -540,7 +540,7 @@ class Discord_Bot_JLG_Admin {
                     </a>
                 </li>
                 <li style="margin-bottom: 10px;">
-                    <a href="https://discord.com/developers/applications" target="_blank" class="button" style="width: 100%;">
+                    <a href="https://discord.com/developers/applications" target="_blank" rel="noopener noreferrer" class="button" style="width: 100%;">
                         🔗 Discord Developer Portal
                     </a>
                 </li>
@@ -831,7 +831,7 @@ class Discord_Bot_JLG_Admin {
                     esc_html(sprintf('Discord Bot - JLG v%s', DISCORD_BOT_JLG_VERSION))
                 );
                 ?>
-               <a href="https://discord.com/developers/docs/intro" target="_blank">Documentation Discord API</a> |
+               <a href="https://discord.com/developers/docs/intro" target="_blank" rel="noopener noreferrer">Documentation Discord API</a> |
                <a href="#" onclick="return false;">Besoin d'aide ?</a>
             </p>
         </div>
