@@ -14,6 +14,11 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+if (!defined('DISCORD_BOT_JLG_VERSION')) {
+    $plugin_data = get_file_data(__FILE__, array('Version' => 'Version'));
+    define('DISCORD_BOT_JLG_VERSION', !empty($plugin_data['Version']) ? $plugin_data['Version'] : '');
+}
+
 define('DISCORD_BOT_JLG_PLUGIN_PATH', plugin_dir_path(__FILE__));
 define('DISCORD_BOT_JLG_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('DISCORD_BOT_JLG_OPTION_NAME', 'discord_server_stats_options');
