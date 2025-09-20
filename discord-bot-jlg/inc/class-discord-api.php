@@ -209,9 +209,19 @@ class Discord_Bot_JLG_API {
             $refresh_requires_remote_call = true;
         }
 
+        $force_refresh = false;
+
+        if (
+            false === $is_public_request
+            && isset($_POST['force_refresh'])
+            && current_user_can('manage_options')
+        ) {
+            $force_refresh = wp_validate_boolean(wp_unslash($_POST['force_refresh']));
+        }
+
         $stats = $this->get_stats(
             array(
-                'bypass_cache' => (false === $is_public_request),
+                'bypass_cache' => $force_refresh,
             )
         );
 
