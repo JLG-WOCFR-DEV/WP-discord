@@ -40,7 +40,7 @@ class Discord_Bot_JLG_API {
      *     @type bool $bypass_cache Si vrai, ignore la valeur mise en cache et interroge l'API directement.
      * }
      *
-     * @return array Statistiques du serveur (clés `online`, `total`, `server_name`, éventuellement `is_demo`).
+     * @return array Statistiques du serveur (clés `online`, `total`, `server_name`, `is_demo`, éventuellement `fallback_demo`).
      */
     public function get_stats($args = array()) {
         $args = wp_parse_args(
@@ -52,7 +52,7 @@ class Discord_Bot_JLG_API {
         );
 
         if (true === $args['force_demo']) {
-            return $this->get_demo_stats();
+            return $this->get_demo_stats(false);
         }
 
         $options = get_option($this->option_name);
@@ -61,7 +61,7 @@ class Discord_Bot_JLG_API {
         }
 
         if (!empty($options['demo_mode'])) {
-            return $this->get_demo_stats();
+            return $this->get_demo_stats(false);
         }
 
         if (false === $args['bypass_cache']) {
@@ -72,7 +72,7 @@ class Discord_Bot_JLG_API {
         }
 
         if (empty($options['server_id'])) {
-            return $this->get_demo_stats();
+            return $this->get_demo_stats(true);
         }
 
         $stats = false;
@@ -129,7 +129,7 @@ class Discord_Bot_JLG_API {
         }
 
         if (false === $this->has_usable_stats($stats)) {
-            return $this->get_demo_stats();
+            return $this->get_demo_stats(true);
         }
 
         set_transient($this->cache_key, $stats, $this->get_cache_duration($options));
@@ -276,9 +276,11 @@ class Discord_Bot_JLG_API {
     /**
      * Génère des statistiques fictives pour la démonstration ou en cas d'absence de configuration.
      *
-     * @return array Statistiques de démonstration comprenant les clés `online`, `total`, `server_name` et `is_demo`.
+     * @param bool $is_fallback Indique si ces statistiques sont utilisées faute de données réelles.
+     *
+     * @return array Statistiques de démonstration comprenant les clés `online`, `total`, `server_name`, `is_demo` et `fallback_demo`.
      */
-    public function get_demo_stats() {
+    public function get_demo_stats($is_fallback = false) {
         $base_online = 42;
         $base_total  = 256;
 
@@ -290,6 +292,7 @@ class Discord_Bot_JLG_API {
             'total'                => (int) $base_total,
             'server_name'          => 'Serveur Démo',
             'is_demo'              => true,
+            'fallback_demo'        => (bool) $is_fallback,
             'has_total'            => true,
             'total_is_approximate' => false,
         );

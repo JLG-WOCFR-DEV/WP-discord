@@ -99,6 +99,10 @@ class Discord_Bot_JLG_Shortcode {
 
         $unique_id = wp_unique_id('discord-stats-');
 
+        $is_demo          = !empty($stats['is_demo']);
+        $is_fallback_demo = !empty($stats['fallback_demo']);
+        $is_forced_demo   = $is_demo && !$is_fallback_demo;
+
         $has_total            = !empty($stats['has_total']) && isset($stats['total']) && null !== $stats['total'];
         $total_is_approximate = !empty($stats['total_is_approximate']);
 
@@ -117,7 +121,7 @@ class Discord_Bot_JLG_Shortcode {
             $container_classes[] = 'discord-animated';
         }
 
-        if (!empty($stats['is_demo'])) {
+        if ($is_demo) {
             $container_classes[] = 'discord-demo-mode';
         }
 
@@ -147,7 +151,8 @@ class Discord_Bot_JLG_Shortcode {
         $attributes = array(
             sprintf('id="%s"', esc_attr($unique_id)),
             sprintf('class="%s"', esc_attr(implode(' ', $container_classes))),
-            sprintf('data-demo="%s"', esc_attr(!empty($stats['is_demo']) ? 'true' : 'false')),
+            sprintf('data-demo="%s"', esc_attr($is_forced_demo ? 'true' : 'false')),
+            sprintf('data-fallback-demo="%s"', esc_attr($is_fallback_demo ? 'true' : 'false')),
         );
 
         if (!empty($style_declarations)) {
@@ -159,7 +164,7 @@ class Discord_Bot_JLG_Shortcode {
             ? Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL
             : 10;
 
-        if ($refresh && empty($stats['is_demo'])) {
+        if ($refresh && (!$is_demo || $is_fallback_demo)) {
             $refresh_interval = max($min_refresh_interval, intval($atts['refresh_interval']));
         }
 
