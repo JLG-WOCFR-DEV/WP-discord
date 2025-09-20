@@ -15,8 +15,12 @@ if (!defined('ABSPATH')) {
 }
 
 if (!defined('DISCORD_BOT_JLG_VERSION')) {
-    $plugin_data = get_file_data(__FILE__, array('Version' => 'Version'));
-    define('DISCORD_BOT_JLG_VERSION', !empty($plugin_data['Version']) ? $plugin_data['Version'] : '');
+    $plugin_data    = get_file_data(__FILE__, array('Version' => 'Version'));
+    $plugin_version = isset($plugin_data['Version']) && '' !== $plugin_data['Version']
+        ? $plugin_data['Version']
+        : '1.0';
+
+    define('DISCORD_BOT_JLG_VERSION', $plugin_version);
 }
 
 define('DISCORD_BOT_JLG_PLUGIN_PATH', plugin_dir_path(__FILE__));
