@@ -195,7 +195,9 @@
         }
 
         Array.prototype.forEach.call(containers, function (container) {
-            if (container.dataset.demo === 'true') {
+            var isForcedDemo = container.dataset.demo === 'true' && container.dataset.fallbackDemo !== 'true';
+
+            if (isForcedDemo) {
                 return;
             }
 
