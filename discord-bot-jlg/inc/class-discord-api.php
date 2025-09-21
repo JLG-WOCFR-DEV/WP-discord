@@ -87,8 +87,9 @@ class Discord_Bot_JLG_API {
 
         $bot_stats  = false;
         $bot_token = $this->get_bot_token($options);
+        $should_call_bot = (!empty($bot_token) && ($widget_incomplete || empty($widget_stats)));
 
-        if (!empty($bot_token)) {
+        if ($should_call_bot) {
             $bot_stats = $this->get_stats_from_bot($options);
 
             if (is_array($bot_stats)) {
