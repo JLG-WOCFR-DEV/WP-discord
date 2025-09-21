@@ -193,6 +193,7 @@ class Discord_Bot_JLG_API {
                 if ($elapsed < $rate_limit_window) {
                     $retry_after = max(0, $rate_limit_window - $elapsed);
                     $message = sprintf(
+                        /* translators: %d: number of seconds to wait before the next refresh. */
                         __('Veuillez patienter %d secondes avant la prochaine actualisation.', 'discord-bot-jlg'),
                         $retry_after
                     );
