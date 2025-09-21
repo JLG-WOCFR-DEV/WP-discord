@@ -2,6 +2,53 @@
     'use strict';
 
     var ERROR_CLASS = 'discord-stats-error';
+    var ERROR_MESSAGE_CLASS = 'discord-error-message';
+
+    function getOrCreateErrorMessageElement(container) {
+        if (!container) {
+            return null;
+        }
+
+        var messageElement = container.querySelector('.' + ERROR_MESSAGE_CLASS);
+        if (!messageElement) {
+            messageElement = document.createElement('div');
+            messageElement.className = ERROR_MESSAGE_CLASS;
+            messageElement.setAttribute('role', 'alert');
+            container.appendChild(messageElement);
+        }
+
+        return messageElement;
+    }
+
+    function showErrorMessage(container, message) {
+        if (!container) {
+            return;
+        }
+
+        if (container.classList) {
+            container.classList.add(ERROR_CLASS);
+        }
+
+        var messageElement = getOrCreateErrorMessageElement(container);
+        if (messageElement) {
+            messageElement.textContent = message;
+        }
+    }
+
+    function clearErrorMessage(container) {
+        if (!container) {
+            return;
+        }
+
+        if (container.classList) {
+            container.classList.remove(ERROR_CLASS);
+        }
+
+        var messageElement = container.querySelector('.' + ERROR_MESSAGE_CLASS);
+        if (messageElement && messageElement.parentNode) {
+            messageElement.parentNode.removeChild(messageElement);
+        }
+    }
 
     function updateStatElement(container, selector, value, formatter) {
         if (value === null) {
@@ -40,29 +87,24 @@
 
                 if (!data.success) {
                     if (data.data && data.data.nonce_expired) {
-                        if (data.data.new_nonce) {
-                            config.nonce = data.data.new_nonce;
-                        }
-
-                        if (container && container.classList) {
-                            container.classList.remove(ERROR_CLASS);
-                        }
-
-                        // Les caches frontaux peuvent invalider les requêtes POST :
-                        // en cas de nonce expiré on relance immédiatement avec le nouveau jeton.
-                        updateStats(container, config, formatter);
-
+                        var nonceMessage = data.data.message || 'Votre session a expiré, veuillez recharger la page.';
+                        console.warn(nonceMessage);
+                        showErrorMessage(container, nonceMessage);
                         return;
                     }
 
+                    var errorMessage = '';
                     if (data.data && data.data.message) {
-                        console.warn(data.data.message);
+                        errorMessage = data.data.message;
                     } else if (typeof data.data === 'string') {
-                        console.warn(data.data);
+                        errorMessage = data.data;
                     }
 
-                    if (container && container.classList) {
-                        container.classList.add(ERROR_CLASS);
+                    if (errorMessage) {
+                        console.warn(errorMessage);
+                        showErrorMessage(container, errorMessage);
+                    } else if (container) {
+                        showErrorMessage(container, 'Une erreur est survenue lors de la récupération des statistiques.');
                     }
 
                     return;
@@ -84,9 +126,7 @@
                     return;
                 }
 
-                if (container && container.classList) {
-                    container.classList.remove(ERROR_CLASS);
-                }
+                clearErrorMessage(container);
 
                 updateStatElement(container, '.discord-online .discord-number', onlineValue, formatter);
 
@@ -157,10 +197,7 @@
             })
             .catch(function (error) {
                 console.error('Erreur lors de la mise à jour des statistiques Discord :', error);
-
-                if (container && container.classList) {
-                    container.classList.add(ERROR_CLASS);
-                }
+                showErrorMessage(container, 'Une erreur est survenue lors de la récupération des statistiques.');
             });
     }
 
