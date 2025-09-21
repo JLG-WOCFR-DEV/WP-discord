@@ -106,12 +106,22 @@ class Discord_Bot_JLG_Shortcode {
         $has_total            = !empty($stats['has_total']) && isset($stats['total']) && null !== $stats['total'];
         $total_is_approximate = !empty($stats['total_is_approximate']);
 
-        $container_classes = array(
-            'discord-stats-container',
-            'discord-layout-' . esc_attr($atts['layout']),
-            'discord-theme-' . esc_attr($atts['theme']),
-            'discord-align-' . esc_attr($atts['align']),
-        );
+        $container_classes = array('discord-stats-container');
+
+        $layout_class = sanitize_html_class($atts['layout'], 'horizontal');
+        if (!empty($layout_class)) {
+            $container_classes[] = 'discord-layout-' . $layout_class;
+        }
+
+        $theme_class = sanitize_html_class($atts['theme'], 'discord');
+        if (!empty($theme_class)) {
+            $container_classes[] = 'discord-theme-' . $theme_class;
+        }
+
+        $align_class = sanitize_html_class($atts['align'], 'left');
+        if (!empty($align_class)) {
+            $container_classes[] = 'discord-align-' . $align_class;
+        }
 
         if ($compact) {
             $container_classes[] = 'discord-compact';
@@ -127,7 +137,11 @@ class Discord_Bot_JLG_Shortcode {
 
         if ($show_discord_icon) {
             $container_classes[] = 'discord-with-logo';
-            $container_classes[] = 'discord-logo-' . esc_attr($atts['discord_icon_position']);
+
+            $logo_position_class = sanitize_html_class($atts['discord_icon_position'], 'left');
+            if (!empty($logo_position_class)) {
+                $container_classes[] = 'discord-logo-' . $logo_position_class;
+            }
         }
 
         if (!$has_total) {
@@ -135,7 +149,15 @@ class Discord_Bot_JLG_Shortcode {
         }
 
         if (!empty($atts['class'])) {
-            $container_classes[] = esc_attr($atts['class']);
+            $custom_classes = preg_split('/\s+/', $atts['class'], -1, PREG_SPLIT_NO_EMPTY);
+
+            if (!empty($custom_classes)) {
+                $custom_classes = array_filter(array_map('sanitize_html_class', $custom_classes));
+
+                if (!empty($custom_classes)) {
+                    $container_classes = array_merge($container_classes, $custom_classes);
+                }
+            }
         }
 
         $style_declarations = array(
