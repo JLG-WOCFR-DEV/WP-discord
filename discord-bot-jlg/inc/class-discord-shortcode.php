@@ -59,8 +59,8 @@ class Discord_Bot_JLG_Shortcode {
                 'class'                => '',
                 'icon_online'          => '🟢',
                 'icon_total'           => '👥',
-                'label_online'         => 'En ligne',
-                'label_total'          => 'Membres',
+                'label_online'         => __('En ligne', 'discord-bot-jlg'),
+                'label_total'          => __('Membres', 'discord-bot-jlg'),
                 'hide_labels'          => false,
                 'hide_icons'           => false,
                 'border_radius'        => '8',
@@ -92,7 +92,10 @@ class Discord_Bot_JLG_Shortcode {
         }
 
         if (!is_array($stats)) {
-            return '<div class="discord-stats-error">Impossible de récupérer les stats Discord</div>';
+            return sprintf(
+                '<div class="discord-stats-error">%s</div>',
+                esc_html__('Impossible de récupérer les stats Discord', 'discord-bot-jlg')
+            );
         }
 
         $this->enqueue_assets($options);
@@ -201,7 +204,7 @@ class Discord_Bot_JLG_Shortcode {
         <div <?php echo implode(' ', $attributes); ?>>
 
             <?php if (!empty($stats['is_demo'])): ?>
-            <div class="discord-demo-badge">Mode Démo</div>
+            <div class="discord-demo-badge"><?php echo esc_html__('Mode Démo', 'discord-bot-jlg'); ?></div>
             <?php endif; ?>
 
             <?php if ($show_title): ?>
