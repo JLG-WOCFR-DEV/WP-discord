@@ -11,6 +11,7 @@ class Discord_Bot_JLG_Admin {
 
     private $option_name;
     private $api;
+    private $demo_page_hook_suffix;
 
     /**
      * Initialise l'instance avec la clé d'option et le client API utilisé pour les vérifications.
@@ -23,6 +24,7 @@ class Discord_Bot_JLG_Admin {
     public function __construct($option_name, Discord_Bot_JLG_API $api) {
         $this->option_name = $option_name;
         $this->api         = $api;
+        $this->demo_page_hook_suffix = '';
     }
 
     /**
@@ -52,7 +54,7 @@ class Discord_Bot_JLG_Admin {
             array($this, 'options_page')
         );
 
-        add_submenu_page(
+        $this->demo_page_hook_suffix = add_submenu_page(
             'discord-bot-jlg',
             'Guide & Démo',
             'Guide & Démo',
@@ -855,6 +857,10 @@ class Discord_Bot_JLG_Admin {
             'toplevel_page_discord-bot-jlg',
             'discord-bot-jlg_page_discord-bot-demo',
         );
+
+        if (!empty($this->demo_page_hook_suffix) && !in_array($this->demo_page_hook_suffix, $allowed_ids, true)) {
+            $allowed_ids[] = $this->demo_page_hook_suffix;
+        }
 
         if (function_exists('get_current_screen')) {
             $current_screen = get_current_screen();
