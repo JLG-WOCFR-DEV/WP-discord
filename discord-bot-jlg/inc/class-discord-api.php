@@ -239,6 +239,18 @@ class Discord_Bot_JLG_API {
             set_transient($rate_limit_key, time(), $rate_limit_window);
         }
 
+        if (
+            is_array($stats)
+            && !empty($stats['is_demo'])
+            && !empty($stats['fallback_demo'])
+        ) {
+            if (true === $is_public_request) {
+                delete_transient($rate_limit_key);
+            }
+
+            wp_send_json_success($stats);
+        }
+
         if (is_array($stats) && empty($stats['is_demo'])) {
             wp_send_json_success($stats);
         }
