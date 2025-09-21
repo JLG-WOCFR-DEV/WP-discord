@@ -230,6 +230,12 @@ class Discord_Bot_JLG_API {
             )
         );
 
+        $is_fallback_demo = (
+            is_array($stats)
+            && !empty($stats['is_demo'])
+            && !empty($stats['fallback_demo'])
+        );
+
         if (
             true === $is_public_request
             && true === $refresh_requires_remote_call
@@ -237,6 +243,11 @@ class Discord_Bot_JLG_API {
             && empty($stats['is_demo'])
         ) {
             set_transient($rate_limit_key, time(), $rate_limit_window);
+        }
+
+        if (true === $is_fallback_demo) {
+            delete_transient($rate_limit_key);
+            wp_send_json_success($stats);
         }
 
         if (is_array($stats) && empty($stats['is_demo'])) {
