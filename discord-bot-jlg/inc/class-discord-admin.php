@@ -853,7 +853,7 @@ class Discord_Bot_JLG_Admin {
     public function enqueue_admin_styles($hook_suffix) {
         $allowed_ids = array(
             'toplevel_page_discord-bot-jlg',
-            'discord-bot_page_discord-bot-demo',
+            'discord-bot-jlg_page_discord-bot-demo',
         );
 
         if (function_exists('get_current_screen')) {
