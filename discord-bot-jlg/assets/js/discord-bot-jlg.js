@@ -67,6 +67,84 @@
         }, 300);
     }
 
+    function getDemoBadgeLabel(container) {
+        if (!container) {
+            return 'Mode Démo';
+        }
+
+        if (container.dataset && container.dataset.demoBadgeLabel) {
+            return container.dataset.demoBadgeLabel;
+        }
+
+        var existingBadge = container.querySelector('.discord-demo-badge');
+        if (existingBadge && existingBadge.textContent) {
+            var label = existingBadge.textContent;
+            if (container.dataset) {
+                container.dataset.demoBadgeLabel = label;
+            }
+            return label;
+        }
+
+        var defaultLabel = 'Mode Démo';
+
+        if (container.dataset) {
+            container.dataset.demoBadgeLabel = defaultLabel;
+        }
+
+        return defaultLabel;
+    }
+
+    function updateDemoBadge(container, shouldShow) {
+        if (!container) {
+            return;
+        }
+
+        var badge = container.querySelector('.discord-demo-badge');
+
+        if (shouldShow) {
+            if (!badge) {
+                badge = document.createElement('div');
+                badge.className = 'discord-demo-badge';
+                badge.textContent = getDemoBadgeLabel(container);
+                container.insertBefore(badge, container.firstChild);
+            } else if (!badge.textContent) {
+                badge.textContent = getDemoBadgeLabel(container);
+            }
+
+            return;
+        }
+
+        if (badge && badge.parentNode) {
+            if (container.dataset && !container.dataset.demoBadgeLabel && badge.textContent) {
+                container.dataset.demoBadgeLabel = badge.textContent;
+            }
+
+            badge.parentNode.removeChild(badge);
+        }
+    }
+
+    function applyDemoState(container, isDemo, isFallbackDemo) {
+        if (!container) {
+            return;
+        }
+
+        var wasForcedDemo = container.dataset
+            && container.dataset.demo === 'true'
+            && container.dataset.fallbackDemo !== 'true';
+
+        if (container.dataset) {
+            container.dataset.demo = isDemo ? 'true' : 'false';
+            container.dataset.fallbackDemo = isFallbackDemo ? 'true' : 'false';
+        }
+
+        if (container.classList) {
+            container.classList.toggle('discord-demo-mode', !!isDemo);
+        }
+
+        var shouldShowBadge = !!isDemo && (isFallbackDemo || !wasForcedDemo);
+        updateDemoBadge(container, shouldShowBadge);
+    }
+
     function updateStats(container, config, formatter) {
         var formData = new FormData();
         formData.append('action', config.action || 'refresh_discord_stats');
@@ -119,6 +197,8 @@
                 }
 
                 var hasTotalInfo = data.data && typeof data.data.has_total !== 'undefined';
+                var isDemo = !!(data.data && data.data.is_demo);
+                var isFallbackDemo = !!(data.data && data.data.fallback_demo);
                 var onlineValue = typeof data.data.online === 'number' ? data.data.online : null;
                 var totalValue = typeof data.data.total === 'number' ? data.data.total : null;
 
@@ -127,6 +207,8 @@
                 }
 
                 clearErrorMessage(container);
+
+                applyDemoState(container, isDemo, isFallbackDemo);
 
                 updateStatElement(container, '.discord-online .discord-number', onlineValue, formatter);
 
