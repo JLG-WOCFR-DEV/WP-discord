@@ -152,8 +152,9 @@ class Discord_Bot_JLG_API {
                 wp_send_json_error(
                     array(
                         'nonce_expired' => true,
-                        'new_nonce'     => wp_create_nonce('refresh_discord_stats'),
-                    )
+                        'message'       => __('Votre session a expiré, veuillez recharger la page.', 'discord-bot-jlg'),
+                    ),
+                    403
                 );
             }
 
