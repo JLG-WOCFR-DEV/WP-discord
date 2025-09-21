@@ -108,17 +108,17 @@ class Discord_Bot_JLG_Shortcode {
 
         $container_classes = array('discord-stats-container');
 
-        $layout_class = sanitize_html_class($atts['layout'], 'horizontal');
+        $layout_class = strtolower(sanitize_html_class($atts['layout'], 'horizontal'));
         if (!empty($layout_class)) {
             $container_classes[] = 'discord-layout-' . $layout_class;
         }
 
-        $theme_class = sanitize_html_class($atts['theme'], 'discord');
+        $theme_class = strtolower(sanitize_html_class($atts['theme'], 'discord'));
         if (!empty($theme_class)) {
             $container_classes[] = 'discord-theme-' . $theme_class;
         }
 
-        $align_class = sanitize_html_class($atts['align'], 'left');
+        $align_class = strtolower(sanitize_html_class($atts['align'], 'left'));
         if (!empty($align_class)) {
             $container_classes[] = 'discord-align-' . $align_class;
         }
@@ -135,10 +135,11 @@ class Discord_Bot_JLG_Shortcode {
             $container_classes[] = 'discord-demo-mode';
         }
 
+        $logo_position_class = '';
         if ($show_discord_icon) {
             $container_classes[] = 'discord-with-logo';
 
-            $logo_position_class = sanitize_html_class($atts['discord_icon_position'], 'left');
+            $logo_position_class = strtolower(sanitize_html_class($atts['discord_icon_position'], 'left'));
             if (!empty($logo_position_class)) {
                 $container_classes[] = 'discord-logo-' . $logo_position_class;
             }
@@ -209,13 +210,13 @@ class Discord_Bot_JLG_Shortcode {
             <?php endif; ?>
 
             <div class="discord-stats-main">
-                <?php if ($show_discord_icon && $atts['discord_icon_position'] === 'left'): ?>
+                <?php if ($show_discord_icon && $logo_position_class === 'left'): ?>
                 <div class="discord-logo-container">
                     <?php echo $discord_svg; ?>
                 </div>
                 <?php endif; ?>
 
-                <?php if ($show_discord_icon && $atts['discord_icon_position'] === 'top'): ?>
+                <?php if ($show_discord_icon && $logo_position_class === 'top'): ?>
                 <div class="discord-logo-container discord-logo-top">
                     <?php echo $discord_svg; ?>
                 </div>
@@ -272,7 +273,7 @@ class Discord_Bot_JLG_Shortcode {
                     <?php endif; ?>
                 </div>
 
-                <?php if ($show_discord_icon && $atts['discord_icon_position'] === 'right'): ?>
+                <?php if ($show_discord_icon && $logo_position_class === 'right'): ?>
                 <div class="discord-logo-container">
                     <?php echo $discord_svg; ?>
                 </div>
