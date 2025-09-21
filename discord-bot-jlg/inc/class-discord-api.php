@@ -460,7 +460,10 @@ class Discord_Bot_JLG_API {
     private function get_cache_duration($options) {
         if (isset($options['cache_duration'])) {
             $duration = (int) $options['cache_duration'];
-            if ($duration >= 60 && $duration <= 3600) {
+            if (
+                $duration >= self::MIN_PUBLIC_REFRESH_INTERVAL
+                && $duration <= 3600
+            ) {
                 return $duration;
             }
         }

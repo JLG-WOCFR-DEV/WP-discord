@@ -202,7 +202,10 @@ class Discord_Bot_JLG_Admin {
 
         if (isset($input['cache_duration'])) {
             $cache_duration               = absint($input['cache_duration']);
-            $sanitized['cache_duration'] = max(60, min(3600, $cache_duration));
+            $sanitized['cache_duration'] = max(
+                Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL,
+                min(3600, $cache_duration)
+            );
         }
 
         if (isset($input['custom_css'])) {
@@ -425,8 +428,10 @@ class Discord_Bot_JLG_Admin {
         ?>
         <input type="number" name="<?php echo esc_attr($this->option_name); ?>[cache_duration]"
                value="<?php echo esc_attr(isset($options['cache_duration']) ? $options['cache_duration'] : ''); ?>"
-               min="60" max="3600" class="small-text" />
-        <p class="description">Minimum 60 secondes, maximum 3600 secondes (1 heure)</p>
+               min="<?php echo esc_attr(Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL); ?>" max="3600" class="small-text" />
+        <p class="description">
+            Minimum <?php echo esc_html(Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL); ?> secondes, maximum 3600 secondes (1 heure)
+        </p>
         <?php
     }
 
