@@ -11,6 +11,7 @@ class Discord_Bot_JLG_Admin {
 
     private $option_name;
     private $api;
+    private $demo_page_hook = '';
 
     /**
      * Initialise l'instance avec la clé d'option et le client API utilisé pour les vérifications.
@@ -52,7 +53,7 @@ class Discord_Bot_JLG_Admin {
             array($this, 'options_page')
         );
 
-        add_submenu_page(
+        $this->demo_page_hook = add_submenu_page(
             'discord-bot-jlg',
             'Guide & Démo',
             'Guide & Démo',
@@ -851,10 +852,13 @@ class Discord_Bot_JLG_Admin {
      * @return void
      */
     public function enqueue_admin_styles($hook_suffix) {
-        $allowed_ids = array(
-            'toplevel_page_discord-bot-jlg',
-            'discord-bot-jlg_page_discord-bot-demo',
-        );
+        $allowed_ids = array('toplevel_page_discord-bot-jlg');
+
+        if (!empty($this->demo_page_hook)) {
+            $allowed_ids[] = $this->demo_page_hook;
+        } else {
+            $allowed_ids[] = 'discord-bot-jlg_page_discord-bot-demo';
+        }
 
         if (function_exists('get_current_screen')) {
             $current_screen = get_current_screen();
