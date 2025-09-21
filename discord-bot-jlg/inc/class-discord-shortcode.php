@@ -276,6 +276,7 @@ class Discord_Bot_JLG_Shortcode {
 
         if (!self::$footer_hook_added) {
             add_action('wp_footer', array($this, 'print_late_styles'), 1);
+            add_action('admin_print_footer_scripts', array($this, 'print_late_styles'), 1);
             self::$footer_hook_added = true;
         }
     }
