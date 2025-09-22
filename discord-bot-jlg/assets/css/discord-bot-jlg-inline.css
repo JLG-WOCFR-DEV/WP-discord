@@ -44,7 +44,10 @@
     margin-bottom: 15px;
 }
 
-.discord-stats-container.discord-theme-discord .discord-logo-svg,
+.discord-stats-container.discord-theme-discord .discord-logo-svg {
+    fill: #5865F2;
+}
+
 .discord-stats-container.discord-theme-dark .discord-logo-svg {
     fill: #ffffff;
 }
