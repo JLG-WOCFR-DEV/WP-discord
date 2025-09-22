@@ -11,7 +11,7 @@ class Discord_Bot_JLG_API {
 
     const MIN_PUBLIC_REFRESH_INTERVAL = 10;
 
-    private const REFRESH_LOCK_SUFFIX = '_refresh_lock';
+    public const REFRESH_LOCK_SUFFIX = '_refresh_lock';
 
     private $option_name;
     private $cache_key;

@@ -36,7 +36,7 @@ function discord_bot_jlg_uninstall() {
     delete_option(DISCORD_BOT_JLG_OPTION_NAME);
     delete_transient(DISCORD_BOT_JLG_CACHE_KEY);
     // Réplique le nettoyage effectué par Discord_Bot_JLG_API::clear_cache().
-    delete_transient(DISCORD_BOT_JLG_CACHE_KEY . '_refresh_lock');
+    delete_transient(DISCORD_BOT_JLG_CACHE_KEY . Discord_Bot_JLG_API::REFRESH_LOCK_SUFFIX);
 }
 
 register_uninstall_hook(__FILE__, 'discord_bot_jlg_uninstall');
