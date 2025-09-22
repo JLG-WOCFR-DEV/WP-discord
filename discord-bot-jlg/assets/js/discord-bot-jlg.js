@@ -3,6 +3,24 @@
 
     var ERROR_CLASS = 'discord-stats-error';
     var ERROR_MESSAGE_CLASS = 'discord-error-message';
+    var globalConfig = {};
+
+    if (typeof window !== 'undefined' && window.discordBotJlg) {
+        globalConfig = window.discordBotJlg;
+    }
+
+    function getLocalizedString(key, fallback) {
+        if (
+            globalConfig
+            && Object.prototype.hasOwnProperty.call(globalConfig, key)
+            && typeof globalConfig[key] === 'string'
+            && globalConfig[key]
+        ) {
+            return globalConfig[key];
+        }
+
+        return fallback;
+    }
 
     function getOrCreateErrorMessageElement(container) {
         if (!container) {
@@ -68,12 +86,14 @@
     }
 
     function getDemoBadgeLabel(container) {
+        var fallbackLabel = getLocalizedString('demoBadgeLabel', 'Mode Démo');
+
         if (!container) {
-            return 'Mode Démo';
+            return fallbackLabel;
         }
 
         if (container.dataset && container.dataset.demoBadgeLabel) {
-            return container.dataset.demoBadgeLabel;
+            return container.dataset.demoBadgeLabel || fallbackLabel;
         }
 
         var existingBadge = container.querySelector('.discord-demo-badge');
@@ -85,7 +105,7 @@
             return label;
         }
 
-        var defaultLabel = 'Mode Démo';
+        var defaultLabel = fallbackLabel;
 
         if (container.dataset) {
             container.dataset.demoBadgeLabel = defaultLabel;
@@ -165,7 +185,11 @@
 
                 if (!data.success) {
                     if (data.data && data.data.nonce_expired) {
-                        var nonceMessage = data.data.message || 'Votre session a expiré, veuillez recharger la page.';
+                        var nonceMessage = data.data.message
+                            || getLocalizedString(
+                                'nonceExpiredFallback',
+                                'Votre session a expiré, veuillez recharger la page.'
+                            );
                         console.warn(nonceMessage);
                         showErrorMessage(container, nonceMessage);
                         return;
@@ -182,7 +206,13 @@
                         console.warn(errorMessage);
                         showErrorMessage(container, errorMessage);
                     } else if (container) {
-                        showErrorMessage(container, 'Une erreur est survenue lors de la récupération des statistiques.');
+                        showErrorMessage(
+                            container,
+                            getLocalizedString(
+                                'genericError',
+                                'Une erreur est survenue lors de la récupération des statistiques.'
+                            )
+                        );
                     }
 
                     return;
@@ -278,8 +308,20 @@
                 }
             })
             .catch(function (error) {
-                console.error('Erreur lors de la mise à jour des statistiques Discord :', error);
-                showErrorMessage(container, 'Une erreur est survenue lors de la récupération des statistiques.');
+                console.error(
+                    getLocalizedString(
+                        'consoleErrorPrefix',
+                        'Erreur lors de la mise à jour des statistiques Discord :'
+                    ),
+                    error
+                );
+                showErrorMessage(
+                    container,
+                    getLocalizedString(
+                        'genericError',
+                        'Une erreur est survenue lors de la récupération des statistiques.'
+                    )
+                );
             });
     }
 
@@ -289,6 +331,7 @@
         }
 
         var config = window.discordBotJlg || {};
+        globalConfig = config;
         if (!config.ajaxUrl || !config.nonce) {
             return;
         }
