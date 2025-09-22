@@ -68,6 +68,28 @@
         }
     }
 
+    var DEFAULT_NUMBER_FORMATTER = {
+        format: function (value) {
+            return String(value);
+        }
+    };
+
+    function createNumberFormatter(locale) {
+        if (typeof Intl === 'undefined' || typeof Intl.NumberFormat !== 'function') {
+            return DEFAULT_NUMBER_FORMATTER;
+        }
+
+        try {
+            return new Intl.NumberFormat(locale);
+        } catch (error) {
+            try {
+                return new Intl.NumberFormat('fr-FR');
+            } catch (fallbackError) {
+                return DEFAULT_NUMBER_FORMATTER;
+            }
+        }
+    }
+
     function updateStatElement(container, selector, value, formatter) {
         if (value === null) {
             return;
@@ -78,7 +100,11 @@
             return;
         }
 
-        element.textContent = formatter.format(value);
+        var safeFormatter = formatter && typeof formatter.format === 'function'
+            ? formatter
+            : DEFAULT_NUMBER_FORMATTER;
+
+        element.textContent = safeFormatter.format(value);
         element.style.transform = 'scale(1.2)';
         setTimeout(function () {
             element.style.transform = 'scale(1)';
@@ -337,19 +363,13 @@
         }
 
         var locale = config.locale || 'fr-FR';
-        var formatter;
+        var formatter = createNumberFormatter(locale);
 
         var minIntervalSeconds = parseInt(config.minRefreshInterval, 10);
         if (isNaN(minIntervalSeconds) || minIntervalSeconds <= 0) {
             minIntervalSeconds = 10;
         }
         var minIntervalMs = minIntervalSeconds * 1000;
-
-        try {
-            formatter = new Intl.NumberFormat(locale);
-        } catch (error) {
-            formatter = new Intl.NumberFormat('fr-FR');
-        }
 
         var containers = document.querySelectorAll('.discord-stats-container[data-refresh]');
         if (!containers.length) {
