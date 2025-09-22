@@ -11,6 +11,8 @@ class Discord_Bot_JLG_API {
 
     const MIN_PUBLIC_REFRESH_INTERVAL = 10;
 
+    private const REFRESH_LOCK_SUFFIX = '_refresh_lock';
+
     private $option_name;
     private $cache_key;
     private $default_cache_duration;
@@ -171,7 +173,7 @@ class Discord_Bot_JLG_API {
             wp_send_json_error('Mode démo actif');
         }
 
-        $rate_limit_key = $this->cache_key . '_refresh_lock';
+        $rate_limit_key = $this->cache_key . self::REFRESH_LOCK_SUFFIX;
         $cache_duration = $this->get_cache_duration($options);
         $default_public_refresh = max(self::MIN_PUBLIC_REFRESH_INTERVAL, (int) $cache_duration);
         $rate_limit_window = (int) apply_filters('discord_bot_jlg_public_refresh_interval', $default_public_refresh, $options);
@@ -286,6 +288,7 @@ class Discord_Bot_JLG_API {
      */
     public function clear_cache() {
         delete_transient($this->cache_key);
+        delete_transient($this->cache_key . self::REFRESH_LOCK_SUFFIX);
     }
 
     /**
