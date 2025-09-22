@@ -996,10 +996,11 @@ class Discord_Bot_JLG_Admin {
 
         $allowed_tags['svg'] = array(
             'class'      => true,
-            'viewbox'    => true,
+            'viewBox'    => true,
             'xmlns'      => true,
             'role'       => true,
             'aria-hidden'=> true,
+            'focusable'  => true,
         );
 
         $allowed_tags['path'] = array(
