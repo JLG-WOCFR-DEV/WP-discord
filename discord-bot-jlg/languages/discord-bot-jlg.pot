@@ -661,13 +661,26 @@ msgid "❌ Échec de la connexion. Vérifiez vos identifiants."
 msgstr ""
 
 #: inc/class-discord-api.php:156
+#: inc/class-discord-shortcode.php:352
 msgid "Votre session a expiré, veuillez recharger la page."
+msgstr ""
+
+#: inc/class-discord-api.php:162
+msgid "Nonce invalide"
+msgstr ""
+
+#: inc/class-discord-api.php:171
+msgid "Mode démo actif"
 msgstr ""
 
 #. translators: %d: number of seconds to wait before the next refresh.
 #: inc/class-discord-api.php:197
 #, php-format
 msgid "Veuillez patienter %d secondes avant la prochaine actualisation."
+msgstr ""
+
+#: inc/class-discord-api.php:279
+msgid "Impossible de récupérer les stats"
 msgstr ""
 
 #: inc/class-discord-api.php:271
@@ -686,11 +699,27 @@ msgstr ""
 msgid "Impossible de récupérer les stats Discord"
 msgstr ""
 
+#: inc/class-discord-api.php:308
+msgid "Serveur Démo"
+msgstr ""
+
 #: inc/class-discord-shortcode.php:208
+#: inc/class-discord-shortcode.php:350
 msgid "Mode Démo"
 msgstr ""
 
 #: inc/class-discord-shortcode.php:264
 #: inc/class-discord-shortcode.php:273
 msgid "approx."
+msgstr ""
+
+#: inc/class-discord-shortcode.php:351
+#: assets/js/discord-bot-jlg.js:213
+#: assets/js/discord-bot-jlg.js:322
+msgid "Une erreur est survenue lors de la récupération des statistiques."
+msgstr ""
+
+#: inc/class-discord-shortcode.php:353
+#: assets/js/discord-bot-jlg.js:314
+msgid "Erreur lors de la mise à jour des statistiques Discord :"
 msgstr ""

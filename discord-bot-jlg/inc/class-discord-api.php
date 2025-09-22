@@ -161,7 +161,7 @@ class Discord_Bot_JLG_API {
                 );
             }
 
-            wp_send_json_error('Nonce invalide', 403);
+            wp_send_json_error(__('Nonce invalide', 'discord-bot-jlg'), 403);
         }
 
         $options = get_option($this->option_name);
@@ -170,7 +170,7 @@ class Discord_Bot_JLG_API {
         }
 
         if (!empty($options['demo_mode'])) {
-            wp_send_json_error('Mode démo actif');
+            wp_send_json_error(__('Mode démo actif', 'discord-bot-jlg'));
         }
 
         $rate_limit_key = $this->cache_key . self::REFRESH_LOCK_SUFFIX;
@@ -278,7 +278,7 @@ class Discord_Bot_JLG_API {
 
         delete_transient($rate_limit_key);
 
-        wp_send_json_error('Impossible de récupérer les stats');
+        wp_send_json_error(__('Impossible de récupérer les stats', 'discord-bot-jlg'));
     }
 
     /**
@@ -308,7 +308,7 @@ class Discord_Bot_JLG_API {
         return array(
             'online'               => (int) round($base_online + $variation),
             'total'                => (int) $base_total,
-            'server_name'          => 'Serveur Démo',
+            'server_name'          => __('Serveur Démo', 'discord-bot-jlg'),
             'is_demo'              => true,
             'fallback_demo'        => (bool) $is_fallback,
             'has_total'            => true,

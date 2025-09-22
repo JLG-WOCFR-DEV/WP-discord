@@ -347,6 +347,10 @@ class Discord_Bot_JLG_Shortcode {
                 'minRefreshInterval' => defined('Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL')
                     ? Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL
                     : 10,
+                'demoBadgeLabel'       => __('Mode Démo', 'discord-bot-jlg'),
+                'genericError'         => __('Une erreur est survenue lors de la récupération des statistiques.', 'discord-bot-jlg'),
+                'nonceExpiredFallback' => __('Votre session a expiré, veuillez recharger la page.', 'discord-bot-jlg'),
+                'consoleErrorPrefix'   => __('Erreur lors de la mise à jour des statistiques Discord :', 'discord-bot-jlg'),
             )
         );
 
