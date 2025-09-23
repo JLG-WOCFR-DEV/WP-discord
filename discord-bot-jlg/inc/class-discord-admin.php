@@ -893,6 +893,12 @@ class Discord_Bot_JLG_Admin {
                 'bypass_cache' => true,
             )
         );
+        $diagnostic = $this->api->get_last_error_message();
+        $diagnostic_suffix = '';
+
+        if (!empty($diagnostic)) {
+            $diagnostic_suffix = ' ' . esc_html($diagnostic);
+        }
 
         if (is_array($stats) && empty($stats['is_demo'])) {
             $server_name = isset($stats['server_name']) ? $stats['server_name'] : '';
@@ -917,13 +923,15 @@ class Discord_Bot_JLG_Admin {
             );
         } elseif (is_array($stats) && !empty($stats['is_demo'])) {
             printf(
-                '<div class="notice notice-warning"><p>%s</p></div>',
-                esc_html__('⚠️ Pas de configuration Discord détectée. Mode démo actif.', 'discord-bot-jlg')
+                '<div class="notice notice-warning"><p>%s%s</p></div>',
+                esc_html__('⚠️ Pas de configuration Discord détectée. Mode démo actif.', 'discord-bot-jlg'),
+                $diagnostic_suffix
             );
         } else {
             printf(
-                '<div class="notice notice-error"><p>%s</p></div>',
-                esc_html__('❌ Échec de la connexion. Vérifiez vos identifiants.', 'discord-bot-jlg')
+                '<div class="notice notice-error"><p>%s%s</p></div>',
+                esc_html__('❌ Échec de la connexion. Vérifiez vos identifiants.', 'discord-bot-jlg'),
+                $diagnostic_suffix
             );
         }
     }
