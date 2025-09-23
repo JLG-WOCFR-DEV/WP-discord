@@ -174,6 +174,7 @@ class Discord_Bot_JLG_API {
         }
 
         $rate_limit_key = $this->cache_key . self::REFRESH_LOCK_SUFFIX;
+        $fallback_bypass_key = $this->cache_key . '_fallback_bypass';
         $cache_duration = $this->get_cache_duration($options);
         $default_public_refresh = max(self::MIN_PUBLIC_REFRESH_INTERVAL, (int) $cache_duration);
         $rate_limit_window = (int) apply_filters('discord_bot_jlg_public_refresh_interval', $default_public_refresh, $options);
@@ -182,10 +183,21 @@ class Discord_Bot_JLG_API {
         }
 
         $refresh_requires_remote_call = false;
+        $fallback_bypass_active      = (bool) get_transient($fallback_bypass_key);
 
         if (true === $is_public_request) {
             $cached_stats = get_transient($this->cache_key);
-            if (is_array($cached_stats) && empty($cached_stats['is_demo'])) {
+            $cached_stats_is_fallback = (
+                is_array($cached_stats)
+                && !empty($cached_stats['is_demo'])
+                && !empty($cached_stats['fallback_demo'])
+            );
+
+            if (true === $cached_stats_is_fallback) {
+                delete_transient($this->cache_key);
+                $fallback_bypass_active = true;
+                set_transient($fallback_bypass_key, 1, max($cache_duration, self::MIN_PUBLIC_REFRESH_INTERVAL));
+            } elseif (false === $fallback_bypass_active && is_array($cached_stats) && empty($cached_stats['is_demo'])) {
                 wp_send_json_success($cached_stats);
             }
 
@@ -214,7 +226,7 @@ class Discord_Bot_JLG_API {
             $refresh_requires_remote_call = true;
         }
 
-        $bypass_cache = false;
+        $bypass_cache = $fallback_bypass_active;
 
         if (isset($_POST['force_refresh'])) {
             $force_refresh = wp_validate_boolean(wp_unslash($_POST['force_refresh']));
@@ -233,6 +245,16 @@ class Discord_Bot_JLG_API {
                 'bypass_cache' => $bypass_cache,
             )
         );
+
+        if (
+            is_array($stats)
+            && !empty($stats['is_demo'])
+            && !empty($stats['fallback_demo'])
+        ) {
+            set_transient($fallback_bypass_key, 1, max($cache_duration, self::MIN_PUBLIC_REFRESH_INTERVAL));
+        } else {
+            delete_transient($fallback_bypass_key);
+        }
 
         if (
             true === $is_public_request
