@@ -3,6 +3,7 @@
 
     var ERROR_CLASS = 'discord-stats-error';
     var ERROR_MESSAGE_CLASS = 'discord-error-message';
+    var STALE_NOTICE_CLASS = 'discord-stale-notice';
     var globalConfig = {};
 
     if (typeof window !== 'undefined' && window.discordBotJlg) {
@@ -36,6 +37,100 @@
         }
 
         return messageElement;
+    }
+
+    function getOrCreateStaleNoticeElement(container) {
+        if (!container) {
+            return null;
+        }
+
+        var notice = container.querySelector('.' + STALE_NOTICE_CLASS);
+        if (!notice) {
+            notice = document.createElement('div');
+            notice.className = STALE_NOTICE_CLASS;
+            container.appendChild(notice);
+        }
+
+        return notice;
+    }
+
+    function removeStaleNotice(container) {
+        if (!container) {
+            return;
+        }
+
+        var notice = container.querySelector('.' + STALE_NOTICE_CLASS);
+        if (notice && notice.parentNode) {
+            notice.parentNode.removeChild(notice);
+        }
+    }
+
+    function formatStaleMessage(timestamp, locale) {
+        if (!timestamp) {
+            return getLocalizedString('staleNotice', 'Données mises en cache');
+        }
+
+        var date;
+        try {
+            date = new Date(timestamp * 1000);
+        } catch (error) {
+            date = null;
+        }
+
+        if (!date || isNaN(date.getTime())) {
+            return getLocalizedString('staleNotice', 'Données mises en cache');
+        }
+
+        var formatted;
+
+        try {
+            formatted = date.toLocaleString(locale || undefined);
+        } catch (error) {
+            try {
+                formatted = date.toLocaleString('fr-FR');
+            } catch (fallbackError) {
+                formatted = date.toISOString();
+            }
+        }
+
+        var template = getLocalizedString('staleNotice', 'Données mises en cache du %s');
+
+        if (template.indexOf('%s') === -1) {
+            return template + ' ' + formatted;
+        }
+
+        return template.replace('%s', formatted);
+    }
+
+    function updateStaleNotice(container, isStale, timestamp, locale) {
+        if (!container) {
+            return;
+        }
+
+        if (!isStale) {
+            removeStaleNotice(container);
+            if (container.dataset) {
+                container.dataset.stale = 'false';
+                delete container.dataset.lastUpdated;
+            }
+            return;
+        }
+
+        var notice = getOrCreateStaleNoticeElement(container);
+        if (!notice) {
+            return;
+        }
+
+        if (container.dataset) {
+            container.dataset.stale = 'true';
+            if (timestamp) {
+                container.dataset.lastUpdated = String(timestamp);
+            } else {
+                delete container.dataset.lastUpdated;
+            }
+        }
+
+        notice.textContent = formatStaleMessage(timestamp, locale);
     }
 
     function showErrorMessage(container, message) {
@@ -191,7 +286,7 @@
         updateDemoBadge(container, shouldShowBadge);
     }
 
-    function updateStats(container, config, formatter) {
+    function updateStats(container, config, formatter, locale) {
         var formData = new FormData();
         formData.append('action', config.action || 'refresh_discord_stats');
         formData.append('_ajax_nonce', config.nonce);
@@ -255,6 +350,16 @@
                 var hasTotalInfo = data.data && typeof data.data.has_total !== 'undefined';
                 var isDemo = !!(data.data && data.data.is_demo);
                 var isFallbackDemo = !!(data.data && data.data.fallback_demo);
+                var isStale = !!(data.data && data.data.stale);
+                var lastUpdated = null;
+
+                if (data.data && typeof data.data.last_updated !== 'undefined') {
+                    var parsed = parseInt(data.data.last_updated, 10);
+                    if (!isNaN(parsed) && parsed > 0) {
+                        lastUpdated = parsed;
+                    }
+                }
+
                 var onlineValue = typeof data.data.online === 'number' ? data.data.online : null;
                 var totalValue = typeof data.data.total === 'number' ? data.data.total : null;
 
@@ -265,6 +370,8 @@
                 clearErrorMessage(container);
 
                 applyDemoState(container, isDemo, isFallbackDemo);
+
+                updateStaleNotice(container, isStale, lastUpdated, locale);
 
                 updateStatElement(container, '.discord-online .discord-number', onlineValue, formatter);
 
@@ -388,6 +495,15 @@
                 return;
             }
 
+            if (container.dataset && container.dataset.stale === 'true') {
+                var initialTimestamp = container.dataset.lastUpdated ? parseInt(container.dataset.lastUpdated, 10) : null;
+                if (!isNaN(initialTimestamp) && initialTimestamp > 0) {
+                    updateStaleNotice(container, true, initialTimestamp, locale);
+                } else {
+                    updateStaleNotice(container, true, null, locale);
+                }
+            }
+
             // L'attribut data-refresh est exprimé en secondes côté PHP.
             if (interval < minIntervalSeconds) {
                 interval = minIntervalSeconds;
@@ -399,7 +515,7 @@
             }
 
             setInterval(function () {
-                updateStats(container, config, formatter);
+                updateStats(container, config, formatter, locale);
             }, intervalMs);
         });
     }
