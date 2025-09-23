@@ -108,6 +108,8 @@ class Discord_Bot_JLG_Shortcode {
 
         $has_total            = !empty($stats['has_total']) && isset($stats['total']) && null !== $stats['total'];
         $total_is_approximate = !empty($stats['total_is_approximate']);
+        $is_stale             = !empty($stats['stale']);
+        $last_updated         = isset($stats['last_updated']) ? (int) $stats['last_updated'] : 0;
 
         $container_classes = array('discord-stats-container');
 
@@ -179,7 +181,12 @@ class Discord_Bot_JLG_Shortcode {
             sprintf('class="%s"', esc_attr(implode(' ', $container_classes))),
             sprintf('data-demo="%s"', esc_attr($is_forced_demo ? 'true' : 'false')),
             sprintf('data-fallback-demo="%s"', esc_attr($is_fallback_demo ? 'true' : 'false')),
+            sprintf('data-stale="%s"', esc_attr($is_stale ? 'true' : 'false')),
         );
+
+        if ($is_stale && $last_updated > 0) {
+            $attributes[] = sprintf('data-last-updated="%s"', esc_attr($last_updated));
+        }
 
         if (!empty($style_declarations)) {
             $attributes[] = sprintf('style="%s"', esc_attr(implode('; ', $style_declarations)));
@@ -351,6 +358,7 @@ class Discord_Bot_JLG_Shortcode {
                 'genericError'         => __('Une erreur est survenue lors de la récupération des statistiques.', 'discord-bot-jlg'),
                 'nonceExpiredFallback' => __('Votre session a expiré, veuillez recharger la page.', 'discord-bot-jlg'),
                 'consoleErrorPrefix'   => __('Erreur lors de la mise à jour des statistiques Discord :', 'discord-bot-jlg'),
+                'staleNotice'          => __('Données mises en cache du %s', 'discord-bot-jlg'),
             )
         );
 

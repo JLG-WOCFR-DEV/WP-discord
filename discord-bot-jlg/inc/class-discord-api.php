@@ -12,6 +12,7 @@ class Discord_Bot_JLG_API {
     const MIN_PUBLIC_REFRESH_INTERVAL = 10;
 
     const REFRESH_LOCK_SUFFIX = '_refresh_lock';
+    const LAST_GOOD_SUFFIX = '_last_good';
 
     private $option_name;
     private $cache_key;
@@ -144,6 +145,7 @@ class Discord_Bot_JLG_API {
         }
 
         set_transient($this->cache_key, $stats, $this->get_cache_duration($options));
+        $this->store_last_good_stats($stats);
 
         return $stats;
     }
@@ -352,6 +354,26 @@ class Discord_Bot_JLG_API {
      * @return array Statistiques de démonstration comprenant les clés `online`, `total`, `server_name`, `is_demo` et `fallback_demo`.
      */
     public function get_demo_stats($is_fallback = false) {
+        if ($is_fallback) {
+            $last_good = get_transient($this->get_last_good_cache_key());
+
+            if (
+                is_array($last_good)
+                && isset($last_good['stats'])
+                && is_array($last_good['stats'])
+            ) {
+                $timestamp = isset($last_good['timestamp']) ? (int) $last_good['timestamp'] : time();
+
+                $stats = $last_good['stats'];
+                $stats['is_demo'] = true;
+                $stats['fallback_demo'] = true;
+                $stats['stale'] = true;
+                $stats['last_updated'] = $timestamp;
+
+                return $stats;
+            }
+        }
+
         $base_online = 42;
         $base_total  = 256;
 
@@ -367,6 +389,30 @@ class Discord_Bot_JLG_API {
             'has_total'            => true,
             'total_is_approximate' => false,
         );
+    }
+
+    private function get_last_good_cache_key() {
+        return $this->cache_key . self::LAST_GOOD_SUFFIX;
+    }
+
+    private function store_last_good_stats($stats) {
+        if (!is_array($stats)) {
+            return;
+        }
+
+        if (!empty($stats['is_demo'])) {
+            return;
+        }
+
+        $normalized_stats = $stats;
+        unset($normalized_stats['stale'], $normalized_stats['last_updated']);
+
+        $payload = array(
+            'stats'     => $normalized_stats,
+            'timestamp' => time(),
+        );
+
+        set_transient($this->get_last_good_cache_key(), $payload, 0);
     }
 
     private function get_stats_from_widget($options) {
