@@ -16,6 +16,7 @@ class Discord_Bot_JLG_API {
     private $option_name;
     private $cache_key;
     private $default_cache_duration;
+    private $last_error;
 
     /**
      * Prépare le service d'accès aux statistiques avec les clés et durées nécessaires.
@@ -30,6 +31,7 @@ class Discord_Bot_JLG_API {
         $this->option_name = $option_name;
         $this->cache_key = $cache_key;
         $this->default_cache_duration = (int) $default_cache_duration;
+        $this->last_error = '';
     }
 
     /**
@@ -45,6 +47,8 @@ class Discord_Bot_JLG_API {
      * @return array Statistiques du serveur (clés `online`, `total`, `server_name`, `is_demo`, éventuellement `fallback_demo`).
      */
     public function get_stats($args = array()) {
+        $this->last_error = '';
+
         $args = wp_parse_args(
             $args,
             array(
@@ -74,6 +78,7 @@ class Discord_Bot_JLG_API {
         }
 
         if (empty($options['server_id'])) {
+            $this->last_error = __('Aucun identifiant de serveur Discord n\'est configuré.', 'discord-bot-jlg');
             return $this->get_demo_stats(true);
         }
 
@@ -132,12 +137,24 @@ class Discord_Bot_JLG_API {
         }
 
         if (false === $this->has_usable_stats($stats)) {
+            if (empty($this->last_error)) {
+                $this->last_error = __('Impossible d\'obtenir des statistiques exploitables depuis Discord.', 'discord-bot-jlg');
+            }
             return $this->get_demo_stats(true);
         }
 
         set_transient($this->cache_key, $stats, $this->get_cache_duration($options));
 
         return $stats;
+    }
+
+    /**
+     * Renvoie le dernier message d'erreur rencontré lors d'une récupération de statistiques.
+     *
+     * @return string
+     */
+    public function get_last_error_message() {
+        return (string) $this->last_error;
     }
 
     /**
@@ -247,6 +264,8 @@ class Discord_Bot_JLG_API {
             )
         );
 
+        $last_error_message = $this->get_last_error_message();
+
         if (
             is_array($stats)
             && !empty($stats['is_demo'])
@@ -290,18 +309,29 @@ class Discord_Bot_JLG_API {
 
             delete_transient($rate_limit_key);
 
-            wp_send_json_error(
-                array(
-                    'rate_limited' => false,
-                    'message'      => __('Actualisation en cours, veuillez réessayer dans quelques instants.', 'discord-bot-jlg'),
-                ),
-                503
+            $error_payload = array(
+                'rate_limited' => false,
+                'message'      => __('Actualisation en cours, veuillez réessayer dans quelques instants.', 'discord-bot-jlg'),
             );
+
+            if (!empty($last_error_message)) {
+                $error_payload['diagnostic'] = $last_error_message;
+            }
+
+            wp_send_json_error($error_payload, 503);
         }
 
         delete_transient($rate_limit_key);
 
-        wp_send_json_error(__('Impossible de récupérer les stats', 'discord-bot-jlg'));
+        $error_payload = array(
+            'message' => __('Impossible de récupérer les stats', 'discord-bot-jlg'),
+        );
+
+        if (!empty($last_error_message)) {
+            $error_payload['diagnostic'] = $last_error_message;
+        }
+
+        wp_send_json_error($error_payload);
     }
 
     /**
@@ -353,12 +383,22 @@ class Discord_Bot_JLG_API {
         );
 
         if (is_wp_error($response)) {
+            $this->last_error = sprintf(
+                /* translators: %s: error message. */
+                __('Erreur lors de l\'appel du widget Discord : %s', 'discord-bot-jlg'),
+                $response->get_error_message()
+            );
             error_log('Discord API error (widget): ' . $response->get_error_message());
             return false;
         }
 
         $response_code = (int) wp_remote_retrieve_response_code($response);
         if (200 !== $response_code) {
+            $this->last_error = sprintf(
+                /* translators: %d: HTTP status code. */
+                __('Réponse inattendue du widget Discord : HTTP %d', 'discord-bot-jlg'),
+                $response_code
+            );
             error_log('Discord API error (widget): HTTP ' . $response_code);
             return false;
         }
@@ -427,12 +467,22 @@ class Discord_Bot_JLG_API {
         );
 
         if (is_wp_error($response)) {
+            $this->last_error = sprintf(
+                /* translators: %s: error message. */
+                __('Erreur lors de l\'appel de l\'API Discord (bot) : %s', 'discord-bot-jlg'),
+                $response->get_error_message()
+            );
             error_log('Discord API error (bot): ' . $response->get_error_message());
             return false;
         }
 
         $response_code = (int) wp_remote_retrieve_response_code($response);
         if (200 !== $response_code) {
+            $this->last_error = sprintf(
+                /* translators: %d: HTTP status code. */
+                __('Réponse inattendue de l\'API Discord (bot) : HTTP %d', 'discord-bot-jlg'),
+                $response_code
+            );
             error_log('Discord API error (bot): HTTP ' . $response_code);
             return false;
         }
