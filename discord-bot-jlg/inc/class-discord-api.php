@@ -359,6 +359,15 @@ class Discord_Bot_JLG_API {
      * @return void
      */
     public function purge_full_cache() {
+        $this->clear_all_cached_data();
+    }
+
+    /**
+     * Supprime toutes les informations mises en cache, y compris les drapeaux de secours.
+     *
+     * @return void
+     */
+    public function clear_all_cached_data() {
         delete_transient($this->cache_key);
         delete_transient($this->cache_key . self::REFRESH_LOCK_SUFFIX);
         delete_transient($this->cache_key . '_fallback_bypass');
