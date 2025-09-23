@@ -34,11 +34,20 @@ define('DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION', 300);
  */
 function discord_bot_jlg_uninstall() {
     delete_option(DISCORD_BOT_JLG_OPTION_NAME);
-    delete_transient(DISCORD_BOT_JLG_CACHE_KEY);
-    // Réplique le nettoyage effectué par Discord_Bot_JLG_API::purge_full_cache().
-    delete_transient(DISCORD_BOT_JLG_CACHE_KEY . '_refresh_lock');
-    delete_transient(DISCORD_BOT_JLG_CACHE_KEY . '_fallback_bypass');
-    delete_transient(DISCORD_BOT_JLG_CACHE_KEY . '_last_good');
+
+    if (!class_exists('Discord_Bot_JLG_API')) {
+        require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-api.php';
+    }
+
+    if (class_exists('Discord_Bot_JLG_API')) {
+        $api = new Discord_Bot_JLG_API(
+            DISCORD_BOT_JLG_OPTION_NAME,
+            DISCORD_BOT_JLG_CACHE_KEY,
+            DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION
+        );
+
+        $api->clear_cache(true);
+    }
 }
 
 register_uninstall_hook(__FILE__, 'discord_bot_jlg_uninstall');
