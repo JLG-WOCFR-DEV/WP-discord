@@ -394,11 +394,22 @@ class Discord_Bot_JLG_API {
 
         $response_code = (int) wp_remote_retrieve_response_code($response);
         if (200 !== $response_code) {
-            $this->last_error = sprintf(
-                /* translators: %d: HTTP status code. */
-                __('Réponse inattendue du widget Discord : HTTP %d', 'discord-bot-jlg'),
-                $response_code
-            );
+            $error_detail = $this->get_response_error_detail($response);
+
+            if (!empty($error_detail)) {
+                $this->last_error = sprintf(
+                    /* translators: 1: HTTP status code, 2: error message. */
+                    __('Réponse inattendue du widget Discord : HTTP %1$d (%2$s)', 'discord-bot-jlg'),
+                    $response_code,
+                    $error_detail
+                );
+            } else {
+                $this->last_error = sprintf(
+                    /* translators: %d: HTTP status code. */
+                    __('Réponse inattendue du widget Discord : HTTP %d', 'discord-bot-jlg'),
+                    $response_code
+                );
+            }
             error_log('Discord API error (widget): HTTP ' . $response_code);
             return false;
         }
@@ -407,6 +418,7 @@ class Discord_Bot_JLG_API {
         $data = json_decode($body, true);
 
         if (false === is_array($data)) {
+            $this->last_error = __('Réponse JSON invalide reçue depuis le widget Discord.', 'discord-bot-jlg');
             return false;
         }
 
@@ -414,6 +426,7 @@ class Discord_Bot_JLG_API {
         $has_members_list   = isset($data['members']) && is_array($data['members']);
 
         if (false === $has_presence_count && false === $has_members_list) {
+            $this->last_error = __('Données incomplètes reçues depuis le widget Discord.', 'discord-bot-jlg');
             return false;
         }
 
@@ -478,11 +491,22 @@ class Discord_Bot_JLG_API {
 
         $response_code = (int) wp_remote_retrieve_response_code($response);
         if (200 !== $response_code) {
-            $this->last_error = sprintf(
-                /* translators: %d: HTTP status code. */
-                __('Réponse inattendue de l\'API Discord (bot) : HTTP %d', 'discord-bot-jlg'),
-                $response_code
-            );
+            $error_detail = $this->get_response_error_detail($response);
+
+            if (!empty($error_detail)) {
+                $this->last_error = sprintf(
+                    /* translators: 1: HTTP status code, 2: error message. */
+                    __('Réponse inattendue de l\'API Discord (bot) : HTTP %1$d (%2$s)', 'discord-bot-jlg'),
+                    $response_code,
+                    $error_detail
+                );
+            } else {
+                $this->last_error = sprintf(
+                    /* translators: %d: HTTP status code. */
+                    __('Réponse inattendue de l\'API Discord (bot) : HTTP %d', 'discord-bot-jlg'),
+                    $response_code
+                );
+            }
             error_log('Discord API error (bot): HTTP ' . $response_code);
             return false;
         }
@@ -491,10 +515,12 @@ class Discord_Bot_JLG_API {
         $data = json_decode($body, true);
 
         if (false === is_array($data)) {
+            $this->last_error = __('Réponse JSON invalide reçue depuis l\'API Discord (bot).', 'discord-bot-jlg');
             return false;
         }
 
         if (false === isset($data['approximate_presence_count'], $data['approximate_member_count'])) {
+            $this->last_error = __('Données incomplètes reçues depuis l\'API Discord (bot).', 'discord-bot-jlg');
             return false;
         }
 
@@ -506,6 +532,37 @@ class Discord_Bot_JLG_API {
             // Discord renvoie uniquement un total approximatif via approximate_member_count.
             'total_is_approximate' => true,
         );
+    }
+
+    private function get_response_error_detail($response) {
+        $message = wp_remote_retrieve_response_message($response);
+        $body    = wp_remote_retrieve_body($response);
+
+        if (!empty($body)) {
+            $decoded_body = json_decode($body, true);
+
+            if (is_array($decoded_body)) {
+                $body_message = '';
+
+                if (!empty($decoded_body['message']) && is_string($decoded_body['message'])) {
+                    $body_message = $decoded_body['message'];
+                } elseif (!empty($decoded_body['error']) && is_string($decoded_body['error'])) {
+                    $body_message = $decoded_body['error'];
+                }
+
+                if (!empty($body_message)) {
+                    $message = $body_message;
+                }
+            } elseif (empty($message)) {
+                $message = $body;
+            }
+        }
+
+        if (empty($message)) {
+            return '';
+        }
+
+        return trim(wp_strip_all_tags($message));
     }
 
     private function has_usable_stats($stats) {
