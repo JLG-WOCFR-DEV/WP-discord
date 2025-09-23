@@ -35,8 +35,10 @@ define('DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION', 300);
 function discord_bot_jlg_uninstall() {
     delete_option(DISCORD_BOT_JLG_OPTION_NAME);
     delete_transient(DISCORD_BOT_JLG_CACHE_KEY);
-    // Réplique le nettoyage effectué par Discord_Bot_JLG_API::clear_cache().
+    // Réplique le nettoyage effectué par Discord_Bot_JLG_API::purge_full_cache().
     delete_transient(DISCORD_BOT_JLG_CACHE_KEY . '_refresh_lock');
+    delete_transient(DISCORD_BOT_JLG_CACHE_KEY . '_fallback_bypass');
+    delete_transient(DISCORD_BOT_JLG_CACHE_KEY . '_last_good');
 }
 
 register_uninstall_hook(__FILE__, 'discord_bot_jlg_uninstall');
@@ -103,6 +105,19 @@ class DiscordServerStats {
     }
 
     public function handle_settings_update($old_value, $value) {
+        $old_value = is_array($old_value) ? $old_value : array();
+        $value     = is_array($value) ? $value : array();
+
+        $old_server_id = isset($old_value['server_id']) ? (string) $old_value['server_id'] : '';
+        $new_server_id = isset($value['server_id']) ? (string) $value['server_id'] : '';
+        $old_bot_token = isset($old_value['bot_token']) ? (string) $old_value['bot_token'] : '';
+        $new_bot_token = isset($value['bot_token']) ? (string) $value['bot_token'] : '';
+
+        if ($old_server_id !== $new_server_id || $old_bot_token !== $new_bot_token) {
+            $this->api->clear_cache(true);
+            return;
+        }
+
         $this->api->clear_cache();
     }
 }

@@ -339,11 +339,30 @@ class Discord_Bot_JLG_API {
     /**
      * Supprime les statistiques mises en cache pour forcer une prochaine récupération.
      *
+     * @param bool $full Supprime également les données persistantes (sauvegardes et indicateurs) si vrai.
+     *
      * @return void
      */
-    public function clear_cache() {
+    public function clear_cache($full = false) {
+        if (true === $full) {
+            $this->purge_full_cache();
+            return;
+        }
+
         delete_transient($this->cache_key);
         delete_transient($this->cache_key . self::REFRESH_LOCK_SUFFIX);
+    }
+
+    /**
+     * Supprime toutes les données de cache, y compris les sauvegardes de secours.
+     *
+     * @return void
+     */
+    public function purge_full_cache() {
+        delete_transient($this->cache_key);
+        delete_transient($this->cache_key . self::REFRESH_LOCK_SUFFIX);
+        delete_transient($this->cache_key . '_fallback_bypass');
+        delete_transient($this->get_last_good_cache_key());
     }
 
     /**
