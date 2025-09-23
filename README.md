@@ -37,6 +37,10 @@ Pour activer l'auto-actualisation, utilisez par exemple :
 
 Le paramètre `refresh_interval` est exprimé en secondes et doit être d'au moins 10 secondes (10 000 ms). Toute valeur plus basse est automatiquement portée à 10 secondes pour éviter les erreurs 429 de Discord.
 
+### Rafraîchissement public & sécurité
+
+Les appels AJAX publics déclenchés par l'auto-actualisation n'utilisent plus de nonce WordPress. La protection repose désormais sur le cache et sur la limitation de fréquence côté serveur (intervalle minimal de 10 secondes, ajustable dans les options). Les utilisateurs connectés continuent à profiter d'un nonce pour les actions nécessitant des privilèges d'administration (ex. forcer un rafraîchissement depuis le back-office).
+
 ### Widget
 Un widget « Discord Bot - JLG » est disponible via le menu « Widgets ».
 

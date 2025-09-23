@@ -349,7 +349,7 @@ class Discord_Bot_JLG_Shortcode {
             array(
                 'ajaxUrl' => admin_url('admin-ajax.php'),
                 'action'  => 'refresh_discord_stats',
-                'nonce'   => wp_create_nonce('refresh_discord_stats'),
+                'nonce'   => is_user_logged_in() ? wp_create_nonce('refresh_discord_stats') : '',
                 'locale'  => $locale,
                 'minRefreshInterval' => defined('Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL')
                     ? Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL

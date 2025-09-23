@@ -802,6 +802,7 @@ class Discord_Bot_JLG_Admin {
                 <li><?php echo wp_kses_post(__('<strong>Stats à 0 ?</strong> Assurez-vous que le widget est activé dans les paramètres Discord', 'discord-bot-jlg')); ?></li>
                 <li><?php echo wp_kses_post(__('<strong>Token invalide ?</strong> Régénérez le token dans le Developer Portal', 'discord-bot-jlg')); ?></li>
                 <li><?php echo wp_kses_post(__('<strong>Cache ?</strong> Les stats sont mises à jour toutes les 5 minutes par défaut', 'discord-bot-jlg')); ?></li>
+                <li><?php echo wp_kses_post(__('<strong>Rafraîchissement public :</strong> Aucun nonce n\'est requis pour l\'auto-actualisation, un délai minimal de 10&nbsp;s limite les abus.', 'discord-bot-jlg')); ?></li>
             </ul>
         </div>
         <?php

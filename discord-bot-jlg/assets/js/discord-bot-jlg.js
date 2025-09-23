@@ -289,7 +289,10 @@
     function updateStats(container, config, formatter, locale) {
         var formData = new FormData();
         formData.append('action', config.action || 'refresh_discord_stats');
-        formData.append('_ajax_nonce', config.nonce);
+
+        if (config.nonce) {
+            formData.append('_ajax_nonce', config.nonce);
+        }
 
         fetch(config.ajaxUrl, {
             method: 'POST',
@@ -305,7 +308,7 @@
                 }
 
                 if (!data.success) {
-                    if (data.data && data.data.nonce_expired) {
+                    if (config.nonce && data.data && data.data.nonce_expired) {
                         var nonceMessage = data.data.message
                             || getLocalizedString(
                                 'nonceExpiredFallback',
@@ -465,7 +468,7 @@
 
         var config = window.discordBotJlg || {};
         globalConfig = config;
-        if (!config.ajaxUrl || !config.nonce) {
+        if (!config.ajaxUrl) {
             return;
         }
 
