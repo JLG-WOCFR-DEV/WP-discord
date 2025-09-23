@@ -12,6 +12,7 @@ class Discord_Bot_JLG_API {
     const MIN_PUBLIC_REFRESH_INTERVAL = 10;
 
     const REFRESH_LOCK_SUFFIX = '_refresh_lock';
+    const LAST_GOOD_SUFFIX    = '_last_good';
 
     private $option_name;
     private $cache_key;
@@ -136,6 +137,7 @@ class Discord_Bot_JLG_API {
         }
 
         set_transient($this->cache_key, $stats, $this->get_cache_duration($options));
+        $this->store_last_good_stats($stats);
 
         return $stats;
     }
@@ -185,11 +187,7 @@ class Discord_Bot_JLG_API {
         $refresh_requires_remote_call = false;
         $fallback_bypass_active      = (bool) get_transient($fallback_bypass_key);
         $cached_stats                = get_transient($this->cache_key);
-        $cached_stats_is_fallback    = (
-            is_array($cached_stats)
-            && !empty($cached_stats['is_demo'])
-            && !empty($cached_stats['fallback_demo'])
-        );
+        $cached_stats_is_fallback = $this->is_fallback_stats($cached_stats);
 
         if (true === $cached_stats_is_fallback) {
             delete_transient($this->cache_key);
@@ -247,11 +245,7 @@ class Discord_Bot_JLG_API {
             )
         );
 
-        if (
-            is_array($stats)
-            && !empty($stats['is_demo'])
-            && !empty($stats['fallback_demo'])
-        ) {
+        if ($this->is_fallback_stats($stats)) {
             set_transient($fallback_bypass_key, 1, max($cache_duration, self::MIN_PUBLIC_REFRESH_INTERVAL));
         } else {
             delete_transient($fallback_bypass_key);
@@ -266,11 +260,7 @@ class Discord_Bot_JLG_API {
             set_transient($rate_limit_key, time(), $rate_limit_window);
         }
 
-        if (
-            is_array($stats)
-            && !empty($stats['is_demo'])
-            && !empty($stats['fallback_demo'])
-        ) {
+        if ($this->is_fallback_stats($stats)) {
             if (true === $is_public_request) {
                 delete_transient($rate_limit_key);
             }
@@ -312,6 +302,7 @@ class Discord_Bot_JLG_API {
     public function clear_cache() {
         delete_transient($this->cache_key);
         delete_transient($this->cache_key . self::REFRESH_LOCK_SUFFIX);
+        delete_transient($this->get_last_good_transient_key());
     }
 
     /**
@@ -322,6 +313,23 @@ class Discord_Bot_JLG_API {
      * @return array Statistiques de démonstration comprenant les clés `online`, `total`, `server_name`, `is_demo` et `fallback_demo`.
      */
     public function get_demo_stats($is_fallback = false) {
+        if (true === $is_fallback) {
+            $last_good_stats = $this->get_last_good_stats();
+            if (false !== $last_good_stats) {
+                $stats = $this->normalize_stats($last_good_stats['stats']);
+
+                if (!isset($stats['is_demo'])) {
+                    $stats['is_demo'] = false;
+                }
+
+                $stats['stale']         = true;
+                $stats['last_updated']  = (int) $last_good_stats['timestamp'];
+                $stats['fallback_demo'] = true;
+
+                return $stats;
+            }
+        }
+
         $base_online = 42;
         $base_total  = 256;
 
@@ -337,6 +345,60 @@ class Discord_Bot_JLG_API {
             'has_total'            => true,
             'total_is_approximate' => false,
         );
+    }
+
+    private function get_last_good_transient_key() {
+        return $this->cache_key . self::LAST_GOOD_SUFFIX;
+    }
+
+    private function store_last_good_stats($stats) {
+        if (!is_array($stats) || !empty($stats['is_demo'])) {
+            return;
+        }
+
+        unset($stats['stale'], $stats['last_updated']);
+
+        $payload = array(
+            'stats'     => $stats,
+            'timestamp' => (int) current_time('timestamp'),
+        );
+
+        set_transient($this->get_last_good_transient_key(), $payload, 0);
+    }
+
+    private function get_last_good_stats() {
+        $payload = get_transient($this->get_last_good_transient_key());
+
+        if (!is_array($payload)) {
+            return false;
+        }
+
+        if (empty($payload['stats']) || !is_array($payload['stats'])) {
+            return false;
+        }
+
+        $timestamp = isset($payload['timestamp']) ? (int) $payload['timestamp'] : 0;
+
+        if ($timestamp <= 0) {
+            $timestamp = (int) current_time('timestamp');
+        }
+
+        return array(
+            'stats'     => $payload['stats'],
+            'timestamp' => $timestamp,
+        );
+    }
+
+    private function is_fallback_stats($stats) {
+        if (!is_array($stats)) {
+            return false;
+        }
+
+        if (!empty($stats['stale'])) {
+            return true;
+        }
+
+        return (!empty($stats['is_demo']) && !empty($stats['fallback_demo']));
     }
 
     private function get_stats_from_widget($options) {

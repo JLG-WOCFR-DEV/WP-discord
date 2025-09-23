@@ -3,6 +3,7 @@
 
     var ERROR_CLASS = 'discord-stats-error';
     var ERROR_MESSAGE_CLASS = 'discord-error-message';
+    var STALE_NOTICE_CLASS = 'discord-stale-notice';
     var globalConfig = {};
 
     if (typeof window !== 'undefined' && window.discordBotJlg) {
@@ -191,7 +192,122 @@
         updateDemoBadge(container, shouldShowBadge);
     }
 
-    function updateStats(container, config, formatter) {
+    function formatLastUpdated(timestamp, locale) {
+        if (typeof timestamp === 'undefined' || timestamp === null) {
+            return '';
+        }
+
+        var numericTimestamp = typeof timestamp === 'number'
+            ? timestamp
+            : parseInt(timestamp, 10);
+
+        if (isNaN(numericTimestamp) || numericTimestamp <= 0) {
+            return '';
+        }
+
+        var date = new Date(numericTimestamp * 1000);
+
+        if (isNaN(date.getTime())) {
+            return '';
+        }
+
+        try {
+            return date.toLocaleString(locale || 'fr-FR');
+        } catch (error) {
+            try {
+                return date.toLocaleString('fr-FR');
+            } catch (fallbackError) {
+                return date.toISOString();
+            }
+        }
+    }
+
+    function getOrCreateStaleNotice(container) {
+        if (!container) {
+            return null;
+        }
+
+        var notice = container.querySelector('.' + STALE_NOTICE_CLASS);
+
+        if (!notice) {
+            notice = document.createElement('div');
+            notice.className = STALE_NOTICE_CLASS;
+            notice.setAttribute('role', 'status');
+            container.appendChild(notice);
+        }
+
+        return notice;
+    }
+
+    function updateStaleNotice(container, isStale, lastUpdated, locale) {
+        if (!container) {
+            return;
+        }
+
+        var notice = container.querySelector('.' + STALE_NOTICE_CLASS);
+
+        if (!isStale) {
+            if (notice && notice.parentNode) {
+                notice.parentNode.removeChild(notice);
+            }
+
+            if (container.dataset) {
+                container.dataset.stale = 'false';
+                delete container.dataset.lastUpdated;
+            }
+
+            return;
+        }
+
+        var formattedDate = formatLastUpdated(lastUpdated, locale);
+        var message = '';
+
+        if (formattedDate) {
+            message = getLocalizedString('staleNoticePrefix', 'Données mises en cache du') + ' ' + formattedDate;
+        } else {
+            message = getLocalizedString('staleNoticeFallback', 'Données mises en cache.');
+        }
+
+        notice = getOrCreateStaleNotice(container);
+
+        if (notice) {
+            notice.textContent = message;
+        }
+
+        if (container.dataset) {
+            container.dataset.stale = 'true';
+            if (formattedDate) {
+                container.dataset.lastUpdated = String(parseInt(lastUpdated, 10));
+            } else {
+                delete container.dataset.lastUpdated;
+            }
+        }
+    }
+
+    function applyInitialStaleNotices(locale) {
+        var containers = document.querySelectorAll('.discord-stats-container');
+
+        if (!containers.length) {
+            return;
+        }
+
+        Array.prototype.forEach.call(containers, function (container) {
+            if (!container || !container.dataset) {
+                return;
+            }
+
+            var isStale = container.dataset.stale === 'true';
+            var lastUpdated = container.dataset.lastUpdated ? parseInt(container.dataset.lastUpdated, 10) : null;
+
+            if (isNaN(lastUpdated)) {
+                lastUpdated = null;
+            }
+
+            updateStaleNotice(container, isStale, lastUpdated, locale);
+        });
+    }
+
+    function updateStats(container, config, formatter, locale) {
         var formData = new FormData();
         formData.append('action', config.action || 'refresh_discord_stats');
         formData.append('_ajax_nonce', config.nonce);
@@ -255,6 +371,14 @@
                 var hasTotalInfo = data.data && typeof data.data.has_total !== 'undefined';
                 var isDemo = !!(data.data && data.data.is_demo);
                 var isFallbackDemo = !!(data.data && data.data.fallback_demo);
+                var isStale = !!(data.data && data.data.stale);
+                var lastUpdatedValue = null;
+                if (data.data && typeof data.data.last_updated !== 'undefined') {
+                    var parsedLastUpdated = parseInt(data.data.last_updated, 10);
+                    if (!isNaN(parsedLastUpdated)) {
+                        lastUpdatedValue = parsedLastUpdated;
+                    }
+                }
                 var onlineValue = typeof data.data.online === 'number' ? data.data.online : null;
                 var totalValue = typeof data.data.total === 'number' ? data.data.total : null;
 
@@ -265,6 +389,7 @@
                 clearErrorMessage(container);
 
                 applyDemoState(container, isDemo, isFallbackDemo);
+                updateStaleNotice(container, isStale, lastUpdatedValue, locale);
 
                 updateStatElement(container, '.discord-online .discord-number', onlineValue, formatter);
 
@@ -352,17 +477,21 @@
     }
 
     function initializeDiscordBot() {
+        var config = window.discordBotJlg || {};
+        globalConfig = config;
+
+        var locale = config.locale || 'fr-FR';
+
+        applyInitialStaleNotices(locale);
+
         if (typeof window.fetch !== 'function' || typeof window.FormData !== 'function') {
             return;
         }
 
-        var config = window.discordBotJlg || {};
-        globalConfig = config;
         if (!config.ajaxUrl || !config.nonce) {
             return;
         }
 
-        var locale = config.locale || 'fr-FR';
         var formatter = createNumberFormatter(locale);
 
         var minIntervalSeconds = parseInt(config.minRefreshInterval, 10);
@@ -399,7 +528,7 @@
             }
 
             setInterval(function () {
-                updateStats(container, config, formatter);
+                updateStats(container, config, formatter, locale);
             }, intervalMs);
         });
     }

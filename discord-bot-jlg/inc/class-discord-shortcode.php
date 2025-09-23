@@ -108,6 +108,8 @@ class Discord_Bot_JLG_Shortcode {
 
         $has_total            = !empty($stats['has_total']) && isset($stats['total']) && null !== $stats['total'];
         $total_is_approximate = !empty($stats['total_is_approximate']);
+        $is_stale             = !empty($stats['stale']);
+        $last_updated         = isset($stats['last_updated']) ? (int) $stats['last_updated'] : 0;
 
         $container_classes = array('discord-stats-container');
 
@@ -180,6 +182,14 @@ class Discord_Bot_JLG_Shortcode {
             sprintf('data-demo="%s"', esc_attr($is_forced_demo ? 'true' : 'false')),
             sprintf('data-fallback-demo="%s"', esc_attr($is_fallback_demo ? 'true' : 'false')),
         );
+
+        if ($is_stale) {
+            $attributes[] = 'data-stale="true"';
+        }
+
+        if ($last_updated > 0) {
+            $attributes[] = sprintf('data-last-updated="%d"', $last_updated);
+        }
 
         if (!empty($style_declarations)) {
             $attributes[] = sprintf('style="%s"', esc_attr(implode('; ', $style_declarations)));
