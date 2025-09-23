@@ -170,18 +170,10 @@ class Discord_Bot_JLG_API {
         $is_public_request  = ('wp_ajax_nopriv_refresh_discord_stats' === $current_action);
         $nonce              = isset($_POST['_ajax_nonce']) ? sanitize_text_field(wp_unslash($_POST['_ajax_nonce'])) : '';
 
-        if (empty($nonce) || !wp_verify_nonce($nonce, 'refresh_discord_stats')) {
-            if (true === $is_public_request) {
-                wp_send_json_error(
-                    array(
-                        'nonce_expired' => true,
-                        'message'       => __('Votre session a expiré, veuillez recharger la page.', 'discord-bot-jlg'),
-                    ),
-                    403
-                );
+        if (false === $is_public_request) {
+            if (empty($nonce) || !wp_verify_nonce($nonce, 'refresh_discord_stats')) {
+                wp_send_json_error(__('Nonce invalide', 'discord-bot-jlg'), 403);
             }
-
-            wp_send_json_error(__('Nonce invalide', 'discord-bot-jlg'), 403);
         }
 
         $options = get_option($this->option_name);

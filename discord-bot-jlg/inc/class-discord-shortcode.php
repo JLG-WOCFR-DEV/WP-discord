@@ -343,13 +343,16 @@ class Discord_Bot_JLG_Shortcode {
 
         $locale = str_replace('_', '-', get_locale());
 
+        $requires_nonce = is_user_logged_in();
+
         wp_localize_script(
             'discord-bot-jlg-frontend',
             'discordBotJlg',
             array(
                 'ajaxUrl' => admin_url('admin-ajax.php'),
                 'action'  => 'refresh_discord_stats',
-                'nonce'   => wp_create_nonce('refresh_discord_stats'),
+                'nonce'   => $requires_nonce ? wp_create_nonce('refresh_discord_stats') : '',
+                'requiresNonce' => $requires_nonce,
                 'locale'  => $locale,
                 'minRefreshInterval' => defined('Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL')
                     ? Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL

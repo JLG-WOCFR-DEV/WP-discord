@@ -289,7 +289,10 @@
     function updateStats(container, config, formatter, locale) {
         var formData = new FormData();
         formData.append('action', config.action || 'refresh_discord_stats');
-        formData.append('_ajax_nonce', config.nonce);
+
+        if (config.requiresNonce && config.nonce) {
+            formData.append('_ajax_nonce', config.nonce);
+        }
 
         fetch(config.ajaxUrl, {
             method: 'POST',
@@ -465,7 +468,14 @@
 
         var config = window.discordBotJlg || {};
         globalConfig = config;
-        if (!config.ajaxUrl || !config.nonce) {
+
+        var requiresNonce = typeof config.requiresNonce === 'undefined'
+            ? true
+            : !!config.requiresNonce;
+
+        config.requiresNonce = requiresNonce;
+
+        if (!config.ajaxUrl || (config.requiresNonce && !config.nonce)) {
             return;
         }
 
