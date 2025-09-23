@@ -13,6 +13,7 @@ class Discord_Bot_JLG_API {
 
     const REFRESH_LOCK_SUFFIX = '_refresh_lock';
     const LAST_GOOD_SUFFIX = '_last_good';
+    const FALLBACK_BYPASS_SUFFIX = '_fallback_bypass';
 
     private $option_name;
     private $cache_key;
@@ -193,7 +194,7 @@ class Discord_Bot_JLG_API {
         }
 
         $rate_limit_key = $this->cache_key . self::REFRESH_LOCK_SUFFIX;
-        $fallback_bypass_key = $this->cache_key . '_fallback_bypass';
+        $fallback_bypass_key = $this->get_fallback_bypass_cache_key();
         $cache_duration = $this->get_cache_duration($options);
         $default_public_refresh = max(self::MIN_PUBLIC_REFRESH_INTERVAL, (int) $cache_duration);
         $rate_limit_window = (int) apply_filters('discord_bot_jlg_public_refresh_interval', $default_public_refresh, $options);
@@ -342,8 +343,37 @@ class Discord_Bot_JLG_API {
      * @return void
      */
     public function clear_cache() {
-        delete_transient($this->cache_key);
-        delete_transient($this->cache_key . self::REFRESH_LOCK_SUFFIX);
+        $this->purge_transient_family($this->cache_key);
+        $this->purge_transient_family($this->cache_key . self::REFRESH_LOCK_SUFFIX);
+        $this->purge_transient_family($this->get_fallback_bypass_cache_key());
+        $this->purge_transient_family($this->get_last_good_cache_key());
+    }
+
+    /**
+     * Supprime un transient et les entrées d'options associées.
+     *
+     * @param string $transient_key Clef du transient à purger.
+     *
+     * @return void
+     */
+    private function purge_transient_family($transient_key) {
+        if (empty($transient_key)) {
+            return;
+        }
+
+        delete_transient($transient_key);
+        delete_site_transient($transient_key);
+
+        $option_prefixes = array(
+            '_transient_',
+            '_transient_timeout_',
+            'transient_',
+            'transient_timeout_',
+        );
+
+        foreach ($option_prefixes as $prefix) {
+            delete_option($prefix . $transient_key);
+        }
     }
 
     /**
@@ -393,6 +423,15 @@ class Discord_Bot_JLG_API {
 
     private function get_last_good_cache_key() {
         return $this->cache_key . self::LAST_GOOD_SUFFIX;
+    }
+
+    /**
+     * Renvoie la clef de cache pour l'état de contournement du mode secours.
+     *
+     * @return string
+     */
+    private function get_fallback_bypass_cache_key() {
+        return $this->cache_key . self::FALLBACK_BYPASS_SUFFIX;
     }
 
     private function store_last_good_stats($stats) {
