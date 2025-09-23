@@ -184,20 +184,21 @@ class Discord_Bot_JLG_API {
 
         $refresh_requires_remote_call = false;
         $fallback_bypass_active      = (bool) get_transient($fallback_bypass_key);
+        $cached_stats                = get_transient($this->cache_key);
+        $cached_stats_is_fallback    = (
+            is_array($cached_stats)
+            && !empty($cached_stats['is_demo'])
+            && !empty($cached_stats['fallback_demo'])
+        );
+
+        if (true === $cached_stats_is_fallback) {
+            delete_transient($this->cache_key);
+            $fallback_bypass_active = true;
+            set_transient($fallback_bypass_key, 1, max($cache_duration, self::MIN_PUBLIC_REFRESH_INTERVAL));
+        }
 
         if (true === $is_public_request) {
-            $cached_stats = get_transient($this->cache_key);
-            $cached_stats_is_fallback = (
-                is_array($cached_stats)
-                && !empty($cached_stats['is_demo'])
-                && !empty($cached_stats['fallback_demo'])
-            );
-
-            if (true === $cached_stats_is_fallback) {
-                delete_transient($this->cache_key);
-                $fallback_bypass_active = true;
-                set_transient($fallback_bypass_key, 1, max($cache_duration, self::MIN_PUBLIC_REFRESH_INTERVAL));
-            } elseif (false === $fallback_bypass_active && is_array($cached_stats) && empty($cached_stats['is_demo'])) {
+            if (false === $fallback_bypass_active && is_array($cached_stats) && empty($cached_stats['is_demo'])) {
                 wp_send_json_success($cached_stats);
             }
 
