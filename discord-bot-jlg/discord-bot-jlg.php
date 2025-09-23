@@ -114,7 +114,7 @@ class DiscordServerStats {
         $new_bot_token = isset($value['bot_token']) ? (string) $value['bot_token'] : '';
 
         if ($old_server_id !== $new_server_id || $old_bot_token !== $new_bot_token) {
-            $this->api->clear_cache(true);
+            $this->api->clear_all_cached_data();
             return;
         }
 
