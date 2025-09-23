@@ -54,16 +54,7 @@ add_action('plugins_loaded', 'discord_bot_jlg_load_textdomain');
 
 class DiscordServerStats {
 
-    private $default_options = array(
-        'server_id'      => '',
-        'bot_token'      => '',
-        'demo_mode'      => false,
-        'show_online'    => true,
-        'show_total'     => true,
-        'custom_css'     => '',
-        'widget_title'   => 'Discord Server',
-        'cache_duration' => DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION,
-    );
+    private $default_options;
 
     private $api;
     private $admin;
@@ -71,6 +62,17 @@ class DiscordServerStats {
     private $widget;
 
     public function __construct() {
+        $this->default_options = array(
+            'server_id'      => '',
+            'bot_token'      => '',
+            'demo_mode'      => false,
+            'show_online'    => true,
+            'show_total'     => true,
+            'custom_css'     => '',
+            'widget_title'   => __('Discord Server', 'discord-bot-jlg'),
+            'cache_duration' => DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION,
+        );
+
         $this->api       = new Discord_Bot_JLG_API(DISCORD_BOT_JLG_OPTION_NAME, DISCORD_BOT_JLG_CACHE_KEY, DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION);
         $this->admin     = new Discord_Bot_JLG_Admin(DISCORD_BOT_JLG_OPTION_NAME, $this->api);
         $this->shortcode = new Discord_Bot_JLG_Shortcode(DISCORD_BOT_JLG_OPTION_NAME, $this->api);
