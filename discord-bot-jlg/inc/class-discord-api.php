@@ -217,6 +217,7 @@ class Discord_Bot_JLG_API {
             delete_transient($this->cache_key);
             $fallback_bypass_active = true;
             set_transient($fallback_bypass_key, 1, max($cache_duration, self::MIN_PUBLIC_REFRESH_INTERVAL));
+            $cached_stats = false;
         }
 
         if (true === $is_public_request) {
@@ -241,10 +242,6 @@ class Discord_Bot_JLG_API {
                 }
             }
 
-            if (false === $fallback_bypass_active && is_array($cached_stats) && empty($cached_stats['is_demo'])) {
-                wp_send_json_success($cached_stats);
-            }
-
             $last_refresh = get_transient($rate_limit_key);
             if (false !== $last_refresh) {
                 $elapsed = time() - (int) $last_refresh;
@@ -265,6 +262,10 @@ class Discord_Bot_JLG_API {
                         429
                     );
                 }
+            }
+
+            if (false === $fallback_bypass_active && is_array($cached_stats) && empty($cached_stats['is_demo'])) {
+                wp_send_json_success($cached_stats);
             }
 
             $refresh_requires_remote_call = true;
@@ -303,18 +304,6 @@ class Discord_Bot_JLG_API {
         }
 
         if (
-            true === $is_public_request
-            && true === $refresh_requires_remote_call
-            && is_array($stats)
-            && empty($stats['is_demo'])
-        ) {
-            set_transient($rate_limit_key, time(), $rate_limit_window);
-            if (!empty($client_rate_limit_key)) {
-                $this->set_client_rate_limit($client_rate_limit_key, $rate_limit_window);
-            }
-        }
-
-        if (
             is_array($stats)
             && !empty($stats['is_demo'])
             && !empty($stats['fallback_demo'])
@@ -330,6 +319,16 @@ class Discord_Bot_JLG_API {
         }
 
         if (is_array($stats) && empty($stats['is_demo'])) {
+            if (
+                true === $is_public_request
+                && true === $refresh_requires_remote_call
+            ) {
+                set_transient($rate_limit_key, time(), $rate_limit_window);
+                if (!empty($client_rate_limit_key)) {
+                    $this->set_client_rate_limit($client_rate_limit_key, $rate_limit_window);
+                }
+            }
+
             wp_send_json_success($stats);
         }
 
