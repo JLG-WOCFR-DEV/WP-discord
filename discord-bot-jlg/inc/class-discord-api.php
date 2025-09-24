@@ -23,6 +23,8 @@ class Discord_Bot_JLG_API {
     private $last_error;
     private $runtime_cache;
     private $runtime_errors;
+    private $http_client;
+    private $options_cache;
 
     /**
      * Prépare le service d'accès aux statistiques avec les clés et durées nécessaires.
@@ -33,13 +35,47 @@ class Discord_Bot_JLG_API {
      *
      * @return void
      */
-    public function __construct($option_name, $cache_key, $default_cache_duration = 300) {
+    public function __construct($option_name, $cache_key, $default_cache_duration = 300, $http_client = null) {
         $this->option_name = $option_name;
         $this->cache_key = $cache_key;
         $this->default_cache_duration = (int) $default_cache_duration;
         $this->last_error = '';
         $this->runtime_cache = array();
         $this->runtime_errors = array();
+        $this->http_client = ($http_client instanceof Discord_Bot_JLG_Http_Client)
+            ? $http_client
+            : new Discord_Bot_JLG_Http_Client();
+        $this->options_cache = null;
+    }
+
+    /**
+     * Réinitialise le cache des options.
+     *
+     * @return void
+     */
+    public function flush_options_cache() {
+        $this->options_cache = null;
+    }
+
+    /**
+     * Récupère les options du plugin avec mise en cache en mémoire.
+     *
+     * @param bool $force_refresh Force une lecture depuis la base si vrai.
+     *
+     * @return array
+     */
+    private function get_plugin_options($force_refresh = false) {
+        if (true === $force_refresh || !is_array($this->options_cache)) {
+            $options = get_option($this->option_name);
+
+            if (false === is_array($options)) {
+                $options = array();
+            }
+
+            $this->options_cache = $options;
+        }
+
+        return $this->options_cache;
     }
 
     /**
@@ -77,10 +113,7 @@ class Discord_Bot_JLG_API {
             return $this->remember_runtime_result($runtime_key, $demo_stats);
         }
 
-        $options = get_option($this->option_name);
-        if (false === is_array($options)) {
-            $options = array();
-        }
+        $options = $this->get_plugin_options();
 
         if (!empty($options['demo_mode'])) {
             $demo_stats = $this->get_demo_stats(false);
@@ -200,10 +233,7 @@ class Discord_Bot_JLG_API {
             }
         }
 
-        $options = get_option($this->option_name);
-        if (false === is_array($options)) {
-            $options = array();
-        }
+        $options = $this->get_plugin_options();
 
         if (!empty($options['demo_mode'])) {
             wp_send_json_error(__('Mode démo actif', 'discord-bot-jlg'));
@@ -415,6 +445,7 @@ class Discord_Bot_JLG_API {
         delete_transient($this->cache_key . self::REFRESH_LOCK_SUFFIX);
         $this->clear_client_rate_limits();
         $this->reset_runtime_cache();
+        $this->flush_options_cache();
     }
 
     /**
@@ -438,6 +469,7 @@ class Discord_Bot_JLG_API {
         delete_transient($this->get_last_good_cache_key());
         $this->clear_client_rate_limits();
         $this->reset_runtime_cache();
+        $this->flush_options_cache();
     }
 
     private function get_runtime_cache_key($args) {
@@ -923,14 +955,12 @@ class Discord_Bot_JLG_API {
     private function get_stats_from_widget($options) {
         $widget_url = 'https://discord.com/api/guilds/' . $options['server_id'] . '/widget.json';
 
-        $response = wp_safe_remote_get(
+        $response = $this->http_client->get(
             $widget_url,
             array(
                 'timeout' => 10,
-                'headers' => array(
-                    'User-Agent' => 'WordPress Discord Stats Plugin',
-                ),
-            )
+            ),
+            'widget'
         );
 
         if (is_wp_error($response)) {
@@ -1019,15 +1049,15 @@ class Discord_Bot_JLG_API {
 
         $api_url = 'https://discord.com/api/v10/guilds/' . $options['server_id'] . '?with_counts=true';
 
-        $response = wp_safe_remote_get(
+        $response = $this->http_client->get(
             $api_url,
             array(
                 'timeout' => 10,
                 'headers' => array(
                     'Authorization' => 'Bot ' . $bot_token,
-                    'User-Agent'    => 'WordPress Discord Stats Plugin',
                 ),
-            )
+            ),
+            'bot'
         );
 
         if (is_wp_error($response)) {
