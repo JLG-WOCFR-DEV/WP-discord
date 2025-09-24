@@ -181,7 +181,9 @@ class Discord_Bot_JLG_Admin {
             'show_online'    => 0,
             'show_total'     => 0,
             'widget_title'   => '',
-            'cache_duration' => 300,
+            'cache_duration' => isset($current_options['cache_duration'])
+                ? (int) $current_options['cache_duration']
+                : 300,
             'custom_css'     => '',
         );
 
@@ -200,7 +202,9 @@ class Discord_Bot_JLG_Admin {
         if (!$constant_overridden && array_key_exists('bot_token', $input)) {
             $raw_token = trim((string) $input['bot_token']);
 
-            if ('' !== $raw_token) {
+            if ('' === $raw_token) {
+                $sanitized['bot_token'] = '';
+            } else {
                 $sanitized['bot_token'] = sanitize_text_field($raw_token);
             }
         }
@@ -213,12 +217,26 @@ class Discord_Bot_JLG_Admin {
             $sanitized['widget_title'] = sanitize_text_field($input['widget_title']);
         }
 
-        if (isset($input['cache_duration'])) {
-            $cache_duration               = absint($input['cache_duration']);
-            $sanitized['cache_duration'] = max(
-                Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL,
-                min(3600, $cache_duration)
-            );
+        if (array_key_exists('cache_duration', $input)) {
+            $raw_cache_duration = is_string($input['cache_duration'])
+                ? trim($input['cache_duration'])
+                : $input['cache_duration'];
+
+            if ('' === $raw_cache_duration) {
+                $fallback_duration          = isset($current_options['cache_duration'])
+                    ? (int) $current_options['cache_duration']
+                    : 300;
+                $sanitized['cache_duration'] = max(
+                    Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL,
+                    min(3600, $fallback_duration)
+                );
+            } else {
+                $cache_duration              = absint($raw_cache_duration);
+                $sanitized['cache_duration'] = max(
+                    Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL,
+                    min(3600, $cache_duration)
+                );
+            }
         }
 
         if (isset($input['custom_css'])) {
