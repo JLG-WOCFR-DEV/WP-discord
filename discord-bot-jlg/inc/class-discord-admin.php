@@ -887,7 +887,6 @@ class Discord_Bot_JLG_Admin {
             return;
         }
 
-        $this->api->clear_cache();
         $stats = $this->api->get_stats(
             array(
                 'bypass_cache' => true,
