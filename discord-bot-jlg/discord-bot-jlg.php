@@ -28,6 +28,26 @@ define('DISCORD_BOT_JLG_OPTION_NAME', 'discord_server_stats_options');
 define('DISCORD_BOT_JLG_CACHE_KEY', 'discord_server_stats_cache');
 define('DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION', 300);
 
+if (!function_exists('discord_bot_jlg_get_default_options')) {
+    /**
+     * Renvoie les valeurs par défaut utilisées pour initialiser les options du plugin.
+     *
+     * @return array
+     */
+    function discord_bot_jlg_get_default_options() {
+        return array(
+            'server_id'      => '',
+            'bot_token'      => '',
+            'demo_mode'      => false,
+            'show_online'    => true,
+            'show_total'     => true,
+            'custom_css'     => '',
+            'widget_title'   => __('Discord Server', 'discord-bot-jlg'),
+            'cache_duration' => DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION,
+        );
+    }
+}
+
 /**
  * Supprime les données enregistrées par le plugin lors de la désinstallation.
  *
@@ -74,21 +94,15 @@ class DiscordServerStats {
     private $widget;
 
     public function __construct() {
-        $this->default_options = array(
-            'server_id'      => '',
-            'bot_token'      => '',
-            'demo_mode'      => false,
-            'show_online'    => true,
-            'show_total'     => true,
-            'custom_css'     => '',
-            'widget_title'   => __('Discord Server', 'discord-bot-jlg'),
-            'cache_duration' => DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION,
-        );
+        $this->default_options = discord_bot_jlg_get_default_options();
 
         $this->api       = new Discord_Bot_JLG_API(DISCORD_BOT_JLG_OPTION_NAME, DISCORD_BOT_JLG_CACHE_KEY, DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION);
         $this->admin     = new Discord_Bot_JLG_Admin(DISCORD_BOT_JLG_OPTION_NAME, $this->api);
         $this->shortcode = new Discord_Bot_JLG_Shortcode(DISCORD_BOT_JLG_OPTION_NAME, $this->api);
         $this->widget    = new Discord_Bot_JLG_Widget();
+
+        add_filter('default_option_' . DISCORD_BOT_JLG_OPTION_NAME, array($this, 'provide_default_options'));
+        add_filter('option_' . DISCORD_BOT_JLG_OPTION_NAME, array($this, 'merge_options_with_defaults'));
 
         register_activation_hook(__FILE__, array($this, 'activate'));
         register_deactivation_hook(__FILE__, array($this, 'deactivate'));
@@ -112,6 +126,30 @@ class DiscordServerStats {
 
     public function deactivate() {
         $this->api->clear_all_cached_data();
+    }
+
+    /**
+     * Injecte les options par défaut lorsqu'aucune valeur n'est encore stockée.
+     *
+     * @return array
+     */
+    public function provide_default_options($default = array()) {
+        return $this->default_options;
+    }
+
+    /**
+     * S'assure que les options récupérées contiennent toujours les clés par défaut attendues.
+     *
+     * @param mixed $value Valeur brute renvoyée par WordPress.
+     *
+     * @return array
+     */
+    public function merge_options_with_defaults($value) {
+        if (!is_array($value)) {
+            $value = array();
+        }
+
+        return wp_parse_args($value, $this->default_options);
     }
 
     public function handle_settings_update($old_value, $value) {

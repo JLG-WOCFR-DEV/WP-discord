@@ -21,6 +21,8 @@ class Discord_Bot_JLG_API {
     private $cache_key;
     private $default_cache_duration;
     private $last_error;
+    private $runtime_cache;
+    private $runtime_errors;
 
     /**
      * Prépare le service d'accès aux statistiques avec les clés et durées nécessaires.
@@ -36,6 +38,8 @@ class Discord_Bot_JLG_API {
         $this->cache_key = $cache_key;
         $this->default_cache_duration = (int) $default_cache_duration;
         $this->last_error = '';
+        $this->runtime_cache = array();
+        $this->runtime_errors = array();
     }
 
     /**
@@ -61,8 +65,16 @@ class Discord_Bot_JLG_API {
             )
         );
 
+        $runtime_key = $this->get_runtime_cache_key($args);
+
+        if (array_key_exists($runtime_key, $this->runtime_cache)) {
+            $this->last_error = isset($this->runtime_errors[$runtime_key]) ? $this->runtime_errors[$runtime_key] : '';
+            return $this->runtime_cache[$runtime_key];
+        }
+
         if (true === $args['force_demo']) {
-            return $this->get_demo_stats(false);
+            $demo_stats = $this->get_demo_stats(false);
+            return $this->remember_runtime_result($runtime_key, $demo_stats);
         }
 
         $options = get_option($this->option_name);
@@ -71,19 +83,21 @@ class Discord_Bot_JLG_API {
         }
 
         if (!empty($options['demo_mode'])) {
-            return $this->get_demo_stats(false);
+            $demo_stats = $this->get_demo_stats(false);
+            return $this->remember_runtime_result($runtime_key, $demo_stats);
         }
 
         if (false === $args['bypass_cache']) {
             $cached_stats = get_transient($this->cache_key);
             if (false !== $cached_stats) {
-                return $cached_stats;
+                return $this->remember_runtime_result($runtime_key, $cached_stats);
             }
         }
 
         if (empty($options['server_id'])) {
             $this->last_error = __('Aucun identifiant de serveur Discord n\'est configuré.', 'discord-bot-jlg');
-            return $this->get_demo_stats(true);
+            $demo_stats = $this->get_demo_stats(true);
+            return $this->remember_runtime_result($runtime_key, $demo_stats);
         }
 
         $stats = false;
@@ -144,14 +158,15 @@ class Discord_Bot_JLG_API {
             if (empty($this->last_error)) {
                 $this->last_error = __('Impossible d\'obtenir des statistiques exploitables depuis Discord.', 'discord-bot-jlg');
             }
-            return $this->get_demo_stats(true);
+            $demo_stats = $this->get_demo_stats(true);
+            return $this->remember_runtime_result($runtime_key, $demo_stats);
         }
 
         $this->last_error = '';
         set_transient($this->cache_key, $stats, $this->get_cache_duration($options));
         $this->store_last_good_stats($stats);
 
-        return $stats;
+        return $this->remember_runtime_result($runtime_key, $stats);
     }
 
     /**
@@ -387,6 +402,7 @@ class Discord_Bot_JLG_API {
         delete_transient($this->cache_key);
         delete_transient($this->cache_key . self::REFRESH_LOCK_SUFFIX);
         $this->clear_client_rate_limits();
+        $this->reset_runtime_cache();
     }
 
     /**
@@ -409,6 +425,34 @@ class Discord_Bot_JLG_API {
         delete_transient($this->get_fallback_bypass_key());
         delete_transient($this->get_last_good_cache_key());
         $this->clear_client_rate_limits();
+        $this->reset_runtime_cache();
+    }
+
+    private function get_runtime_cache_key($args) {
+        if (!is_array($args)) {
+            $args = array();
+        }
+
+        $normalized_args = array(
+            'force_demo'   => !empty($args['force_demo']),
+            'bypass_cache' => !empty($args['bypass_cache']),
+        );
+
+        return md5(wp_json_encode($normalized_args));
+    }
+
+    private function remember_runtime_result($runtime_key, $stats) {
+        if ('' !== $runtime_key) {
+            $this->runtime_cache[$runtime_key]  = $stats;
+            $this->runtime_errors[$runtime_key] = $this->last_error;
+        }
+
+        return $stats;
+    }
+
+    private function reset_runtime_cache() {
+        $this->runtime_cache  = array();
+        $this->runtime_errors = array();
     }
 
     /**
