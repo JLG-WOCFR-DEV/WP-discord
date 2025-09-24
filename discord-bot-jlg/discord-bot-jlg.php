@@ -107,7 +107,7 @@ class DiscordServerStats {
     }
 
     public function activate() {
-        add_option(DISCORD_BOT_JLG_OPTION_NAME, $this->default_options);
+        add_option(DISCORD_BOT_JLG_OPTION_NAME, $this->default_options, '', false);
     }
 
     public function deactivate() {

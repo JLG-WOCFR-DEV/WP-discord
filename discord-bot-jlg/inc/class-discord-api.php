@@ -439,27 +439,165 @@ class Discord_Bot_JLG_API {
      * @return string
      */
     private function generate_public_request_fingerprint() {
-        $parts = array();
+        $server_vars = $_SERVER;
+        $parts       = array();
 
-        if (!empty($_SERVER['REMOTE_ADDR'])) {
-            $parts[] = sanitize_text_field(wp_unslash($_SERVER['REMOTE_ADDR']));
+        $request_ip = $this->get_public_request_ip($server_vars);
+
+        if (!empty($request_ip)) {
+            $parts[] = $request_ip;
         }
 
-        if (!empty($_SERVER['HTTP_USER_AGENT'])) {
-            $parts[] = sanitize_text_field(wp_unslash($_SERVER['HTTP_USER_AGENT']));
+        if (!empty($server_vars['HTTP_USER_AGENT'])) {
+            $parts[] = sanitize_text_field(wp_unslash($server_vars['HTTP_USER_AGENT']));
         }
+
+        /**
+         * Permet de modifier les éléments utilisés pour générer l'empreinte publique.
+         *
+         * @since 1.0.1
+         *
+         * @param array $parts       Tableau des fragments d'empreinte.
+         * @param array $server_vars Variables serveur disponibles.
+         */
+        $parts = apply_filters('discord_bot_jlg_public_fingerprint_parts', $parts, $server_vars);
+
+        if (!is_array($parts)) {
+            $parts = array();
+        }
+
+        $parts = array_filter(array_map('strval', $parts));
 
         if (empty($parts)) {
             return '';
         }
 
-        $fingerprint = wp_hash(implode('|', $parts));
+        $raw_fingerprint = implode('|', $parts);
 
-        if (empty($fingerprint)) {
+        $hashed_fingerprint = wp_hash($raw_fingerprint);
+
+        if (!is_string($hashed_fingerprint)) {
+            $hashed_fingerprint = '';
+        }
+
+        if ('' !== $hashed_fingerprint) {
+            $hashed_fingerprint = substr($hashed_fingerprint, 0, 20);
+        }
+
+        /**
+         * Permet de filtrer l'empreinte générée pour la limitation de fréquence publique.
+         *
+         * @since 1.0.1
+         *
+         * @param string $hashed_fingerprint Empreinte hachée générée par défaut.
+         * @param string $raw_fingerprint    Empreinte avant hachage.
+         * @param array  $parts              Fragments ayant servi à construire l'empreinte.
+         * @param array  $server_vars        Variables serveur disponibles.
+         */
+        $fingerprint = apply_filters(
+            'discord_bot_jlg_public_request_fingerprint',
+            $hashed_fingerprint,
+            $raw_fingerprint,
+            $parts,
+            $server_vars
+        );
+
+        $fingerprint = sanitize_text_field((string) $fingerprint);
+
+        if ('' === $fingerprint) {
             return '';
         }
 
-        return substr($fingerprint, 0, 20);
+        return substr($fingerprint, 0, 40);
+    }
+
+    /**
+     * Retourne une adresse IP anonymisée permettant d'identifier un visiteur derrière un proxy.
+     *
+     * @since 1.0.1
+     *
+     * @param array $server_vars Variables serveur disponibles.
+     *
+     * @return string
+     */
+    private function get_public_request_ip($server_vars) {
+        $headers = array(
+            'HTTP_CLIENT_IP',
+            'HTTP_X_FORWARDED_FOR',
+            'HTTP_X_FORWARDED',
+            'HTTP_X_CLUSTER_CLIENT_IP',
+            'HTTP_FORWARDED_FOR',
+            'HTTP_FORWARDED',
+            'REMOTE_ADDR',
+        );
+
+        foreach ($headers as $header) {
+            if (empty($server_vars[$header])) {
+                continue;
+            }
+
+            $raw_values = wp_unslash($server_vars[$header]);
+
+            if ('REMOTE_ADDR' === $header) {
+                $raw_values = array($raw_values);
+            } else {
+                $raw_values = explode(',', (string) $raw_values);
+            }
+
+            foreach ($raw_values as $value) {
+                $ip = trim((string) $value);
+
+                if ('' === $ip || false === $this->is_valid_ip($ip)) {
+                    continue;
+                }
+
+                $is_ipv6    = (false !== strpos($ip, ':'));
+                $anonymized = $this->anonymize_ip($ip, $is_ipv6);
+
+                if ('' === $anonymized) {
+                    continue;
+                }
+
+                return sanitize_text_field($anonymized);
+            }
+        }
+
+        return '';
+    }
+
+    /**
+     * Vérifie si la chaîne fournie est une adresse IP valide.
+     *
+     * @since 1.0.1
+     *
+     * @param string $ip Adresse IP à valider.
+     *
+     * @return bool
+     */
+    private function is_valid_ip($ip) {
+        return (bool) filter_var($ip, FILTER_VALIDATE_IP);
+    }
+
+    /**
+     * Anonymise une adresse IP en tenant compte de sa version.
+     *
+     * @since 1.0.1
+     *
+     * @param string $ip     Adresse IP à anonymiser.
+     * @param bool   $is_ipv6 Indique s'il s'agit d'une adresse IPv6.
+     *
+     * @return string
+     */
+    private function anonymize_ip($ip, $is_ipv6) {
+        if (function_exists('wp_privacy_anonymize_ip')) {
+            $anonymized = wp_privacy_anonymize_ip($ip, $is_ipv6);
+
+            if (is_string($anonymized) && '' !== $anonymized) {
+                return $anonymized;
+            }
+        }
+
+        return (string) $ip;
     }
 
     /**
