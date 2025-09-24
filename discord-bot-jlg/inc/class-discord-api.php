@@ -15,7 +15,7 @@ class Discord_Bot_JLG_API {
     const CLIENT_REFRESH_LOCK_PREFIX = '_refresh_lock_client_';
     const CLIENT_REFRESH_LOCK_INDEX_SUFFIX = '_refresh_lock_clients';
     const LAST_GOOD_SUFFIX = '_last_good';
-    const FALLBACK_BYPASS_SUFFIX = '_fallback_bypass';
+    const FALLBACK_RETRY_SUFFIX = '_fallback_retry_after';
 
     private $option_name;
     private $cache_key;
@@ -211,8 +211,7 @@ class Discord_Bot_JLG_API {
 
         $rate_limit_key        = $this->cache_key . self::REFRESH_LOCK_SUFFIX;
         $client_rate_limit_key = $this->get_client_rate_limit_key($is_public_request);
-        $fallback_bypass_key = $this->get_fallback_bypass_key();
-        $cache_duration = $this->get_cache_duration($options);
+        $cache_duration        = $this->get_cache_duration($options);
         $default_public_refresh = max(self::MIN_PUBLIC_REFRESH_INTERVAL, (int) $cache_duration);
         $rate_limit_window = (int) apply_filters('discord_bot_jlg_public_refresh_interval', $default_public_refresh, $options);
         if ($rate_limit_window < self::MIN_PUBLIC_REFRESH_INTERVAL) {
@@ -220,7 +219,6 @@ class Discord_Bot_JLG_API {
         }
 
         $refresh_requires_remote_call = false;
-        $fallback_bypass_active      = (bool) get_transient($fallback_bypass_key);
         $cached_stats                = get_transient($this->cache_key);
         $cached_stats_is_fallback    = (
             is_array($cached_stats)
@@ -228,12 +226,15 @@ class Discord_Bot_JLG_API {
             && !empty($cached_stats['fallback_demo'])
         );
 
-        if (true === $cached_stats_is_fallback) {
-            delete_transient($this->cache_key);
-            $fallback_bypass_active = true;
-            set_transient($fallback_bypass_key, 1, max($cache_duration, self::MIN_PUBLIC_REFRESH_INTERVAL));
-            $cached_stats = false;
+        $fallback_retry_key   = $this->get_fallback_retry_key();
+        $fallback_retry_after = (int) get_transient($fallback_retry_key);
+        $now                  = time();
+
+        if (true === $cached_stats_is_fallback && $fallback_retry_after <= 0) {
+            $fallback_retry_after = $this->schedule_next_fallback_retry($cache_duration, $options);
         }
+
+        $bypass_cache = false;
 
         if (true === $is_public_request) {
             if (!empty($client_rate_limit_key)) {
@@ -279,14 +280,24 @@ class Discord_Bot_JLG_API {
                 }
             }
 
-            if (false === $fallback_bypass_active && is_array($cached_stats) && empty($cached_stats['is_demo'])) {
-                wp_send_json_success($cached_stats);
-            }
+            if ($cached_stats_is_fallback) {
+                if ($fallback_retry_after > $now) {
+                    wp_send_json_success($cached_stats);
+                }
 
-            $refresh_requires_remote_call = true;
+                $refresh_requires_remote_call = true;
+                $bypass_cache = true;
+            } elseif (is_array($cached_stats) && empty($cached_stats['is_demo'])) {
+                wp_send_json_success($cached_stats);
+            } else {
+                $refresh_requires_remote_call = true;
+            }
         }
 
-        $bypass_cache = $fallback_bypass_active;
+        if (false === $is_public_request && $cached_stats_is_fallback) {
+            $refresh_requires_remote_call = true;
+            $bypass_cache = true;
+        }
 
         if (isset($_POST['force_refresh'])) {
             $force_refresh = wp_validate_boolean(wp_unslash($_POST['force_refresh']));
@@ -297,6 +308,7 @@ class Discord_Bot_JLG_API {
                 && current_user_can('manage_options')
             ) {
                 $bypass_cache = true;
+                $refresh_requires_remote_call = true;
             }
         }
 
@@ -313,9 +325,9 @@ class Discord_Bot_JLG_API {
             && !empty($stats['is_demo'])
             && !empty($stats['fallback_demo'])
         ) {
-            set_transient($fallback_bypass_key, 1, max($cache_duration, self::MIN_PUBLIC_REFRESH_INTERVAL));
+            $this->schedule_next_fallback_retry($cache_duration, $options);
         } else {
-            delete_transient($fallback_bypass_key);
+            $this->clear_fallback_retry_schedule();
         }
 
         if (
@@ -422,7 +434,7 @@ class Discord_Bot_JLG_API {
     public function clear_all_cached_data() {
         delete_transient($this->cache_key);
         delete_transient($this->cache_key . self::REFRESH_LOCK_SUFFIX);
-        delete_transient($this->get_fallback_bypass_key());
+        $this->clear_fallback_retry_schedule();
         delete_transient($this->get_last_good_cache_key());
         $this->clear_client_rate_limits();
         $this->reset_runtime_cache();
@@ -835,8 +847,44 @@ class Discord_Bot_JLG_API {
         return $this->cache_key . self::LAST_GOOD_SUFFIX;
     }
 
-    private function get_fallback_bypass_key() {
-        return $this->cache_key . self::FALLBACK_BYPASS_SUFFIX;
+    private function get_fallback_retry_key() {
+        return $this->cache_key . self::FALLBACK_RETRY_SUFFIX;
+    }
+
+    private function get_fallback_retry_window($cache_duration, $options) {
+        $cache_duration = (int) $cache_duration;
+        $cache_duration = $cache_duration > 0 ? $cache_duration : $this->default_cache_duration;
+
+        $base_window = max(self::MIN_PUBLIC_REFRESH_INTERVAL, $cache_duration);
+
+        if (!is_array($options)) {
+            $options = array();
+        }
+
+        $filtered_window = apply_filters('discord_bot_jlg_fallback_retry_window', $base_window, $options, $this->cache_key);
+
+        if (!is_int($filtered_window)) {
+            $filtered_window = (int) $filtered_window;
+        }
+
+        if ($filtered_window < self::MIN_PUBLIC_REFRESH_INTERVAL) {
+            $filtered_window = self::MIN_PUBLIC_REFRESH_INTERVAL;
+        }
+
+        return $filtered_window;
+    }
+
+    private function schedule_next_fallback_retry($cache_duration, $options) {
+        $retry_window = $this->get_fallback_retry_window($cache_duration, $options);
+        $next_retry   = time() + $retry_window;
+
+        set_transient($this->get_fallback_retry_key(), $next_retry, $retry_window);
+
+        return $next_retry;
+    }
+
+    private function clear_fallback_retry_schedule() {
+        delete_transient($this->get_fallback_retry_key());
     }
 
     private function store_last_good_stats($stats) {

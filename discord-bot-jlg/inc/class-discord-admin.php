@@ -169,9 +169,14 @@ class Discord_Bot_JLG_Admin {
             $input = array();
         }
 
+        $current_options = get_option($this->option_name);
+        if (!is_array($current_options)) {
+            $current_options = array();
+        }
+
         $sanitized = array(
             'server_id'      => '',
-            'bot_token'      => '',
+            'bot_token'      => isset($current_options['bot_token']) ? $current_options['bot_token'] : '',
             'demo_mode'      => 0,
             'show_online'    => 0,
             'show_total'     => 0,
@@ -190,8 +195,14 @@ class Discord_Bot_JLG_Admin {
             }
         }
 
-        if (isset($input['bot_token'])) {
-            $sanitized['bot_token'] = sanitize_text_field($input['bot_token']);
+        $constant_overridden = (defined('DISCORD_BOT_JLG_TOKEN') && '' !== DISCORD_BOT_JLG_TOKEN);
+
+        if (!$constant_overridden && array_key_exists('bot_token', $input)) {
+            $raw_token = trim((string) $input['bot_token']);
+
+            if ('' !== $raw_token) {
+                $sanitized['bot_token'] = sanitize_text_field($raw_token);
+            }
         }
 
         $sanitized['demo_mode']   = !empty($input['demo_mode']) ? 1 : 0;
@@ -357,16 +368,44 @@ class Discord_Bot_JLG_Admin {
     public function bot_token_render() {
         $options = get_option($this->option_name);
         $constant_overridden = (defined('DISCORD_BOT_JLG_TOKEN') && '' !== DISCORD_BOT_JLG_TOKEN);
+        $has_saved_token = (!$constant_overridden && !empty($options['bot_token']));
+
+        $input_attributes = array(
+            'type'          => 'password',
+            'name'          => sprintf('%s[bot_token]', $this->option_name),
+            'class'         => 'regular-text',
+            'value'         => '',
+            'autocomplete'  => 'new-password',
+        );
+
+        if ($constant_overridden) {
+            $input_attributes['readonly'] = 'readonly';
+            $input_attributes['placeholder'] = __('Défini via une constante', 'discord-bot-jlg');
+        } else {
+            $input_attributes['placeholder'] = __('Collez votre token Discord', 'discord-bot-jlg');
+        }
+
+        $attribute_parts = array();
+        foreach ($input_attributes as $attribute => $value) {
+            if ('' === $value && 'value' !== $attribute) {
+                continue;
+            }
+
+            $attribute_parts[] = sprintf('%s="%s"', esc_attr($attribute), esc_attr($value));
+        }
         ?>
-        <input type="password" name="<?php echo esc_attr($this->option_name); ?>[bot_token]"
-               value="<?php echo esc_attr(isset($options['bot_token']) ? $options['bot_token'] : ''); ?>"
-               class="regular-text" <?php echo $constant_overridden ? 'readonly' : ''; ?> />
+        <input <?php echo implode(' ', $attribute_parts); ?> />
         <p class="description">
             <?php
             if ($constant_overridden) {
                 echo wp_kses_post(__('Le token est actuellement défini via la constante <code>DISCORD_BOT_JLG_TOKEN</code> et remplace cette valeur.', 'discord-bot-jlg'));
             } else {
                 echo esc_html__('Le token de votre bot Discord (gardez-le secret !).', 'discord-bot-jlg');
+
+                if ($has_saved_token) {
+                    echo '<br />';
+                    echo esc_html__('Un token est déjà enregistré. Laissez ce champ vide pour le conserver ou saisissez un nouveau token pour le remplacer.', 'discord-bot-jlg');
+                }
             }
             ?>
         </p>

@@ -98,8 +98,6 @@ class Discord_Bot_JLG_Shortcode {
             );
         }
 
-        $this->enqueue_assets($options);
-
         if (function_exists('wp_unique_id')) {
             $unique_id = wp_unique_id('discord-stats-');
         } else {
@@ -209,6 +207,38 @@ class Discord_Bot_JLG_Shortcode {
             $attributes[] = sprintf('data-refresh="%s"', esc_attr($refresh_interval));
         }
 
+        $this->enqueue_assets($options, ($refresh_interval > 0));
+
+        $stale_notice_text = '';
+
+        if ($is_stale) {
+            $stale_notice_text = __('Données mises en cache', 'discord-bot-jlg');
+
+            if ($last_updated > 0) {
+                $date_format = trim(get_option('date_format'));
+                $time_format = trim(get_option('time_format'));
+                $combined_format = trim($date_format . ' ' . $time_format);
+
+                if ('' === $combined_format) {
+                    $combined_format = 'F j, Y H:i';
+                }
+
+                if (function_exists('wp_date')) {
+                    $formatted_timestamp = wp_date($combined_format, $last_updated);
+                } else {
+                    $formatted_timestamp = date_i18n($combined_format, $last_updated);
+                }
+
+                $template = __('Données mises en cache du %s', 'discord-bot-jlg');
+
+                if (false !== strpos($template, '%s')) {
+                    $stale_notice_text = sprintf($template, $formatted_timestamp);
+                } else {
+                    $stale_notice_text = trim($template . ' ' . $formatted_timestamp);
+                }
+            }
+        }
+
         $discord_svg = '<svg class="discord-logo-svg" aria-hidden="true" focusable="false" viewBox="0 0 127.14 96.36" xmlns="http://www.w3.org/2000/svg"><path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.25,105.25,0,0,0,126.6,80.22h0C129.24,52.84,122.09,29.11,107.7,8.07ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.25,60,73.25,53s5-12.74,11.44-12.74S96.23,46,96.12,53,91.08,65.69,84.69,65.69Z"/></svg>';
 
         ob_start();
@@ -217,6 +247,10 @@ class Discord_Bot_JLG_Shortcode {
 
             <?php if (!empty($stats['is_demo'])): ?>
             <div class="discord-demo-badge"><?php echo esc_html__('Mode Démo', 'discord-bot-jlg'); ?></div>
+            <?php endif; ?>
+
+            <?php if ($is_stale && '' !== $stale_notice_text): ?>
+            <div class="discord-stale-notice"><?php echo esc_html($stale_notice_text); ?></div>
             <?php endif; ?>
 
             <?php if ($show_title): ?>
@@ -299,7 +333,7 @@ class Discord_Bot_JLG_Shortcode {
         return ob_get_clean();
     }
 
-    private function enqueue_assets($options) {
+    private function enqueue_assets($options, $needs_script = false) {
         $this->register_assets();
 
         if (!self::$inline_css_added && is_array($options) && !empty($options['custom_css'])) {
@@ -309,7 +343,10 @@ class Discord_Bot_JLG_Shortcode {
 
         wp_enqueue_style('discord-bot-jlg');
         wp_enqueue_style('discord-bot-jlg-inline');
-        wp_enqueue_script('discord-bot-jlg-frontend');
+
+        if ($needs_script) {
+            wp_enqueue_script('discord-bot-jlg-frontend');
+        }
 
         if (!self::$footer_hook_added) {
             add_action('wp_footer', array($this, 'print_late_styles'), 1);
