@@ -887,6 +887,19 @@ class Discord_Bot_JLG_API {
         delete_transient($this->get_fallback_retry_key());
     }
 
+    private function log_debug($message) {
+        if ('' === trim((string) $message)) {
+            return;
+        }
+
+        $debug_enabled = (defined('WP_DEBUG') && WP_DEBUG)
+            || (defined('WP_DEBUG_LOG') && WP_DEBUG_LOG);
+
+        if ($debug_enabled) {
+            error_log('[discord-bot-jlg] ' . $message);
+        }
+    }
+
     private function store_last_good_stats($stats) {
         if (!is_array($stats)) {
             return;
@@ -926,7 +939,7 @@ class Discord_Bot_JLG_API {
                 __('Erreur lors de l\'appel du widget Discord : %s', 'discord-bot-jlg'),
                 $response->get_error_message()
             );
-            error_log('Discord API error (widget): ' . $response->get_error_message());
+            $this->log_debug('Discord API error (widget): ' . $response->get_error_message());
             return false;
         }
 
@@ -948,7 +961,7 @@ class Discord_Bot_JLG_API {
                     $response_code
                 );
             }
-            error_log('Discord API error (widget): HTTP ' . $response_code);
+            $this->log_debug('Discord API error (widget): HTTP ' . $response_code);
             return false;
         }
 
@@ -1023,7 +1036,7 @@ class Discord_Bot_JLG_API {
                 __('Erreur lors de l\'appel de l\'API Discord (bot) : %s', 'discord-bot-jlg'),
                 $response->get_error_message()
             );
-            error_log('Discord API error (bot): ' . $response->get_error_message());
+            $this->log_debug('Discord API error (bot): ' . $response->get_error_message());
             return false;
         }
 
@@ -1045,7 +1058,7 @@ class Discord_Bot_JLG_API {
                     $response_code
                 );
             }
-            error_log('Discord API error (bot): HTTP ' . $response_code);
+            $this->log_debug('Discord API error (bot): HTTP ' . $response_code);
             return false;
         }
 
