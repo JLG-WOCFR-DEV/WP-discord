@@ -300,7 +300,36 @@
             credentials: 'same-origin'
         })
             .then(function (response) {
-                return response.json();
+                if (!response || typeof response !== 'object') {
+                    var invalidResponseError = new Error('Invalid network response');
+                    invalidResponseError.userMessage = getLocalizedString(
+                        'genericError',
+                        'Une erreur est survenue lors de la récupération des statistiques.'
+                    );
+                    throw invalidResponseError;
+                }
+
+                if (!response.ok) {
+                    var statusError = new Error('HTTP error ' + response.status);
+                    statusError.status = response.status;
+                    statusError.statusText = response.statusText;
+
+                    return response
+                        .text()
+                        .then(function (text) {
+                            statusError.responseText = text;
+                            throw statusError;
+                        })
+                        .catch(function () {
+                            throw statusError;
+                        });
+                }
+
+                return response.json().catch(function (error) {
+                    var parseError = new Error('Invalid JSON response');
+                    parseError.originalError = error;
+                    throw parseError;
+                });
             })
             .then(function (data) {
                 if (!data || typeof data !== 'object') {
@@ -451,13 +480,31 @@
                     ),
                     error
                 );
-                showErrorMessage(
-                    container,
-                    getLocalizedString(
-                        'genericError',
-                        'Une erreur est survenue lors de la récupération des statistiques.'
-                    )
+
+                if (!container) {
+                    return;
+                }
+
+                var fallbackMessage = getLocalizedString(
+                    'genericError',
+                    'Une erreur est survenue lors de la récupération des statistiques.'
                 );
+
+                var message = fallbackMessage;
+                if (error) {
+                    if (error.responseText) {
+                        var trimmed = String(error.responseText).trim();
+                        if (trimmed && trimmed.indexOf('<') === -1 && trimmed.length < 500) {
+                            message = trimmed;
+                        }
+                    } else if (error.userMessage) {
+                        message = error.userMessage;
+                    } else if (error.statusText) {
+                        message = error.statusText;
+                    }
+                }
+
+                showErrorMessage(container, message);
             });
     }
 

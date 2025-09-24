@@ -173,7 +173,13 @@ class Discord_Bot_JLG_API {
 
         if (false === $is_public_request) {
             if (empty($nonce) || !wp_verify_nonce($nonce, 'refresh_discord_stats')) {
-                wp_send_json_error(__('Nonce invalide', 'discord-bot-jlg'), 403);
+                wp_send_json_error(
+                    array(
+                        'nonce_expired' => true,
+                        'message'       => __('Nonce invalide', 'discord-bot-jlg'),
+                    ),
+                    403
+                );
             }
         }
 
