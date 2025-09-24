@@ -287,6 +287,12 @@
     }
 
     function updateStats(container, config, formatter, locale) {
+        var resultInfo = {
+            success: false,
+            rateLimited: false,
+            retryAfter: null
+        };
+
         var formData = new FormData();
         formData.append('action', config.action || 'refresh_discord_stats');
 
@@ -294,7 +300,7 @@
             formData.append('_ajax_nonce', config.nonce);
         }
 
-        fetch(config.ajaxUrl, {
+        return fetch(config.ajaxUrl, {
             method: 'POST',
             body: formData,
             credentials: 'same-origin'
@@ -333,7 +339,7 @@
             })
             .then(function (data) {
                 if (!data || typeof data !== 'object') {
-                    return;
+                    return resultInfo;
                 }
 
                 if (!data.success) {
@@ -345,7 +351,7 @@
                             );
                         console.warn(nonceMessage);
                         showErrorMessage(container, nonceMessage);
-                        return;
+                        return resultInfo;
                     }
 
                     var errorMessage = '';
@@ -368,7 +374,7 @@
                         );
                     }
 
-                    return;
+                    return resultInfo;
                 }
 
                 if (!data.data || data.data.rate_limited) {
@@ -388,7 +394,21 @@
                         showErrorMessage(container, rateLimitMessage);
                     }
 
-                    return;
+                    var retryAfterSeconds = null;
+                    if (data.data && typeof data.data.retry_after !== 'undefined') {
+                        var parsedRetry = parseFloat(data.data.retry_after);
+                        if (!isNaN(parsedRetry) && parsedRetry >= 0) {
+                            retryAfterSeconds = parsedRetry;
+                        }
+                    }
+
+                    if (retryAfterSeconds !== null) {
+                        resultInfo.retryAfter = retryAfterSeconds * 1000;
+                    }
+
+                    resultInfo.rateLimited = true;
+
+                    return resultInfo;
                 }
 
                 var hasTotalInfo = data.data && typeof data.data.has_total !== 'undefined';
@@ -408,7 +428,7 @@
                 var totalValue = typeof data.data.total === 'number' ? data.data.total : null;
 
                 if (onlineValue === null && totalValue === null && !hasTotalInfo) {
-                    return;
+                    return resultInfo;
                 }
 
                 clearErrorMessage(container);
@@ -483,6 +503,10 @@
                         }
                     }
                 }
+
+                resultInfo.success = true;
+
+                return resultInfo;
             })
             .catch(function (error) {
                 console.error(
@@ -517,6 +541,7 @@
                 }
 
                 showErrorMessage(container, message);
+                return resultInfo;
             });
     }
 
@@ -552,6 +577,61 @@
             return;
         }
 
+        function scheduleNextRefresh(container, state, delayMs) {
+            if (!state) {
+                return;
+            }
+
+            if (state.timeoutId) {
+                clearTimeout(state.timeoutId);
+                state.timeoutId = null;
+            }
+
+            var effectiveDelay;
+            if (typeof delayMs === 'number' && !isNaN(delayMs)) {
+                effectiveDelay = Math.max(delayMs, 0);
+                if (effectiveDelay > 0 && effectiveDelay < state.minIntervalMs) {
+                    effectiveDelay = state.minIntervalMs;
+                }
+            } else {
+                effectiveDelay = state.intervalMs;
+            }
+
+            state.timeoutId = window.setTimeout(function () {
+                state.timeoutId = null;
+                if (state.inFlight) {
+                    scheduleNextRefresh(container, state, state.minIntervalMs);
+                    return;
+                }
+
+                triggerRefresh(container, state);
+            }, effectiveDelay);
+        }
+
+        function triggerRefresh(container, state, overrideDelay) {
+            if (!state || state.inFlight) {
+                return;
+            }
+
+            state.inFlight = true;
+
+            updateStats(container, config, formatter, locale).then(function (result) {
+                var nextDelay = state.intervalMs;
+
+                if (result && typeof result.retryAfter === 'number' && result.retryAfter >= 0) {
+                    nextDelay = Math.max(result.retryAfter, state.intervalMs);
+                } else if (typeof overrideDelay === 'number') {
+                    nextDelay = overrideDelay;
+                }
+
+                scheduleNextRefresh(container, state, nextDelay);
+            }).catch(function () {
+                scheduleNextRefresh(container, state, state.intervalMs);
+            }).finally(function () {
+                state.inFlight = false;
+            });
+        }
+
         Array.prototype.forEach.call(containers, function (container) {
             var isForcedDemo = container.dataset.demo === 'true' && container.dataset.fallbackDemo !== 'true';
 
@@ -583,9 +663,21 @@
                 intervalMs = minIntervalMs;
             }
 
-            setInterval(function () {
-                updateStats(container, config, formatter, locale);
-            }, intervalMs);
+            var state = {
+                intervalMs: intervalMs,
+                minIntervalMs: minIntervalMs,
+                timeoutId: null,
+                inFlight: false
+            };
+
+            var shouldForceImmediateRefresh = (container.dataset && container.dataset.stale === 'true')
+                || (container.dataset && container.dataset.fallbackDemo === 'true');
+
+            if (shouldForceImmediateRefresh) {
+                triggerRefresh(container, state, state.intervalMs);
+            } else {
+                scheduleNextRefresh(container, state, state.intervalMs);
+            }
         });
     }
 
