@@ -4,6 +4,7 @@
  * Plugin URI: https://yourwebsite.com/
  * Description: Affiche les statistiques de votre serveur Discord (membres en ligne et total)
  * Version: 1.0
+ * Requires at least: 5.2
  * Author: Jérôme Le Gousse
  * Text Domain: discord-bot-jlg
  * Domain Path: /languages
@@ -110,7 +111,7 @@ class DiscordServerStats {
     }
 
     public function deactivate() {
-        $this->api->clear_cache();
+        $this->api->clear_all_cached_data();
     }
 
     public function handle_settings_update($old_value, $value) {

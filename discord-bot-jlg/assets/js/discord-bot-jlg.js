@@ -372,8 +372,20 @@
                 }
 
                 if (!data.data || data.data.rate_limited) {
+                    var rateLimitMessage = '';
+
                     if (data.data && data.data.message) {
-                        console.warn(data.data.message);
+                        rateLimitMessage = data.data.message;
+                    } else {
+                        rateLimitMessage = getLocalizedString(
+                            'rateLimited',
+                            'Actualisation trop fréquente, veuillez patienter avant de réessayer.'
+                        );
+                    }
+
+                    if (rateLimitMessage) {
+                        console.warn(rateLimitMessage);
+                        showErrorMessage(container, rateLimitMessage);
                     }
 
                     return;

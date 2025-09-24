@@ -12,6 +12,8 @@ class Discord_Bot_JLG_API {
     const MIN_PUBLIC_REFRESH_INTERVAL = 10;
 
     const REFRESH_LOCK_SUFFIX = '_refresh_lock';
+    const CLIENT_REFRESH_LOCK_PREFIX = '_refresh_lock_client_';
+    const CLIENT_REFRESH_LOCK_INDEX_SUFFIX = '_refresh_lock_clients';
     const LAST_GOOD_SUFFIX = '_last_good';
     const FALLBACK_BYPASS_SUFFIX = '_fallback_bypass';
 
@@ -192,7 +194,8 @@ class Discord_Bot_JLG_API {
             wp_send_json_error(__('Mode démo actif', 'discord-bot-jlg'));
         }
 
-        $rate_limit_key = $this->cache_key . self::REFRESH_LOCK_SUFFIX;
+        $rate_limit_key        = $this->cache_key . self::REFRESH_LOCK_SUFFIX;
+        $client_rate_limit_key = $this->get_client_rate_limit_key($is_public_request);
         $fallback_bypass_key = $this->get_fallback_bypass_key();
         $cache_duration = $this->get_cache_duration($options);
         $default_public_refresh = max(self::MIN_PUBLIC_REFRESH_INTERVAL, (int) $cache_duration);
@@ -217,6 +220,27 @@ class Discord_Bot_JLG_API {
         }
 
         if (true === $is_public_request) {
+            if (!empty($client_rate_limit_key)) {
+                $client_retry_after = $this->get_retry_after($client_rate_limit_key, $rate_limit_window);
+
+                if ($client_retry_after > 0) {
+                    $message = sprintf(
+                        /* translators: %d: number of seconds to wait before the next refresh. */
+                        __('Veuillez patienter %d secondes avant la prochaine actualisation.', 'discord-bot-jlg'),
+                        $client_retry_after
+                    );
+
+                    wp_send_json_error(
+                        array(
+                            'rate_limited' => true,
+                            'message'      => $message,
+                            'retry_after'  => $client_retry_after,
+                        ),
+                        429
+                    );
+                }
+            }
+
             if (false === $fallback_bypass_active && is_array($cached_stats) && empty($cached_stats['is_demo'])) {
                 wp_send_json_success($cached_stats);
             }
@@ -285,6 +309,9 @@ class Discord_Bot_JLG_API {
             && empty($stats['is_demo'])
         ) {
             set_transient($rate_limit_key, time(), $rate_limit_window);
+            if (!empty($client_rate_limit_key)) {
+                $this->set_client_rate_limit($client_rate_limit_key, $rate_limit_window);
+            }
         }
 
         if (
@@ -294,6 +321,9 @@ class Discord_Bot_JLG_API {
         ) {
             if (true === $is_public_request) {
                 delete_transient($rate_limit_key);
+                if (!empty($client_rate_limit_key)) {
+                    $this->delete_client_rate_limit($client_rate_limit_key);
+                }
             }
 
             wp_send_json_success($stats);
@@ -310,6 +340,9 @@ class Discord_Bot_JLG_API {
             }
 
             delete_transient($rate_limit_key);
+            if (!empty($client_rate_limit_key)) {
+                $this->delete_client_rate_limit($client_rate_limit_key);
+            }
 
             $error_payload = array(
                 'rate_limited' => false,
@@ -324,6 +357,9 @@ class Discord_Bot_JLG_API {
         }
 
         delete_transient($rate_limit_key);
+        if (!empty($client_rate_limit_key)) {
+            $this->delete_client_rate_limit($client_rate_limit_key);
+        }
 
         $error_payload = array(
             'message' => __('Impossible de récupérer les stats', 'discord-bot-jlg'),
@@ -351,6 +387,7 @@ class Discord_Bot_JLG_API {
 
         delete_transient($this->cache_key);
         delete_transient($this->cache_key . self::REFRESH_LOCK_SUFFIX);
+        $this->clear_client_rate_limits();
     }
 
     /**
@@ -372,6 +409,200 @@ class Discord_Bot_JLG_API {
         delete_transient($this->cache_key . self::REFRESH_LOCK_SUFFIX);
         delete_transient($this->get_fallback_bypass_key());
         delete_transient($this->get_last_good_cache_key());
+        $this->clear_client_rate_limits();
+    }
+
+    /**
+     * Renvoie la clé de limitation spécifique à un visiteur public.
+     *
+     * @param bool $is_public_request Indique si la requête provient d'un visiteur non connecté.
+     *
+     * @return string
+     */
+    private function get_client_rate_limit_key($is_public_request) {
+        if (false === $is_public_request) {
+            return '';
+        }
+
+        $fingerprint = $this->generate_public_request_fingerprint();
+
+        if (empty($fingerprint)) {
+            return '';
+        }
+
+        return $this->cache_key . self::CLIENT_REFRESH_LOCK_PREFIX . $fingerprint;
+    }
+
+    /**
+     * Génère une empreinte anonymisée basée sur les informations de la requête.
+     *
+     * @return string
+     */
+    private function generate_public_request_fingerprint() {
+        $parts = array();
+
+        if (!empty($_SERVER['REMOTE_ADDR'])) {
+            $parts[] = sanitize_text_field(wp_unslash($_SERVER['REMOTE_ADDR']));
+        }
+
+        if (!empty($_SERVER['HTTP_USER_AGENT'])) {
+            $parts[] = sanitize_text_field(wp_unslash($_SERVER['HTTP_USER_AGENT']));
+        }
+
+        if (empty($parts)) {
+            return '';
+        }
+
+        $fingerprint = wp_hash(implode('|', $parts));
+
+        if (empty($fingerprint)) {
+            return '';
+        }
+
+        return substr($fingerprint, 0, 20);
+    }
+
+    /**
+     * Stocke une limitation de fréquence spécifique au client.
+     *
+     * @param string $client_key        Clé du transient à définir.
+     * @param int    $rate_limit_window Durée d'expiration en secondes.
+     *
+     * @return void
+     */
+    private function set_client_rate_limit($client_key, $rate_limit_window) {
+        if (empty($client_key)) {
+            return;
+        }
+
+        set_transient($client_key, time(), $rate_limit_window);
+        $this->remember_client_rate_limit_key($client_key);
+    }
+
+    /**
+     * Supprime une limitation de fréquence spécifique à un client.
+     *
+     * @param string $client_key Clé du transient à supprimer.
+     *
+     * @return void
+     */
+    private function delete_client_rate_limit($client_key) {
+        if (empty($client_key)) {
+            return;
+        }
+
+        delete_transient($client_key);
+
+        $index_key   = $this->get_client_rate_limit_index_key();
+        $client_keys = get_transient($index_key);
+
+        if (!is_array($client_keys)) {
+            return;
+        }
+
+        if (isset($client_keys[$client_key])) {
+            unset($client_keys[$client_key]);
+
+            if (!empty($client_keys)) {
+                set_transient($index_key, $client_keys, DAY_IN_SECONDS);
+            } else {
+                delete_transient($index_key);
+            }
+        }
+    }
+
+    /**
+     * Enregistre la clé d'un client dans l'index pour faciliter les purges.
+     *
+     * @param string $client_key Clé de limitation à mémoriser.
+     *
+     * @return void
+     */
+    private function remember_client_rate_limit_key($client_key) {
+        if (empty($client_key)) {
+            return;
+        }
+
+        $index_key   = $this->get_client_rate_limit_index_key();
+        $client_keys = get_transient($index_key);
+
+        if (!is_array($client_keys)) {
+            $client_keys = array();
+        }
+
+        $now = time();
+        $updated_keys = array();
+
+        foreach ($client_keys as $stored_key => $timestamp) {
+            if ($stored_key === $client_key) {
+                continue;
+            }
+
+            if (false === get_transient($stored_key)) {
+                continue;
+            }
+
+            $updated_keys[$stored_key] = $timestamp;
+        }
+
+        $updated_keys[$client_key] = $now;
+
+        set_transient($index_key, $updated_keys, DAY_IN_SECONDS);
+    }
+
+    /**
+     * Supprime toutes les limitations de fréquence spécifiques aux clients.
+     *
+     * @return void
+     */
+    private function clear_client_rate_limits() {
+        $index_key   = $this->get_client_rate_limit_index_key();
+        $client_keys = get_transient($index_key);
+
+        if (is_array($client_keys)) {
+            foreach (array_keys($client_keys) as $client_key) {
+                delete_transient($client_key);
+            }
+        }
+
+        delete_transient($index_key);
+    }
+
+    /**
+     * Calcule le délai restant avant qu'un client puisse relancer une requête.
+     *
+     * @param string $key               Clé du transient.
+     * @param int    $rate_limit_window Durée de la fenêtre de limitation.
+     *
+     * @return int
+     */
+    private function get_retry_after($key, $rate_limit_window) {
+        if (empty($key)) {
+            return 0;
+        }
+
+        $last_refresh = get_transient($key);
+
+        if (false === $last_refresh) {
+            return 0;
+        }
+
+        $elapsed = time() - (int) $last_refresh;
+
+        if ($elapsed < $rate_limit_window) {
+            return max(0, $rate_limit_window - $elapsed);
+        }
+
+        return 0;
+    }
+
+    /**
+     * Renvoie la clé de l'index stockant les limitations par client.
+     *
+     * @return string
+     */
+    private function get_client_rate_limit_index_key() {
+        return $this->cache_key . self::CLIENT_REFRESH_LOCK_INDEX_SUFFIX;
     }
 
     /**

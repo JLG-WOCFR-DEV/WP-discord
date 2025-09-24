@@ -100,7 +100,11 @@ class Discord_Bot_JLG_Shortcode {
 
         $this->enqueue_assets($options);
 
-        $unique_id = wp_unique_id('discord-stats-');
+        if (function_exists('wp_unique_id')) {
+            $unique_id = wp_unique_id('discord-stats-');
+        } else {
+            $unique_id = str_replace('.', '-', uniqid('discord-stats-', true));
+        }
 
         $is_demo          = !empty($stats['is_demo']);
         $is_fallback_demo = !empty($stats['fallback_demo']);
@@ -362,6 +366,7 @@ class Discord_Bot_JLG_Shortcode {
                 'nonceExpiredFallback' => __('Votre session a expiré, veuillez recharger la page.', 'discord-bot-jlg'),
                 'consoleErrorPrefix'   => __('Erreur lors de la mise à jour des statistiques Discord :', 'discord-bot-jlg'),
                 'staleNotice'          => __('Données mises en cache du %s', 'discord-bot-jlg'),
+                'rateLimited'          => __('Actualisation trop fréquente, veuillez patienter avant de réessayer.', 'discord-bot-jlg'),
             )
         );
 
