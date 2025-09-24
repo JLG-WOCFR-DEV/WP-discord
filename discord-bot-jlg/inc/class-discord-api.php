@@ -145,6 +145,7 @@ class Discord_Bot_JLG_API {
             return $this->get_demo_stats(true);
         }
 
+        $this->last_error = '';
         set_transient($this->cache_key, $stats, $this->get_cache_duration($options));
         $this->store_last_good_stats($stats);
 
