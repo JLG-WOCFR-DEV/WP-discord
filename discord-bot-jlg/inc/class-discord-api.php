@@ -16,6 +16,7 @@ class Discord_Bot_JLG_API {
     const CLIENT_REFRESH_LOCK_INDEX_SUFFIX = '_refresh_lock_clients';
     const LAST_GOOD_SUFFIX = '_last_good';
     const FALLBACK_RETRY_SUFFIX = '_fallback_retry_after';
+    const FALLBACK_RETRY_API_DELAY_SUFFIX = '_fallback_retry_after_delay';
 
     private $option_name;
     private $cache_key;
@@ -23,6 +24,8 @@ class Discord_Bot_JLG_API {
     private $last_error;
     private $runtime_cache;
     private $runtime_errors;
+    private $last_retry_after;
+    private $runtime_retry_after;
     private $http_client;
     private $options_cache;
 
@@ -42,6 +45,8 @@ class Discord_Bot_JLG_API {
         $this->last_error = '';
         $this->runtime_cache = array();
         $this->runtime_errors = array();
+        $this->last_retry_after = 0;
+        $this->runtime_retry_after = array();
         $this->http_client = ($http_client instanceof Discord_Bot_JLG_Http_Client)
             ? $http_client
             : new Discord_Bot_JLG_Http_Client();
@@ -92,6 +97,7 @@ class Discord_Bot_JLG_API {
      */
     public function get_stats($args = array()) {
         $this->last_error = '';
+        $this->last_retry_after = 0;
 
         $args = wp_parse_args(
             $args,
@@ -105,6 +111,7 @@ class Discord_Bot_JLG_API {
 
         if (array_key_exists($runtime_key, $this->runtime_cache)) {
             $this->last_error = isset($this->runtime_errors[$runtime_key]) ? $this->runtime_errors[$runtime_key] : '';
+            $this->last_retry_after = isset($this->runtime_retry_after[$runtime_key]) ? (int) $this->runtime_retry_after[$runtime_key] : 0;
             return $this->runtime_cache[$runtime_key];
         }
 
@@ -191,11 +198,14 @@ class Discord_Bot_JLG_API {
             if (empty($this->last_error)) {
                 $this->last_error = __('Impossible d\'obtenir des statistiques exploitables depuis Discord.', 'discord-bot-jlg');
             }
+            $this->store_api_retry_after_delay($this->last_retry_after);
             $demo_stats = $this->get_demo_stats(true);
             return $this->remember_runtime_result($runtime_key, $demo_stats);
         }
 
         $this->last_error = '';
+        $this->set_last_retry_after(0);
+        $this->clear_api_retry_after_delay();
         set_transient($this->cache_key, $stats, $this->get_cache_duration($options));
         $this->store_last_good_stats($stats);
 
@@ -213,6 +223,9 @@ class Discord_Bot_JLG_API {
 
     /**
      * Gère la requête AJAX d'actualisation des statistiques et renvoie une réponse JSON.
+     *
+     * Les réponses publiques en erreur exposent la clé `retry_after` afin que le
+     * frontal puisse respecter le délai communiqué par Discord lorsque disponible.
      *
      * @return void
      */
@@ -409,6 +422,8 @@ class Discord_Bot_JLG_API {
                 'message'      => __('Actualisation en cours, veuillez réessayer dans quelques instants.', 'discord-bot-jlg'),
             );
 
+            $error_payload['retry_after'] = max(0, (int) $this->last_retry_after);
+
             if (!empty($last_error_message)) {
                 $error_payload['diagnostic'] = $last_error_message;
             }
@@ -428,6 +443,8 @@ class Discord_Bot_JLG_API {
         if (!empty($last_error_message)) {
             $error_payload['diagnostic'] = $last_error_message;
         }
+
+        $error_payload['retry_after'] = max(0, (int) $this->last_retry_after);
 
         wp_send_json_error($error_payload);
     }
@@ -470,6 +487,7 @@ class Discord_Bot_JLG_API {
         delete_transient($this->cache_key);
         delete_transient($this->cache_key . self::REFRESH_LOCK_SUFFIX);
         $this->clear_fallback_retry_schedule();
+        $this->clear_api_retry_after_delay();
         delete_transient($this->get_last_good_cache_key());
         $this->clear_client_rate_limits();
         $this->reset_runtime_cache();
@@ -491,16 +509,18 @@ class Discord_Bot_JLG_API {
 
     private function remember_runtime_result($runtime_key, $stats) {
         if ('' !== $runtime_key) {
-            $this->runtime_cache[$runtime_key]  = $stats;
-            $this->runtime_errors[$runtime_key] = $this->last_error;
+            $this->runtime_cache[$runtime_key]       = $stats;
+            $this->runtime_errors[$runtime_key]      = $this->last_error;
+            $this->runtime_retry_after[$runtime_key] = $this->last_retry_after;
         }
 
         return $stats;
     }
 
     private function reset_runtime_cache() {
-        $this->runtime_cache  = array();
-        $this->runtime_errors = array();
+        $this->runtime_cache        = array();
+        $this->runtime_errors       = array();
+        $this->runtime_retry_after  = array();
     }
 
     /**
@@ -925,6 +945,10 @@ class Discord_Bot_JLG_API {
         return $this->cache_key . self::FALLBACK_RETRY_SUFFIX;
     }
 
+    private function get_api_retry_after_key() {
+        return $this->cache_key . self::FALLBACK_RETRY_API_DELAY_SUFFIX;
+    }
+
     private function get_fallback_retry_window($cache_duration, $options) {
         $cache_duration = (int) $cache_duration;
         $cache_duration = $cache_duration > 0 ? $cache_duration : $this->default_cache_duration;
@@ -948,17 +972,79 @@ class Discord_Bot_JLG_API {
         return $filtered_window;
     }
 
+    /**
+     * Programme la prochaine tentative lorsque des statistiques de secours sont utilisées.
+     *
+     * Le délai est basé sur la configuration locale, mais l'en-tête Retry-After
+     * fourni par l'API Discord est prioritaire lorsqu'il est disponible.
+     *
+     * @param int   $cache_duration Durée de cache configurée.
+     * @param array $options        Options du plugin.
+     *
+     * @return int Timestamp UNIX de la prochaine tentative.
+     */
     private function schedule_next_fallback_retry($cache_duration, $options) {
         $retry_window = $this->get_fallback_retry_window($cache_duration, $options);
-        $next_retry   = time() + $retry_window;
+        $api_retry_after = $this->consume_api_retry_after_delay();
 
-        set_transient($this->get_fallback_retry_key(), $next_retry, $retry_window);
+        if ($api_retry_after > 0) {
+            $retry_window = max(1, (int) $api_retry_after);
+        }
+
+        $next_retry = time() + $retry_window;
+
+        set_transient($this->get_fallback_retry_key(), $next_retry, max(1, $retry_window));
 
         return $next_retry;
     }
 
     private function clear_fallback_retry_schedule() {
         delete_transient($this->get_fallback_retry_key());
+    }
+
+    /**
+     * Mémorise le délai Retry-After fourni par l'API afin de prioriser la reprise.
+     *
+     * @param int $retry_after Durée en secondes.
+     *
+     * @return void
+     */
+    private function store_api_retry_after_delay($retry_after) {
+        $retry_after = (int) $retry_after;
+        $key         = $this->get_api_retry_after_key();
+
+        if ($retry_after > 0) {
+            set_transient($key, $retry_after, max(1, $retry_after));
+            return;
+        }
+
+        delete_transient($key);
+    }
+
+    /**
+     * Récupère et efface le délai Retry-After précédemment mémorisé.
+     *
+     * @return int
+     */
+    private function consume_api_retry_after_delay() {
+        $key         = $this->get_api_retry_after_key();
+        $retry_after = (int) get_transient($key);
+
+        if ($retry_after > 0) {
+            delete_transient($key);
+            return $retry_after;
+        }
+
+        return 0;
+    }
+
+    /**
+     * Supprime tout délai Retry-After mémorisé.
+     *
+     * @return void
+     */
+    private function clear_api_retry_after_delay() {
+        delete_transient($this->get_api_retry_after_key());
     }
 
     private function log_debug($message) {
@@ -1017,6 +1103,7 @@ class Discord_Bot_JLG_API {
 
         $response_code = (int) wp_remote_retrieve_response_code($response);
         if (200 !== $response_code) {
+            $this->set_last_retry_after($this->extract_retry_after_seconds($response));
             $error_detail = $this->get_response_error_detail($response);
 
             if (!empty($error_detail)) {
@@ -1114,6 +1201,7 @@ class Discord_Bot_JLG_API {
 
         $response_code = (int) wp_remote_retrieve_response_code($response);
         if (200 !== $response_code) {
+            $this->set_last_retry_after($this->extract_retry_after_seconds($response));
             $error_detail = $this->get_response_error_detail($response);
 
             if (!empty($error_detail)) {
@@ -1186,6 +1274,50 @@ class Discord_Bot_JLG_API {
         }
 
         return trim(wp_strip_all_tags($message));
+    }
+
+    /**
+     * Normalise la valeur de l'en-tête Retry-After d'une réponse HTTP.
+     *
+     * @param array|WP_Error $response Réponse HTTP WordPress.
+     *
+     * @return int Durée en secondes.
+     */
+    private function extract_retry_after_seconds($response) {
+        $header = wp_remote_retrieve_header($response, 'retry-after');
+
+        if (is_array($header)) {
+            $header = reset($header);
+        }
+
+        if (!is_string($header)) {
+            return 0;
+        }
+
+        $header = trim($header);
+
+        if ('' === $header) {
+            return 0;
+        }
+
+        if (ctype_digit($header)) {
+            $retry_after = (int) $header;
+            return ($retry_after > 0) ? $retry_after : 0;
+        }
+
+        $timestamp = strtotime($header);
+
+        if (false === $timestamp) {
+            return 0;
+        }
+
+        $delta = $timestamp - time();
+
+        return ($delta > 0) ? $delta : 0;
+    }
+
+    private function set_last_retry_after($retry_after) {
+        $this->last_retry_after = max(0, (int) $retry_after);
     }
 
     private function has_usable_stats($stats) {
