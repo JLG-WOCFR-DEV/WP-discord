@@ -185,6 +185,45 @@
         }
     }
 
+    function convertRetryAfterToMilliseconds(rawValue) {
+        if (rawValue === null || typeof rawValue === 'undefined') {
+            return null;
+        }
+
+        var numericValue = null;
+
+        if (typeof rawValue === 'string') {
+            var trimmedValue = rawValue.trim();
+
+            if (!trimmedValue) {
+                return null;
+            }
+
+            var lowerValue = trimmedValue.toLowerCase();
+            if (lowerValue.slice(-2) === 'ms') {
+                var parsedMs = parseFloat(trimmedValue.slice(0, -2));
+                if (!isNaN(parsedMs) && parsedMs >= 0) {
+                    numericValue = parsedMs;
+                }
+            } else {
+                var parsedSeconds = parseFloat(trimmedValue);
+                if (!isNaN(parsedSeconds) && parsedSeconds >= 0) {
+                    numericValue = parsedSeconds * 1000;
+                }
+            }
+        } else if (typeof rawValue === 'number') {
+            if (!isNaN(rawValue) && rawValue >= 0) {
+                numericValue = rawValue * 1000;
+            }
+        }
+
+        if (numericValue === null) {
+            return null;
+        }
+
+        return numericValue;
+    }
+
     function updateStatElement(container, selector, value, formatter) {
         if (value === null) {
             return;
@@ -320,13 +359,71 @@
                     statusError.status = response.status;
                     statusError.statusText = response.statusText;
 
-                    return response
-                        .text()
-                        .then(function (text) {
-                            statusError.responseText = text;
+                    var jsonSource = typeof response.clone === 'function'
+                        ? response.clone()
+                        : response;
+
+                    return jsonSource
+                        .json()
+                        .then(function (data) {
+                            if (data && typeof data === 'object') {
+                                var errorData = data.data && typeof data.data === 'object'
+                                    ? data.data
+                                    : data;
+
+                                if (
+                                    typeof data.message !== 'undefined'
+                                    && (
+                                        typeof errorData.message === 'undefined'
+                                        || errorData.message === null
+                                    )
+                                ) {
+                                    errorData.message = data.message;
+                                }
+
+                                var retryAfterSource;
+                                if (
+                                    errorData
+                                    && typeof errorData.retry_after !== 'undefined'
+                                ) {
+                                    retryAfterSource = errorData.retry_after;
+                                } else if (
+                                    typeof data.retry_after !== 'undefined'
+                                ) {
+                                    retryAfterSource = data.retry_after;
+                                }
+
+                                var retryAfterMs = convertRetryAfterToMilliseconds(
+                                    retryAfterSource
+                                );
+
+                                if (retryAfterMs !== null) {
+                                    errorData.retry_after = retryAfterMs;
+                                    statusError.retryAfter = retryAfterMs;
+                                }
+
+                                statusError.data = errorData;
+                            }
+
                             throw statusError;
                         })
-                        .catch(function () {
+                        .catch(function (jsonError) {
+                            if (jsonError === statusError) {
+                                throw statusError;
+                            }
+
+                            if (typeof response.text === 'function') {
+                                return response
+                                    .text()
+                                    .then(function (text) {
+                                        statusError.responseText = text;
+                                        throw statusError;
+                                    })
+                                    .catch(function () {
+                                        throw statusError;
+                                    });
+                            }
+
                             throw statusError;
                         });
                 }
@@ -394,16 +491,14 @@
                         showErrorMessage(container, rateLimitMessage);
                     }
 
-                    var retryAfterSeconds = null;
                     if (data.data && typeof data.data.retry_after !== 'undefined') {
-                        var parsedRetry = parseFloat(data.data.retry_after);
-                        if (!isNaN(parsedRetry) && parsedRetry >= 0) {
-                            retryAfterSeconds = parsedRetry;
-                        }
-                    }
+                        var retryAfterValue = convertRetryAfterToMilliseconds(
+                            data.data.retry_after
+                        );
 
-                    if (retryAfterSeconds !== null) {
-                        resultInfo.retryAfter = retryAfterSeconds * 1000;
+                        if (retryAfterValue !== null) {
+                            resultInfo.retryAfter = retryAfterValue;
+                        }
                     }
 
                     resultInfo.rateLimited = true;
@@ -528,15 +623,50 @@
 
                 var message = fallbackMessage;
                 if (error) {
-                    if (error.responseText) {
+                    var dataMessage = null;
+
+                    if (error.data) {
+                        if (typeof error.data === 'string') {
+                            dataMessage = error.data;
+                        } else if (typeof error.data === 'object') {
+                            if (
+                                typeof error.data.message === 'string'
+                                && error.data.message
+                            ) {
+                                dataMessage = error.data.message;
+                            } else if (
+                                typeof error.data.error === 'string'
+                                && error.data.error
+                            ) {
+                                dataMessage = error.data.error;
+                            } else if (
+                                typeof error.data.detail === 'string'
+                                && error.data.detail
+                            ) {
+                                dataMessage = error.data.detail;
+                            }
+                        }
+                    }
+
+                    if (dataMessage) {
+                        message = dataMessage;
+                    } else if (error.userMessage) {
+                        message = error.userMessage;
+                    } else if (error.responseText) {
                         var trimmed = String(error.responseText).trim();
                         if (trimmed && trimmed.indexOf('<') === -1 && trimmed.length < 500) {
                             message = trimmed;
                         }
-                    } else if (error.userMessage) {
-                        message = error.userMessage;
                     } else if (error.statusText) {
                         message = error.statusText;
+                    }
+
+                    if (
+                        typeof resultInfo.retryAfter !== 'number'
+                        && typeof error.retryAfter === 'number'
+                        && error.retryAfter >= 0
+                    ) {
+                        resultInfo.retryAfter = error.retryAfter;
                     }
                 }
 
