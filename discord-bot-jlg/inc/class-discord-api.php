@@ -574,6 +574,10 @@ class Discord_Bot_JLG_API {
          *
          * @since 1.0.1
          *
+         * Les fragments incluent notamment l'adresse IP publique déterminée en priorisant les
+         * en-têtes `HTTP_CF_CONNECTING_IP`, `HTTP_X_REAL_IP` et `HTTP_TRUE_CLIENT_IP`, puis les
+         * en-têtes génériques (X-Forwarded-For, Forwarded, etc.).
+         *
          * @param array $parts       Tableau des fragments d'empreinte.
          * @param array $server_vars Variables serveur disponibles.
          */
@@ -638,6 +642,12 @@ class Discord_Bot_JLG_API {
      * @return string
      */
     private function get_public_request_ip($server_vars) {
+        $priority_headers = array(
+            'HTTP_CF_CONNECTING_IP',
+            'HTTP_X_REAL_IP',
+            'HTTP_TRUE_CLIENT_IP',
+        );
+
         $headers = array(
             'HTTP_CLIENT_IP',
             'HTTP_X_FORWARDED_FOR',
@@ -648,7 +658,9 @@ class Discord_Bot_JLG_API {
             'REMOTE_ADDR',
         );
 
-        foreach ($headers as $header) {
+        $candidate_headers = array_merge($priority_headers, $headers);
+
+        foreach ($candidate_headers as $header) {
             if (empty($server_vars[$header])) {
                 continue;
             }
