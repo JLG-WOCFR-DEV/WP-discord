@@ -56,6 +56,10 @@ if (!function_exists('discord_bot_jlg_get_default_options')) {
 function discord_bot_jlg_uninstall() {
     delete_option(DISCORD_BOT_JLG_OPTION_NAME);
 
+    if (!class_exists('Discord_Bot_JLG_Http_Client')) {
+        require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-http.php';
+    }
+
     if (!class_exists('Discord_Bot_JLG_API')) {
         require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-api.php';
     }
