@@ -64,7 +64,7 @@ class Discord_Bot_JLG_API {
      *
      * @return array
      */
-    private function get_plugin_options($force_refresh = false) {
+    public function get_plugin_options($force_refresh = false) {
         if (true === $force_refresh || !is_array($this->options_cache)) {
             $options = get_option($this->option_name);
 
@@ -236,7 +236,11 @@ class Discord_Bot_JLG_API {
         $options = $this->get_plugin_options();
 
         if (!empty($options['demo_mode'])) {
-            wp_send_json_error(__('Mode démo actif', 'discord-bot-jlg'));
+            wp_send_json_error(
+                array(
+                    'message' => __('Mode démo actif', 'discord-bot-jlg'),
+                )
+            );
         }
 
         $rate_limit_key        = $this->cache_key . self::REFRESH_LOCK_SUFFIX;
@@ -511,7 +515,29 @@ class Discord_Bot_JLG_API {
             return '';
         }
 
-        $fingerprint = $this->generate_public_request_fingerprint();
+        $server_vars = $_SERVER;
+
+        /**
+         * Permet de forcer l'identifiant utilisé pour limiter les rafraîchissements côté public.
+         *
+         * @since 1.0.1
+         *
+         * @param string $identifier Identifiant personnalisé. Laisser vide pour utiliser l'empreinte par défaut.
+         * @param array  $server_vars Variables serveur disponibles au moment de la requête.
+         */
+        $custom_identifier = apply_filters('discord_bot_jlg_public_rate_limit_identifier', '', $server_vars);
+
+        if (!is_string($custom_identifier)) {
+            $custom_identifier = '';
+        } else {
+            $custom_identifier = sanitize_text_field($custom_identifier);
+        }
+
+        if ('' !== $custom_identifier) {
+            $fingerprint = md5($custom_identifier);
+        } else {
+            $fingerprint = $this->generate_public_request_fingerprint($server_vars);
+        }
 
         if (empty($fingerprint)) {
             return '';
@@ -523,10 +549,14 @@ class Discord_Bot_JLG_API {
     /**
      * Génère une empreinte anonymisée basée sur les informations de la requête.
      *
+     * @param array|null $server_vars Variables serveur disponibles.
+     *
      * @return string
      */
-    private function generate_public_request_fingerprint() {
-        $server_vars = $_SERVER;
+    private function generate_public_request_fingerprint($server_vars = null) {
+        if (null === $server_vars || !is_array($server_vars)) {
+            $server_vars = $_SERVER;
+        }
         $parts       = array();
 
         $request_ip = $this->get_public_request_ip($server_vars);

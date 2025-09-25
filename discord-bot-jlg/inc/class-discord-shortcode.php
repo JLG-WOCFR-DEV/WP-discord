@@ -37,10 +37,7 @@ class Discord_Bot_JLG_Shortcode {
      * @return string HTML du composant de statistiques prêt à être inséré dans la page.
      */
     public function render_shortcode($atts) {
-        $options = get_option($this->option_name);
-        if (!is_array($options)) {
-            $options = array();
-        }
+        $options = $this->api->get_plugin_options();
 
         $atts = shortcode_atts(
             array(
