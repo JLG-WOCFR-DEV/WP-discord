@@ -218,3 +218,84 @@ function wp_privacy_anonymize_ip($ip, $is_ipv6) {
 function wp_test_get_transient_entry($key) {
     return isset($GLOBALS['wp_test_transients'][$key]) ? $GLOBALS['wp_test_transients'][$key] : null;
 }
+
+if (!function_exists('wp_hash')) {
+    function wp_hash($data) {
+        if (!is_string($data) && !is_numeric($data) && !is_bool($data)) {
+            return false;
+        }
+
+        $data = (string) $data;
+        $salt = 'wordpress-test-salt';
+
+        return hash_hmac('md5', $data, $salt);
+    }
+}
+
+if (!function_exists('wp_json_encode')) {
+    function wp_json_encode($data, $options = 0, $depth = 512) {
+        if (defined('JSON_PARTIAL_OUTPUT_ON_ERROR')) {
+            $options |= JSON_PARTIAL_OUTPUT_ON_ERROR;
+        }
+
+        $encoded = json_encode($data, $options, $depth);
+
+        if (false === $encoded && JSON_ERROR_UTF8 === json_last_error()) {
+            $data    = wp_json_prepare_data($data);
+            $encoded = json_encode($data, $options, $depth);
+        }
+
+        return (false === $encoded) ? false : $encoded;
+    }
+
+    function wp_json_prepare_data($data) {
+        if (is_array($data)) {
+            $output = array();
+            foreach ($data as $key => $value) {
+                $output[$key] = wp_json_prepare_data($value);
+            }
+            return $output;
+        }
+
+        if (is_object($data)) {
+            foreach ($data as $key => $value) {
+                $data->$key = wp_json_prepare_data($value);
+            }
+            return $data;
+        }
+
+        if (is_string($data)) {
+            return wp_sanitize_utf8_string($data);
+        }
+
+        return $data;
+    }
+
+    function wp_sanitize_utf8_string($string) {
+        $string = (string) $string;
+
+        if ('' === $string) {
+            return $string;
+        }
+
+        if (preg_match('//u', $string)) {
+            return $string;
+        }
+
+        if (function_exists('iconv')) {
+            $converted = @iconv('UTF-8', 'UTF-8//IGNORE', $string);
+            if (false !== $converted) {
+                return $converted;
+            }
+        }
+
+        if (function_exists('mb_convert_encoding')) {
+            $converted = @mb_convert_encoding($string, 'UTF-8', 'UTF-8');
+            if (false !== $converted) {
+                return $converted;
+            }
+        }
+
+        return '';
+    }
+}
