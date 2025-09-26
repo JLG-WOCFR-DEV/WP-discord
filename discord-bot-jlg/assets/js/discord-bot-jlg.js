@@ -5,6 +5,9 @@
     var ERROR_MESSAGE_CLASS = 'discord-error-message';
     var STALE_NOTICE_CLASS = 'discord-stale-notice';
     var globalConfig = {};
+    var SERVER_NAME_SELECTOR = '[data-role="discord-server-name"]';
+    var SERVER_NAME_CLASS = 'discord-server-name';
+    var SERVER_NAME_TEXT_CLASS = 'discord-server-name__text';
 
     if (typeof window !== 'undefined' && window.discordBotJlg) {
         globalConfig = window.discordBotJlg;
@@ -160,6 +163,86 @@
         var messageElement = container.querySelector('.' + ERROR_MESSAGE_CLASS);
         if (messageElement && messageElement.parentNode) {
             messageElement.parentNode.removeChild(messageElement);
+        }
+    }
+
+    function getServerNameWrapper(container) {
+        if (!container) {
+            return null;
+        }
+
+        return container.querySelector('.discord-stats-wrapper');
+    }
+
+    function removeServerNameElement(container) {
+        if (!container) {
+            return;
+        }
+
+        var element = container.querySelector(SERVER_NAME_SELECTOR);
+        if (element && element.parentNode) {
+            element.parentNode.removeChild(element);
+        }
+
+        if (container.dataset) {
+            delete container.dataset.serverName;
+        }
+    }
+
+    function ensureServerNameElement(container) {
+        var wrapper = getServerNameWrapper(container);
+        if (!wrapper) {
+            return null;
+        }
+
+        var element = wrapper.querySelector(SERVER_NAME_SELECTOR);
+        if (!element) {
+            element = document.createElement('div');
+            element.className = SERVER_NAME_CLASS;
+            element.setAttribute('data-role', 'discord-server-name');
+            var firstStat = wrapper.querySelector('.discord-stat');
+            wrapper.insertBefore(element, firstStat || wrapper.firstChild);
+        }
+
+        var textElement = element.querySelector('.' + SERVER_NAME_TEXT_CLASS);
+        if (!textElement) {
+            textElement = document.createElement('span');
+            textElement.className = SERVER_NAME_TEXT_CLASS;
+            element.appendChild(textElement);
+        }
+
+        return {
+            element: element,
+            textElement: textElement
+        };
+    }
+
+    function updateServerName(container, serverName) {
+        if (!container || !container.dataset || container.dataset.showServerName !== 'true') {
+            removeServerNameElement(container);
+            return;
+        }
+
+        var safeName = '';
+
+        if (typeof serverName === 'string') {
+            safeName = serverName.trim();
+        }
+
+        if (!safeName) {
+            removeServerNameElement(container);
+            return;
+        }
+
+        var elements = ensureServerNameElement(container);
+        if (!elements) {
+            return;
+        }
+
+        elements.textElement.textContent = safeName;
+
+        if (container.dataset) {
+            container.dataset.serverName = safeName;
         }
     }
 
@@ -511,12 +594,17 @@
                 var isFallbackDemo = !!(data.data && data.data.fallback_demo);
                 var isStale = !!(data.data && data.data.stale);
                 var lastUpdated = null;
+                var serverNameValue = '';
 
                 if (data.data && typeof data.data.last_updated !== 'undefined') {
                     var parsed = parseInt(data.data.last_updated, 10);
                     if (!isNaN(parsed) && parsed > 0) {
                         lastUpdated = parsed;
                     }
+                }
+
+                if (data.data && typeof data.data.server_name === 'string') {
+                    serverNameValue = data.data.server_name;
                 }
 
                 var onlineValue = typeof data.data.online === 'number' ? data.data.online : null;
@@ -531,6 +619,8 @@
                 applyDemoState(container, isDemo, isFallbackDemo);
 
                 updateStaleNotice(container, isStale, lastUpdated, locale);
+
+                updateServerName(container, serverNameValue);
 
                 updateStatElement(container, '.discord-online .discord-number', onlineValue, formatter);
 
