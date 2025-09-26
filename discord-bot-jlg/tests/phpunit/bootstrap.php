@@ -220,30 +220,44 @@ function wp_test_get_transient_entry($key) {
 }
 
 if (!function_exists('wp_hash')) {
-    function wp_hash($data) {
-        if (!is_string($data) && !is_numeric($data) && !is_bool($data)) {
+    function wp_hash($data, $scheme = 'auth') {
+        if (!is_scalar($data) && null !== $data) {
             return false;
         }
 
-        $data = (string) $data;
-        $salt = 'wordpress-test-salt';
+        $salt_suffix = '';
+        if (null !== $scheme) {
+            $scheme      = sanitize_key($scheme);
+            $salt_suffix = ($scheme !== '') ? ':' . $scheme : '';
+        }
 
-        return hash_hmac('md5', $data, $salt);
+        $hash = hash_hmac('md5', (string) $data, 'wordpress-test-salt' . $salt_suffix);
+
+        return (false === $hash) ? false : $hash;
     }
 }
 
 if (!function_exists('wp_json_encode')) {
     function wp_json_encode($data, $options = 0, $depth = 512) {
+        $options = (int) $options;
+        $depth   = (int) $depth;
+
         if (defined('JSON_PARTIAL_OUTPUT_ON_ERROR')) {
             $options |= JSON_PARTIAL_OUTPUT_ON_ERROR;
         }
 
         $encoded = json_encode($data, $options, $depth);
 
-        if (false === $encoded && JSON_ERROR_UTF8 === json_last_error()) {
-            $data    = wp_json_prepare_data($data);
-            $encoded = json_encode($data, $options, $depth);
+        if (false !== $encoded) {
+            return $encoded;
         }
+
+        if (JSON_ERROR_UTF8 !== json_last_error()) {
+            return false;
+        }
+
+        $prepared = wp_json_prepare_data($data);
+        $encoded  = json_encode($prepared, $options, $depth);
 
         return (false === $encoded) ? false : $encoded;
     }
