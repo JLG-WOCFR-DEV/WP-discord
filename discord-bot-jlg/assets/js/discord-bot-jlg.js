@@ -614,6 +614,14 @@
                     return resultInfo;
                 }
 
+                if (data.data && typeof data.data.retry_after !== 'undefined') {
+                    var successRetryAfter = convertRetryAfterToMilliseconds(data.data.retry_after);
+
+                    if (successRetryAfter !== null) {
+                        resultInfo.retryAfter = successRetryAfter;
+                    }
+                }
+
                 clearErrorMessage(container);
 
                 applyDemoState(container, isDemo, isFallbackDemo);

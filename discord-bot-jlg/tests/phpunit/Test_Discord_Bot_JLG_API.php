@@ -82,6 +82,7 @@ class Test_Discord_Bot_JLG_API extends TestCase {
         $entry = wp_test_get_transient_entry($cache_key . Discord_Bot_JLG_API::FALLBACK_RETRY_SUFFIX);
         $this->assertNotNull($entry);
         $this->assertGreaterThan(time(), $entry['value']);
+        $retry_timestamp = $entry['value'];
 
         try {
             $api->ajax_refresh_stats();
@@ -90,6 +91,13 @@ class Test_Discord_Bot_JLG_API extends TestCase {
             $payload = $response->data;
             $this->assertTrue($payload['is_demo']);
             $this->assertTrue($payload['fallback_demo']);
+            $this->assertArrayHasKey('retry_after', $payload);
+            $this->assertIsInt($payload['retry_after']);
+            $this->assertGreaterThanOrEqual(0, $payload['retry_after']);
+
+            $remaining = max(0, $retry_timestamp - time());
+            $this->assertGreaterThanOrEqual(max(0, $remaining - 1), $payload['retry_after']);
+            $this->assertLessThanOrEqual($remaining + 1, $payload['retry_after']);
         }
 
         $this->assertSame(2, $http_client->call_count, 'HTTP client should not be invoked again before retry window expires');
