@@ -1,4 +1,7 @@
 <?php
+
+require_once __DIR__ . '/includes/bootstrap.php';
+
 /**
  * @group discord-bot-jlg
  */
@@ -44,7 +47,13 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
         $this->admin = new Discord_Bot_JLG_Admin(DISCORD_BOT_JLG_OPTION_NAME, $this->api);
     }
 
-    public function sanitize_options_data_provider() {
+    protected function tearDown(): void {
+        delete_option(DISCORD_BOT_JLG_OPTION_NAME);
+
+        parent::tearDown();
+    }
+
+    public function sanitize_options_data_provider(): array {
         $sanitized_css = sanitize_textarea_field("body { color: red; }\n<script>alert('test');</script>");
 
         return array(
@@ -69,7 +78,6 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
                     'cache_duration' => 45,
                     'custom_css'   => $sanitized_css,
                 ),
-                false,
             ),
             'valid-server-id-below-min-cache' => array(
                 array(
@@ -86,7 +94,6 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
                     'show_online'    => 1,
                     'show_total'     => 1,
                 ),
-                false,
             ),
             'cache-duration-above-max' => array(
                 array(
@@ -95,7 +102,6 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
                 array(
                     'cache_duration' => 3600,
                 ),
-                false,
             ),
             'empty-cache-duration-fallback' => array(
                 array(
@@ -104,16 +110,6 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
                 array(
                     'cache_duration' => 450,
                 ),
-                false,
-            ),
-            'bot-token-constant-preserves-value' => array(
-                array(
-                    'bot_token' => '',
-                ),
-                array(
-                    'bot_token' => 'stored-token',
-                ),
-                true,
             ),
         );
     }
@@ -121,14 +117,33 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
     /**
      * @dataProvider sanitize_options_data_provider
      */
-    public function test_sanitize_options(array $input, array $expected_overrides, $define_constant) {
-        if ($define_constant && !defined('DISCORD_BOT_JLG_TOKEN')) {
-            define('DISCORD_BOT_JLG_TOKEN', 'constant-token');
-        }
+    public function test_sanitize_options(array $input, array $expected_overrides) {
+        $result = $this->admin->sanitize_options($input);
+        $expected = array_merge($this->get_expected_defaults(), $expected_overrides);
+
+        $this->assertSame($expected, $result);
+    }
+
+    /**
+     * @runInSeparateProcess
+     * @preserveGlobalState disabled
+     */
+    public function test_sanitize_options_preserves_bot_token_when_constant_defined() {
+        define('DISCORD_BOT_JLG_TOKEN', 'constant-token');
+
+        $input = array(
+            'bot_token' => '',
+        );
 
         $result = $this->admin->sanitize_options($input);
+        $expected = $this->get_expected_defaults();
 
-        $expected = array(
+        $this->assertSame($expected['bot_token'], $result['bot_token']);
+        $this->assertSame($expected, $result);
+    }
+
+    private function get_expected_defaults(): array {
+        return array(
             'server_id'      => '',
             'bot_token'      => $this->saved_options['bot_token'],
             'demo_mode'      => 0,
@@ -141,9 +156,5 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
             ),
             'custom_css'     => '',
         );
-
-        $expected = array_merge($expected, $expected_overrides);
-
-        $this->assertSame($expected, $result);
     }
 }
