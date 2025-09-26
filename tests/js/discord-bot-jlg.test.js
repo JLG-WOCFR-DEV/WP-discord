@@ -281,6 +281,40 @@ describe('discord-bot-jlg integration', () => {
         expect(lastCall[1]).toBe(42000);
     });
 
+    test('network failure surfaces generic error without altering state and keeps default schedule', async () => {
+        const container = createContainer();
+
+        window.discordBotJlg = {
+            ajaxUrl: 'https://example.com/wp-admin/admin-ajax.php',
+            nonce: 'nonce',
+            requiresNonce: true,
+            locale: 'en-US',
+            minRefreshInterval: '5'
+        };
+
+        global.fetch.mockImplementation(() => Promise.reject(new Error('Network down')));
+
+        loadScript();
+
+        runTimerByDelay(15000);
+        await flushPromises();
+
+        const errorMessage = container.querySelector('.discord-error-message');
+        expect(errorMessage).not.toBeNull();
+        expect(errorMessage.textContent).toBe('Une erreur est survenue lors de la récupération des statistiques.');
+
+        expect(container.classList.contains('discord-stats-error')).toBe(true);
+        expect(container.classList.contains('discord-demo-mode')).toBe(false);
+        expect(container.querySelector('.discord-demo-badge')).toBeNull();
+        expect(container.querySelector('.discord-stale-notice')).toBeNull();
+        expect(container.dataset.stale).toBeUndefined();
+        expect(container.dataset.demo).toBe('false');
+        expect(container.dataset.fallbackDemo).toBe('false');
+
+        const setTimeoutCalls = setTimeoutSpy.mock.calls;
+        expect(setTimeoutCalls[setTimeoutCalls.length - 1][1]).toBe(15000);
+    });
+
     test('stale notice renders with formatted timestamp', async () => {
         const container = createContainer({ stale: true, lastUpdated: 1700000001 });
 
