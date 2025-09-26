@@ -1,0 +1,166 @@
+<?php
+$GLOBALS['wp_test_options']    = array();
+$GLOBALS['wp_test_transients'] = array();
+$GLOBALS['wp_test_current_action'] = 'wp_ajax_nopriv_refresh_discord_stats';
+
+if (!defined('ABSPATH')) {
+    define('ABSPATH', __DIR__);
+}
+
+require_once __DIR__ . '/../../inc/class-discord-http.php';
+require_once __DIR__ . '/../../inc/class-discord-api.php';
+
+function wp_parse_args($args, $defaults = array()) {
+    if (is_object($args)) {
+        $args = get_object_vars($args);
+    }
+
+    if (!is_array($args)) {
+        $args = array();
+    }
+
+    if (!is_array($defaults)) {
+        $defaults = array();
+    }
+
+    return array_merge($defaults, $args);
+}
+
+function get_option($name) {
+    return isset($GLOBALS['wp_test_options'][$name]) ? $GLOBALS['wp_test_options'][$name] : false;
+}
+
+function set_transient($key, $value, $expiration) {
+    $expiration = (int) $expiration;
+    $expires_at = ($expiration > 0) ? time() + $expiration : 0;
+
+    $GLOBALS['wp_test_transients'][$key] = array(
+        'value'     => $value,
+        'expires_at'=> $expires_at,
+        'ttl'       => $expiration,
+    );
+
+    return true;
+}
+
+function get_transient($key) {
+    if (!isset($GLOBALS['wp_test_transients'][$key])) {
+        return false;
+    }
+
+    $entry = $GLOBALS['wp_test_transients'][$key];
+
+    if ($entry['expires_at'] > 0 && $entry['expires_at'] <= time()) {
+        unset($GLOBALS['wp_test_transients'][$key]);
+        return false;
+    }
+
+    return $entry['value'];
+}
+
+function delete_transient($key) {
+    unset($GLOBALS['wp_test_transients'][$key]);
+    return true;
+}
+
+function wp_unslash($value) {
+    return $value;
+}
+
+function sanitize_text_field($value) {
+    if (is_array($value)) {
+        return array_map('sanitize_text_field', $value);
+    }
+
+    return is_string($value) ? trim($value) : $value;
+}
+
+function sanitize_key($key) {
+    $key = strtolower((string) $key);
+    return preg_replace('/[^a-z0-9_]/', '', $key);
+}
+
+function current_action() {
+    return $GLOBALS['wp_test_current_action'];
+}
+
+function wp_verify_nonce($nonce, $action) {
+    return true;
+}
+
+function apply_filters($hook, $value, ...$args) {
+    return $value;
+}
+
+function wp_validate_boolean($value) {
+    if (is_bool($value)) {
+        return $value;
+    }
+
+    if (is_string($value)) {
+        $value = strtolower($value);
+        return in_array($value, array('1', 'true', 'yes', 'on'), true);
+    }
+
+    return (bool) $value;
+}
+
+function current_user_can($capability) {
+    return true;
+}
+
+function __($text, $domain = null) {
+    return $text;
+}
+
+class WP_Error {
+    private $message;
+
+    public function __construct($code = '', $message = '') {
+        $this->message = $message;
+    }
+
+    public function get_error_message() {
+        return $this->message;
+    }
+}
+
+function is_wp_error($thing) {
+    return $thing instanceof WP_Error;
+}
+
+class WP_Send_JSON_Success extends Exception {
+    public $data;
+
+    public function __construct($data) {
+        parent::__construct('success');
+        $this->data = $data;
+    }
+}
+
+class WP_Send_JSON_Error extends Exception {
+    public $data;
+    public $status_code;
+
+    public function __construct($data, $status_code = null) {
+        parent::__construct('error');
+        $this->data        = $data;
+        $this->status_code = $status_code;
+    }
+}
+
+function wp_send_json_success($data) {
+    throw new WP_Send_JSON_Success($data);
+}
+
+function wp_send_json_error($data, $status_code = null) {
+    throw new WP_Send_JSON_Error($data, $status_code);
+}
+
+function wp_privacy_anonymize_ip($ip, $is_ipv6) {
+    return $ip;
+}
+
+function wp_test_get_transient_entry($key) {
+    return isset($GLOBALS['wp_test_transients'][$key]) ? $GLOBALS['wp_test_transients'][$key] : null;
+}

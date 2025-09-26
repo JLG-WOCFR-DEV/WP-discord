@@ -136,7 +136,7 @@ class Discord_Bot_JLG_API {
 
         if (empty($options['server_id'])) {
             $this->last_error = __('Aucun identifiant de serveur Discord n\'est configuré.', 'discord-bot-jlg');
-            $demo_stats = $this->get_demo_stats(true);
+            $demo_stats = $this->persist_fallback_stats($this->get_demo_stats(true), $options);
             return $this->remember_runtime_result($runtime_key, $demo_stats);
         }
 
@@ -199,7 +199,7 @@ class Discord_Bot_JLG_API {
                 $this->last_error = __('Impossible d\'obtenir des statistiques exploitables depuis Discord.', 'discord-bot-jlg');
             }
             $this->store_api_retry_after_delay($this->last_retry_after);
-            $demo_stats = $this->get_demo_stats(true);
+            $demo_stats = $this->persist_fallback_stats($this->get_demo_stats(true), $options);
             return $this->remember_runtime_result($runtime_key, $demo_stats);
         }
 
@@ -935,6 +935,61 @@ class Discord_Bot_JLG_API {
             'has_total'            => true,
             'total_is_approximate' => false,
         );
+    }
+
+    private function persist_fallback_stats($stats, $options) {
+        if (!is_array($stats)) {
+            return $stats;
+        }
+
+        $is_fallback = (
+            !empty($stats['is_demo'])
+            && !empty($stats['fallback_demo'])
+        );
+
+        if (false === $is_fallback) {
+            return $stats;
+        }
+
+        if (!array_key_exists('stale', $stats)) {
+            $stats['stale'] = true;
+        }
+
+        if (!isset($stats['last_updated']) || !is_numeric($stats['last_updated'])) {
+            $stats['last_updated'] = time();
+        }
+
+        $ttl = $this->get_fallback_cache_ttl($options);
+
+        set_transient($this->cache_key, $stats, $ttl);
+
+        return $stats;
+    }
+
+    private function get_fallback_cache_ttl($options) {
+        $cache_duration = (int) $this->get_cache_duration($options);
+        $candidates     = array();
+
+        if ($cache_duration > 0) {
+            $candidates[] = $cache_duration;
+        }
+
+        $retry_window = (int) $this->get_fallback_retry_window($cache_duration, $options);
+        if ($retry_window > 0) {
+            $candidates[] = $retry_window;
+        }
+
+        if ($this->last_retry_after > 0) {
+            $candidates[] = (int) $this->last_retry_after;
+        }
+
+        if (empty($candidates)) {
+            $candidates[] = (int) $this->default_cache_duration;
+        }
+
+        $ttl = max($candidates);
+
+        return max(1, (int) $ttl);
     }
 
     private function get_last_good_cache_key() {
