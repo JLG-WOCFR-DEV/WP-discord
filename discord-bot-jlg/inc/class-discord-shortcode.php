@@ -66,6 +66,7 @@ class Discord_Bot_JLG_Shortcode {
                 'demo'                 => false,
                 'show_discord_icon'    => false,
                 'discord_icon_position'=> 'left',
+                'show_server_name'     => false,
             ),
             $atts,
             'discord_stats'
@@ -81,6 +82,7 @@ class Discord_Bot_JLG_Shortcode {
         $hide_icons         = filter_var($atts['hide_icons'], FILTER_VALIDATE_BOOLEAN);
         $force_demo         = filter_var($atts['demo'], FILTER_VALIDATE_BOOLEAN);
         $show_discord_icon  = filter_var($atts['show_discord_icon'], FILTER_VALIDATE_BOOLEAN);
+        $show_server_name   = filter_var($atts['show_server_name'], FILTER_VALIDATE_BOOLEAN);
 
         if ($force_demo) {
             $stats = $this->api->get_demo_stats();
@@ -109,6 +111,7 @@ class Discord_Bot_JLG_Shortcode {
         $total_is_approximate = !empty($stats['total_is_approximate']);
         $is_stale             = !empty($stats['stale']);
         $last_updated         = isset($stats['last_updated']) ? (int) $stats['last_updated'] : 0;
+        $server_name          = isset($stats['server_name']) ? trim((string) $stats['server_name']) : '';
 
         $container_classes = array('discord-stats-container');
 
@@ -191,6 +194,14 @@ class Discord_Bot_JLG_Shortcode {
             $attributes[] = sprintf('style="%s"', esc_attr(implode('; ', $style_declarations)));
         }
 
+        if ($show_server_name) {
+            $attributes[] = 'data-show-server-name="true"';
+
+            if ('' !== $server_name) {
+                $attributes[] = sprintf('data-server-name="%s"', esc_attr($server_name));
+            }
+        }
+
         $refresh_interval = 0;
         $min_refresh_interval = defined('Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL')
             ? Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL
@@ -268,6 +279,11 @@ class Discord_Bot_JLG_Shortcode {
                 <?php endif; ?>
 
                 <div class="discord-stats-wrapper">
+                    <?php if ($show_server_name && '' !== $server_name) : ?>
+                    <div class="discord-server-name" data-role="discord-server-name">
+                        <span class="discord-server-name__text"><?php echo esc_html($server_name); ?></span>
+                    </div>
+                    <?php endif; ?>
                     <?php if ($show_online) : ?>
                     <div class="discord-stat discord-online" data-value="<?php echo esc_attr((int) $stats['online']); ?>">
                         <?php if (!$hide_icons): ?>
