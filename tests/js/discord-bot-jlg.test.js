@@ -246,6 +246,41 @@ describe('discord-bot-jlg integration', () => {
         expect(lastCall[1]).toBe(60000);
     });
 
+    test('fallback success response propagates retry_after delay to next refresh', async () => {
+        const container = createContainer({ fallbackDemo: 'true', demo: 'true' });
+
+        window.discordBotJlg = {
+            ajaxUrl: 'https://example.com/wp-admin/admin-ajax.php',
+            nonce: 'nonce',
+            requiresNonce: true,
+            locale: 'en-US',
+            minRefreshInterval: '5'
+        };
+
+        global.fetch.mockResolvedValue({
+            ok: true,
+            json: () => Promise.resolve({
+                success: true,
+                data: {
+                    online: 5,
+                    total: 15,
+                    has_total: true,
+                    total_is_approximate: false,
+                    stale: true,
+                    is_demo: true,
+                    fallback_demo: true,
+                    retry_after: 42
+                }
+            })
+        });
+
+        loadScript();
+        await flushPromises();
+
+        const lastCall = setTimeoutSpy.mock.calls[setTimeoutSpy.mock.calls.length - 1];
+        expect(lastCall[1]).toBe(42000);
+    });
+
     test('stale notice renders with formatted timestamp', async () => {
         const container = createContainer({ stale: true, lastUpdated: 1700000001 });
 

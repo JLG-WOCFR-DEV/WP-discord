@@ -329,7 +329,13 @@ class Discord_Bot_JLG_API {
 
             if ($cached_stats_is_fallback) {
                 if ($fallback_retry_after > $now) {
-                    wp_send_json_success($cached_stats);
+                    $response_payload = $cached_stats;
+
+                    if (is_array($response_payload)) {
+                        $response_payload['retry_after'] = max(0, (int) $fallback_retry_after - $now);
+                    }
+
+                    wp_send_json_success($response_payload);
                 }
 
                 $refresh_requires_remote_call = true;
