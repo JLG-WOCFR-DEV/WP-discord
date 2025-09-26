@@ -61,6 +61,8 @@ Le plugin est compatible avec la suite de tests WordPress générée par `wp sca
 phpunit --testsuite discord-bot-jlg
 ```
 
+La suite couvre à la fois la couche API et la sanitisation des options d'administration (ID serveur, token, durée du cache et CSS personnalisé).
+
 Le fichier `phpunit.xml.dist` du plugin référence automatiquement le bootstrap de la suite de tests.
 
 ## Support
