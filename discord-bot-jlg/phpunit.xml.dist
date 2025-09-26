@@ -1,0 +1,11 @@
+<?xml version="1.0"?>
+<phpunit bootstrap="tests/phpunit/includes/bootstrap.php"
+         colors="true"
+         backupGlobals="false"
+         backupStaticAttributes="false">
+    <testsuites>
+        <testsuite name="discord-bot-jlg">
+            <directory suffix=".php">tests/phpunit/</directory>
+        </testsuite>
+    </testsuites>
+</phpunit>

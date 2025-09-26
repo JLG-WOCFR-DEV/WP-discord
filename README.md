@@ -51,6 +51,18 @@ Un widget « Discord Bot - JLG » est disponible via le menu « Widgets ».
 ## Désinstallation
 La suppression du plugin depuis WordPress efface automatiquement l’option `discord_server_stats_options` et le transient `discord_server_stats_cache` associés aux statistiques du serveur.
 
+## Tests
+Le plugin est compatible avec la suite de tests WordPress générée par `wp scaffold plugin-tests`.
+
+1. Installez la bibliothèque de tests WordPress et définissez la variable d'environnement `WP_TESTS_DIR` (ou laissez la valeur par défaut `sys_get_temp_dir()/wordpress-tests-lib`).
+2. Depuis le dossier `discord-bot-jlg`, exécutez :
+
+```
+phpunit --testsuite discord-bot-jlg
+```
+
+Le fichier `phpunit.xml.dist` du plugin référence automatiquement le bootstrap de la suite de tests.
+
 ## Support
 - Portail développeur Discord : https://discord.com/developers/applications
 - Notes de version disponibles dans l’interface du plugin.
