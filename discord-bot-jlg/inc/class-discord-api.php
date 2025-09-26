@@ -1121,6 +1121,22 @@ class Discord_Bot_JLG_API {
         }
     }
 
+    private function get_debug_body_preview($body) {
+        $body_string = trim((string) $body);
+
+        if ('' === $body_string) {
+            return '[empty]';
+        }
+
+        $max_length = 500;
+
+        if (strlen($body_string) > $max_length) {
+            return substr($body_string, 0, $max_length) . '…';
+        }
+
+        return $body_string;
+    }
+
     private function store_last_good_stats($stats) {
         if (!is_array($stats)) {
             return;
@@ -1189,6 +1205,21 @@ class Discord_Bot_JLG_API {
         $data = json_decode($body, true);
 
         if (false === is_array($data)) {
+            $error_context = array();
+
+            if (function_exists('json_last_error')) {
+                $json_error = json_last_error();
+                $error_context[] = 'json_last_error=' . $json_error;
+
+                if (function_exists('json_last_error_msg')) {
+                    $error_context[] = 'json_last_error_msg=' . json_last_error_msg();
+                }
+            }
+
+            $error_context[] = 'decoded_type=' . gettype($data);
+            $error_context[] = 'body_preview=' . $this->get_debug_body_preview($body);
+
+            $this->log_debug('Discord API error (widget): invalid JSON response (' . implode(', ', $error_context) . ')');
             $this->last_error = __('Réponse JSON invalide reçue depuis le widget Discord.', 'discord-bot-jlg');
             return false;
         }
@@ -1198,6 +1229,21 @@ class Discord_Bot_JLG_API {
 
         if (false === $has_presence_count && false === $has_members_list) {
             $this->last_error = __('Données incomplètes reçues depuis le widget Discord.', 'discord-bot-jlg');
+            $missing_parts = array();
+
+            if (false === $has_presence_count) {
+                $missing_parts[] = 'presence_count';
+            }
+
+            if (false === $has_members_list) {
+                $missing_parts[] = 'members';
+            }
+
+            $this->log_debug(sprintf(
+                'Discord API error (widget): incomplete data (missing %s). Body preview: %s',
+                implode(', ', $missing_parts),
+                $this->get_debug_body_preview($body)
+            ));
             return false;
         }
 
@@ -1287,11 +1333,45 @@ class Discord_Bot_JLG_API {
         $data = json_decode($body, true);
 
         if (false === is_array($data)) {
+            $error_context = array();
+
+            if (function_exists('json_last_error')) {
+                $json_error = json_last_error();
+                $error_context[] = 'json_last_error=' . $json_error;
+
+                if (function_exists('json_last_error_msg')) {
+                    $error_context[] = 'json_last_error_msg=' . json_last_error_msg();
+                }
+            }
+
+            $error_context[] = 'decoded_type=' . gettype($data);
+            $error_context[] = 'body_preview=' . $this->get_debug_body_preview($body);
+
+            $this->log_debug('Discord API error (bot): invalid JSON response (' . implode(', ', $error_context) . ')');
             $this->last_error = __('Réponse JSON invalide reçue depuis l\'API Discord (bot).', 'discord-bot-jlg');
             return false;
         }
 
-        if (false === isset($data['approximate_presence_count'], $data['approximate_member_count'])) {
+        $has_presence = isset($data['approximate_presence_count']);
+        $has_total    = isset($data['approximate_member_count']);
+
+        if (false === $has_presence || false === $has_total) {
+            $missing_parts = array();
+
+            if (false === $has_presence) {
+                $missing_parts[] = 'approximate_presence_count';
+            }
+
+            if (false === $has_total) {
+                $missing_parts[] = 'approximate_member_count';
+            }
+
+            $this->log_debug(sprintf(
+                'Discord API error (bot): incomplete data (missing %s). Body preview: %s',
+                implode(', ', $missing_parts),
+                $this->get_debug_body_preview($body)
+            ));
+
             $this->last_error = __('Données incomplètes reçues depuis l\'API Discord (bot).', 'discord-bot-jlg');
             return false;
         }
