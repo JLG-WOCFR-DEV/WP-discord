@@ -9,6 +9,60 @@ if (!defined('ABSPATH')) {
 
 require_once __DIR__ . '/../../inc/class-discord-http.php';
 require_once __DIR__ . '/../../inc/class-discord-api.php';
+require_once __DIR__ . '/../../inc/class-discord-widget.php';
+
+if (!defined('DISCORD_BOT_JLG_OPTION_NAME')) {
+    define('DISCORD_BOT_JLG_OPTION_NAME', 'discord_server_stats_options');
+}
+
+if (!class_exists('WP_Widget')) {
+    class WP_Widget {
+        public $id_base;
+
+        public function __construct($id_base = '', $name = '', $widget_options = array()) {
+            $this->id_base = $id_base;
+        }
+
+        public function get_field_id($field_name) {
+            return $this->id_base . '-' . $field_name;
+        }
+
+        public function get_field_name($field_name) {
+            return $this->id_base . '[' . $field_name . ']';
+        }
+    }
+}
+
+if (!function_exists('esc_html__')) {
+    function esc_html__($text, $domain = null) {
+        return $text;
+    }
+}
+
+if (!function_exists('esc_html_e')) {
+    function esc_html_e($text, $domain = null) {
+        echo esc_html__($text, $domain);
+    }
+}
+
+if (!function_exists('esc_html')) {
+    function esc_html($text) {
+        return is_string($text) ? $text : (string) $text;
+    }
+}
+
+if (!function_exists('esc_attr')) {
+    function esc_attr($text) {
+        return is_string($text) ? $text : (string) $text;
+    }
+}
+
+if (!function_exists('do_shortcode')) {
+    function do_shortcode($shortcode) {
+        $GLOBALS['discord_bot_jlg_last_shortcode'] = $shortcode;
+        return $shortcode;
+    }
+}
 
 function wp_parse_args($args, $defaults = array()) {
     if (is_object($args)) {
