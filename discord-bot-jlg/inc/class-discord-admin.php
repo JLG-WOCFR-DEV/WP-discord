@@ -557,9 +557,22 @@ class Discord_Bot_JLG_Admin {
      * Traite la demande de test de connexion depuis la page d'options.
      */
     private function handle_test_connection_request() {
-        if (isset($_POST['test_connection']) && check_admin_referer('discord_test_connection')) {
-            $this->test_discord_connection();
+        if (!isset($_POST['test_connection']) || !check_admin_referer('discord_test_connection')) {
+            return;
         }
+
+        if (!current_user_can('manage_options')) {
+            add_settings_error(
+                'discord_stats_settings',
+                'discord_bot_jlg_access_denied',
+                esc_html__('Accès refusé : vous n\'avez pas les droits suffisants pour tester la connexion Discord.', 'discord-bot-jlg'),
+                'error'
+            );
+
+            return;
+        }
+
+        $this->test_discord_connection();
     }
 
     /**
