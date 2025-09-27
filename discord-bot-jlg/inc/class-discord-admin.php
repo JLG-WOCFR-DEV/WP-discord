@@ -1047,12 +1047,18 @@ class Discord_Bot_JLG_Admin {
             array(
                 'style'                 => true,
                 'data-demo'             => true,
+                'data-fallback-demo'    => true,
+                'data-stale'            => true,
+                'data-last-updated'     => true,
                 'data-refresh'          => true,
+                'data-show-server-name' => true,
+                'data-server-name'      => true,
                 'data-value'            => true,
                 'data-label-total'      => true,
                 'data-label-unavailable'=> true,
                 'data-label-approx'     => true,
                 'data-placeholder'      => true,
+                'data-role'             => true,
             )
         );
         $allowed_tags['div'] = $div_attributes;
