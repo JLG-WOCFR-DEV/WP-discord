@@ -538,6 +538,7 @@ class Discord_Bot_JLG_Admin {
         ?>
         <div class="wrap">
             <h1><?php esc_html_e('🎮 Discord Bot - JLG - Configuration', 'discord-bot-jlg'); ?></h1>
+            <?php settings_errors('discord_stats_settings'); ?>
             <?php $this->handle_test_connection_request(); ?>
 
             <div style="display: flex; gap: 20px; margin-top: 20px;">
