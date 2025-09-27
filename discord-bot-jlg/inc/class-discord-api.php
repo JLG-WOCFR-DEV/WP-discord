@@ -107,6 +107,9 @@ class Discord_Bot_JLG_API {
             )
         );
 
+        $args['force_demo']   = wp_validate_boolean($args['force_demo']);
+        $args['bypass_cache'] = wp_validate_boolean($args['bypass_cache']);
+
         $runtime_key = $this->get_runtime_cache_key($args);
 
         if (array_key_exists($runtime_key, $this->runtime_cache)) {
@@ -506,8 +509,8 @@ class Discord_Bot_JLG_API {
         }
 
         $normalized_args = array(
-            'force_demo'   => !empty($args['force_demo']),
-            'bypass_cache' => !empty($args['bypass_cache']),
+            'force_demo'   => isset($args['force_demo']) ? (bool) $args['force_demo'] : false,
+            'bypass_cache' => isset($args['bypass_cache']) ? (bool) $args['bypass_cache'] : false,
         );
 
         return md5(wp_json_encode($normalized_args));

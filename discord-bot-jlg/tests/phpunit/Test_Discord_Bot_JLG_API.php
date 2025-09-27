@@ -206,6 +206,46 @@ class Test_Discord_Bot_JLG_API extends TestCase {
         $this->assertGreaterThan(0, $last_good_entry['value']['timestamp']);
     }
 
+    public function test_get_stats_treats_string_force_demo_as_true() {
+        $option_name = 'discord_server_stats_options';
+        $cache_key   = 'discord_server_stats_cache';
+
+        $http_client = new Mock_Discord_Bot_JLG_Http_Client();
+        $api         = new Discord_Bot_JLG_API($option_name, $cache_key, 60, $http_client);
+
+        $stats = $api->get_stats(array('force_demo' => '1'));
+
+        $this->assertIsArray($stats);
+        $this->assertTrue($stats['is_demo']);
+        $this->assertFalse($stats['fallback_demo']);
+        $this->assertSame(0, $http_client->call_count, 'Force demo should bypass remote calls');
+    }
+
+    public function test_get_stats_respects_cached_value_when_bypass_cache_falsey_string() {
+        $option_name = 'discord_server_stats_options';
+        $cache_key   = 'discord_server_stats_cache';
+
+        $cached_stats = array(
+            'online'               => 7,
+            'total'                => 111,
+            'server_name'          => 'Cached Guild',
+            'is_demo'              => false,
+            'fallback_demo'        => false,
+            'has_total'            => true,
+            'total_is_approximate' => false,
+        );
+
+        set_transient($cache_key, $cached_stats, 60);
+
+        $http_client = new Mock_Discord_Bot_JLG_Http_Client();
+        $api         = new Discord_Bot_JLG_API($option_name, $cache_key, 60, $http_client);
+
+        $stats = $api->get_stats(array('bypass_cache' => '0'));
+
+        $this->assertSame($cached_stats, $stats);
+        $this->assertSame(0, $http_client->call_count, 'Cached payload should prevent HTTP requests');
+    }
+
     public function test_ajax_refresh_stats_reuses_cached_fallback_until_retry_window() {
         $option_name = 'discord_server_stats_options';
         $cache_key   = 'discord_server_stats_cache';
