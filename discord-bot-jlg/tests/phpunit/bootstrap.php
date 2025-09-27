@@ -68,6 +68,61 @@ if (!function_exists('do_shortcode')) {
     }
 }
 
+if (!function_exists('current_time')) {
+    function current_time($type, $gmt = 0) {
+        $reference = isset($GLOBALS['wp_test_current_timestamp'])
+            ? (int) $GLOBALS['wp_test_current_timestamp']
+            : time();
+
+        if ('timestamp' === $type) {
+            if ($gmt) {
+                return $reference;
+            }
+
+            $timezone_string = isset($GLOBALS['wp_test_timezone_string']) ? $GLOBALS['wp_test_timezone_string'] : 'UTC';
+
+            try {
+                $timezone = new DateTimeZone($timezone_string);
+                $datetime = new DateTimeImmutable('@' . $reference);
+                return $reference + $timezone->getOffset($datetime);
+            } catch (Exception $exception) {
+                return $reference;
+            }
+        }
+
+        if ('mysql' === $type) {
+            return gmdate('Y-m-d H:i:s', current_time('timestamp', (bool) $gmt));
+        }
+
+        return $reference;
+    }
+}
+
+if (!function_exists('wp_date')) {
+    function wp_date($format, $timestamp = null, $timezone = null) {
+        if (null === $timestamp) {
+            $timestamp = current_time('timestamp', true);
+        }
+
+        if (null === $timezone) {
+            $timezone = isset($GLOBALS['wp_test_timezone_string']) ? $GLOBALS['wp_test_timezone_string'] : 'UTC';
+        }
+
+        if (!$timezone instanceof DateTimeZone) {
+            try {
+                $timezone = new DateTimeZone($timezone);
+            } catch (Exception $exception) {
+                $timezone = new DateTimeZone('UTC');
+            }
+        }
+
+        $datetime = new DateTimeImmutable('@' . (int) $timestamp);
+        $datetime = $datetime->setTimezone($timezone);
+
+        return $datetime->format($format);
+    }
+}
+
 function wp_parse_args($args, $defaults = array()) {
     if (is_object($args)) {
         $args = get_object_vars($args);

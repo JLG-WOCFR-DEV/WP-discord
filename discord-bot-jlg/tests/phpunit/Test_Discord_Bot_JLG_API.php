@@ -253,4 +253,39 @@ class Test_Discord_Bot_JLG_API extends TestCase {
 
         $this->assertSame(2, $http_client->call_count, 'HTTP client should not be invoked again before retry window expires');
     }
+
+    public function test_get_demo_stats_respects_wordpress_timezone() {
+        $option_name = 'discord_server_stats_options';
+        $cache_key   = 'discord_server_stats_cache';
+
+        $api = new Discord_Bot_JLG_API($option_name, $cache_key, 60);
+
+        $previous_timestamp = isset($GLOBALS['wp_test_current_timestamp']) ? $GLOBALS['wp_test_current_timestamp'] : null;
+        $previous_timezone  = isset($GLOBALS['wp_test_timezone_string']) ? $GLOBALS['wp_test_timezone_string'] : null;
+
+        $GLOBALS['wp_test_current_timestamp'] = gmmktime(3, 0, 0, 1, 1, 2024); // 03:00 UTC.
+        $GLOBALS['wp_test_timezone_string']  = 'Asia/Tokyo'; // UTC+9.
+
+        $stats = $api->get_demo_stats(false);
+
+        $expected_hour       = (int) wp_date('H', $GLOBALS['wp_test_current_timestamp']);
+        $expected_variation  = sin($expected_hour * 0.26) * 10;
+        $expected_online     = (int) round(42 + $expected_variation);
+
+        $this->assertSame($expected_online, $stats['online']);
+        $this->assertTrue($stats['is_demo']);
+        $this->assertFalse($stats['fallback_demo']);
+
+        if (null === $previous_timestamp) {
+            unset($GLOBALS['wp_test_current_timestamp']);
+        } else {
+            $GLOBALS['wp_test_current_timestamp'] = $previous_timestamp;
+        }
+
+        if (null === $previous_timezone) {
+            unset($GLOBALS['wp_test_timezone_string']);
+        } else {
+            $GLOBALS['wp_test_timezone_string'] = $previous_timezone;
+        }
+    }
 }

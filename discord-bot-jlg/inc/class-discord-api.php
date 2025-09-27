@@ -901,6 +901,9 @@ class Discord_Bot_JLG_API {
     /**
      * Génère des statistiques fictives pour la démonstration ou en cas d'absence de configuration.
      *
+     * Le calcul de la variation horaire utilise désormais l'horloge configurée dans WordPress afin de
+     * refléter le fuseau défini sur le site.
+     *
      * @param bool $is_fallback Indique si ces statistiques sont utilisées faute de données réelles.
      *
      * @return array Statistiques de démonstration comprenant les clés `online`, `total`, `server_name`, `is_demo` et `fallback_demo`.
@@ -929,7 +932,8 @@ class Discord_Bot_JLG_API {
         $base_online = 42;
         $base_total  = 256;
 
-        $hour      = (int) date('H');
+        $timestamp = current_time('timestamp', true);
+        $hour      = (int) wp_date('H', $timestamp);
         $variation = sin($hour * 0.26) * 10;
 
         return array(
