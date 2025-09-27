@@ -202,9 +202,7 @@ class Discord_Bot_JLG_Admin {
         if (!$constant_overridden && array_key_exists('bot_token', $input)) {
             $raw_token = trim((string) $input['bot_token']);
 
-            if ('' === $raw_token) {
-                $sanitized['bot_token'] = '';
-            } else {
+            if ('' !== $raw_token) {
                 $sanitized['bot_token'] = sanitize_text_field($raw_token);
             }
         }
