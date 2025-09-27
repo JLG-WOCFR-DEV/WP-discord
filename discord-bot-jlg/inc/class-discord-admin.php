@@ -202,7 +202,9 @@ class Discord_Bot_JLG_Admin {
         if (!$constant_overridden && array_key_exists('bot_token', $input)) {
             $raw_token = trim((string) $input['bot_token']);
 
-            if ('' !== $raw_token) {
+            if ('' === $raw_token) {
+                $sanitized['bot_token'] = '';
+            } else {
                 $sanitized['bot_token'] = sanitize_text_field($raw_token);
             }
         }
@@ -422,7 +424,7 @@ class Discord_Bot_JLG_Admin {
 
                 if ($has_saved_token) {
                     echo '<br />';
-                    echo esc_html__('Un token est déjà enregistré. Laissez ce champ vide pour le conserver ou saisissez un nouveau token pour le remplacer.', 'discord-bot-jlg');
+                    echo esc_html__('Un token est déjà enregistré. Saisissez un nouveau token pour le remplacer ou laissez ce champ vide pour le supprimer.', 'discord-bot-jlg');
                 }
             }
             ?>

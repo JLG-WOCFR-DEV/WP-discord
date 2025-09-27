@@ -142,15 +142,15 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
         $this->assertSame($expected, $result);
     }
 
-    public function test_sanitize_options_preserves_stored_bot_token_when_input_empty() {
+    public function test_sanitize_options_clears_stored_bot_token_when_input_empty() {
         $input = array(
             'bot_token' => '',
         );
 
         $result   = $this->admin->sanitize_options($input);
         $expected = $this->get_expected_defaults();
+        $expected['bot_token'] = '';
 
-        $this->assertSame($expected['bot_token'], $result['bot_token']);
         $this->assertSame($expected, $result);
     }
 
