@@ -7,6 +7,10 @@ if (!defined('ABSPATH')) {
     define('ABSPATH', __DIR__);
 }
 
+if (!defined('DAY_IN_SECONDS')) {
+    define('DAY_IN_SECONDS', 86400);
+}
+
 require_once __DIR__ . '/../../inc/class-discord-http.php';
 require_once __DIR__ . '/../../inc/class-discord-api.php';
 require_once __DIR__ . '/../../inc/class-discord-widget.php';
