@@ -893,7 +893,7 @@ class Discord_Bot_JLG_Admin {
                 );
                 ?>
                <a href="https://discord.com/developers/docs/intro" target="_blank" rel="noopener noreferrer"><?php esc_html_e('Documentation Discord API', 'discord-bot-jlg'); ?></a> |
-               <a href="#" onclick="return false;"><?php esc_html_e('Besoin d\'aide ?', 'discord-bot-jlg'); ?></a>
+               <?php esc_html_e('Besoin d\'aide ?', 'discord-bot-jlg'); ?>
             </p>
         </div>
         <?php
