@@ -913,6 +913,15 @@
         });
     }
 
+    if (typeof window !== 'undefined') {
+        if (!window.discordBotJlg) {
+            window.discordBotJlg = {};
+        }
+
+        window.discordBotJlgInit = initializeDiscordBot;
+        window.discordBotJlg.init = initializeDiscordBot;
+    }
+
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initializeDiscordBot);
     } else {

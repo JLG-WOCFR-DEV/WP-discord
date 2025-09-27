@@ -39,6 +39,18 @@ Le paramètre `refresh_interval` est exprimé en secondes et doit être d'au moi
 
 Les rafraîchissements publics (visiteurs non connectés) n'exigent plus de nonce WordPress ; seuls les administrateurs connectés utilisent un jeton de sécurité pour l'action AJAX `refresh_discord_stats`.
 
+### Ré-initialisation manuelle du widget
+
+Si vous chargez dynamiquement du HTML contenant de nouveaux conteneurs `.discord-stats-container`, vous pouvez relancer l'initialisation automatique en appelant l'API publique exposée par le script côté client :
+
+```js
+window.discordBotJlgInit();
+// ou, si vous préférez conserver la configuration existante sur `window.discordBotJlg`
+window.discordBotJlg.init();
+```
+
+Cette méthode relit la configuration globale (`window.discordBotJlg`) et programme les rafraîchissements pour tous les conteneurs présents dans le DOM.
+
 ### Widget
 Un widget « Discord Bot - JLG » est disponible via le menu « Widgets ».
 
