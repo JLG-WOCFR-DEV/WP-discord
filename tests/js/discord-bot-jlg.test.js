@@ -315,6 +315,60 @@ describe('discord-bot-jlg integration', () => {
         expect(setTimeoutCalls[setTimeoutCalls.length - 1][1]).toBe(15000);
     });
 
+    test('failed refresh clears inFlight flag and allows subsequent refresh', async () => {
+        const container = createContainer();
+
+        window.discordBotJlg = {
+            ajaxUrl: 'https://example.com/wp-admin/admin-ajax.php',
+            nonce: 'nonce',
+            requiresNonce: true,
+            locale: 'en-US',
+            minRefreshInterval: '5'
+        };
+
+        global.fetch
+            .mockImplementationOnce(() => Promise.reject(new Error('Temporary failure')))
+            .mockImplementationOnce(() => Promise.resolve({
+                ok: true,
+                json: () => Promise.resolve({
+                    success: true,
+                    data: {
+                        online: 7,
+                        total: 11,
+                        has_total: true,
+                        total_is_approximate: false,
+                        stale: false,
+                        is_demo: false,
+                        fallback_demo: false,
+                        server_name: 'Recovered Server',
+                        last_updated: 1700000100
+                    }
+                })
+            }));
+
+        loadScript();
+
+        runTimerByDelay(15000);
+        await flushPromises();
+
+        const errorMessage = container.querySelector('.discord-error-message');
+        expect(errorMessage).not.toBeNull();
+
+        runTimerByDelay(15000);
+        await flushPromises();
+
+        const onlineNumber = container.querySelector('.discord-online .discord-number');
+        const totalNumber = container.querySelector('.discord-total .discord-number');
+
+        expect(global.fetch).toHaveBeenCalledTimes(2);
+        expect(onlineNumber.textContent).toBe('7');
+        expect(totalNumber.textContent).toBe('11');
+        expect(container.classList.contains('discord-stats-error')).toBe(false);
+
+        const lastCall = setTimeoutSpy.mock.calls[setTimeoutSpy.mock.calls.length - 1];
+        expect(lastCall[1]).toBe(15000);
+    });
+
     test('stale notice renders with formatted timestamp', async () => {
         const container = createContainer({ stale: true, lastUpdated: 1700000001 });
 
