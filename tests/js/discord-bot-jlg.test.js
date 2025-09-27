@@ -524,4 +524,56 @@ describe('discord-bot-jlg integration', () => {
         const firstCall = setTimeoutSpy.mock.calls[0];
         expect(firstCall[1]).toBe(5000);
     });
+
+    test('public init API re-initializes new containers', async () => {
+        createContainer({ refresh: '15' });
+
+        window.discordBotJlg = {
+            ajaxUrl: 'https://example.com/wp-admin/admin-ajax.php',
+            nonce: 'nonce',
+            requiresNonce: true,
+            locale: 'en-US',
+            minRefreshInterval: '10'
+        };
+
+        global.fetch.mockResolvedValue({
+            ok: true,
+            json: () => Promise.resolve({
+                success: true,
+                data: {
+                    online: 7,
+                    total: 42,
+                    has_total: true,
+                    total_is_approximate: false,
+                    stale: false,
+                    is_demo: false,
+                    fallback_demo: false,
+                    server_name: 'Second Server',
+                    last_updated: 1700000100
+                }
+            })
+        });
+
+        loadScript();
+
+        expect(typeof window.discordBotJlgInit).toBe('function');
+        expect(window.discordBotJlg.init).toBe(window.discordBotJlgInit);
+
+        const existingCalls = setTimeoutSpy.mock.calls.length;
+
+        const newContainer = createContainer({ refresh: '30' });
+        expect(newContainer.dataset.refresh).toBe('30');
+
+        window.discordBotJlgInit();
+
+        const newCalls = setTimeoutSpy.mock.calls.slice(existingCalls);
+        const hasNewTimer = newCalls.some((call) => call[1] === 30000);
+        expect(hasNewTimer).toBe(true);
+
+        const fetchCallsBefore = global.fetch.mock.calls.length;
+        runTimerByDelay(30000);
+        await flushPromises();
+
+        expect(global.fetch.mock.calls.length).toBe(fetchCallsBefore + 1);
+    });
 });
