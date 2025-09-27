@@ -384,9 +384,10 @@ class Discord_Bot_JLG_Admin {
      * @return void
      */
     public function bot_token_render() {
-        $options = get_option($this->option_name);
+        $options             = get_option($this->option_name);
         $constant_overridden = (defined('DISCORD_BOT_JLG_TOKEN') && '' !== DISCORD_BOT_JLG_TOKEN);
-        $has_saved_token = (!$constant_overridden && !empty($options['bot_token']));
+        $has_saved_token     = (!$constant_overridden && !empty($options['bot_token']));
+        $input_id            = sprintf('%s_bot_token', $this->option_name);
 
         $input_attributes = array(
             'type'          => 'password',
@@ -394,6 +395,7 @@ class Discord_Bot_JLG_Admin {
             'class'         => 'regular-text',
             'value'         => '',
             'autocomplete'  => 'new-password',
+            'id'            => $input_id,
         );
 
         if ($constant_overridden) {
@@ -413,7 +415,7 @@ class Discord_Bot_JLG_Admin {
         }
         ?>
         <input <?php echo implode(' ', $attribute_parts); ?> />
-        <p class="description">
+        <label class="description" for="<?php echo esc_attr($input_id); ?>">
             <?php
             if ($constant_overridden) {
                 echo wp_kses_post(__('Le token est actuellement défini via la constante <code>DISCORD_BOT_JLG_TOKEN</code> et remplace cette valeur.', 'discord-bot-jlg'));
@@ -426,7 +428,7 @@ class Discord_Bot_JLG_Admin {
                 }
             }
             ?>
-        </p>
+        </label>
         <?php
     }
 
