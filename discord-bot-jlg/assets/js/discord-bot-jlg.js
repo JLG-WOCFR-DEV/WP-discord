@@ -843,6 +843,10 @@
 
             state.inFlight = true;
 
+            function resetInFlight() {
+                state.inFlight = false;
+            }
+
             updateStats(container, config, formatter, locale).then(function (result) {
                 var nextDelay = state.intervalMs;
 
@@ -853,10 +857,10 @@
                 }
 
                 scheduleNextRefresh(container, state, nextDelay);
+                resetInFlight();
             }).catch(function () {
                 scheduleNextRefresh(container, state, state.intervalMs);
-            }).finally(function () {
-                state.inFlight = false;
+                resetInFlight();
             });
         }
 
