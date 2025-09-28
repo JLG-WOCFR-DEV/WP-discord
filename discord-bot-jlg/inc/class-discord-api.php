@@ -603,9 +603,9 @@ class Discord_Bot_JLG_API {
          *
          * @since 1.0.1
          *
-         * Les fragments incluent notamment l'adresse IP publique déterminée en priorisant les
-         * en-têtes `HTTP_CF_CONNECTING_IP`, `HTTP_X_REAL_IP` et `HTTP_TRUE_CLIENT_IP`, puis les
-         * en-têtes génériques (X-Forwarded-For, Forwarded, etc.).
+         * Les fragments incluent notamment l'adresse IP publique déterminée via l'adresse
+         * `REMOTE_ADDR`, éventuellement complétée par les en-têtes déclarés comme provenant de
+         * proxys de confiance via le filtre `discord_bot_jlg_trusted_proxy_headers`.
          *
          * @param array $parts       Tableau des fragments d'empreinte.
          * @param array $server_vars Variables serveur disponibles.
@@ -666,43 +666,42 @@ class Discord_Bot_JLG_API {
      *
      * @since 1.0.1
      *
+     * Les proxys de confiance peuvent être déclarés via le filtre
+     * `discord_bot_jlg_trusted_proxy_headers` afin d'autoriser des en-têtes supplémentaires.
+     *
      * @param array $server_vars Variables serveur disponibles.
      *
      * @return string
      */
     private function get_public_request_ip($server_vars) {
-        $priority_headers = array(
-            'HTTP_CF_CONNECTING_IP',
-            'HTTP_X_REAL_IP',
-            'HTTP_TRUE_CLIENT_IP',
-        );
+        $candidates = array();
 
-        $headers = array(
-            'HTTP_CLIENT_IP',
-            'HTTP_X_FORWARDED_FOR',
-            'HTTP_X_FORWARDED',
-            'HTTP_X_CLUSTER_CLIENT_IP',
-            'HTTP_FORWARDED_FOR',
-            'HTTP_FORWARDED',
-            'REMOTE_ADDR',
-        );
+        if (!empty($server_vars['REMOTE_ADDR'])) {
+            $candidates[] = array('REMOTE_ADDR', array(wp_unslash($server_vars['REMOTE_ADDR'])));
+        }
 
-        $candidate_headers = array_merge($priority_headers, $headers);
+        $proxy_headers = $this->get_trusted_proxy_headers();
 
-        foreach ($candidate_headers as $header) {
+        foreach ($proxy_headers as $header) {
             if (empty($server_vars[$header])) {
                 continue;
             }
 
             $raw_values = wp_unslash($server_vars[$header]);
 
-            if ('REMOTE_ADDR' === $header) {
-                $raw_values = array($raw_values);
+            if (is_array($raw_values)) {
+                $values = $raw_values;
             } else {
-                $raw_values = explode(',', (string) $raw_values);
+                $values = explode(',', (string) $raw_values);
             }
 
-            foreach ($raw_values as $value) {
+            $candidates[] = array($header, $values);
+        }
+
+        foreach ($candidates as $candidate) {
+            $values = isset($candidate[1]) ? $candidate[1] : array();
+
+            foreach ($values as $value) {
                 $ip = trim((string) $value);
 
                 if ('' === $ip || false === $this->is_valid_ip($ip)) {
@@ -721,6 +720,27 @@ class Discord_Bot_JLG_API {
         }
 
         return '';
+    }
+
+    /**
+     * Retourne la liste des en-têtes HTTP considérés comme provenant de proxys de confiance.
+     *
+     * @since 1.1.0
+     *
+     * Les en-têtes doivent être fournis dans leur forme attendue dans $_SERVER (ex. `HTTP_X_FORWARDED_FOR`).
+     *
+     * @return array
+     */
+    private function get_trusted_proxy_headers() {
+        $headers = apply_filters('discord_bot_jlg_trusted_proxy_headers', array());
+
+        if (!is_array($headers)) {
+            return array();
+        }
+
+        $headers = array_filter(array_map('strval', $headers));
+
+        return array_values(array_unique($headers));
     }
 
     /**
