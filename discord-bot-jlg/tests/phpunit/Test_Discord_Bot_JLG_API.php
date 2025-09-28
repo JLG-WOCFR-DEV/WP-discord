@@ -328,4 +328,25 @@ class Test_Discord_Bot_JLG_API extends TestCase {
             $GLOBALS['wp_test_timezone_string'] = $previous_timezone;
         }
     }
+
+    public function test_public_request_ip_ignores_untrusted_headers() {
+        $option_name = 'discord_server_stats_options';
+        $cache_key   = 'discord_server_stats_cache';
+
+        $api = new Discord_Bot_JLG_API($option_name, $cache_key, 60);
+
+        $server_vars = array(
+            'REMOTE_ADDR'            => '198.51.100.23',
+            'HTTP_X_FORWARDED_FOR'   => '203.0.113.5',
+            'HTTP_X_CLUSTER_CLIENT_IP' => '192.0.2.1',
+        );
+
+        $reflection = new ReflectionClass($api);
+        $method     = $reflection->getMethod('get_public_request_ip');
+        $method->setAccessible(true);
+
+        $ip = $method->invoke($api, $server_vars);
+
+        $this->assertSame('198.51.100.23', $ip, 'Untrusted proxy headers should be ignored by default');
+    }
 }
