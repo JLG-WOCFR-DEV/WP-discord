@@ -296,12 +296,14 @@ class Discord_Bot_JLG_Admin {
         <ol>
             <li><?php echo wp_kses_post(__('Dans le menu de gauche, allez dans <strong>"OAuth2"</strong> &gt; <strong>"URL Generator"</strong>', 'discord-bot-jlg')); ?></li>
             <li><?php echo wp_kses_post(__('Dans "Scopes", cochez <strong>"bot"</strong>', 'discord-bot-jlg')); ?></li>
-            <li><?php echo wp_kses_post(__('Dans "Bot Permissions", sélectionnez :', 'discord-bot-jlg')); ?></li>
+            <li>
+                <?php echo wp_kses_post(__('Dans "Bot Permissions", sélectionnez :', 'discord-bot-jlg')); ?>
                 <ul>
                     <li><?php esc_html_e('✅ View Channels', 'discord-bot-jlg'); ?></li>
                     <li><?php esc_html_e('✅ Read Messages', 'discord-bot-jlg'); ?></li>
                     <li><?php esc_html_e('✅ Send Messages (optionnel)', 'discord-bot-jlg'); ?></li>
                 </ul>
+            </li>
             <li><?php esc_html_e('Copiez l\'URL générée en bas de la page', 'discord-bot-jlg'); ?></li>
             <li><?php esc_html_e('Ouvrez cette URL dans votre navigateur', 'discord-bot-jlg'); ?></li>
             <li><?php echo wp_kses_post(__('Sélectionnez votre serveur et cliquez sur <strong>"Autoriser"</strong>', 'discord-bot-jlg')); ?></li>
