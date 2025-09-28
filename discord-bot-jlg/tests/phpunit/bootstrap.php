@@ -2,6 +2,8 @@
 $GLOBALS['wp_test_options']    = array();
 $GLOBALS['wp_test_transients'] = array();
 $GLOBALS['wp_test_current_action'] = 'wp_ajax_nopriv_refresh_discord_stats';
+$GLOBALS['wp_test_filters'] = array();
+$GLOBALS['wp_test_last_remote_request'] = null;
 
 if (!defined('ABSPATH')) {
     define('ABSPATH', __DIR__);
@@ -201,8 +203,97 @@ function wp_verify_nonce($nonce, $action) {
     return true;
 }
 
+function add_filter($hook, $callback, $priority = 10, $accepted_args = 1) {
+    if (!is_string($hook) || '' === $hook) {
+        return false;
+    }
+
+    if (!isset($GLOBALS['wp_test_filters'][$hook])) {
+        $GLOBALS['wp_test_filters'][$hook] = array();
+    }
+
+    if (!isset($GLOBALS['wp_test_filters'][$hook][$priority])) {
+        $GLOBALS['wp_test_filters'][$hook][$priority] = array();
+    }
+
+    $GLOBALS['wp_test_filters'][$hook][$priority][] = array(
+        'callback'      => $callback,
+        'accepted_args' => max(1, (int) $accepted_args),
+    );
+
+    return true;
+}
+
+function remove_filter($hook, $callback, $priority = 10) {
+    if (!isset($GLOBALS['wp_test_filters'][$hook][$priority])) {
+        return false;
+    }
+
+    foreach ($GLOBALS['wp_test_filters'][$hook][$priority] as $index => $registered) {
+        if ($registered['callback'] === $callback) {
+            unset($GLOBALS['wp_test_filters'][$hook][$priority][$index]);
+
+            if (empty($GLOBALS['wp_test_filters'][$hook][$priority])) {
+                unset($GLOBALS['wp_test_filters'][$hook][$priority]);
+            }
+
+            if (empty($GLOBALS['wp_test_filters'][$hook])) {
+                unset($GLOBALS['wp_test_filters'][$hook]);
+            }
+
+            return true;
+        }
+    }
+
+    return false;
+}
+
+function remove_all_filters($hook) {
+    if (isset($GLOBALS['wp_test_filters'][$hook])) {
+        unset($GLOBALS['wp_test_filters'][$hook]);
+    }
+}
+
 function apply_filters($hook, $value, ...$args) {
+    if (!isset($GLOBALS['wp_test_filters'][$hook])) {
+        return $value;
+    }
+
+    $args = array_values($args);
+    ksort($GLOBALS['wp_test_filters'][$hook]);
+
+    foreach ($GLOBALS['wp_test_filters'][$hook] as $priority => $callbacks) {
+        foreach ($callbacks as $callback) {
+            $params = array($value);
+
+            if ($callback['accepted_args'] > 1) {
+                $params = array_merge(
+                    $params,
+                    array_slice($args, 0, $callback['accepted_args'] - 1)
+                );
+            }
+
+            $value = call_user_func_array($callback['callback'], $params);
+        }
+    }
+
     return $value;
+}
+
+function wp_safe_remote_get($url, $args = array()) {
+    $GLOBALS['wp_test_last_remote_request'] = array(
+        'url'  => $url,
+        'args' => $args,
+    );
+
+    return array(
+        'response' => array(
+            'code'    => 200,
+            'message' => 'OK',
+        ),
+        'body'    => '',
+        'headers' => array(),
+    );
 }
 
 function wp_validate_boolean($value) {

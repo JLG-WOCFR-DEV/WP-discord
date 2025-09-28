@@ -22,6 +22,22 @@ Accédez à la page **Discord Bot** dans l’administration pour :
 
 Il est possible de forcer l'utilisation d'un token spécifique en définissant la constante `DISCORD_BOT_JLG_TOKEN` dans votre fichier `wp-config.php` ou dans un plugin mu. Lorsque cette constante est présente (et non vide), elle est utilisée à la place de la valeur enregistrée dans l'administration et le champ correspondant devient en lecture seule.
 
+### Ajuster la taille maximale des réponses HTTP
+
+Par défaut, le client HTTP plafonne les réponses distantes à 1 048 576 octets pour éviter de charger des fichiers trop volumineux. Si vous devez assouplir ou renforcer cette limite (par exemple pour supporter des payloads plus importants renvoyés par un proxy), vous pouvez utiliser le filtre `discord_bot_jlg_http_max_bytes` :
+
+```php
+add_filter('discord_bot_jlg_http_max_bytes', function ($max_bytes, $url, $context) {
+    if ('widget' === $context) {
+        return 2 * MB_IN_BYTES; // Autorise jusqu'à 2 Mo pour les appels du widget.
+    }
+
+    return $max_bytes;
+}, 10, 3);
+```
+
+Le callback reçoit la valeur par défaut (1 048 576), l’URL ciblée et le contexte (`widget`, `bot`, etc.). Retournez une valeur entière strictement positive pour activer la nouvelle limite. Toute valeur inférieure ou égale à zéro réappliquera la limite par défaut.
+
 ## Utilisation
 ### Shortcode
 ```
