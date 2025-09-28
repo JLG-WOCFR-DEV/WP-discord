@@ -16,6 +16,7 @@ Accédez à la page **Discord Bot** dans l’administration pour :
 - Saisir le token de votre bot Discord ;
 - Indiquer l’ID du serveur à surveiller ;
 - Définir la durée du cache des statistiques ;
+- Déclarer les proxies de confiance autorisés à transmettre l’adresse IP via les en-têtes `X-Forwarded-*` ;
 - Ajouter du CSS personnalisé.
 
 ### Définir le token via une constante
@@ -38,6 +39,10 @@ Pour activer l'auto-actualisation, utilisez par exemple :
 Le paramètre `refresh_interval` est exprimé en secondes et doit être d'au moins 10 secondes (10 000 ms). Toute valeur plus basse est automatiquement portée à 10 secondes pour éviter les erreurs 429 de Discord.
 
 Les rafraîchissements publics (visiteurs non connectés) n'exigent plus de nonce WordPress ; seuls les administrateurs connectés utilisent un jeton de sécurité pour l'action AJAX `refresh_discord_stats`.
+
+### Proxies de confiance
+
+Si votre site est derrière un reverse proxy (Cloudflare, proxy applicatif, etc.), indiquez ses adresses IP dans le champ **Proxies de confiance**. Seules ces adresses sont autorisées à fournir une IP cliente via les en-têtes `X-Forwarded-*`. Vous pouvez également compléter ou modifier cette liste grâce au filtre PHP `discord_bot_jlg_trusted_proxy_ips`.
 
 ### Ré-initialisation manuelle du widget
 

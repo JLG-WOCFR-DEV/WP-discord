@@ -328,4 +328,92 @@ class Test_Discord_Bot_JLG_API extends TestCase {
             $GLOBALS['wp_test_timezone_string'] = $previous_timezone;
         }
     }
+
+    private function invoke_private_method($object, $method_name, array $args = array()) {
+        $reflection = new ReflectionClass($object);
+        $method     = $reflection->getMethod($method_name);
+        $method->setAccessible(true);
+
+        return $method->invokeArgs($object, $args);
+    }
+
+    public function test_generate_public_request_fingerprint_without_trusted_proxy() {
+        $option_name = 'discord_server_stats_options';
+        $cache_key   = 'discord_server_stats_cache';
+
+        $api = new Discord_Bot_JLG_API($option_name, $cache_key, 60);
+
+        $server_vars = array(
+            'REMOTE_ADDR'     => '198.51.100.42',
+            'HTTP_USER_AGENT' => 'UnitTest',
+            'HTTP_X_FORWARDED_FOR' => '203.0.113.99',
+        );
+
+        $ip = $this->invoke_private_method($api, 'get_public_request_ip', array($server_vars));
+        $this->assertSame('198.51.100.42', $ip);
+
+        $fingerprint = $this->invoke_private_method($api, 'generate_public_request_fingerprint', array($server_vars));
+
+        $expected_raw   = '198.51.100.42|UnitTest';
+        $expected_hash  = wp_hash($expected_raw);
+        $expected_finger = substr((string) $expected_hash, 0, 20);
+
+        $this->assertSame($expected_finger, $fingerprint);
+    }
+
+    public function test_generate_public_request_fingerprint_with_trusted_proxy() {
+        $option_name = 'discord_server_stats_options';
+        $cache_key   = 'discord_server_stats_cache';
+
+        $GLOBALS['wp_test_options'][$option_name] = array(
+            'trusted_proxy_ips' => "203.0.113.5\n2001:db8::1",
+        );
+
+        $api = new Discord_Bot_JLG_API($option_name, $cache_key, 60);
+
+        $server_vars = array(
+            'REMOTE_ADDR'          => '203.0.113.5',
+            'HTTP_USER_AGENT'      => 'UnitTest',
+            'HTTP_X_FORWARDED_FOR' => '198.51.100.77, 203.0.113.5',
+        );
+
+        $ip = $this->invoke_private_method($api, 'get_public_request_ip', array($server_vars));
+        $this->assertSame('198.51.100.77', $ip);
+
+        $fingerprint = $this->invoke_private_method($api, 'generate_public_request_fingerprint', array($server_vars));
+
+        $expected_raw   = '198.51.100.77|UnitTest';
+        $expected_hash  = wp_hash($expected_raw);
+        $expected_finger = substr((string) $expected_hash, 0, 20);
+
+        $this->assertSame($expected_finger, $fingerprint);
+    }
+
+    public function test_generate_public_request_fingerprint_with_untrusted_proxy() {
+        $option_name = 'discord_server_stats_options';
+        $cache_key   = 'discord_server_stats_cache';
+
+        $GLOBALS['wp_test_options'][$option_name] = array(
+            'trusted_proxy_ips' => "203.0.113.5",
+        );
+
+        $api = new Discord_Bot_JLG_API($option_name, $cache_key, 60);
+
+        $server_vars = array(
+            'REMOTE_ADDR'          => '198.51.100.44',
+            'HTTP_USER_AGENT'      => 'UnitTest',
+            'HTTP_X_FORWARDED_FOR' => '203.0.113.10',
+        );
+
+        $ip = $this->invoke_private_method($api, 'get_public_request_ip', array($server_vars));
+        $this->assertSame('198.51.100.44', $ip);
+
+        $fingerprint = $this->invoke_private_method($api, 'generate_public_request_fingerprint', array($server_vars));
+
+        $expected_raw   = '198.51.100.44|UnitTest';
+        $expected_hash  = wp_hash($expected_raw);
+        $expected_finger = substr((string) $expected_hash, 0, 20);
+
+        $this->assertSame($expected_finger, $fingerprint);
+    }
 }

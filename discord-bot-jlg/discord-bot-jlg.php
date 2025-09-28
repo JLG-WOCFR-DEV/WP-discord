@@ -44,6 +44,7 @@ if (!function_exists('discord_bot_jlg_get_default_options')) {
             'custom_css'     => '',
             'widget_title'   => __('Discord Server', 'discord-bot-jlg'),
             'cache_duration' => DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION,
+            'trusted_proxy_ips' => '',
         );
     }
 }

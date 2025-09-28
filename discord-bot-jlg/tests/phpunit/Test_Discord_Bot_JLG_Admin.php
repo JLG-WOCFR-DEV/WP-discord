@@ -34,6 +34,7 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
             'widget_title'   => 'Existing title',
             'cache_duration' => 450,
             'custom_css'     => '.existing { color: blue; }',
+            'trusted_proxy_ips' => "198.51.100.5\n2001:db8::5",
         );
 
         update_option(DISCORD_BOT_JLG_OPTION_NAME, $this->saved_options);
@@ -67,6 +68,7 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
                     'widget_title' => ' <strong>Stats</strong> ',
                     'cache_duration' => '45',
                     'custom_css'   => "body { color: red; }\n<script>alert('test');</script>",
+                    'trusted_proxy_ips' => "198.51.100.10\ninvalid\n2001:db8::1",
                 ),
                 array(
                     'server_id'    => '',
@@ -77,6 +79,7 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
                     'widget_title' => sanitize_text_field(' <strong>Stats</strong> '),
                     'cache_duration' => 45,
                     'custom_css'   => $sanitized_css,
+                    'trusted_proxy_ips' => "198.51.100.10\n2001:db8::1",
                 ),
             ),
             'valid-server-id-below-min-cache' => array(
@@ -167,6 +170,7 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
                 min(3600, (int) $this->saved_options['cache_duration'])
             ),
             'custom_css'     => '',
+            'trusted_proxy_ips' => $this->saved_options['trusted_proxy_ips'],
         );
     }
 }

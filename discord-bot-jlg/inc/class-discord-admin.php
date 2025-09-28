@@ -101,6 +101,14 @@ class Discord_Bot_JLG_Admin {
             'discord_stats_api_section'
         );
 
+        add_settings_field(
+            'trusted_proxy_ips',
+            __('Proxies de confiance', 'discord-bot-jlg'),
+            array($this, 'trusted_proxy_ips_render'),
+            'discord_stats_settings',
+            'discord_stats_api_section'
+        );
+
         add_settings_section(
             'discord_stats_display_section',
             esc_html__('Options d\'affichage', 'discord-bot-jlg'),
@@ -185,6 +193,9 @@ class Discord_Bot_JLG_Admin {
                 ? (int) $current_options['cache_duration']
                 : 300,
             'custom_css'     => '',
+            'trusted_proxy_ips' => isset($current_options['trusted_proxy_ips'])
+                ? (string) $current_options['trusted_proxy_ips']
+                : '',
         );
 
         if (isset($input['server_id'])) {
@@ -243,7 +254,55 @@ class Discord_Bot_JLG_Admin {
             $sanitized['custom_css'] = sanitize_textarea_field($input['custom_css']);
         }
 
+        if (array_key_exists('trusted_proxy_ips', $input)) {
+            $raw_list = is_array($input['trusted_proxy_ips'])
+                ? implode(',', $input['trusted_proxy_ips'])
+                : (string) $input['trusted_proxy_ips'];
+
+            $candidates = preg_split('/[\r\n,]+/', $raw_list);
+            $valid_ips  = array();
+
+            foreach ($candidates as $candidate) {
+                $candidate = trim((string) $candidate);
+
+                if ('' === $candidate) {
+                    continue;
+                }
+
+                $candidate = sanitize_text_field($candidate);
+
+                if (false === filter_var($candidate, FILTER_VALIDATE_IP)) {
+                    continue;
+                }
+
+                $valid_ips[] = $candidate;
+            }
+
+            $valid_ips = array_values(array_unique($valid_ips));
+            $sanitized['trusted_proxy_ips'] = implode("\n", $valid_ips);
+        }
+
         return $sanitized;
+    }
+
+    /**
+     * Rend la zone de texte dédiée aux proxies de confiance.
+     *
+     * @return void
+     */
+    public function trusted_proxy_ips_render() {
+        $options = get_option($this->option_name);
+        $value   = isset($options['trusted_proxy_ips']) ? $options['trusted_proxy_ips'] : '';
+        ?>
+        <textarea name="<?php echo esc_attr($this->option_name); ?>[trusted_proxy_ips]"
+                  rows="4"
+                  cols="50"
+                  class="large-text code"
+                  placeholder="203.0.113.10&#10;2001:db8::1"><?php echo esc_textarea($value); ?></textarea>
+        <p class="description">
+            <?php esc_html_e('Une adresse IP par ligne. Seules les requêtes provenant de ces proxies pourront utiliser les en-têtes X-Forwarded-* pour la limitation publique.', 'discord-bot-jlg'); ?>
+        </p>
+        <?php
     }
 
     /**

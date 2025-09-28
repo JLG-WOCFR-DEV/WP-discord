@@ -603,9 +603,10 @@ class Discord_Bot_JLG_API {
          *
          * @since 1.0.1
          *
-         * Les fragments incluent notamment l'adresse IP publique déterminée en priorisant les
-         * en-têtes `HTTP_CF_CONNECTING_IP`, `HTTP_X_REAL_IP` et `HTTP_TRUE_CLIENT_IP`, puis les
-         * en-têtes génériques (X-Forwarded-For, Forwarded, etc.).
+         * Les fragments incluent notamment l'adresse IP publique déterminée depuis `REMOTE_ADDR`.
+         * Lorsque l'adresse source correspond à un proxy de confiance déclaré par l'administrateur
+         * (ou via le filtre `discord_bot_jlg_trusted_proxy_ips`), les en-têtes de type
+         * `X-Forwarded-*` sont alors pris en compte pour récupérer l'adresse réelle du visiteur.
          *
          * @param array $parts       Tableau des fragments d'empreinte.
          * @param array $server_vars Variables serveur disponibles.
@@ -671,56 +672,183 @@ class Discord_Bot_JLG_API {
      * @return string
      */
     private function get_public_request_ip($server_vars) {
-        $priority_headers = array(
-            'HTTP_CF_CONNECTING_IP',
-            'HTTP_X_REAL_IP',
-            'HTTP_TRUE_CLIENT_IP',
-        );
+        $remote_addr = '';
 
-        $headers = array(
-            'HTTP_CLIENT_IP',
-            'HTTP_X_FORWARDED_FOR',
-            'HTTP_X_FORWARDED',
-            'HTTP_X_CLUSTER_CLIENT_IP',
-            'HTTP_FORWARDED_FOR',
-            'HTTP_FORWARDED',
-            'REMOTE_ADDR',
-        );
+        if (!empty($server_vars['REMOTE_ADDR'])) {
+            $candidate = trim((string) wp_unslash($server_vars['REMOTE_ADDR']));
 
-        $candidate_headers = array_merge($priority_headers, $headers);
-
-        foreach ($candidate_headers as $header) {
-            if (empty($server_vars[$header])) {
-                continue;
-            }
-
-            $raw_values = wp_unslash($server_vars[$header]);
-
-            if ('REMOTE_ADDR' === $header) {
-                $raw_values = array($raw_values);
-            } else {
-                $raw_values = explode(',', (string) $raw_values);
-            }
-
-            foreach ($raw_values as $value) {
-                $ip = trim((string) $value);
-
-                if ('' === $ip || false === $this->is_valid_ip($ip)) {
-                    continue;
-                }
-
-                $is_ipv6    = (false !== strpos($ip, ':'));
-                $anonymized = $this->anonymize_ip($ip, $is_ipv6);
-
-                if ('' === $anonymized) {
-                    continue;
-                }
-
-                return sanitize_text_field($anonymized);
+            if ('' !== $candidate && $this->is_valid_ip($candidate)) {
+                $remote_addr = $candidate;
             }
         }
 
-        return '';
+        if ('' === $remote_addr) {
+            return '';
+        }
+
+        $options         = $this->get_plugin_options();
+        $trusted_proxies = $this->get_trusted_proxy_ips($options);
+
+        $is_trusted_proxy = $this->is_trusted_proxy_ip($remote_addr, $trusted_proxies);
+
+        if ($is_trusted_proxy) {
+            $candidate_headers = array(
+                'HTTP_CF_CONNECTING_IP',
+                'HTTP_X_REAL_IP',
+                'HTTP_TRUE_CLIENT_IP',
+                'HTTP_CLIENT_IP',
+                'HTTP_X_FORWARDED_FOR',
+                'HTTP_X_FORWARDED',
+                'HTTP_X_CLUSTER_CLIENT_IP',
+                'HTTP_FORWARDED_FOR',
+                'HTTP_FORWARDED',
+            );
+
+            foreach ($candidate_headers as $header) {
+                if (empty($server_vars[$header])) {
+                    continue;
+                }
+
+                $raw_values = wp_unslash($server_vars[$header]);
+
+                if (is_array($raw_values)) {
+                    $values = array_values($raw_values);
+                } elseif (in_array($header, array('HTTP_CF_CONNECTING_IP', 'HTTP_X_REAL_IP', 'HTTP_TRUE_CLIENT_IP'), true)) {
+                    $values = array($raw_values);
+                } else {
+                    $values = explode(',', (string) $raw_values);
+                }
+
+                foreach ($values as $value) {
+                    $ip = trim((string) $value);
+
+                    if ('' === $ip || false === $this->is_valid_ip($ip)) {
+                        continue;
+                    }
+
+                    if ($this->is_trusted_proxy_ip($ip, $trusted_proxies)) {
+                        continue;
+                    }
+
+                    $is_ipv6    = (false !== strpos($ip, ':'));
+                    $anonymized = $this->anonymize_ip($ip, $is_ipv6);
+
+                    if ('' === $anonymized) {
+                        continue;
+                    }
+
+                    return sanitize_text_field($anonymized);
+                }
+            }
+        }
+
+        $is_ipv6    = (false !== strpos($remote_addr, ':'));
+        $anonymized = $this->anonymize_ip($remote_addr, $is_ipv6);
+
+        if ('' === $anonymized) {
+            return '';
+        }
+
+        return sanitize_text_field($anonymized);
+    }
+
+    /**
+     * Récupère la liste des proxies de confiance déclarés.
+     *
+     * @since 1.0.1
+     *
+     * @param array $options Options du plugin.
+     *
+     * @return array Liste d'adresses IP valides.
+     */
+    private function get_trusted_proxy_ips($options) {
+        if (!is_array($options)) {
+            $options = array();
+        }
+
+        $trusted = array();
+
+        if (isset($options['trusted_proxy_ips'])) {
+            $raw_list = $options['trusted_proxy_ips'];
+
+            if (is_string($raw_list)) {
+                $candidates = preg_split('/[\r\n,]+/', $raw_list);
+            } elseif (is_array($raw_list)) {
+                $candidates = $raw_list;
+            } else {
+                $candidates = array();
+            }
+
+            foreach ($candidates as $candidate) {
+                $ip = trim((string) $candidate);
+
+                if ('' === $ip) {
+                    continue;
+                }
+
+                $ip = sanitize_text_field($ip);
+
+                if (!$this->is_valid_ip($ip)) {
+                    continue;
+                }
+
+                $trusted[] = $ip;
+            }
+        }
+
+        $trusted = array_values(array_unique($trusted));
+
+        /**
+         * Permet de modifier la liste des proxies considérés comme fiables.
+         *
+         * @since 1.0.1
+         *
+         * @param array $trusted Liste des adresses IP de proxies approuvés.
+         * @param array $options Options actuelles du plugin.
+         */
+        $trusted = apply_filters('discord_bot_jlg_trusted_proxy_ips', $trusted, $options);
+
+        if (!is_array($trusted)) {
+            return array();
+        }
+
+        $normalized = array();
+
+        foreach ($trusted as $ip) {
+            $candidate = trim((string) $ip);
+
+            if ('' === $candidate || !$this->is_valid_ip($candidate)) {
+                continue;
+            }
+
+            $normalized[] = $candidate;
+        }
+
+        return array_values(array_unique($normalized));
+    }
+
+    /**
+     * Vérifie si l'adresse fournie correspond à un proxy approuvé.
+     *
+     * @since 1.0.1
+     *
+     * @param string $ip             Adresse IP à vérifier.
+     * @param array  $trusted_proxies Liste d'adresses IP de confiance.
+     *
+     * @return bool
+     */
+    private function is_trusted_proxy_ip($ip, $trusted_proxies) {
+        if (empty($trusted_proxies)) {
+            return false;
+        }
+
+        $ip = trim((string) $ip);
+
+        if ('' === $ip) {
+            return false;
+        }
+
+        return in_array($ip, $trusted_proxies, true);
     }
 
     /**
