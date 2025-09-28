@@ -434,7 +434,16 @@ class Discord_Bot_JLG_API {
             $error_payload['retry_after'] = max(0, (int) $this->last_retry_after);
 
             if (!empty($last_error_message)) {
-                $error_payload['diagnostic'] = $last_error_message;
+                $this->log_debug(
+                    sprintf(
+                        'ajax_refresh_stats error (public request): %s',
+                        $last_error_message
+                    )
+                );
+
+                if (false === $is_public_request) {
+                    $error_payload['diagnostic'] = $last_error_message;
+                }
             }
 
             wp_send_json_error($error_payload, 503);
@@ -450,7 +459,16 @@ class Discord_Bot_JLG_API {
         );
 
         if (!empty($last_error_message)) {
-            $error_payload['diagnostic'] = $last_error_message;
+            $this->log_debug(
+                sprintf(
+                    'ajax_refresh_stats error (authenticated request): %s',
+                    $last_error_message
+                )
+            );
+
+            if (false === $is_public_request) {
+                $error_payload['diagnostic'] = $last_error_message;
+            }
         }
 
         $error_payload['retry_after'] = max(0, (int) $this->last_retry_after);

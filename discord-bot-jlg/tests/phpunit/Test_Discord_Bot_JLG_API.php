@@ -103,6 +103,39 @@ class Successful_Mock_Discord_Bot_JLG_Http_Client extends Discord_Bot_JLG_Http_C
     }
 }
 
+class Stubbed_Discord_Bot_JLG_API extends Discord_Bot_JLG_API {
+    private $mock_stats;
+    private $has_mock_stats = false;
+    private $mock_last_error;
+    private $has_mock_last_error = false;
+
+    public function set_mock_stats($stats) {
+        $this->mock_stats     = $stats;
+        $this->has_mock_stats = true;
+    }
+
+    public function set_mock_last_error_message($message) {
+        $this->mock_last_error     = $message;
+        $this->has_mock_last_error = true;
+    }
+
+    public function get_stats($args = array()) {
+        if (true === $this->has_mock_stats) {
+            return $this->mock_stats;
+        }
+
+        return parent::get_stats($args);
+    }
+
+    public function get_last_error_message() {
+        if (true === $this->has_mock_last_error) {
+            return $this->mock_last_error;
+        }
+
+        return parent::get_last_error_message();
+    }
+}
+
 class Test_Discord_Bot_JLG_API extends TestCase {
     protected function setUp(): void {
         parent::setUp();
@@ -326,6 +359,57 @@ class Test_Discord_Bot_JLG_API extends TestCase {
             unset($GLOBALS['wp_test_timezone_string']);
         } else {
             $GLOBALS['wp_test_timezone_string'] = $previous_timezone;
+        }
+    }
+
+    public function test_ajax_refresh_stats_hides_diagnostic_for_public_errors() {
+        $option_name = 'discord_server_stats_options';
+        $cache_key   = 'discord_server_stats_cache';
+
+        $api = new Stubbed_Discord_Bot_JLG_API($option_name, $cache_key, 60);
+        $api->set_mock_stats(null);
+        $api->set_mock_last_error_message('Detailed diagnostics');
+
+        $GLOBALS['wp_test_current_action'] = 'wp_ajax_nopriv_refresh_discord_stats';
+
+        try {
+            $api->ajax_refresh_stats();
+            $this->fail('Expected error response for public request');
+        } catch (WP_Send_JSON_Error $response) {
+            $this->assertSame(503, $response->status_code);
+            $this->assertArrayHasKey('message', $response->data);
+            $this->assertArrayHasKey('retry_after', $response->data);
+            $this->assertArrayNotHasKey(
+                'diagnostic',
+                $response->data,
+                'Public responses should not expose diagnostic information'
+            );
+        }
+    }
+
+    public function test_ajax_refresh_stats_exposes_diagnostic_for_authenticated_errors() {
+        $option_name = 'discord_server_stats_options';
+        $cache_key   = 'discord_server_stats_cache';
+
+        $api = new Stubbed_Discord_Bot_JLG_API($option_name, $cache_key, 60);
+        $api->set_mock_stats(null);
+        $api->set_mock_last_error_message('Administrative diagnostics');
+
+        $GLOBALS['wp_test_current_action'] = 'wp_ajax_refresh_discord_stats';
+        $_POST['_ajax_nonce'] = 'valid-nonce';
+
+        try {
+            $api->ajax_refresh_stats();
+            $this->fail('Expected error response for authenticated request');
+        } catch (WP_Send_JSON_Error $response) {
+            $this->assertNull($response->status_code);
+            $this->assertArrayHasKey('retry_after', $response->data);
+            $this->assertArrayHasKey(
+                'diagnostic',
+                $response->data,
+                'Authenticated responses should include diagnostic information'
+            );
+            $this->assertSame('Administrative diagnostics', $response->data['diagnostic']);
         }
     }
 
