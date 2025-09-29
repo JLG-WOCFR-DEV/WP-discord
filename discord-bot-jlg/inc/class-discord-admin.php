@@ -199,13 +199,17 @@ class Discord_Bot_JLG_Admin {
 
         $constant_overridden = (defined('DISCORD_BOT_JLG_TOKEN') && '' !== DISCORD_BOT_JLG_TOKEN);
 
-        if (!$constant_overridden && array_key_exists('bot_token', $input)) {
-            $raw_token = trim((string) $input['bot_token']);
+        if (!$constant_overridden) {
+            $delete_requested = !empty($input['bot_token_delete']);
 
-            if ('' === $raw_token) {
+            if ($delete_requested) {
                 $sanitized['bot_token'] = '';
-            } else {
-                $sanitized['bot_token'] = sanitize_text_field($raw_token);
+            } elseif (array_key_exists('bot_token', $input)) {
+                $raw_token = trim((string) $input['bot_token']);
+
+                if ('' !== $raw_token) {
+                    $sanitized['bot_token'] = sanitize_text_field($raw_token);
+                }
             }
         }
 
@@ -390,6 +394,8 @@ class Discord_Bot_JLG_Admin {
         $constant_overridden = (defined('DISCORD_BOT_JLG_TOKEN') && '' !== DISCORD_BOT_JLG_TOKEN);
         $has_saved_token     = (!$constant_overridden && !empty($options['bot_token']));
         $input_id            = sprintf('%s_bot_token', $this->option_name);
+        $delete_input_name   = sprintf('%s[bot_token_delete]', $this->option_name);
+        $delete_input_id     = sprintf('%s_bot_token_delete', $this->option_name);
 
         $input_attributes = array(
             'type'          => 'password',
@@ -398,6 +404,7 @@ class Discord_Bot_JLG_Admin {
             'value'         => '',
             'autocomplete'  => 'new-password',
             'id'            => $input_id,
+            'aria-describedby' => sprintf('%s_description', $input_id),
         );
 
         if ($constant_overridden) {
@@ -417,20 +424,35 @@ class Discord_Bot_JLG_Admin {
         }
         ?>
         <input <?php echo implode(' ', $attribute_parts); ?> />
-        <label class="description" for="<?php echo esc_attr($input_id); ?>">
+        <p class="description" id="<?php echo esc_attr($input_id); ?>_description">
             <?php
             if ($constant_overridden) {
                 echo wp_kses_post(__('Le token est actuellement défini via la constante <code>DISCORD_BOT_JLG_TOKEN</code> et remplace cette valeur.', 'discord-bot-jlg'));
             } else {
-                echo esc_html__('Le token de votre bot Discord (gardez-le secret !).', 'discord-bot-jlg');
-
-                if ($has_saved_token) {
-                    echo '<br />';
-                    echo esc_html__('Un token est déjà enregistré. Saisissez un nouveau token pour le remplacer ou laissez ce champ vide pour le supprimer.', 'discord-bot-jlg');
-                }
+                echo esc_html__('Saisissez un nouveau token pour mettre à jour la valeur enregistrée. Laissez ce champ vide pour conserver le token actuel.', 'discord-bot-jlg');
             }
             ?>
-        </label>
+        </p>
+        <p class="description">
+            <strong><?php esc_html_e('Statut :', 'discord-bot-jlg'); ?></strong>
+            <?php
+            if ($constant_overridden) {
+                esc_html_e('Défini via une constante.', 'discord-bot-jlg');
+            } elseif ($has_saved_token) {
+                esc_html_e('Un token est enregistré.', 'discord-bot-jlg');
+            } else {
+                esc_html_e('Aucun token enregistré.', 'discord-bot-jlg');
+            }
+            ?>
+        </p>
+        <?php if (!$constant_overridden && $has_saved_token) : ?>
+            <p>
+                <label for="<?php echo esc_attr($delete_input_id); ?>">
+                    <input type="checkbox" name="<?php echo esc_attr($delete_input_name); ?>" id="<?php echo esc_attr($delete_input_id); ?>" value="1" />
+                    <?php esc_html_e('Supprimer le token enregistré lors de l\'enregistrement', 'discord-bot-jlg'); ?>
+                </label>
+            </p>
+        <?php endif; ?>
         <?php
     }
 
