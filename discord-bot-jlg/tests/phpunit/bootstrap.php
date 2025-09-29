@@ -16,9 +16,18 @@ if (!defined('DAY_IN_SECONDS')) {
 require_once __DIR__ . '/../../inc/class-discord-http.php';
 require_once __DIR__ . '/../../inc/class-discord-api.php';
 require_once __DIR__ . '/../../inc/class-discord-widget.php';
+require_once __DIR__ . '/../../inc/class-discord-shortcode.php';
 
 if (!defined('DISCORD_BOT_JLG_OPTION_NAME')) {
     define('DISCORD_BOT_JLG_OPTION_NAME', 'discord_server_stats_options');
+}
+
+if (!defined('DISCORD_BOT_JLG_PLUGIN_URL')) {
+    define('DISCORD_BOT_JLG_PLUGIN_URL', 'https://example.com/wp-content/plugins/discord-bot-jlg/');
+}
+
+if (!defined('DISCORD_BOT_JLG_VERSION')) {
+    define('DISCORD_BOT_JLG_VERSION', 'test');
 }
 
 if (!class_exists('WP_Widget')) {
@@ -195,6 +204,127 @@ function sanitize_key($key) {
     return preg_replace('/[^a-z0-9_]/', '', $key);
 }
 
+function shortcode_atts($pairs, $atts, $shortcode = '') {
+    $atts = (array) $atts;
+    $out  = array();
+
+    foreach ($pairs as $name => $default) {
+        if (array_key_exists($name, $atts)) {
+            $out[$name] = $atts[$name];
+        } else {
+            $out[$name] = $default;
+        }
+    }
+
+    foreach ($atts as $name => $value) {
+        if (!array_key_exists($name, $pairs)) {
+            $out[$name] = $value;
+        }
+    }
+
+    return $out;
+}
+
+function sanitize_html_class($class, $fallback = '') {
+    $class = preg_replace('/[^A-Za-z0-9_-]/', '', (string) $class);
+
+    if ('' === $class && '' !== $fallback) {
+        $class = preg_replace('/[^A-Za-z0-9_-]/', '', (string) $fallback);
+    }
+
+    return strtolower($class);
+}
+
+function number_format_i18n($number, $decimals = 0) {
+    return number_format((float) $number, (int) $decimals, ',', ' ');
+}
+
+$GLOBALS['wp_test_registered_styles'] = array();
+$GLOBALS['wp_test_enqueued_styles']   = array();
+$GLOBALS['wp_test_inline_styles']     = array();
+$GLOBALS['wp_test_registered_scripts'] = array();
+$GLOBALS['wp_test_enqueued_scripts']   = array();
+$GLOBALS['wp_test_localized_scripts']  = array();
+
+function wp_register_style($handle, $src = '', $deps = array(), $ver = false) {
+    $GLOBALS['wp_test_registered_styles'][$handle] = array(
+        'src'  => $src,
+        'deps' => $deps,
+        'ver'  => $ver,
+    );
+
+    return true;
+}
+
+function wp_enqueue_style($handle) {
+    $GLOBALS['wp_test_enqueued_styles'][$handle] = true;
+    return true;
+}
+
+function wp_add_inline_style($handle, $css) {
+    if (!isset($GLOBALS['wp_test_inline_styles'][$handle])) {
+        $GLOBALS['wp_test_inline_styles'][$handle] = array();
+    }
+
+    $GLOBALS['wp_test_inline_styles'][$handle][] = (string) $css;
+    return true;
+}
+
+function wp_register_script($handle, $src = '', $deps = array(), $ver = false, $in_footer = false) {
+    $GLOBALS['wp_test_registered_scripts'][$handle] = array(
+        'src'       => $src,
+        'deps'      => $deps,
+        'ver'       => $ver,
+        'in_footer' => $in_footer,
+    );
+
+    return true;
+}
+
+function wp_enqueue_script($handle) {
+    $GLOBALS['wp_test_enqueued_scripts'][$handle] = true;
+    return true;
+}
+
+function wp_localize_script($handle, $object_name, $l10n) {
+    $GLOBALS['wp_test_localized_scripts'][$handle] = array(
+        'object_name' => $object_name,
+        'data'        => $l10n,
+    );
+
+    return true;
+}
+
+function wp_style_is($handle, $list = 'enqueued') {
+    if ('enqueued' === $list) {
+        return !empty($GLOBALS['wp_test_enqueued_styles'][$handle]);
+    }
+
+    return false;
+}
+
+function wp_print_styles($handle = '') {
+    return true;
+}
+
+function is_user_logged_in() {
+    return false;
+}
+
+function admin_url($path = '', $scheme = 'admin') {
+    $base = 'https://example.com/wp-admin/';
+
+    return $base . ltrim((string) $path, '/');
+}
+
+function wp_create_nonce($action = -1) {
+    return 'test-nonce';
+}
+
+function get_locale() {
+    return 'fr_FR';
+}
+
 function current_action() {
     return $GLOBALS['wp_test_current_action'];
 }
@@ -246,6 +376,10 @@ function remove_filter($hook, $callback, $priority = 10) {
     }
 
     return false;
+}
+
+function add_action($hook, $callback, $priority = 10, $accepted_args = 1) {
+    return add_filter($hook, $callback, $priority, $accepted_args);
 }
 
 function remove_all_filters($hook) {

@@ -175,7 +175,11 @@ class Discord_Bot_JLG_Shortcode {
         );
 
         if (!empty($atts['width'])) {
-            $style_declarations[] = 'width: ' . sanitize_text_field($atts['width']);
+            $validated_width = $this->validate_width_value($atts['width']);
+
+            if ('' !== $validated_width) {
+                $style_declarations[] = 'width: ' . $validated_width;
+            }
         }
 
         $attributes = array(
@@ -344,6 +348,42 @@ class Discord_Bot_JLG_Shortcode {
 
         <?php
         return ob_get_clean();
+    }
+
+    private function validate_width_value($raw_width) {
+        if (is_array($raw_width)) {
+            return '';
+        }
+
+        $width = trim((string) $raw_width);
+
+        if ('' === $width) {
+            return '';
+        }
+
+        $width = preg_replace('/\s+/', ' ', $width);
+
+        if (null === $width) {
+            return '';
+        }
+
+        $length_pattern = '/^(?:\d+(?:\.\d+)?)(?:px|em|rem|%|vh|vw|vmin|vmax|ch|ex|cm|mm|in|pt|pc)$/i';
+        if (preg_match($length_pattern, $width)) {
+            return $width;
+        }
+
+        $keywords = array('auto', 'fit-content', 'max-content', 'min-content');
+        $lower_width = strtolower($width);
+        if (in_array($lower_width, $keywords, true)) {
+            return $lower_width;
+        }
+
+        $calc_pattern = '/^calc\(\s*[0-9+\-*\/\.%\sA-Za-z()]+\)$/';
+        if (preg_match($calc_pattern, $width)) {
+            return $width;
+        }
+
+        return '';
     }
 
     private function enqueue_assets($options, $needs_script = false) {
