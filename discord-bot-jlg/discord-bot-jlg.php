@@ -27,6 +27,54 @@ define('DISCORD_BOT_JLG_PLUGIN_URL', plugin_dir_url(__FILE__));
 define('DISCORD_BOT_JLG_OPTION_NAME', 'discord_server_stats_options');
 define('DISCORD_BOT_JLG_CACHE_KEY', 'discord_server_stats_cache');
 define('DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION', 300);
+define('DISCORD_BOT_JLG_CRON_HOOK', 'discord_bot_jlg_refresh_cache');
+
+if (!function_exists('discord_bot_jlg_get_cron_interval')) {
+    /**
+     * Renvoie l'intervalle utilisé pour la planification du rafraîchissement automatique.
+     *
+     * @return int
+     */
+    function discord_bot_jlg_get_cron_interval() {
+        $default_interval = (int) DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION;
+
+        if ($default_interval <= 0) {
+            $default_interval = 300;
+        }
+
+        $interval = (int) apply_filters('discord_bot_jlg_cron_interval', $default_interval);
+
+        if ($interval < 60) {
+            $interval = 60;
+        }
+
+        return $interval;
+    }
+}
+
+if (!function_exists('discord_bot_jlg_register_cron_schedule')) {
+    /**
+     * Déclare un intervalle de cron dédié au rafraîchissement du cache du plugin.
+     *
+     * @param array $schedules Listes des plannings cron disponibles.
+     *
+     * @return array
+     */
+    function discord_bot_jlg_register_cron_schedule($schedules) {
+        if (!is_array($schedules)) {
+            $schedules = array();
+        }
+
+        $schedules['discord_bot_jlg_refresh'] = array(
+            'interval' => discord_bot_jlg_get_cron_interval(),
+            'display'  => __('Discord Bot JLG cache refresh', 'discord-bot-jlg'),
+        );
+
+        return $schedules;
+    }
+}
+
+add_filter('cron_schedules', 'discord_bot_jlg_register_cron_schedule');
 
 if (!function_exists('discord_bot_jlg_get_default_options')) {
     /**
@@ -55,6 +103,8 @@ if (!function_exists('discord_bot_jlg_get_default_options')) {
  */
 function discord_bot_jlg_uninstall() {
     delete_option(DISCORD_BOT_JLG_OPTION_NAME);
+
+    wp_clear_scheduled_hook(DISCORD_BOT_JLG_CRON_HOOK);
 
     if (!class_exists('Discord_Bot_JLG_API')) {
         if (!class_exists('Discord_Bot_JLG_Http_Client')) {
@@ -125,14 +175,23 @@ class DiscordServerStats {
         add_action('wp_ajax_refresh_discord_stats', array($this->api, 'ajax_refresh_stats'));
         add_action('wp_ajax_nopriv_refresh_discord_stats', array($this->api, 'ajax_refresh_stats'));
         add_action('update_option_' . DISCORD_BOT_JLG_OPTION_NAME, array($this, 'handle_settings_update'), 10, 2);
+
+        add_action(DISCORD_BOT_JLG_CRON_HOOK, array($this->api, 'refresh_cache_via_cron'));
     }
 
     public function activate() {
         add_option(DISCORD_BOT_JLG_OPTION_NAME, $this->default_options, '', false);
+
+        if (false === wp_next_scheduled(DISCORD_BOT_JLG_CRON_HOOK)) {
+            $timestamp = time() + discord_bot_jlg_get_cron_interval();
+
+            wp_schedule_event($timestamp, 'discord_bot_jlg_refresh', DISCORD_BOT_JLG_CRON_HOOK);
+        }
     }
 
     public function deactivate() {
         $this->api->clear_all_cached_data();
+        wp_clear_scheduled_hook(DISCORD_BOT_JLG_CRON_HOOK);
     }
 
     /**
