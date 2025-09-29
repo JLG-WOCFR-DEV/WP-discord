@@ -477,6 +477,60 @@ class Discord_Bot_JLG_API {
     }
 
     /**
+     * Rafraîchit silencieusement le cache via une tâche cron interne.
+     *
+     * @return void
+     */
+    public function refresh_cache_via_cron() {
+        $options = $this->get_plugin_options(true);
+
+        if (!empty($options['demo_mode'])) {
+            $this->log_debug('Cron refresh skipped: demo mode enabled.');
+            return;
+        }
+
+        $server_id = isset($options['server_id']) ? trim((string) $options['server_id']) : '';
+        $bot_token = trim((string) $this->get_bot_token($options));
+
+        if ('' === $server_id) {
+            $this->log_debug('Cron refresh skipped: missing server ID.');
+            return;
+        }
+
+        if ('' === $bot_token) {
+            $this->log_debug('Cron refresh skipped: missing bot token.');
+            return;
+        }
+
+        $stats = $this->get_stats(
+            array(
+                'bypass_cache' => true,
+            )
+        );
+
+        if (!is_array($stats)) {
+            $last_error = $this->get_last_error_message();
+
+            if ('' === $last_error) {
+                $last_error = 'Unknown error.';
+            }
+
+            $this->log_debug('Cron refresh failed: ' . $last_error);
+            return;
+        }
+
+        if (!empty($stats['is_demo']) && !empty($stats['fallback_demo'])) {
+            $last_error = $this->get_last_error_message();
+
+            if ('' === $last_error) {
+                $last_error = 'Fallback statistics returned.';
+            }
+
+            $this->log_debug('Cron refresh produced fallback stats: ' . $last_error);
+        }
+    }
+
+    /**
      * Supprime les statistiques mises en cache pour forcer une prochaine récupération.
      *
      * @param bool $full Supprime également les données persistantes (sauvegardes et indicateurs) si vrai.
