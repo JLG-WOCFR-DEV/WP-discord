@@ -1,0 +1,127 @@
+{
+    "apiVersion": 2,
+    "name": "discord-bot-jlg/discord-stats",
+    "title": "Discord Server Stats",
+    "category": "widgets",
+    "icon": "chart-bar",
+    "description": "Affiche les statistiques de votre serveur Discord dans un bloc personnalisable.",
+    "keywords": [
+        "discord",
+        "bot",
+        "stats"
+    ],
+    "textdomain": "discord-bot-jlg",
+    "editorScript": "discord-bot-jlg-block-editor",
+    "editorStyle": "discord-bot-jlg-block-editor-style",
+    "style": "discord-bot-jlg-inline",
+    "supports": {
+        "html": false,
+        "customClassName": false
+    },
+    "attributes": {
+        "layout": {
+            "type": "string",
+            "default": "horizontal"
+        },
+        "show_online": {
+            "type": "boolean",
+            "default": true
+        },
+        "show_total": {
+            "type": "boolean",
+            "default": true
+        },
+        "show_title": {
+            "type": "boolean",
+            "default": false
+        },
+        "title": {
+            "type": "string",
+            "default": ""
+        },
+        "theme": {
+            "type": "string",
+            "default": "discord"
+        },
+        "animated": {
+            "type": "boolean",
+            "default": true
+        },
+        "refresh": {
+            "type": "boolean",
+            "default": false
+        },
+        "refresh_interval": {
+            "type": "string",
+            "default": "60"
+        },
+        "compact": {
+            "type": "boolean",
+            "default": false
+        },
+        "align": {
+            "type": "string",
+            "default": "left"
+        },
+        "width": {
+            "type": "string",
+            "default": ""
+        },
+        "class": {
+            "type": "string",
+            "default": ""
+        },
+        "icon_online": {
+            "type": "string",
+            "default": "\ud83d\udfe2"
+        },
+        "icon_total": {
+            "type": "string",
+            "default": "\ud83d\udc65"
+        },
+        "label_online": {
+            "type": "string",
+            "default": "En ligne"
+        },
+        "label_total": {
+            "type": "string",
+            "default": "Membres"
+        },
+        "hide_labels": {
+            "type": "boolean",
+            "default": false
+        },
+        "hide_icons": {
+            "type": "boolean",
+            "default": false
+        },
+        "border_radius": {
+            "type": "number",
+            "default": 8
+        },
+        "gap": {
+            "type": "number",
+            "default": 20
+        },
+        "padding": {
+            "type": "number",
+            "default": 15
+        },
+        "demo": {
+            "type": "boolean",
+            "default": false
+        },
+        "show_discord_icon": {
+            "type": "boolean",
+            "default": false
+        },
+        "discord_icon_position": {
+            "type": "string",
+            "default": "left"
+        },
+        "show_server_name": {
+            "type": "boolean",
+            "default": false
+        }
+    }
+}

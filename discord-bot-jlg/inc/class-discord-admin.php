@@ -811,6 +811,10 @@ class Discord_Bot_JLG_Admin {
             <p style="margin-top: 10px;"><em><?php echo esc_html__('ℹ️ L\'auto-refresh nécessite un intervalle d\'au moins 10 secondes (10 000 ms). Toute valeur inférieure est automatiquement ajustée pour éviter les erreurs 429.', 'discord-bot-jlg'); ?></em></p>
             <p style="margin-top: 10px;"><em><?php echo esc_html__('🔐 Les rafraîchissements publics n\'utilisent plus de nonce WordPress. Un jeton reste exigé uniquement pour les requêtes effectuées par des utilisateurs connectés (administration).', 'discord-bot-jlg'); ?></em></p>
 
+            <h3><?php esc_html_e('Option 2 : Bloc Éditeur Gutenberg', 'discord-bot-jlg'); ?></h3>
+            <p><?php echo wp_kses_post(__('Ajoutez le bloc <strong>« Discord Server Stats »</strong> depuis l\'inserteur Gutenberg pour configurer vos statistiques en mode visuel. Toutes les options du shortcode sont disponibles via la barre latérale (mise en page, couleurs, libellés, rafraîchissement automatique, etc.).', 'discord-bot-jlg')); ?></p>
+            <p><?php echo wp_kses_post(__('Le bloc affiche immédiatement un aperçu rendu côté serveur. Lors de l\'enregistrement avec l\'éditeur classique, un shortcode équivalent est automatiquement inséré pour conserver la compatibilité.', 'discord-bot-jlg')); ?></p>
+
             <h4><?php esc_html_e('Tous les paramètres disponibles :', 'discord-bot-jlg'); ?></h4>
             <div style="background: white; padding: 15px; border-radius: 4px;">
                 <h5><?php esc_html_e('🎨 Apparence & Layout :', 'discord-bot-jlg'); ?></h5>
