@@ -155,6 +155,21 @@ function get_option($name) {
     return isset($GLOBALS['wp_test_options'][$name]) ? $GLOBALS['wp_test_options'][$name] : false;
 }
 
+function update_option($name, $value, $autoload = null) {
+    $GLOBALS['wp_test_options'][$name] = $value;
+
+    return true;
+}
+
+function delete_option($name) {
+    if (isset($GLOBALS['wp_test_options'][$name])) {
+        unset($GLOBALS['wp_test_options'][$name]);
+        return true;
+    }
+
+    return false;
+}
+
 function set_transient($key, $value, $expiration) {
     $expiration = (int) $expiration;
     $expires_at = ($expiration > 0) ? time() + $expiration : 0;

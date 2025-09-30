@@ -2,6 +2,33 @@
 
 require_once __DIR__ . '/includes/bootstrap.php';
 
+class Discord_Bot_JLG_Admin_Success_Http_Client extends Discord_Bot_JLG_Http_Client {
+    public function get($url, array $args = array(), $context = '') {
+        if ('widget' !== $context) {
+            return new WP_Error('unexpected_context', 'Unexpected context: ' . $context);
+        }
+
+        $payload = array(
+            'presence_count' => 12,
+            'name'           => 'Admin Test Guild',
+            'members'        => array(
+                array('id' => 1),
+                array('id' => 2),
+                array('id' => 3),
+            ),
+        );
+
+        return array(
+            'response' => array(
+                'code'    => 200,
+                'message' => 'OK',
+            ),
+            'body'    => wp_json_encode($payload),
+            'headers' => array(),
+        );
+    }
+}
+
 /**
  * @group discord-bot-jlg
  */
@@ -200,6 +227,49 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
         unset($expected['bot_token'], $result['bot_token']);
 
         $this->assertSame($expected, $result);
+    }
+
+    public function test_fallback_notice_cleared_after_successful_refresh() {
+        $options = $this->saved_options;
+        $options['demo_mode'] = 0;
+        $options['bot_token'] = '';
+
+        update_option(DISCORD_BOT_JLG_OPTION_NAME, $options);
+
+        $http_client = new Discord_Bot_JLG_Admin_Success_Http_Client();
+        $this->api   = new Discord_Bot_JLG_API(
+            DISCORD_BOT_JLG_OPTION_NAME,
+            DISCORD_BOT_JLG_CACHE_KEY,
+            DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION,
+            $http_client
+        );
+        $this->admin = new Discord_Bot_JLG_Admin(DISCORD_BOT_JLG_OPTION_NAME, $this->api);
+
+        $fallback_reason = 'Connexion à Discord interrompue';
+        update_option(
+            Discord_Bot_JLG_API::LAST_FALLBACK_OPTION,
+            array(
+                'timestamp' => 1700000000,
+                'reason'    => $fallback_reason,
+            )
+        );
+
+        $retry_key = DISCORD_BOT_JLG_CACHE_KEY . Discord_Bot_JLG_API::FALLBACK_RETRY_SUFFIX;
+        set_transient($retry_key, time() + 120, 120);
+
+        ob_start();
+        $this->admin->test_discord_connection();
+        $first_output = ob_get_clean();
+
+        $this->assertStringContainsString('notice-warning', $first_output);
+        $this->assertStringContainsString($fallback_reason, $first_output);
+        $this->assertFalse(get_option(Discord_Bot_JLG_API::LAST_FALLBACK_OPTION));
+
+        ob_start();
+        $this->admin->test_discord_connection();
+        $second_output = ob_get_clean();
+
+        $this->assertStringNotContainsString('notice-warning', $second_output);
     }
 
     private function get_expected_defaults(): array {

@@ -179,6 +179,57 @@ class Test_Discord_Bot_JLG_API extends TestCase {
         $this->assertSame(120, $entry['ttl']);
     }
 
+    public function test_get_stats_updates_last_fallback_option_and_clears_on_success() {
+        $option_name = 'discord_server_stats_options';
+        $cache_key   = 'discord_server_stats_cache';
+
+        $GLOBALS['wp_test_options'][$option_name] = array(
+            'server_id'      => '555666777',
+            'cache_duration' => 90,
+        );
+
+        $http_client = new Mock_Discord_Bot_JLG_Http_Client();
+        $api         = new Discord_Bot_JLG_API($option_name, $cache_key, 60, $http_client);
+
+        $stats = $api->get_stats(array('bypass_cache' => true));
+
+        $this->assertIsArray($stats);
+        $this->assertTrue($stats['is_demo']);
+        $this->assertTrue($stats['fallback_demo']);
+
+        $fallback_details = get_option(Discord_Bot_JLG_API::LAST_FALLBACK_OPTION);
+        $this->assertIsArray($fallback_details);
+        $this->assertArrayHasKey('timestamp', $fallback_details);
+        $this->assertArrayHasKey('reason', $fallback_details);
+        $this->assertGreaterThan(0, $fallback_details['timestamp']);
+        $this->assertNotSame('', trim((string) $fallback_details['reason']));
+
+        $widget_payload = array(
+            'presence_count' => 8,
+            'name'           => 'Recovered Guild',
+            'members'        => array(
+                array('id' => 1),
+                array('id' => 2),
+                array('id' => 3),
+            ),
+        );
+
+        $bot_payload = array(
+            'approximate_presence_count' => 15,
+            'approximate_member_count'   => 50,
+            'name'                       => 'Recovered Guild',
+        );
+
+        $recovery_client = new Successful_Mock_Discord_Bot_JLG_Http_Client($widget_payload, $bot_payload);
+        $recovery_api    = new Discord_Bot_JLG_API($option_name, $cache_key, 60, $recovery_client);
+
+        $recovered_stats = $recovery_api->get_stats(array('bypass_cache' => true));
+
+        $this->assertIsArray($recovered_stats);
+        $this->assertArrayNotHasKey('is_demo', $recovered_stats);
+        $this->assertFalse(get_option(Discord_Bot_JLG_API::LAST_FALLBACK_OPTION));
+    }
+
     public function test_ajax_refresh_stats_returns_retry_after_with_uncached_fallback() {
         $option_name = 'discord_server_stats_options';
         $cache_key   = 'discord_server_stats_cache';

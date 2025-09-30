@@ -21,6 +21,7 @@ class Discord_Bot_JLG_API {
     const LAST_GOOD_SUFFIX = '_last_good';
     const FALLBACK_RETRY_SUFFIX = '_fallback_retry_after';
     const FALLBACK_RETRY_API_DELAY_SUFFIX = '_fallback_retry_after_delay';
+    const LAST_FALLBACK_OPTION = 'discord_bot_jlg_last_fallback';
 
     private $option_name;
     private $cache_key;
@@ -145,7 +146,7 @@ class Discord_Bot_JLG_API {
 
         if (empty($options['server_id'])) {
             $this->last_error = __('Aucun identifiant de serveur Discord n\'est configuré.', 'discord-bot-jlg');
-            $demo_stats = $this->persist_fallback_stats($this->get_demo_stats(true), $options);
+            $demo_stats = $this->persist_fallback_stats($this->get_demo_stats(true), $options, $this->last_error);
             return $this->remember_runtime_result($runtime_key, $demo_stats);
         }
 
@@ -208,7 +209,7 @@ class Discord_Bot_JLG_API {
                 $this->last_error = __('Impossible d\'obtenir des statistiques exploitables depuis Discord.', 'discord-bot-jlg');
             }
             $this->store_api_retry_after_delay($this->last_retry_after);
-            $demo_stats = $this->persist_fallback_stats($this->get_demo_stats(true), $options);
+            $demo_stats = $this->persist_fallback_stats($this->get_demo_stats(true), $options, $this->last_error);
             return $this->remember_runtime_result($runtime_key, $demo_stats);
         }
 
@@ -217,6 +218,7 @@ class Discord_Bot_JLG_API {
         $this->clear_api_retry_after_delay();
         set_transient($this->cache_key, $stats, $this->get_cache_duration($options));
         $this->store_last_good_stats($stats);
+        $this->clear_last_fallback_details();
 
         return $this->remember_runtime_result($runtime_key, $stats);
     }
@@ -228,6 +230,47 @@ class Discord_Bot_JLG_API {
      */
     public function get_last_error_message() {
         return (string) $this->last_error;
+    }
+
+    public function get_last_fallback_details() {
+        $option = get_option($this->get_last_fallback_option_name());
+
+        if (!is_array($option)) {
+            return array();
+        }
+
+        $timestamp = isset($option['timestamp']) ? (int) $option['timestamp'] : 0;
+        $reason    = isset($option['reason']) ? (string) $option['reason'] : '';
+
+        if ($timestamp <= 0 && '' === trim($reason)) {
+            return array();
+        }
+
+        $details = array(
+            'timestamp' => max(0, $timestamp),
+            'reason'    => $reason,
+        );
+
+        $next_retry = $this->get_next_fallback_retry_timestamp();
+        $details['next_retry'] = ($next_retry > 0) ? $next_retry : 0;
+
+        return $details;
+    }
+
+    public function get_next_fallback_retry_timestamp() {
+        $runtime_timestamp = $this->get_runtime_fallback_retry_timestamp();
+
+        if ($runtime_timestamp > 0) {
+            return $runtime_timestamp;
+        }
+
+        $stored_timestamp = (int) get_transient($this->get_fallback_retry_key());
+
+        if ($stored_timestamp > 0) {
+            return $stored_timestamp;
+        }
+
+        return 0;
     }
 
     /**
@@ -1073,7 +1116,7 @@ class Discord_Bot_JLG_API {
         );
     }
 
-    private function persist_fallback_stats($stats, $options) {
+    private function persist_fallback_stats($stats, $options, $reason = '') {
         if (!is_array($stats)) {
             return $stats;
         }
@@ -1098,6 +1141,7 @@ class Discord_Bot_JLG_API {
         $ttl = $this->get_fallback_cache_ttl($options);
 
         set_transient($this->cache_key, $stats, $ttl);
+        $this->store_last_fallback_details($reason);
 
         return $stats;
     }
@@ -1138,6 +1182,10 @@ class Discord_Bot_JLG_API {
 
     private function get_api_retry_after_key() {
         return $this->cache_key . self::FALLBACK_RETRY_API_DELAY_SUFFIX;
+    }
+
+    private function get_last_fallback_option_name() {
+        return self::LAST_FALLBACK_OPTION;
     }
 
     private function get_fallback_retry_window($cache_duration, $options) {
@@ -1198,6 +1246,19 @@ class Discord_Bot_JLG_API {
     private function clear_fallback_retry_schedule() {
         delete_transient($this->get_fallback_retry_key());
         $this->runtime_fallback_retry_timestamp = 0;
+    }
+
+    private function store_last_fallback_details($reason) {
+        $payload = array(
+            'timestamp' => time(),
+            'reason'    => trim((string) $reason),
+        );
+
+        update_option($this->get_last_fallback_option_name(), $payload, false);
+    }
+
+    private function clear_last_fallback_details() {
+        delete_option($this->get_last_fallback_option_name());
     }
 
     /**
