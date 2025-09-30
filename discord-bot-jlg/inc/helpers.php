@@ -86,7 +86,16 @@ if (!function_exists('discord_bot_jlg_encrypt_secret')) {
             );
         }
 
-        if (!function_exists('openssl_encrypt')) {
+        $has_openssl_encrypt = function_exists('openssl_encrypt');
+        if (function_exists('apply_filters')) {
+            $has_openssl_encrypt = (bool) apply_filters(
+                'discord_bot_jlg_has_openssl_encrypt',
+                $has_openssl_encrypt,
+                $secret
+            );
+        }
+
+        if (!$has_openssl_encrypt) {
             return new WP_Error(
                 'discord_bot_jlg_encrypt_secret_missing_openssl',
                 __('La bibliothèque OpenSSL est requise pour chiffrer le token Discord.', 'discord-bot-jlg')
@@ -142,7 +151,16 @@ if (!function_exists('discord_bot_jlg_decrypt_secret')) {
             );
         }
 
-        if (!function_exists('openssl_decrypt')) {
+        $has_openssl_decrypt = function_exists('openssl_decrypt');
+        if (function_exists('apply_filters')) {
+            $has_openssl_decrypt = (bool) apply_filters(
+                'discord_bot_jlg_has_openssl_decrypt',
+                $has_openssl_decrypt,
+                $secret
+            );
+        }
+
+        if (!$has_openssl_decrypt) {
             return new WP_Error(
                 'discord_bot_jlg_decrypt_secret_missing_openssl',
                 __('La bibliothèque OpenSSL est requise pour déchiffrer le token Discord.', 'discord-bot-jlg')
