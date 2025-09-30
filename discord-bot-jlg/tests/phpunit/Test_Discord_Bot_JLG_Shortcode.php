@@ -52,4 +52,37 @@ class Test_Discord_Bot_JLG_Shortcode extends TestCase {
         $this->assertStringNotContainsString('width: 100%;position:fixed', $html);
         $this->assertStringNotContainsString('width:100%;position:fixed', $html);
     }
+
+    public function test_render_shortcode_accepts_min_function_width() {
+        $shortcode = $this->get_shortcode_instance();
+
+        $html = $shortcode->render_shortcode(array(
+            'width' => 'min(100%, 50vw)',
+        ));
+
+        $this->assertStringContainsString('style="', $html);
+        $this->assertStringContainsString('width: min(100%, 50vw)', $html);
+    }
+
+    public function test_render_shortcode_accepts_max_function_width() {
+        $shortcode = $this->get_shortcode_instance();
+
+        $html = $shortcode->render_shortcode(array(
+            'width' => 'max(300px, var(--discord-width))',
+        ));
+
+        $this->assertStringContainsString('style="', $html);
+        $this->assertStringContainsString('width: max(300px, var(--discord-width))', $html);
+    }
+
+    public function test_render_shortcode_accepts_clamp_function_width() {
+        $shortcode = $this->get_shortcode_instance();
+
+        $html = $shortcode->render_shortcode(array(
+            'width' => 'clamp(200px, 50%, var(--max-width))',
+        ));
+
+        $this->assertStringContainsString('style="', $html);
+        $this->assertStringContainsString('width: clamp(200px, 50%, var(--max-width))', $html);
+    }
 }

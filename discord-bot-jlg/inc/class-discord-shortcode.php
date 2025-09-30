@@ -383,6 +383,20 @@ class Discord_Bot_JLG_Shortcode {
             return $width;
         }
 
+        $numeric_pattern = '-?\d+(?:\.\d+)?(?:px|em|rem|%|vh|vw|vmin|vmax|ch|ex|cm|mm|in|pt|pc)?';
+        $variable_pattern = 'var\(\s*--[A-Za-z0-9_-]+\s*\)';
+        $function_value_pattern = '(?:' . $numeric_pattern . '|' . $variable_pattern . ')';
+
+        $min_max_pattern = '/^(?:min|max)\(\s*' . $function_value_pattern . '(?:\s*,\s*' . $function_value_pattern . ')+\s*\)$/i';
+        if (preg_match($min_max_pattern, $width)) {
+            return $width;
+        }
+
+        $clamp_pattern = '/^clamp\(\s*' . $function_value_pattern . '\s*,\s*' . $function_value_pattern . '\s*,\s*' . $function_value_pattern . '\s*\)$/i';
+        if (preg_match($clamp_pattern, $width)) {
+            return $width;
+        }
+
         return '';
     }
 
