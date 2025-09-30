@@ -173,11 +173,63 @@ class DiscordServerStats {
 
         add_action('widgets_init', array($this->widget, 'register_widget'));
 
+        add_action('init', array($this, 'register_block'));
+
         add_action('wp_ajax_refresh_discord_stats', array($this->api, 'ajax_refresh_stats'));
         add_action('wp_ajax_nopriv_refresh_discord_stats', array($this->api, 'ajax_refresh_stats'));
         add_action('update_option_' . DISCORD_BOT_JLG_OPTION_NAME, array($this, 'handle_settings_update'), 10, 2);
 
         add_action(DISCORD_BOT_JLG_CRON_HOOK, array($this->api, 'refresh_cache_via_cron'));
+    }
+
+    public function register_block() {
+        if (!function_exists('register_block_type')) {
+            return;
+        }
+
+        $script_handle       = 'discord-bot-jlg-block-editor';
+        $editor_style_handle = 'discord-bot-jlg-block-editor-style';
+        $style_handle        = 'discord-bot-jlg-inline';
+
+        wp_register_script(
+            $script_handle,
+            DISCORD_BOT_JLG_PLUGIN_URL . 'assets/js/discord-bot-block.js',
+            array('wp-blocks', 'wp-element', 'wp-components', 'wp-block-editor', 'wp-data', 'wp-i18n', 'wp-server-side-render'),
+            DISCORD_BOT_JLG_VERSION,
+            true
+        );
+
+        wp_register_style(
+            'discord-bot-jlg',
+            DISCORD_BOT_JLG_PLUGIN_URL . 'assets/css/discord-bot-jlg.css',
+            array(),
+            DISCORD_BOT_JLG_VERSION
+        );
+
+        wp_register_style(
+            $style_handle,
+            DISCORD_BOT_JLG_PLUGIN_URL . 'assets/css/discord-bot-jlg-inline.css',
+            array('discord-bot-jlg'),
+            DISCORD_BOT_JLG_VERSION
+        );
+
+        wp_register_style(
+            $editor_style_handle,
+            DISCORD_BOT_JLG_PLUGIN_URL . 'assets/css/discord-bot-jlg.css',
+            array($style_handle),
+            DISCORD_BOT_JLG_VERSION
+        );
+
+        if (function_exists('wp_set_script_translations')) {
+            wp_set_script_translations($script_handle, 'discord-bot-jlg', DISCORD_BOT_JLG_PLUGIN_PATH . 'languages');
+        }
+
+        register_block_type(
+            DISCORD_BOT_JLG_PLUGIN_PATH . 'block/discord-stats',
+            array(
+                'render_callback' => array($this->shortcode, 'render_shortcode')
+            )
+        );
     }
 
     public function activate() {
