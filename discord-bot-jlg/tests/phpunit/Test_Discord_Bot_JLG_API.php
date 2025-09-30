@@ -179,6 +179,54 @@ class Test_Discord_Bot_JLG_API extends TestCase {
         $this->assertSame(120, $entry['ttl']);
     }
 
+    public function test_get_fallback_streak_defaults_to_zero() {
+        $api = new Discord_Bot_JLG_API('discord_server_stats_options', 'discord_server_stats_cache', 60);
+
+        $this->assertSame(0, $api->get_fallback_streak());
+    }
+
+    public function test_ajax_refresh_stats_increments_fallback_streak() {
+        $option_name = 'discord_server_stats_options';
+        $cache_key   = 'discord_server_stats_cache';
+
+        $GLOBALS['wp_test_options'][$option_name] = array(
+            'server_id'      => '987654321',
+            'cache_duration' => 45,
+        );
+
+        $api = new Stubbed_Discord_Bot_JLG_API($option_name, $cache_key, 30);
+
+        $fallback_stats = array(
+            'online'               => 3,
+            'total'                => null,
+            'server_name'          => 'Fallback Guild',
+            'has_total'            => false,
+            'total_is_approximate' => true,
+            'is_demo'              => true,
+            'fallback_demo'        => true,
+        );
+
+        $api->set_mock_stats($fallback_stats);
+
+        try {
+            $api->ajax_refresh_stats();
+            $this->fail('Expected fallback response');
+        } catch (WP_Send_JSON_Success $response) {
+            $this->assertTrue($response->data['fallback_demo']);
+        }
+
+        $this->assertSame(1, $api->get_fallback_streak());
+
+        try {
+            $api->ajax_refresh_stats();
+            $this->fail('Expected cached fallback response');
+        } catch (WP_Send_JSON_Success $response) {
+            $this->assertTrue($response->data['fallback_demo']);
+        }
+
+        $this->assertSame(2, $api->get_fallback_streak());
+    }
+
     public function test_ajax_refresh_stats_returns_retry_after_with_uncached_fallback() {
         $option_name = 'discord_server_stats_options';
         $cache_key   = 'discord_server_stats_cache';
@@ -224,6 +272,67 @@ class Test_Discord_Bot_JLG_API extends TestCase {
         $expected_retry_after = max(0, (int) $transient_entry['value'] - time());
 
         $this->assertEqualsWithDelta($expected_retry_after, $payload['retry_after'], 1.0);
+    }
+
+    public function test_ajax_refresh_stats_resets_fallback_streak_on_success() {
+        $option_name = 'discord_server_stats_options';
+        $cache_key   = 'discord_server_stats_cache';
+
+        $GLOBALS['wp_test_options'][$option_name] = array(
+            'server_id'      => '123456789',
+            'cache_duration' => 60,
+        );
+
+        $api = new Stubbed_Discord_Bot_JLG_API($option_name, $cache_key, 30);
+
+        $fallback_stats = array(
+            'online'               => 2,
+            'total'                => null,
+            'server_name'          => 'Fallback Guild',
+            'has_total'            => false,
+            'total_is_approximate' => false,
+            'is_demo'              => true,
+            'fallback_demo'        => true,
+        );
+
+        $api->set_mock_stats($fallback_stats);
+
+        try {
+            $api->ajax_refresh_stats();
+            $this->fail('Expected fallback response');
+        } catch (WP_Send_JSON_Success $response) {
+            $this->assertTrue($response->data['fallback_demo']);
+        }
+
+        $this->assertGreaterThan(0, $api->get_fallback_streak());
+
+        $GLOBALS['wp_test_current_action'] = 'wp_ajax_refresh_discord_stats';
+        $_POST['_ajax_nonce'] = 'valid-nonce';
+
+        $real_stats = array(
+            'online'               => 5,
+            'total'                => 42,
+            'server_name'          => 'Primary Guild',
+            'has_total'            => true,
+            'total_is_approximate' => false,
+            'is_demo'              => false,
+            'fallback_demo'        => false,
+        );
+
+        $api->set_mock_stats($real_stats);
+
+        try {
+            $api->ajax_refresh_stats();
+            $this->fail('Expected successful response');
+        } catch (WP_Send_JSON_Success $response) {
+            $this->assertIsArray($response->data);
+            $this->assertFalse(isset($response->data['fallback_demo']) && $response->data['fallback_demo']);
+        }
+
+        $this->assertSame(0, $api->get_fallback_streak());
+
+        $GLOBALS['wp_test_current_action'] = 'wp_ajax_nopriv_refresh_discord_stats';
+        unset($_POST['_ajax_nonce']);
     }
 
     public function test_get_stats_stores_successful_payload() {

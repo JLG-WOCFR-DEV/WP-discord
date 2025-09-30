@@ -21,6 +21,7 @@ class Discord_Bot_JLG_API {
     const LAST_GOOD_SUFFIX = '_last_good';
     const FALLBACK_RETRY_SUFFIX = '_fallback_retry_after';
     const FALLBACK_RETRY_API_DELAY_SUFFIX = '_fallback_retry_after_delay';
+    const FALLBACK_STREAK_SUFFIX = '_fallback_streak';
 
     private $option_name;
     private $cache_key;
@@ -33,6 +34,7 @@ class Discord_Bot_JLG_API {
     private $http_client;
     private $options_cache;
     private $runtime_fallback_retry_timestamp;
+    private $runtime_fallback_streak;
 
     /**
      * Prépare le service d'accès aux statistiques avec les clés et durées nécessaires.
@@ -57,6 +59,7 @@ class Discord_Bot_JLG_API {
             : new Discord_Bot_JLG_Http_Client();
         $this->options_cache = null;
         $this->runtime_fallback_retry_timestamp = 0;
+        $this->runtime_fallback_streak = null;
     }
 
     /**
@@ -351,6 +354,7 @@ class Discord_Bot_JLG_API {
                         $response_payload['retry_after'] = max(0, (int) $next_retry - time());
                     }
 
+                    $this->increment_fallback_streak();
                     wp_send_json_success($response_payload);
                 }
 
@@ -416,6 +420,7 @@ class Discord_Bot_JLG_API {
                 $stats['retry_after'] = max(0, (int) $next_retry - time());
             }
 
+            $this->increment_fallback_streak();
             wp_send_json_success($stats);
         }
 
@@ -430,6 +435,7 @@ class Discord_Bot_JLG_API {
                 }
             }
 
+            $this->reset_fallback_streak();
             wp_send_json_success($stats);
         }
 
@@ -621,6 +627,7 @@ class Discord_Bot_JLG_API {
         $this->runtime_errors       = array();
         $this->runtime_retry_after  = array();
         $this->runtime_fallback_retry_timestamp = 0;
+        $this->runtime_fallback_streak = null;
     }
 
     private function set_runtime_fallback_retry_timestamp($timestamp) {
@@ -1136,6 +1143,10 @@ class Discord_Bot_JLG_API {
         return $this->cache_key . self::FALLBACK_RETRY_SUFFIX;
     }
 
+    private function get_fallback_streak_key() {
+        return $this->cache_key . self::FALLBACK_STREAK_SUFFIX;
+    }
+
     private function get_api_retry_after_key() {
         return $this->cache_key . self::FALLBACK_RETRY_API_DELAY_SUFFIX;
     }
@@ -1198,6 +1209,36 @@ class Discord_Bot_JLG_API {
     private function clear_fallback_retry_schedule() {
         delete_transient($this->get_fallback_retry_key());
         $this->runtime_fallback_retry_timestamp = 0;
+        $this->reset_fallback_streak();
+    }
+
+    private function increment_fallback_streak() {
+        $current = $this->get_fallback_streak();
+        $current++;
+
+        set_transient($this->get_fallback_streak_key(), $current, 0);
+        $this->runtime_fallback_streak = $current;
+
+        return $current;
+    }
+
+    private function reset_fallback_streak() {
+        delete_transient($this->get_fallback_streak_key());
+        $this->runtime_fallback_streak = null;
+    }
+
+    public function get_fallback_streak() {
+        if (null === $this->runtime_fallback_streak) {
+            $streak = (int) get_transient($this->get_fallback_streak_key());
+
+            if ($streak < 0) {
+                $streak = 0;
+            }
+
+            $this->runtime_fallback_streak = $streak;
+        }
+
+        return (int) $this->runtime_fallback_streak;
     }
 
     /**

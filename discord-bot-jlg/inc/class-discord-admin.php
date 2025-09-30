@@ -28,6 +28,50 @@ class Discord_Bot_JLG_Admin {
     }
 
     /**
+     * Affiche un message d'avertissement lorsque les statistiques de secours sont utilisées de manière répétée.
+     *
+     * @return void
+     */
+    public function maybe_render_fallback_notice() {
+        if (!current_user_can('manage_options')) {
+            return;
+        }
+
+        $threshold = (int) apply_filters('discord_bot_jlg_fallback_notice_threshold', 3);
+
+        if ($threshold <= 0) {
+            return;
+        }
+
+        $streak = (int) $this->api->get_fallback_streak();
+
+        if ($streak < $threshold) {
+            return;
+        }
+
+        $formatted_streak = number_format_i18n($streak);
+        $message = sprintf(
+            /* translators: %s: number of consecutive fallback responses. */
+            __(
+                'Discord Bot - JLG renvoie des statistiques de secours depuis %s tentatives consécutives. Vérifiez la configuration ou le statut de l\'API Discord.',
+                'discord-bot-jlg'
+            ),
+            $formatted_streak
+        );
+
+        $hint = __(
+            'Vous pouvez ajuster le seuil via le filtre "discord_bot_jlg_fallback_notice_threshold".',
+            'discord-bot-jlg'
+        );
+
+        printf(
+            '<div class="notice notice-warning"><p>%s</p><p class="description">%s</p></div>',
+            esc_html($message),
+            esc_html($hint)
+        );
+    }
+
+    /**
      * Enregistre le menu principal et les sous-menus du plugin dans l'administration WordPress.
      *
      * @return void
@@ -948,14 +992,7 @@ class Discord_Bot_JLG_Admin {
      * @return void
      */
     public function enqueue_admin_styles($hook_suffix) {
-        $allowed_ids = array(
-            'toplevel_page_discord-bot-jlg',
-            'discord-bot-jlg_page_discord-bot-demo',
-        );
-
-        if (!empty($this->demo_page_hook_suffix) && !in_array($this->demo_page_hook_suffix, $allowed_ids, true)) {
-            $allowed_ids[] = $this->demo_page_hook_suffix;
-        }
+        $allowed_ids = $this->get_plugin_screen_ids();
 
         if (function_exists('get_current_screen')) {
             $current_screen = get_current_screen();
@@ -973,6 +1010,24 @@ class Discord_Bot_JLG_Admin {
             array(),
             DISCORD_BOT_JLG_VERSION
         );
+    }
+
+    /**
+     * Renvoie les identifiants d'écrans associés au plugin.
+     *
+     * @return array
+     */
+    private function get_plugin_screen_ids() {
+        $allowed_ids = array(
+            'toplevel_page_discord-bot-jlg',
+            'discord-bot-jlg_page_discord-bot-demo',
+        );
+
+        if (!empty($this->demo_page_hook_suffix) && !in_array($this->demo_page_hook_suffix, $allowed_ids, true)) {
+            $allowed_ids[] = $this->demo_page_hook_suffix;
+        }
+
+        return $allowed_ids;
     }
 
     /**

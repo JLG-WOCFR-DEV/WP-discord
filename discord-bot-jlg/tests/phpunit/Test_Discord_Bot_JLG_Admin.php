@@ -49,6 +49,8 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
 
     protected function tearDown(): void {
         delete_option(DISCORD_BOT_JLG_OPTION_NAME);
+        delete_transient(DISCORD_BOT_JLG_CACHE_KEY . Discord_Bot_JLG_API::FALLBACK_STREAK_SUFFIX);
+        remove_all_filters('discord_bot_jlg_fallback_notice_threshold');
 
         parent::tearDown();
     }
@@ -122,6 +124,44 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
         $expected = array_merge($this->get_expected_defaults(), $expected_overrides);
 
         $this->assertSame($expected, $result);
+    }
+
+    public function test_maybe_render_fallback_notice_outputs_warning_when_threshold_reached() {
+        add_filter('discord_bot_jlg_fallback_notice_threshold', function() {
+            return 2;
+        });
+
+        set_transient(
+            DISCORD_BOT_JLG_CACHE_KEY . Discord_Bot_JLG_API::FALLBACK_STREAK_SUFFIX,
+            3,
+            0
+        );
+
+        ob_start();
+        $this->admin->maybe_render_fallback_notice();
+        $output = ob_get_clean();
+
+        $this->assertNotEmpty($output);
+        $this->assertStringContainsString('notice-warning', $output);
+        $this->assertStringContainsString('3', $output);
+    }
+
+    public function test_maybe_render_fallback_notice_skips_when_below_threshold() {
+        add_filter('discord_bot_jlg_fallback_notice_threshold', function() {
+            return 5;
+        });
+
+        set_transient(
+            DISCORD_BOT_JLG_CACHE_KEY . Discord_Bot_JLG_API::FALLBACK_STREAK_SUFFIX,
+            2,
+            0
+        );
+
+        ob_start();
+        $this->admin->maybe_render_fallback_notice();
+        $output = ob_get_clean();
+
+        $this->assertSame('', $output);
     }
 
     /**
