@@ -1045,6 +1045,66 @@ class Discord_Bot_JLG_Admin {
             $options = array();
         }
 
+        $fallback_details = $this->api->get_last_fallback_details();
+
+        if (
+            !empty($fallback_details)
+            && (empty($options['demo_mode']))
+        ) {
+            $timestamp = isset($fallback_details['timestamp']) ? (int) $fallback_details['timestamp'] : 0;
+            if ($timestamp <= 0) {
+                $timestamp = time();
+            }
+
+            $date_format = get_option('date_format');
+            if (!is_string($date_format) || '' === trim($date_format)) {
+                $date_format = 'Y-m-d';
+            }
+
+            $time_format = get_option('time_format');
+            if (!is_string($time_format) || '' === trim($time_format)) {
+                $time_format = 'H:i';
+            }
+
+            $formatted_time = wp_date($date_format . ' ' . $time_format, $timestamp);
+            $reason_text    = isset($fallback_details['reason']) ? trim((string) $fallback_details['reason']) : '';
+            $message_parts  = array();
+
+            $message_parts[] = sprintf(
+                /* translators: %s: formatted date and time. */
+                esc_html__('⚠️ Statistiques de secours utilisées depuis le %s.', 'discord-bot-jlg'),
+                esc_html($formatted_time)
+            );
+
+            if ('' !== $reason_text) {
+                $message_parts[] = sprintf(
+                    /* translators: %s: reason for the fallback. */
+                    esc_html__('Raison : %s.', 'discord-bot-jlg'),
+                    esc_html($reason_text)
+                );
+            }
+
+            $next_retry = isset($fallback_details['next_retry']) ? (int) $fallback_details['next_retry'] : 0;
+
+            if ($next_retry > 0) {
+                $seconds_until_retry = max(0, $next_retry - time());
+                $retry_time          = wp_date($date_format . ' ' . $time_format, $next_retry);
+                $message_parts[]     = sprintf(
+                    /* translators: 1: seconds before retry, 2: formatted date and time. */
+                    esc_html__('Prochaine tentative dans %1$d secondes (vers %2$s).', 'discord-bot-jlg'),
+                    $seconds_until_retry,
+                    esc_html($retry_time)
+                );
+            } else {
+                $message_parts[] = esc_html__('Prochaine tentative dès que possible.', 'discord-bot-jlg');
+            }
+
+            printf(
+                '<div class="notice notice-warning"><p>%s</p></div>',
+                implode(' ', $message_parts)
+            );
+        }
+
         if (!empty($options['demo_mode'])) {
             printf(
                 '<div class="notice notice-info"><p>%s</p></div>',
