@@ -4,6 +4,10 @@ if (false === defined('ABSPATH')) {
     exit;
 }
 
+if (!function_exists('discord_bot_jlg_validate_bool')) {
+    require_once __DIR__ . '/helpers.php';
+}
+
 /**
  * Fournit les appels à l'API Discord ainsi que la gestion du cache et des données de démonstration.
  */
@@ -109,8 +113,8 @@ class Discord_Bot_JLG_API {
             )
         );
 
-        $args['force_demo']   = wp_validate_boolean($args['force_demo']);
-        $args['bypass_cache'] = wp_validate_boolean($args['bypass_cache']);
+        $args['force_demo']   = discord_bot_jlg_validate_bool($args['force_demo']);
+        $args['bypass_cache'] = discord_bot_jlg_validate_bool($args['bypass_cache']);
 
         $runtime_key = $this->get_runtime_cache_key($args);
 
@@ -365,7 +369,7 @@ class Discord_Bot_JLG_API {
         }
 
         if (isset($_POST['force_refresh'])) {
-            $force_refresh = wp_validate_boolean(wp_unslash($_POST['force_refresh']));
+            $force_refresh = discord_bot_jlg_validate_bool(wp_unslash($_POST['force_refresh']));
 
             if (
                 true === $force_refresh

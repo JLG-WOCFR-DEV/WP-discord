@@ -13,6 +13,7 @@ if (!defined('DAY_IN_SECONDS')) {
     define('DAY_IN_SECONDS', 86400);
 }
 
+require_once __DIR__ . '/../../inc/helpers.php';
 require_once __DIR__ . '/../../inc/class-discord-http.php';
 require_once __DIR__ . '/../../inc/class-discord-api.php';
 require_once __DIR__ . '/../../inc/class-discord-widget.php';
@@ -430,6 +431,29 @@ function wp_safe_remote_get($url, $args = array()) {
     );
 }
 
+function current_user_can($capability) {
+    return true;
+}
+
+function __($text, $domain = null) {
+    return $text;
+}
+
+if (!function_exists('wp_validate_boolean')) {
+    $api = new Discord_Bot_JLG_API('discord_bot_jlg_test_option', 'discord_bot_jlg_test_cache');
+
+    $stats = $api->get_stats(
+        array(
+            'force_demo'   => 'true',
+            'bypass_cache' => 'false',
+        )
+    );
+
+    if (!is_array($stats)) {
+        throw new RuntimeException('Discord Bot JLG API should load without wp_validate_boolean.');
+    }
+}
+
 function wp_validate_boolean($value) {
     if (is_bool($value)) {
         return $value;
@@ -441,14 +465,6 @@ function wp_validate_boolean($value) {
     }
 
     return (bool) $value;
-}
-
-function current_user_can($capability) {
-    return true;
-}
-
-function __($text, $domain = null) {
-    return $text;
 }
 
 class WP_Error {
