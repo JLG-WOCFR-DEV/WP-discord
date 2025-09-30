@@ -1102,7 +1102,7 @@ class Discord_Bot_JLG_API {
         $base_total  = 256;
 
         $timestamp = current_time('timestamp', true);
-        $hour      = (int) wp_date('H', $timestamp);
+        $hour      = (int) discord_bot_jlg_format_datetime('H', $timestamp);
         $variation = sin($hour * 0.26) * 10;
 
         return array(
