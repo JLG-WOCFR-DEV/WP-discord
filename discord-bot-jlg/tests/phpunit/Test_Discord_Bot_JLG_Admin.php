@@ -163,6 +163,7 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
             $this->assertSame('', $result_token);
         } else {
             $this->assertTrue(discord_bot_jlg_is_encrypted_secret($result_token));
+            $this->assertStringStartsWith(DISCORD_BOT_JLG_SECRET_PREFIX, $result_token);
             $decrypted = discord_bot_jlg_decrypt_secret($result_token);
 
             $this->assertFalse(is_wp_error($decrypted));
@@ -207,6 +208,38 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
 
         $this->assertFalse(is_wp_error($decrypted));
         $this->assertSame($this->saved_options['bot_token'], $decrypted);
+
+        unset($expected['bot_token'], $result['bot_token']);
+
+        $this->assertSame($expected, $result);
+    }
+
+    public function test_sanitize_options_preserves_legacy_encrypted_bot_token() {
+        $legacy_plain  = 'legacy-token';
+        $legacy_secret = $this->encrypt_secret_v1($legacy_plain);
+
+        $this->saved_options['bot_token'] = $legacy_secret;
+
+        update_option(
+            DISCORD_BOT_JLG_OPTION_NAME,
+            array_merge($this->saved_options, array('bot_token' => $legacy_secret))
+        );
+
+        $input = array(
+            'widget_title' => 'Updated title',
+            'bot_token'    => '',
+        );
+
+        $result   = $this->admin->sanitize_options($input);
+        $expected = $this->get_expected_defaults();
+        $expected['widget_title'] = sanitize_text_field('Updated title');
+
+        $this->assertSame($legacy_secret, $result['bot_token']);
+
+        $decrypted = discord_bot_jlg_decrypt_secret($result['bot_token']);
+
+        $this->assertFalse(is_wp_error($decrypted));
+        $this->assertSame($legacy_plain, $decrypted);
 
         unset($expected['bot_token'], $result['bot_token']);
 
@@ -270,6 +303,17 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
         $second_output = ob_get_clean();
 
         $this->assertStringNotContainsString('notice-warning', $second_output);
+    }
+
+    private function encrypt_secret_v1($plaintext) {
+        $key_material = hash('sha256', AUTH_KEY, true);
+        $iv_material  = hash('sha256', AUTH_SALT . AUTH_KEY, true);
+        $iv           = substr($iv_material, 0, 16);
+
+        $ciphertext = openssl_encrypt($plaintext, 'aes-256-cbc', $key_material, OPENSSL_RAW_DATA, $iv);
+        $mac        = hash_hmac('sha256', $ciphertext, AUTH_SALT, true);
+
+        return DISCORD_BOT_JLG_SECRET_PREFIX_V1 . base64_encode($ciphertext . $mac);
     }
 
     private function get_expected_defaults(): array {

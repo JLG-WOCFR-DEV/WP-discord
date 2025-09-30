@@ -22,6 +22,10 @@ Accédez à la page **Discord Bot** dans l’administration pour :
 
 Il est possible de forcer l'utilisation d'un token spécifique en définissant la constante `DISCORD_BOT_JLG_TOKEN` dans votre fichier `wp-config.php` ou dans un plugin mu. Lorsque cette constante est présente (et non vide), elle est utilisée à la place de la valeur enregistrée dans l'administration et le champ correspondant devient en lecture seule.
 
+### Nouvelle version du secret chiffré
+
+Les tokens stockés en base de données sont désormais encodés avec le préfixe `dbjlg_enc_v2:` et un vecteur d'initialisation (IV) généré aléatoirement pour chaque chiffrement. Les anciens secrets (`dbjlg_enc_v1:`) restent pris en charge et seront automatiquement déchiffrés. Pour bénéficier du nouvel encodage renforcé, il suffit de ressaisir et enregistrer le token du bot depuis l’interface d’administration (ou de l’effacer puis de le coller à nouveau).
+
 ### Ajuster la taille maximale des réponses HTTP
 
 Par défaut, le client HTTP plafonne les réponses distantes à 1 048 576 octets pour éviter de charger des fichiers trop volumineux. Si vous devez assouplir ou renforcer cette limite (par exemple pour supporter des payloads plus importants renvoyés par un proxy), vous pouvez utiliser le filtre `discord_bot_jlg_http_max_bytes` :
