@@ -1235,7 +1235,7 @@ class Discord_Bot_JLG_Admin {
 
         $allowed_tags['svg'] = array(
             'class'       => true,
-            'viewBox'     => true,
+            'viewbox'     => true,
             'xmlns'       => true,
             'role'        => true,
             'aria-hidden' => true,
