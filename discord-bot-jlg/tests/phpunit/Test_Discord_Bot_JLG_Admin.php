@@ -121,7 +121,26 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
         $result = $this->admin->sanitize_options($input);
         $expected = array_merge($this->get_expected_defaults(), $expected_overrides);
 
+        $result_token   = isset($result['bot_token']) ? $result['bot_token'] : '';
+        $expected_token = $this->saved_options['bot_token'];
+
+        if (array_key_exists('bot_token', $expected_overrides)) {
+            $expected_token = $expected_overrides['bot_token'];
+        }
+
+        unset($expected['bot_token'], $result['bot_token']);
+
         $this->assertSame($expected, $result);
+
+        if ('' === $expected_token) {
+            $this->assertSame('', $result_token);
+        } else {
+            $this->assertTrue(discord_bot_jlg_is_encrypted_secret($result_token));
+            $decrypted = discord_bot_jlg_decrypt_secret($result_token);
+
+            $this->assertFalse(is_wp_error($decrypted));
+            $this->assertSame($expected_token, $decrypted);
+        }
     }
 
     /**
@@ -139,6 +158,9 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
         $expected = $this->get_expected_defaults();
 
         $this->assertSame($expected['bot_token'], $result['bot_token']);
+
+        unset($expected['bot_token'], $result['bot_token']);
+
         $this->assertSame($expected, $result);
     }
 
@@ -152,6 +174,15 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
         $expected = $this->get_expected_defaults();
         $expected['widget_title'] = sanitize_text_field('Updated title');
 
+        $this->assertTrue(discord_bot_jlg_is_encrypted_secret($result['bot_token']));
+
+        $decrypted = discord_bot_jlg_decrypt_secret($result['bot_token']);
+
+        $this->assertFalse(is_wp_error($decrypted));
+        $this->assertSame($this->saved_options['bot_token'], $decrypted);
+
+        unset($expected['bot_token'], $result['bot_token']);
+
         $this->assertSame($expected, $result);
     }
 
@@ -163,6 +194,10 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
         $result   = $this->admin->sanitize_options($input);
         $expected = $this->get_expected_defaults();
         $expected['bot_token'] = '';
+
+        $this->assertSame('', $result['bot_token']);
+
+        unset($expected['bot_token'], $result['bot_token']);
 
         $this->assertSame($expected, $result);
     }

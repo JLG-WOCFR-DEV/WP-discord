@@ -208,7 +208,37 @@ class Discord_Bot_JLG_Admin {
                 $raw_token = trim((string) $input['bot_token']);
 
                 if ('' !== $raw_token) {
-                    $sanitized['bot_token'] = sanitize_text_field($raw_token);
+                    $token_to_store = sanitize_text_field($raw_token);
+                    $encrypted      = discord_bot_jlg_encrypt_secret($token_to_store);
+
+                    if (is_wp_error($encrypted)) {
+                        add_settings_error(
+                            'discord_stats_settings',
+                            'discord_bot_jlg_token_encrypt_error',
+                            $encrypted->get_error_message(),
+                            'error'
+                        );
+                    } else {
+                        $sanitized['bot_token'] = $encrypted;
+                    }
+                }
+            }
+
+            if (
+                '' !== $sanitized['bot_token']
+                && !discord_bot_jlg_is_encrypted_secret($sanitized['bot_token'])
+            ) {
+                $migrated = discord_bot_jlg_encrypt_secret($sanitized['bot_token']);
+
+                if (is_wp_error($migrated)) {
+                    add_settings_error(
+                        'discord_stats_settings',
+                        'discord_bot_jlg_token_migration_error',
+                        $migrated->get_error_message(),
+                        'error'
+                    );
+                } else {
+                    $sanitized['bot_token'] = $migrated;
                 }
             }
         }
@@ -392,7 +422,32 @@ class Discord_Bot_JLG_Admin {
     public function bot_token_render() {
         $options             = get_option($this->option_name);
         $constant_overridden = (defined('DISCORD_BOT_JLG_TOKEN') && '' !== DISCORD_BOT_JLG_TOKEN);
-        $has_saved_token     = (!$constant_overridden && !empty($options['bot_token']));
+        $stored_token        = isset($options['bot_token']) ? $options['bot_token'] : '';
+        $is_encrypted_token  = discord_bot_jlg_is_encrypted_secret($stored_token);
+        $decryption_error    = null;
+
+        if ($is_encrypted_token) {
+            $decrypted_token = discord_bot_jlg_decrypt_secret($stored_token);
+
+            if (is_wp_error($decrypted_token)) {
+                $decryption_error = $decrypted_token;
+
+                $this->api->flush_options_cache();
+
+                add_settings_error(
+                    'discord_stats_settings',
+                    'discord_bot_jlg_token_decrypt_error',
+                    $decryption_error->get_error_message(),
+                    'error'
+                );
+            }
+        }
+
+        $has_saved_token = (
+            !$constant_overridden
+            && !empty($stored_token)
+            && (null === $decryption_error)
+        );
         $input_id            = sprintf('%s_bot_token', $this->option_name);
         $delete_input_name   = sprintf('%s[bot_token_delete]', $this->option_name);
         $delete_input_id     = sprintf('%s_bot_token_delete', $this->option_name);
@@ -438,8 +493,12 @@ class Discord_Bot_JLG_Admin {
             <?php
             if ($constant_overridden) {
                 esc_html_e('Défini via une constante.', 'discord-bot-jlg');
+            } elseif ($has_saved_token && $is_encrypted_token) {
+                esc_html_e('Un token est enregistré (secret chiffré).', 'discord-bot-jlg');
             } elseif ($has_saved_token) {
                 esc_html_e('Un token est enregistré.', 'discord-bot-jlg');
+            } elseif (null !== $decryption_error) {
+                esc_html_e('Erreur lors du déchiffrement du token enregistré.', 'discord-bot-jlg');
             } else {
                 esc_html_e('Aucun token enregistré.', 'discord-bot-jlg');
             }

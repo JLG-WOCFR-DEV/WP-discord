@@ -1635,7 +1635,30 @@ class Discord_Bot_JLG_API {
             return DISCORD_BOT_JLG_TOKEN;
         }
 
-        return isset($options['bot_token']) ? $options['bot_token'] : '';
+        if (!isset($options['bot_token']) || '' === $options['bot_token']) {
+            return '';
+        }
+
+        $stored_token = $options['bot_token'];
+
+        if (!is_string($stored_token)) {
+            return '';
+        }
+
+        if (!discord_bot_jlg_is_encrypted_secret($stored_token)) {
+            return $stored_token;
+        }
+
+        $decrypted = discord_bot_jlg_decrypt_secret($stored_token);
+
+        if (is_wp_error($decrypted)) {
+            $this->last_error = $decrypted->get_error_message();
+            $this->flush_options_cache();
+
+            return '';
+        }
+
+        return $decrypted;
     }
 
     private function get_cache_duration($options) {
