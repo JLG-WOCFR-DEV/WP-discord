@@ -2,6 +2,7 @@
 /**
  * Shared helper functions for Discord Bot JLG plugin.
  */
+
 if (!function_exists('discord_bot_jlg_validate_bool')) {
     /**
      * Normalizes a value to a boolean, falling back when wp_validate_boolean() is unavailable.
