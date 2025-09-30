@@ -136,6 +136,21 @@ require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-admin.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-shortcode.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-widget.php';
 
+if (defined('WP_CLI') && WP_CLI) {
+    require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-cli.php';
+
+    WP_CLI::add_command(
+        'discord-bot',
+        new Discord_Bot_JLG_CLI(
+            new Discord_Bot_JLG_API(
+                DISCORD_BOT_JLG_OPTION_NAME,
+                DISCORD_BOT_JLG_CACHE_KEY,
+                DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION
+            )
+        )
+    );
+}
+
 function discord_bot_jlg_load_textdomain() {
     load_plugin_textdomain('discord-bot-jlg', false, dirname(plugin_basename(__FILE__)) . '/languages');
 }
