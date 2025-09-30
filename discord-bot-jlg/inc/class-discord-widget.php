@@ -258,7 +258,11 @@ class Discord_Stats_Widget extends WP_Widget {
             $options = array();
         }
 
-        $default_title = isset($options['widget_title']) ? $options['widget_title'] : __('Discord Server', 'discord-bot-jlg');
+        $default_title = isset($options['widget_title']) ? $options['widget_title'] : '';
+
+        if ('' === $default_title || 'Discord Server' === $default_title) {
+            $default_title = esc_html__('Discord Server', 'discord-bot-jlg');
+        }
 
         $min_refresh = defined('Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL')
             ? Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL
