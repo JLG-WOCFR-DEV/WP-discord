@@ -28,6 +28,7 @@ class Discord_Bot_JLG_API {
     private $runtime_retry_after;
     private $http_client;
     private $options_cache;
+    private $runtime_fallback_retry_timestamp;
 
     /**
      * Prépare le service d'accès aux statistiques avec les clés et durées nécessaires.
@@ -51,6 +52,7 @@ class Discord_Bot_JLG_API {
             ? $http_client
             : new Discord_Bot_JLG_Http_Client();
         $this->options_cache = null;
+        $this->runtime_fallback_retry_timestamp = 0;
     }
 
     /**
@@ -278,6 +280,9 @@ class Discord_Bot_JLG_API {
 
         $fallback_retry_key   = $this->get_fallback_retry_key();
         $fallback_retry_after = (int) get_transient($fallback_retry_key);
+        if ($fallback_retry_after > 0) {
+            $this->set_runtime_fallback_retry_timestamp($fallback_retry_after);
+        }
         $now                  = time();
 
         if (true === $cached_stats_is_fallback && $fallback_retry_after <= 0) {
@@ -335,7 +340,11 @@ class Discord_Bot_JLG_API {
                     $response_payload = $cached_stats;
 
                     if (is_array($response_payload)) {
-                        $response_payload['retry_after'] = max(0, (int) $fallback_retry_after - $now);
+                        $next_retry = $this->get_runtime_fallback_retry_timestamp();
+                        if ($next_retry <= 0) {
+                            $next_retry = (int) $fallback_retry_after;
+                        }
+                        $response_payload['retry_after'] = max(0, (int) $next_retry - time());
                     }
 
                     wp_send_json_success($response_payload);
@@ -396,6 +405,11 @@ class Discord_Bot_JLG_API {
                 if (!empty($client_rate_limit_key)) {
                     $this->delete_client_rate_limit($client_rate_limit_key);
                 }
+            }
+
+            $next_retry = $this->get_runtime_fallback_retry_timestamp();
+            if ($next_retry > 0) {
+                $stats['retry_after'] = max(0, (int) $next_retry - time());
             }
 
             wp_send_json_success($stats);
@@ -602,6 +616,19 @@ class Discord_Bot_JLG_API {
         $this->runtime_cache        = array();
         $this->runtime_errors       = array();
         $this->runtime_retry_after  = array();
+        $this->runtime_fallback_retry_timestamp = 0;
+    }
+
+    private function set_runtime_fallback_retry_timestamp($timestamp) {
+        $timestamp = (int) $timestamp;
+
+        if ($timestamp > 0) {
+            $this->runtime_fallback_retry_timestamp = $timestamp;
+        }
+    }
+
+    private function get_runtime_fallback_retry_timestamp() {
+        return (int) $this->runtime_fallback_retry_timestamp;
     }
 
     /**
@@ -1144,6 +1171,11 @@ class Discord_Bot_JLG_API {
      * @return int Timestamp UNIX de la prochaine tentative.
      */
     private function schedule_next_fallback_retry($cache_duration, $options) {
+        $existing_retry = $this->get_runtime_fallback_retry_timestamp();
+        if ($existing_retry > 0) {
+            return $existing_retry;
+        }
+
         $retry_window = $this->get_fallback_retry_window($cache_duration, $options);
         $api_retry_after = $this->consume_api_retry_after_delay();
 
@@ -1154,12 +1186,14 @@ class Discord_Bot_JLG_API {
         $next_retry = time() + $retry_window;
 
         set_transient($this->get_fallback_retry_key(), $next_retry, max(1, $retry_window));
+        $this->set_runtime_fallback_retry_timestamp($next_retry);
 
         return $next_retry;
     }
 
     private function clear_fallback_retry_schedule() {
         delete_transient($this->get_fallback_retry_key());
+        $this->runtime_fallback_retry_timestamp = 0;
     }
 
     /**

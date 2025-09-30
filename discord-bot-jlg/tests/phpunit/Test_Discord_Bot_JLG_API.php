@@ -179,6 +179,53 @@ class Test_Discord_Bot_JLG_API extends TestCase {
         $this->assertSame(120, $entry['ttl']);
     }
 
+    public function test_ajax_refresh_stats_returns_retry_after_with_uncached_fallback() {
+        $option_name = 'discord_server_stats_options';
+        $cache_key   = 'discord_server_stats_cache';
+
+        $GLOBALS['wp_test_options'][$option_name] = array(
+            'server_id'      => '987654321',
+            'cache_duration' => 45,
+        );
+
+        $api = new Stubbed_Discord_Bot_JLG_API($option_name, $cache_key, 30);
+
+        $fallback_stats = array(
+            'online'               => 3,
+            'total'                => null,
+            'server_name'          => 'Fallback Guild',
+            'has_total'            => false,
+            'total_is_approximate' => true,
+            'is_demo'              => true,
+            'fallback_demo'        => true,
+        );
+
+        $api->set_mock_stats($fallback_stats);
+
+        $payload = null;
+
+        try {
+            $api->ajax_refresh_stats();
+            $this->fail('Expected WP_Send_JSON_Success to be thrown.');
+        } catch (WP_Send_JSON_Success $success) {
+            $payload = $success->data;
+        }
+
+        $this->assertIsArray($payload);
+        $this->assertArrayHasKey('retry_after', $payload);
+        $this->assertIsInt($payload['retry_after']);
+
+        $fallback_retry_key = $cache_key . Discord_Bot_JLG_API::FALLBACK_RETRY_SUFFIX;
+        $transient_entry    = wp_test_get_transient_entry($fallback_retry_key);
+
+        $this->assertNotNull($transient_entry);
+        $this->assertArrayHasKey('value', $transient_entry);
+
+        $expected_retry_after = max(0, (int) $transient_entry['value'] - time());
+
+        $this->assertEqualsWithDelta($expected_retry_after, $payload['retry_after'], 1.0);
+    }
+
     public function test_get_stats_stores_successful_payload() {
         $option_name    = 'discord_server_stats_options';
         $cache_key      = 'discord_server_stats_cache';
