@@ -98,3 +98,12 @@ Le fichier `phpunit.xml.dist` du plugin référence automatiquement le bootstrap
 ## Support
 - Portail développeur Discord : https://discord.com/developers/applications
 - Notes de version disponibles dans l’interface du plugin.
+
+### CLI
+
+Deux commandes WP-CLI facilitent les opérations :
+
+- `wp discord-bot refresh-cache` force l'appel API immédiat en ignorant le cache ;
+- `wp discord-bot clear-cache` purge toutes les données (transients, sauvegardes et limites de taux).
+
+Les deux commandes retournent un code de sortie non nul en cas d'erreur afin de permettre l'automatisation dans vos scripts d'exploitation.
