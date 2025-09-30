@@ -378,7 +378,7 @@ class Discord_Bot_JLG_Shortcode {
             return $lower_width;
         }
 
-        $calc_pattern = '/^calc\(\s*[0-9+\-*\/\.%\sA-Za-z()]+\)$/';
+        $calc_pattern = '/^calc\(\s*[0-9+\-*\/\.,%\sA-Za-z_()\-]+\)$/';
         if (preg_match($calc_pattern, $width)) {
             return $width;
         }

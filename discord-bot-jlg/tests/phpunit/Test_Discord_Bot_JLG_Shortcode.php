@@ -52,4 +52,16 @@ class Test_Discord_Bot_JLG_Shortcode extends TestCase {
         $this->assertStringNotContainsString('width: 100%;position:fixed', $html);
         $this->assertStringNotContainsString('width:100%;position:fixed', $html);
     }
+
+    public function test_render_shortcode_accepts_calc_with_nested_functions() {
+        $shortcode = $this->get_shortcode_instance();
+
+        $width = 'calc(min(100%, 320px) - 2rem)';
+
+        $html = $shortcode->render_shortcode(array(
+            'width' => $width,
+        ));
+
+        $this->assertStringContainsString('width: ' . $width, $html);
+    }
 }
