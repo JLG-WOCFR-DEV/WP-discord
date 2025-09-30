@@ -12,6 +12,27 @@ if (!function_exists('discord_bot_jlg_validate_bool')) {
      * @return bool
      */
     function discord_bot_jlg_validate_bool($value) {
+        if (is_array($value)) {
+            $found = false;
+
+            $iterator = new \RecursiveIteratorIterator(new \RecursiveArrayIterator($value));
+            foreach ($iterator as $item) {
+                if (is_scalar($item)) {
+                    $value = $item;
+                    $found = true;
+                    break;
+                }
+            }
+
+            if (false === $found) {
+                $value = null;
+            }
+        }
+
+        if (!is_scalar($value)) {
+            return false;
+        }
+
         if (function_exists('wp_validate_boolean')) {
             return wp_validate_boolean($value);
         }

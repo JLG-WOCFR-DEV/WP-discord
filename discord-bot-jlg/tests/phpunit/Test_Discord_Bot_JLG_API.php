@@ -226,6 +226,40 @@ class Test_Discord_Bot_JLG_API extends TestCase {
         $this->assertEqualsWithDelta($expected_retry_after, $payload['retry_after'], 1.0);
     }
 
+    public function test_ajax_refresh_stats_handles_array_force_refresh_input() {
+        $option_name = 'discord_server_stats_options';
+        $cache_key   = 'discord_server_stats_cache';
+
+        $GLOBALS['wp_test_options'][$option_name] = array(
+            'server_id'      => '55555',
+            'cache_duration' => 60,
+        );
+
+        $api = new Stubbed_Discord_Bot_JLG_API($option_name, $cache_key, 60);
+        $api->set_mock_stats(
+            array(
+                'online'        => 5,
+                'total'         => 15,
+                'server_name'   => 'Array Input Guild',
+                'is_demo'       => false,
+                'fallback_demo' => false,
+            )
+        );
+
+        $GLOBALS['wp_test_current_action'] = 'wp_ajax_refresh_discord_stats';
+        $_POST['_ajax_nonce']              = 'valid-nonce';
+        $_POST['force_refresh']            = array('1');
+
+        try {
+            $api->ajax_refresh_stats();
+            $this->fail('Expected WP_Send_JSON_Success to be thrown.');
+        } catch (WP_Send_JSON_Success $response) {
+            $this->assertIsArray($response->data);
+            $this->assertArrayHasKey('online', $response->data);
+            $this->assertSame(5, $response->data['online']);
+        }
+    }
+
     public function test_get_stats_stores_successful_payload() {
         $option_name    = 'discord_server_stats_options';
         $cache_key      = 'discord_server_stats_cache';
