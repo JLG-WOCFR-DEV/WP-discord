@@ -110,6 +110,24 @@ if (!function_exists('current_time')) {
     }
 }
 
+if (!function_exists('date_i18n')) {
+    function date_i18n($format, $timestamp = null, $gmt = false) {
+        $GLOBALS['discord_bot_jlg_last_date_i18n_args'] = array(
+            'format'    => $format,
+            'timestamp' => $timestamp,
+            'gmt'       => $gmt,
+        );
+
+        if (null === $timestamp) {
+            $timestamp = current_time('timestamp', (bool) $gmt);
+        }
+
+        $formatted = gmdate($format, (int) $timestamp);
+
+        return apply_filters('date_i18n', $formatted, $format, $timestamp, $gmt);
+    }
+}
+
 if (!function_exists('wp_date')) {
     function wp_date($format, $timestamp = null, $timezone = null) {
         if (null === $timestamp) {

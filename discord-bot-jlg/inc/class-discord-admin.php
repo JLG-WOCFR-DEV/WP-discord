@@ -1066,7 +1066,7 @@ class Discord_Bot_JLG_Admin {
                 $time_format = 'H:i';
             }
 
-            $formatted_time = wp_date($date_format . ' ' . $time_format, $timestamp);
+            $formatted_time = discord_bot_jlg_format_datetime($date_format . ' ' . $time_format, $timestamp);
             $reason_text    = isset($fallback_details['reason']) ? trim((string) $fallback_details['reason']) : '';
             $message_parts  = array();
 
@@ -1088,7 +1088,7 @@ class Discord_Bot_JLG_Admin {
 
             if ($next_retry > 0) {
                 $seconds_until_retry = max(0, $next_retry - time());
-                $retry_time          = wp_date($date_format . ' ' . $time_format, $next_retry);
+                $retry_time          = discord_bot_jlg_format_datetime($date_format . ' ' . $time_format, $next_retry);
                 $message_parts[]     = sprintf(
                     /* translators: 1: seconds before retry, 2: formatted date and time. */
                     esc_html__('Prochaine tentative dans %1$d secondes (vers %2$s).', 'discord-bot-jlg'),

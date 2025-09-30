@@ -49,6 +49,39 @@ if (!function_exists('discord_bot_jlg_validate_bool')) {
     }
 }
 
+if (!function_exists('discord_bot_jlg_has_wp_date')) {
+    /**
+     * Determine if wp_date() should be used.
+     *
+     * @return bool
+     */
+    function discord_bot_jlg_has_wp_date() {
+        if (!empty($GLOBALS['discord_bot_jlg_disable_wp_date'])) {
+            return false;
+        }
+
+        return function_exists('wp_date');
+    }
+}
+
+if (!function_exists('discord_bot_jlg_format_datetime')) {
+    /**
+     * Formats a timestamp using wp_date() when available, falling back to date_i18n().
+     *
+     * @param string   $format    Format string compatible with PHP date().
+     * @param int|null $timestamp Unix timestamp to format.
+     *
+     * @return string
+     */
+    function discord_bot_jlg_format_datetime($format, $timestamp = null) {
+        if (discord_bot_jlg_has_wp_date()) {
+            return wp_date($format, $timestamp);
+        }
+
+        return date_i18n($format, $timestamp);
+    }
+}
+
 if (!function_exists('discord_bot_jlg_is_encrypted_secret')) {
     /**
      * Détermine si une valeur correspond à un secret chiffré reconnu.

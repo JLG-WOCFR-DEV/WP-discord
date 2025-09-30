@@ -565,4 +565,38 @@ class Test_Discord_Bot_JLG_API extends TestCase {
 
         $this->assertSame('198.51.100.23', $ip, 'Untrusted proxy headers should be ignored by default');
     }
+
+    public function test_get_demo_stats_uses_date_i18n_when_wp_date_unavailable() {
+        $option_name = 'discord_server_stats_options';
+        $cache_key   = 'discord_server_stats_cache';
+
+        $api = new Discord_Bot_JLG_API($option_name, $cache_key, 60);
+
+        $GLOBALS['discord_bot_jlg_disable_wp_date'] = true;
+
+        $captured_args = null;
+        $callback      = function($formatted, $format, $timestamp) use (&$captured_args) {
+            $captured_args = array(
+                'formatted' => $formatted,
+                'format'    => $format,
+                'timestamp' => $timestamp,
+            );
+
+            return $formatted;
+        };
+
+        add_filter('date_i18n', $callback, 10, 3);
+
+        try {
+            $stats = $api->get_demo_stats(false);
+        } finally {
+            remove_filter('date_i18n', $callback, 10);
+            unset($GLOBALS['discord_bot_jlg_disable_wp_date']);
+        }
+
+        $this->assertIsArray($stats);
+        $this->assertArrayHasKey('online', $stats);
+        $this->assertNotNull($captured_args);
+        $this->assertSame('H', $captured_args['format']);
+    }
 }

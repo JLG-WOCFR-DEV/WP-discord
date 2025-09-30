@@ -272,6 +272,68 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
         $this->assertStringNotContainsString('notice-warning', $second_output);
     }
 
+    public function test_test_discord_connection_uses_date_i18n_when_wp_date_unavailable() {
+        $options = $this->saved_options;
+        $options['demo_mode'] = 0;
+        update_option(DISCORD_BOT_JLG_OPTION_NAME, $options);
+
+        update_option('date_format', 'd/m/Y');
+        update_option('time_format', 'H:i');
+
+        $fallback_timestamp = 1700000000;
+        $next_retry         = 1700000600;
+        $fallback_reason    = 'Test fallback';
+
+        update_option(
+            Discord_Bot_JLG_API::LAST_FALLBACK_OPTION,
+            array(
+                'timestamp'  => $fallback_timestamp,
+                'reason'     => $fallback_reason,
+                'next_retry' => $next_retry,
+            )
+        );
+
+        $GLOBALS['discord_bot_jlg_disable_wp_date'] = true;
+
+        $captured_calls = array();
+        $callback       = function($formatted, $format, $timestamp, $gmt) use (&$captured_calls) {
+            $captured_calls[] = array(
+                'formatted' => $formatted,
+                'format'    => $format,
+                'timestamp' => $timestamp,
+                'gmt'       => $gmt,
+            );
+
+            return $formatted;
+        };
+
+        add_filter('date_i18n', $callback, 10, 4);
+
+        ob_start();
+        try {
+            $this->admin->test_discord_connection();
+        } finally {
+            $output = ob_get_clean();
+            remove_filter('date_i18n', $callback, 10);
+            unset($GLOBALS['discord_bot_jlg_disable_wp_date']);
+        }
+
+        $this->assertStringContainsString($fallback_reason, $output);
+
+        $expected_formatted_time = gmdate('d/m/Y H:i', $fallback_timestamp);
+        $expected_retry_time     = gmdate('d/m/Y H:i', $next_retry);
+
+        $this->assertStringContainsString($expected_formatted_time, $output);
+        $this->assertStringContainsString($expected_retry_time, $output);
+
+        $this->assertNotEmpty($captured_calls);
+        $last_call = end($captured_calls);
+        $this->assertSame('d/m/Y H:i', $last_call['format']);
+        $this->assertSame($next_retry, $last_call['timestamp']);
+
+        delete_option(Discord_Bot_JLG_API::LAST_FALLBACK_OPTION);
+    }
+
     private function get_expected_defaults(): array {
         return array(
             'server_id'      => '',
