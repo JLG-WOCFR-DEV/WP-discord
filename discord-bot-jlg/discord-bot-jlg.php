@@ -90,7 +90,7 @@ if (!function_exists('discord_bot_jlg_get_default_options')) {
             'show_online'    => true,
             'show_total'     => true,
             'custom_css'     => '',
-            'widget_title'   => __('Discord Server', 'discord-bot-jlg'),
+            'widget_title'   => 'Discord Server',
             'cache_duration' => DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION,
         );
     }
@@ -268,7 +268,13 @@ class DiscordServerStats {
      * @return array
      */
     public function provide_default_options($default = array()) {
-        return $this->default_options;
+        $options = $this->default_options;
+
+        if (empty($options['widget_title']) || 'Discord Server' === $options['widget_title']) {
+            $options['widget_title'] = __('Discord Server', 'discord-bot-jlg');
+        }
+
+        return $options;
     }
 
     /**
@@ -283,7 +289,13 @@ class DiscordServerStats {
             $value = array();
         }
 
-        return wp_parse_args($value, $this->default_options);
+        $options = wp_parse_args($value, $this->default_options);
+
+        if (empty($options['widget_title']) || 'Discord Server' === $options['widget_title']) {
+            $options['widget_title'] = __('Discord Server', 'discord-bot-jlg');
+        }
+
+        return $options;
     }
 
     public function handle_settings_update($old_value, $value) {
