@@ -129,6 +129,7 @@ function discord_bot_jlg_uninstall() {
 
 register_uninstall_hook(__FILE__, 'discord_bot_jlg_uninstall');
 
+require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/helpers.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-http.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-api.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-admin.php';
