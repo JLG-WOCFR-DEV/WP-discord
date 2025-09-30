@@ -440,14 +440,22 @@ function __($text, $domain = null) {
 }
 
 if (!function_exists('wp_validate_boolean')) {
-    $api = new Discord_Bot_JLG_API('discord_bot_jlg_test_option', 'discord_bot_jlg_test_cache');
+    try {
+        $api = new Discord_Bot_JLG_API('discord_bot_jlg_test_option', 'discord_bot_jlg_test_cache');
 
-    $stats = $api->get_stats(
-        array(
-            'force_demo'   => 'true',
-            'bypass_cache' => 'false',
-        )
-    );
+        $stats = $api->get_stats(
+            array(
+                'force_demo'   => 'true',
+                'bypass_cache' => 'false',
+            )
+        );
+    } catch (Throwable $throwable) {
+        throw new RuntimeException(
+            'Discord Bot JLG API should load without wp_validate_boolean.',
+            0,
+            $throwable
+        );
+    }
 
     if (!is_array($stats)) {
         throw new RuntimeException('Discord Bot JLG API should load without wp_validate_boolean.');
