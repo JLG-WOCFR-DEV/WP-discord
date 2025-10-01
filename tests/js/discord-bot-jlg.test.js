@@ -209,6 +209,57 @@ describe('discord-bot-jlg integration', () => {
         expect(setTimeoutCalls[setTimeoutCalls.length - 1][1]).toBe(15000);
     });
 
+    test('stats update does not animate when container is not marked animated', async () => {
+        const container = createContainer();
+        container.className = 'discord-stats-container';
+
+        window.discordBotJlg = {
+            ajaxUrl: 'https://example.com/wp-admin/admin-ajax.php',
+            nonce: 'nonce',
+            requiresNonce: true,
+            locale: 'en-US',
+            minRefreshInterval: '5',
+            staleNotice: 'Cached data from %s',
+            demoBadgeLabel: 'Demo Mode'
+        };
+
+        global.fetch.mockResolvedValue({
+            ok: true,
+            json: () => Promise.resolve({
+                success: true,
+                data: {
+                    online: 10,
+                    total: 20,
+                    has_total: true,
+                    total_is_approximate: false,
+                    stale: false,
+                    is_demo: false,
+                    fallback_demo: false,
+                    server_name: 'Test Server',
+                    last_updated: 1700000000
+                }
+            })
+        });
+
+        loadScript();
+
+        runTimerByDelay(15000);
+        await flushPromises();
+
+        const onlineNumber = container.querySelector('.discord-online .discord-number');
+        const totalNumber = container.querySelector('.discord-total .discord-number');
+
+        expect(onlineNumber.textContent).toBe('10');
+        expect(totalNumber.textContent).toBe('20');
+        expect(onlineNumber.style.transform).toBe('');
+        expect(onlineNumber.getAttribute('style')).toBeNull();
+        expect(totalNumber.style.transform).toBe('');
+        expect(totalNumber.getAttribute('style')).toBeNull();
+
+        const hasAnimationTimer = setTimeoutSpy.mock.calls.some((call) => call[1] === 300);
+        expect(hasAnimationTimer).toBe(false);
+    });
+
     test('rate limited response surfaces error and delays next refresh based on retry_after', async () => {
         const container = createContainer();
 

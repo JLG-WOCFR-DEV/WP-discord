@@ -323,6 +323,63 @@
 
         element.textContent = safeFormatter.format(value);
 
+        function isAnimationEnabled(target) {
+            if (!target) {
+                return false;
+            }
+
+            var hasAnimatedClass = false;
+
+            if (target.classList && typeof target.classList.contains === 'function') {
+                hasAnimatedClass = target.classList.contains('discord-animated');
+            } else if (typeof target.className === 'string' && target.className) {
+                hasAnimatedClass = (' ' + target.className + ' ').indexOf(' discord-animated ') !== -1;
+            }
+
+            if (hasAnimatedClass) {
+                return true;
+            }
+
+            var dataValue = null;
+
+            if (target.dataset && Object.prototype.hasOwnProperty.call(target.dataset, 'animated')) {
+                dataValue = target.dataset.animated;
+            } else if (typeof target.getAttribute === 'function') {
+                dataValue = target.getAttribute('data-animated');
+            }
+
+            if (dataValue === null || typeof dataValue === 'undefined') {
+                return false;
+            }
+
+            if (dataValue === '' || dataValue === true || dataValue === 'true' || dataValue === '1') {
+                return true;
+            }
+
+            if (typeof dataValue === 'string') {
+                var normalized = dataValue.toLowerCase();
+                return normalized !== 'false' && normalized !== '0' && normalized !== 'off' && normalized !== 'no';
+            }
+
+            return !!dataValue;
+        }
+
+        function resetTransform() {
+            if (!element || !element.style) {
+                return;
+            }
+
+            if (typeof element.style.removeProperty === 'function') {
+                element.style.removeProperty('transform');
+            } else {
+                element.style.transform = '';
+            }
+
+            if (typeof element.getAttribute === 'function' && element.getAttribute('style') === '') {
+                element.removeAttribute('style');
+            }
+        }
+
         var prefersReducedMotion = false;
         if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
             try {
@@ -332,14 +389,14 @@
             }
         }
 
-        if (prefersReducedMotion) {
-            element.style.transform = 'scale(1)';
+        if (prefersReducedMotion || !isAnimationEnabled(container)) {
+            resetTransform();
             return;
         }
 
         element.style.transform = 'scale(1.2)';
         setTimeout(function () {
-            element.style.transform = 'scale(1)';
+            resetTransform();
         }, 300);
     }
 
