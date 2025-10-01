@@ -14,6 +14,8 @@
     var TextControl = components.TextControl;
     var SelectControl = components.SelectControl;
     var RangeControl = components.RangeControl;
+    var NumberControl = components.NumberControl || components.__experimentalNumberControl;
+    var RefreshIntervalControl = NumberControl || RangeControl || TextControl;
     var ServerSideRender = serverSideRender;
 
     if (!registerBlockType || !InspectorControls) {
@@ -75,6 +77,21 @@
         show_server_name: false
     };
 
+    var REFRESH_INTERVAL_MIN = 10;
+    var REFRESH_INTERVAL_MAX = 3600;
+    var REFRESH_INTERVAL_FALLBACK = 60;
+
+    function normalizeRefreshInterval(value) {
+        var parsed = parseInt(value, 10);
+        var normalized = Math.max(REFRESH_INTERVAL_MIN, parsed || REFRESH_INTERVAL_FALLBACK);
+
+        if (typeof REFRESH_INTERVAL_MAX === 'number') {
+            normalized = Math.min(REFRESH_INTERVAL_MAX, normalized);
+        }
+
+        return normalized;
+    }
+
     function attributesToShortcode(attributes) {
         var pairs = [];
 
@@ -93,9 +110,7 @@
             var normalized = typeof value === 'boolean' ? (value ? 'true' : 'false') : String(value);
 
             if (key === 'refresh_interval') {
-                var parsedInterval = parseInt(normalized, 10);
-                var sanitizedInterval = Math.max(10, isNaN(parsedInterval) ? 60 : parsedInterval);
-                normalized = String(sanitizedInterval);
+                normalized = String(normalizeRefreshInterval(normalized));
             }
 
             if (normalized === '') {
@@ -114,9 +129,7 @@
             var newValue = value;
 
             if (name === 'refresh_interval') {
-                var parsed = parseInt(value, 10);
-                var safeValue = Math.max(10, isNaN(parsed) ? 60 : parsed);
-                newValue = String(safeValue);
+                newValue = String(normalizeRefreshInterval(value));
             } else if (typeof defaultAttributes[name] === 'boolean') {
                 newValue = !!value;
             }
@@ -290,12 +303,12 @@
                             checked: !!attributes.refresh,
                             onChange: updateAttribute(setAttributes, 'refresh')
                         }),
-                        !!attributes.refresh && createElement(RangeControl, {
+                        !!attributes.refresh && createElement(RefreshIntervalControl, {
                             label: __('Intervalle de rafraîchissement (secondes)', 'discord-bot-jlg'),
-                            value: parseInt(attributes.refresh_interval, 10) || 60,
+                            value: normalizeRefreshInterval(attributes.refresh_interval),
                             onChange: updateAttribute(setAttributes, 'refresh_interval'),
-                            min: 10,
-                            max: 3600,
+                            min: REFRESH_INTERVAL_MIN,
+                            max: REFRESH_INTERVAL_MAX,
                             step: 5,
                             help: __('Minimum 10 secondes afin d’éviter les limitations de Discord.', 'discord-bot-jlg')
                         }),

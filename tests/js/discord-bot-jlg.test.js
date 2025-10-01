@@ -839,7 +839,8 @@ describe('discord-bot-jlg block editor', () => {
                 ToggleControl: function ToggleControl() { return null; },
                 TextControl: function TextControl() { return null; },
                 SelectControl: function SelectControl() { return null; },
-                RangeControl: function RangeControl() { return null; }
+                RangeControl: function RangeControl() { return null; },
+                NumberControl: function NumberControl() { return null; }
             },
             blockEditor: {
                 InspectorControls: function InspectorControls() { return null; },
@@ -870,7 +871,7 @@ describe('discord-bot-jlg block editor', () => {
         const shortcode = settings.save({
             attributes: {
                 refresh: true,
-                refresh_interval: '5'
+                refresh_interval: 5
             }
         });
 
