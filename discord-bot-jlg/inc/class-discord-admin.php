@@ -274,7 +274,7 @@ class Discord_Bot_JLG_Admin {
         }
 
         if (isset($input['custom_css'])) {
-            $sanitized['custom_css'] = sanitize_textarea_field($input['custom_css']);
+            $sanitized['custom_css'] = discord_bot_jlg_sanitize_custom_css($input['custom_css']);
         }
 
         return $sanitized;

@@ -237,3 +237,40 @@ if (!function_exists('discord_bot_jlg_decrypt_secret')) {
         return $plaintext;
     }
 }
+
+if (!function_exists('discord_bot_jlg_sanitize_custom_css')) {
+    /**
+     * Sanitizes custom CSS by removing any HTML/JS tags while preserving CSS syntax.
+     *
+     * @param string $css Raw CSS provided by the user.
+     *
+     * @return string Sanitized CSS string safe to store.
+     */
+    function discord_bot_jlg_sanitize_custom_css($css) {
+        if (!is_string($css)) {
+            if (is_scalar($css)) {
+                $css = (string) $css;
+            } else {
+                return '';
+            }
+        }
+
+        if ('' === $css) {
+            return '';
+        }
+
+        $css = str_replace("\0", '', $css);
+
+        $css = preg_replace('#<\s*(script|style)[^>]*>.*?<\s*/\s*(?:script|style)\s*>#is', '', $css);
+        $css = preg_replace('#<!--.*?-->#s', '', $css);
+        $css = preg_replace('#<\?(?:php|=)?[\s\S]*?\?>#i', '', $css);
+
+        $css = strip_tags($css);
+
+        $css = preg_replace('#</[^>]*>#i', '', $css);
+
+        $css = str_ireplace(array('<script', '</script', '<style', '</style'), '', $css);
+
+        return trim($css);
+    }
+}
