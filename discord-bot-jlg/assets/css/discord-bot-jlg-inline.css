@@ -3,6 +3,8 @@
     --discord-gap: 20px;
     --discord-padding: 15px;
     --discord-radius: 8px;
+    max-width: 100%;
+    box-sizing: border-box;
 }
 
 .discord-stats-container .discord-stats-wrapper {

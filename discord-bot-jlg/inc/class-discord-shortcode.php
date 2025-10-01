@@ -178,7 +178,7 @@ class Discord_Bot_JLG_Shortcode {
             $validated_width = $this->validate_width_value($atts['width']);
 
             if ('' !== $validated_width) {
-                $style_declarations[] = 'width: ' . $validated_width;
+                $style_declarations[] = 'max-width: ' . $validated_width;
             }
         }
 
