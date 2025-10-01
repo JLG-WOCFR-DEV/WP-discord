@@ -587,13 +587,23 @@ describe('discord-bot-jlg integration', () => {
         loadScript();
 
         runTimerByDelay(15000);
+        expect(container.dataset.refreshing).toBe('true');
+        expect(container.querySelector('.discord-refresh-status')).not.toBeNull();
         await flushPromises();
+
+        expect(container.dataset.refreshing).toBe('false');
+        expect(container.querySelector('.discord-refresh-status')).toBeNull();
 
         const errorMessage = container.querySelector('.discord-error-message');
         expect(errorMessage).not.toBeNull();
 
         runTimerByDelay(15000);
+        expect(container.dataset.refreshing).toBe('true');
+        expect(container.querySelector('.discord-refresh-status')).not.toBeNull();
         await flushPromises();
+
+        expect(container.dataset.refreshing).toBe('false');
+        expect(container.querySelector('.discord-refresh-status')).toBeNull();
 
         const onlineNumber = container.querySelector('.discord-online .discord-number');
         const totalNumber = container.querySelector('.discord-total .discord-number');

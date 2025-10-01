@@ -592,6 +592,17 @@
     }
 
     function updateStats(container, config, formatter, locale) {
+        var managesRefreshIndicator = false;
+
+        if (container) {
+            var isAlreadyRefreshing = container.dataset && container.dataset.refreshing === 'true';
+
+            if (!isAlreadyRefreshing) {
+                showRefreshIndicator(container);
+                managesRefreshIndicator = true;
+            }
+        }
+
         var resultInfo = {
             success: false,
             rateLimited: false,
@@ -605,7 +616,7 @@
             formData.append('_ajax_nonce', config.nonce);
         }
 
-        return fetch(config.ajaxUrl, {
+        var requestPromise = fetch(config.ajaxUrl, {
             method: 'POST',
             body: formData,
             credentials: 'same-origin'
@@ -955,6 +966,21 @@
                 showErrorMessage(container, message);
                 return resultInfo;
             });
+
+        if (managesRefreshIndicator) {
+            requestPromise = requestPromise.then(
+                function (value) {
+                    hideRefreshIndicator(container);
+                    return value;
+                },
+                function (error) {
+                    hideRefreshIndicator(container);
+                    throw error;
+                }
+            );
+        }
+
+        return requestPromise;
     }
 
     function initializeDiscordBot() {
