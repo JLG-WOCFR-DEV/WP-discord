@@ -188,6 +188,7 @@ class Discord_Bot_JLG_Shortcode {
             sprintf('data-demo="%s"', esc_attr($is_forced_demo ? 'true' : 'false')),
             sprintf('data-fallback-demo="%s"', esc_attr($is_fallback_demo ? 'true' : 'false')),
             sprintf('data-stale="%s"', esc_attr($is_stale ? 'true' : 'false')),
+            sprintf('data-hide-labels="%s"', esc_attr($hide_labels ? 'true' : 'false')),
         );
 
         if ($is_stale && $last_updated > 0) {
@@ -289,14 +290,23 @@ class Discord_Bot_JLG_Shortcode {
                     </div>
                     <?php endif; ?>
                     <?php if ($show_online) : ?>
-                    <div class="discord-stat discord-online" data-value="<?php echo esc_attr((int) $stats['online']); ?>">
+                    <?php
+                    $online_label_classes = array('discord-label');
+                    if ($hide_labels) {
+                        $online_label_classes[] = 'screen-reader-text';
+                    }
+                    ?>
+                    <div class="discord-stat discord-online"
+                        data-value="<?php echo esc_attr((int) $stats['online']); ?>"
+                        data-label-online="<?php echo esc_attr($atts['label_online']); ?>"
+                        data-hide-labels="<?php echo esc_attr($hide_labels ? 'true' : 'false'); ?>">
                         <?php if (!$hide_icons): ?>
                         <span class="discord-icon"><?php echo esc_html($atts['icon_online']); ?></span>
                         <?php endif; ?>
                         <span class="discord-number" role="status" aria-live="polite"><?php echo esc_html(number_format_i18n((int) $stats['online'])); ?></span>
-                        <?php if (!$hide_labels): ?>
-                        <span class="discord-label"><?php echo esc_html($atts['label_online']); ?></span>
-                        <?php endif; ?>
+                        <span class="<?php echo esc_attr(implode(' ', $online_label_classes)); ?>">
+                            <span class="discord-label-text"><?php echo esc_html($atts['label_online']); ?></span>
+                        </span>
                     </div>
                     <?php endif; ?>
 
