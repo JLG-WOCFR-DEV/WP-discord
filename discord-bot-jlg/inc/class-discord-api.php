@@ -193,7 +193,21 @@ class Discord_Bot_JLG_API {
                             : (isset($bot_stats['server_name']) ? $bot_stats['server_name'] : ''),
                         'has_total'            => $has_total,
                         'total_is_approximate' => $total_approximate,
+                        'server_avatar_url'    => '',
+                        'server_avatar_base_url' => '',
                     );
+
+                    if (!empty($widget_stats['server_avatar_url'])) {
+                        $stats['server_avatar_url'] = $widget_stats['server_avatar_url'];
+                    } elseif (!empty($bot_stats['server_avatar_url'])) {
+                        $stats['server_avatar_url'] = $bot_stats['server_avatar_url'];
+                    }
+
+                    if (!empty($widget_stats['server_avatar_base_url'])) {
+                        $stats['server_avatar_base_url'] = $widget_stats['server_avatar_base_url'];
+                    } elseif (!empty($bot_stats['server_avatar_base_url'])) {
+                        $stats['server_avatar_base_url'] = $bot_stats['server_avatar_base_url'];
+                    }
                 } elseif (false === $stats) {
                     $stats = $bot_stats;
                 }
@@ -1106,6 +1120,9 @@ class Discord_Bot_JLG_API {
         $hour      = (int) discord_bot_jlg_format_datetime('H', $timestamp);
         $variation = sin($hour * 0.26) * 10;
 
+        $demo_avatar_base = 'https://cdn.discordapp.com/embed/avatars/0.png';
+        $demo_avatar_url  = add_query_arg('size', 256, $demo_avatar_base);
+
         return array(
             'online'               => (int) round($base_online + $variation),
             'total'                => (int) $base_total,
@@ -1114,6 +1131,8 @@ class Discord_Bot_JLG_API {
             'fallback_demo'        => (bool) $is_fallback,
             'has_total'            => true,
             'total_is_approximate' => false,
+            'server_avatar_url'    => $demo_avatar_url,
+            'server_avatar_base_url' => $demo_avatar_base,
         );
     }
 
@@ -1575,6 +1594,43 @@ class Discord_Bot_JLG_API {
             return false;
         }
 
+        $server_avatar_base_url = '';
+        $server_avatar_url      = '';
+
+        $icon_hash = isset($data['icon']) ? trim((string) $data['icon']) : '';
+        $discovery_splash_hash = isset($data['discovery_splash']) ? trim((string) $data['discovery_splash']) : '';
+
+        if ('' !== $icon_hash) {
+            $extension = $this->is_animated_hash($icon_hash) ? 'gif' : 'png';
+            $server_avatar_base_url = $this->build_guild_asset_url(
+                'icons',
+                $options['server_id'],
+                $icon_hash,
+                $extension
+            );
+            $server_avatar_url = $this->build_guild_asset_url(
+                'icons',
+                $options['server_id'],
+                $icon_hash,
+                $extension,
+                256
+            );
+        } elseif ('' !== $discovery_splash_hash) {
+            $server_avatar_base_url = $this->build_guild_asset_url(
+                'discovery-splashes',
+                $options['server_id'],
+                $discovery_splash_hash,
+                'jpg'
+            );
+            $server_avatar_url = $this->build_guild_asset_url(
+                'discovery-splashes',
+                $options['server_id'],
+                $discovery_splash_hash,
+                'jpg',
+                256
+            );
+        }
+
         return array(
             'online'               => (int) $data['approximate_presence_count'],
             'total'                => (int) $data['approximate_member_count'],
@@ -1582,7 +1638,57 @@ class Discord_Bot_JLG_API {
             'has_total'            => true,
             // Discord renvoie uniquement un total approximatif via approximate_member_count.
             'total_is_approximate' => true,
+            'server_avatar_url'    => $server_avatar_url,
+            'server_avatar_base_url' => $server_avatar_base_url,
         );
+    }
+
+    private function build_guild_asset_url($type, $guild_id, $hash, $extension, $size = null) {
+        if ('' === trim((string) $guild_id) || '' === trim((string) $hash)) {
+            return '';
+        }
+
+        $base = sprintf(
+            'https://cdn.discordapp.com/%1$s/%2$s/%3$s.%4$s',
+            trim($type, '/'),
+            rawurlencode((string) $guild_id),
+            rawurlencode((string) $hash),
+            $extension
+        );
+
+        if (null === $size) {
+            return $base;
+        }
+
+        $normalized_size = $this->normalize_discord_image_size($size);
+
+        return add_query_arg('size', $normalized_size, $base);
+    }
+
+    private function normalize_discord_image_size($size, $default = 128) {
+        $allowed_sizes = array(16, 32, 64, 128, 256, 512, 1024, 2048, 4096);
+        $size = (int) $size;
+        $fallback = in_array((int) $default, $allowed_sizes, true) ? (int) $default : 128;
+
+        if ($size <= 0) {
+            return $fallback;
+        }
+
+        if (in_array($size, $allowed_sizes, true)) {
+            return $size;
+        }
+
+        foreach ($allowed_sizes as $allowed) {
+            if ($size <= $allowed) {
+                return $allowed;
+            }
+        }
+
+        return $allowed_sizes[count($allowed_sizes) - 1];
+    }
+
+    private function is_animated_hash($hash) {
+        return (0 === strpos($hash, 'a_'));
     }
 
     private function get_response_error_detail($response) {
@@ -1756,6 +1862,14 @@ class Discord_Bot_JLG_API {
 
         if (!isset($stats['total_is_approximate'])) {
             $stats['total_is_approximate'] = false;
+        }
+
+        if (!isset($stats['server_avatar_url'])) {
+            $stats['server_avatar_url'] = '';
+        }
+
+        if (!isset($stats['server_avatar_base_url'])) {
+            $stats['server_avatar_base_url'] = '';
         }
 
         return $stats;

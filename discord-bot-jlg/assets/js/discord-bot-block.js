@@ -74,7 +74,9 @@
         demo: false,
         show_discord_icon: false,
         discord_icon_position: 'left',
-        show_server_name: false
+        show_server_name: false,
+        show_server_avatar: false,
+        avatar_size: 128
     };
 
     var REFRESH_INTERVAL_MIN = 10;
@@ -90,6 +92,23 @@
         }
 
         return normalized;
+    }
+
+    function normalizeAvatarSize(value) {
+        var allowedSizes = [16, 32, 64, 128, 256, 512, 1024, 2048, 4096];
+        var parsed = parseInt(value, 10);
+
+        if (isNaN(parsed) || parsed <= 0) {
+            parsed = 128;
+        }
+
+        for (var i = 0; i < allowedSizes.length; i++) {
+            if (parsed <= allowedSizes[i]) {
+                return allowedSizes[i];
+            }
+        }
+
+        return allowedSizes[allowedSizes.length - 1];
     }
 
     function attributesToShortcode(attributes) {
@@ -130,6 +149,8 @@
 
             if (name === 'refresh_interval') {
                 newValue = String(normalizeRefreshInterval(value));
+            } else if (name === 'avatar_size') {
+                newValue = normalizeAvatarSize(value);
             } else if (typeof defaultAttributes[name] === 'boolean') {
                 newValue = !!value;
             }
@@ -293,6 +314,22 @@
                             label: __('Afficher le nom du serveur', 'discord-bot-jlg'),
                             checked: !!attributes.show_server_name,
                             onChange: updateAttribute(setAttributes, 'show_server_name')
+                        }),
+                        createElement(ToggleControl, {
+                            label: __('Afficher l\'avatar du serveur', 'discord-bot-jlg'),
+                            checked: !!attributes.show_server_avatar,
+                            onChange: updateAttribute(setAttributes, 'show_server_avatar')
+                        }),
+                        !!attributes.show_server_avatar && createElement(NumberControl, {
+                            label: __('Taille de l\'avatar (px)', 'discord-bot-jlg'),
+                            value: attributes.avatar_size,
+                            min: 16,
+                            max: 4096,
+                            step: 16,
+                            onChange: function (value) {
+                                updateAttribute(setAttributes, 'avatar_size')(value);
+                            },
+                            help: __('Utilisez une puissance de deux (ex. 128, 256, 512) pour une image nette.', 'discord-bot-jlg')
                         })
                     ),
                     createElement(

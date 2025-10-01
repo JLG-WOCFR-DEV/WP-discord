@@ -67,6 +67,8 @@ class Discord_Bot_JLG_Shortcode {
                 'show_discord_icon'    => false,
                 'discord_icon_position'=> 'left',
                 'show_server_name'     => false,
+                'show_server_avatar'   => false,
+                'avatar_size'          => '128',
             ),
             $atts,
             'discord_stats'
@@ -83,6 +85,8 @@ class Discord_Bot_JLG_Shortcode {
         $force_demo         = filter_var($atts['demo'], FILTER_VALIDATE_BOOLEAN);
         $show_discord_icon  = filter_var($atts['show_discord_icon'], FILTER_VALIDATE_BOOLEAN);
         $show_server_name   = filter_var($atts['show_server_name'], FILTER_VALIDATE_BOOLEAN);
+        $show_server_avatar = filter_var($atts['show_server_avatar'], FILTER_VALIDATE_BOOLEAN);
+        $avatar_size        = $this->sanitize_avatar_size($atts['avatar_size']);
 
         if ($force_demo) {
             $stats = $this->api->get_demo_stats();
@@ -112,6 +116,13 @@ class Discord_Bot_JLG_Shortcode {
         $is_stale             = !empty($stats['stale']);
         $last_updated         = isset($stats['last_updated']) ? (int) $stats['last_updated'] : 0;
         $server_name          = isset($stats['server_name']) ? trim((string) $stats['server_name']) : '';
+        $server_avatar_base   = isset($stats['server_avatar_base_url']) ? esc_url_raw($stats['server_avatar_base_url']) : '';
+        $server_avatar_raw    = isset($stats['server_avatar_url']) ? esc_url_raw($stats['server_avatar_url']) : '';
+        $server_avatar_url    = '';
+
+        if ($show_server_avatar) {
+            $server_avatar_url = $this->prepare_avatar_url($server_avatar_base, $server_avatar_raw, $avatar_size);
+        }
 
         $container_classes = array('discord-stats-container');
 
@@ -168,6 +179,14 @@ class Discord_Bot_JLG_Shortcode {
             }
         }
 
+        if ($show_server_avatar) {
+            $container_classes[] = 'discord-avatar-enabled';
+
+            if ('' !== $server_avatar_url) {
+                $container_classes[] = 'discord-has-server-avatar';
+            }
+        }
+
         $style_declarations = array(
             '--discord-gap: ' . intval($atts['gap']) . 'px',
             '--discord-padding: ' . intval($atts['padding']) . 'px',
@@ -213,6 +232,19 @@ class Discord_Bot_JLG_Shortcode {
 
             if ('' !== $server_name) {
                 $attributes[] = sprintf('data-server-name="%s"', esc_attr($server_name));
+            }
+        }
+
+        if ($show_server_avatar) {
+            $attributes[] = 'data-show-server-avatar="true"';
+            $attributes[] = sprintf('data-avatar-size="%s"', esc_attr($avatar_size));
+
+            if ('' !== $server_avatar_url) {
+                $attributes[] = sprintf('data-server-avatar-url="%s"', esc_url($server_avatar_url));
+            }
+
+            if ('' !== $server_avatar_base) {
+                $attributes[] = sprintf('data-server-avatar-base-url="%s"', esc_url($server_avatar_base));
             }
         }
 
@@ -293,9 +325,29 @@ class Discord_Bot_JLG_Shortcode {
                 <?php endif; ?>
 
                 <div class="discord-stats-wrapper">
-                    <?php if ($show_server_name && '' !== $server_name) : ?>
-                    <div class="discord-server-name" data-role="discord-server-name">
-                        <span class="discord-server-name__text"><?php echo esc_html($server_name); ?></span>
+                    <?php if (($show_server_avatar && '' !== $server_avatar_url) || ($show_server_name && '' !== $server_name)) : ?>
+                    <div class="discord-server-header" data-role="discord-server-header">
+                        <?php if ($show_server_avatar && '' !== $server_avatar_url) :
+                            $avatar_alt = ('' !== $server_name)
+                                ? sprintf(__('Avatar du serveur Discord %s', 'discord-bot-jlg'), $server_name)
+                                : __('Avatar du serveur Discord', 'discord-bot-jlg');
+                        ?>
+                        <div class="discord-server-avatar" data-role="discord-server-avatar">
+                            <img class="discord-server-avatar__image"
+                                src="<?php echo esc_url($server_avatar_url); ?>"
+                                alt="<?php echo esc_attr($avatar_alt); ?>"
+                                loading="lazy"
+                                decoding="async"
+                                width="<?php echo esc_attr($avatar_size); ?>"
+                                height="<?php echo esc_attr($avatar_size); ?>"
+                            />
+                        </div>
+                        <?php endif; ?>
+                        <?php if ($show_server_name && '' !== $server_name) : ?>
+                        <div class="discord-server-name" data-role="discord-server-name">
+                            <span class="discord-server-name__text"><?php echo esc_html($server_name); ?></span>
+                        </div>
+                        <?php endif; ?>
                     </div>
                     <?php endif; ?>
                     <?php if ($show_online) : ?>
@@ -367,6 +419,45 @@ class Discord_Bot_JLG_Shortcode {
 
         <?php
         return ob_get_clean();
+    }
+
+    private function sanitize_avatar_size($size) {
+        $allowed_sizes = array(16, 32, 64, 128, 256, 512, 1024, 2048, 4096);
+        $size = (int) $size;
+
+        if ($size <= 0) {
+            $size = 128;
+        }
+
+        if (in_array($size, $allowed_sizes, true)) {
+            return $size;
+        }
+
+        foreach ($allowed_sizes as $allowed) {
+            if ($size <= $allowed) {
+                return $allowed;
+            }
+        }
+
+        return $allowed_sizes[count($allowed_sizes) - 1];
+    }
+
+    private function prepare_avatar_url($base_url, $fallback_url, $size) {
+        $base = '';
+
+        if ('' !== $base_url) {
+            $base = $base_url;
+        } elseif ('' !== $fallback_url) {
+            $base = $fallback_url;
+        }
+
+        if ('' === $base) {
+            return '';
+        }
+
+        $base = remove_query_arg('size', $base);
+
+        return add_query_arg('size', $this->sanitize_avatar_size($size), $base);
     }
 
     private function validate_width_value($raw_width) {
@@ -499,6 +590,8 @@ class Discord_Bot_JLG_Shortcode {
                 'consoleErrorPrefix'   => __('Erreur lors de la mise à jour des statistiques Discord :', 'discord-bot-jlg'),
                 'staleNotice'          => __('Données mises en cache du %s', 'discord-bot-jlg'),
                 'rateLimited'          => __('Actualisation trop fréquente, veuillez patienter avant de réessayer.', 'discord-bot-jlg'),
+                'serverAvatarAltTemplate' => __('Avatar du serveur Discord %s', 'discord-bot-jlg'),
+                'serverAvatarAltFallback' => __('Avatar du serveur Discord', 'discord-bot-jlg'),
             )
         );
 
