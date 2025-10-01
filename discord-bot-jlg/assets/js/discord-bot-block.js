@@ -92,6 +92,12 @@
 
             var normalized = typeof value === 'boolean' ? (value ? 'true' : 'false') : String(value);
 
+            if (key === 'refresh_interval') {
+                var parsedInterval = parseInt(normalized, 10);
+                var sanitizedInterval = Math.max(10, isNaN(parsedInterval) ? 60 : parsedInterval);
+                normalized = String(sanitizedInterval);
+            }
+
             if (normalized === '') {
                 continue;
             }
@@ -107,7 +113,11 @@
         return function (value) {
             var newValue = value;
 
-            if (typeof defaultAttributes[name] === 'boolean') {
+            if (name === 'refresh_interval') {
+                var parsed = parseInt(value, 10);
+                var safeValue = Math.max(10, isNaN(parsed) ? 60 : parsed);
+                newValue = String(safeValue);
+            } else if (typeof defaultAttributes[name] === 'boolean') {
                 newValue = !!value;
             }
 
@@ -280,10 +290,14 @@
                             checked: !!attributes.refresh,
                             onChange: updateAttribute(setAttributes, 'refresh')
                         }),
-                        !!attributes.refresh && createElement(TextControl, {
+                        !!attributes.refresh && createElement(RangeControl, {
                             label: __('Intervalle de rafraîchissement (secondes)', 'discord-bot-jlg'),
-                            value: attributes.refresh_interval,
-                            onChange: updateAttribute(setAttributes, 'refresh_interval')
+                            value: parseInt(attributes.refresh_interval, 10) || 60,
+                            onChange: updateAttribute(setAttributes, 'refresh_interval'),
+                            min: 10,
+                            max: 3600,
+                            step: 5,
+                            help: __('Minimum 10 secondes afin d’éviter les limitations de Discord.', 'discord-bot-jlg')
                         }),
                         createElement(ToggleControl, {
                             label: __('Forcer le mode démo', 'discord-bot-jlg'),

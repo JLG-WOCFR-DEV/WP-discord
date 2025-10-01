@@ -759,3 +759,65 @@ describe('discord-bot-jlg integration', () => {
         expect(global.fetch.mock.calls.length).toBe(fetchCallsBefore + 1);
     });
 });
+
+describe('discord-bot-jlg block editor', () => {
+    let originalWp;
+
+    beforeEach(() => {
+        jest.resetModules();
+        originalWp = window.wp;
+        let registeredSettings = null;
+
+        window.wp = {
+            blocks: {
+                registerBlockType: jest.fn((name, settings) => {
+                    registeredSettings = settings;
+                })
+            },
+            element: {
+                createElement: () => ({}),
+                Fragment: 'fragment'
+            },
+            components: {
+                PanelBody: function PanelBody() { return null; },
+                ToggleControl: function ToggleControl() { return null; },
+                TextControl: function TextControl() { return null; },
+                SelectControl: function SelectControl() { return null; },
+                RangeControl: function RangeControl() { return null; }
+            },
+            blockEditor: {
+                InspectorControls: function InspectorControls() { return null; },
+                useBlockProps: () => ({})
+            },
+            i18n: {
+                __: (text) => text
+            }
+        };
+
+        Object.defineProperty(window.wp.blocks, 'lastRegisteredSettings', {
+            configurable: true,
+            get: () => registeredSettings
+        });
+    });
+
+    afterEach(() => {
+        window.wp = originalWp;
+        jest.resetModules();
+    });
+
+    test('serialises refresh_interval values below 10 as 10 seconds', () => {
+        require('../../discord-bot-jlg/assets/js/discord-bot-block.js');
+
+        const settings = window.wp.blocks.lastRegisteredSettings;
+        expect(settings).toBeTruthy();
+
+        const shortcode = settings.save({
+            attributes: {
+                refresh: true,
+                refresh_interval: '5'
+            }
+        });
+
+        expect(shortcode).toBe('[discord_stats refresh="true" refresh_interval="10"]');
+    });
+});
