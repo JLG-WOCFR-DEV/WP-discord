@@ -230,6 +230,24 @@ class Test_Discord_Bot_JLG_API extends TestCase {
         $this->assertFalse(get_option(Discord_Bot_JLG_API::LAST_FALLBACK_OPTION));
     }
 
+    public function test_clear_all_cached_data_removes_last_fallback_option() {
+        $option_name = 'discord_server_stats_options';
+        $cache_key   = 'discord_server_stats_cache';
+
+        update_option(
+            Discord_Bot_JLG_API::LAST_FALLBACK_OPTION,
+            array(
+                'timestamp' => time(),
+                'reason'    => 'Test reason',
+            )
+        );
+
+        $api = new Discord_Bot_JLG_API($option_name, $cache_key, 60);
+        $api->clear_all_cached_data();
+
+        $this->assertFalse(get_option(Discord_Bot_JLG_API::LAST_FALLBACK_OPTION));
+    }
+
     public function test_ajax_refresh_stats_returns_retry_after_with_uncached_fallback() {
         $option_name = 'discord_server_stats_options';
         $cache_key   = 'discord_server_stats_cache';

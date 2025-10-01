@@ -98,6 +98,6 @@ class Discord_Bot_JLG_CLI {
      */
     public function clear_cache($args, $assoc_args) {
         $this->api->clear_all_cached_data();
-        \WP_CLI::success(__('Tous les caches Discord Bot JLG ont été vidés.', 'discord-bot-jlg'));
+        \WP_CLI::success(__('Tous les caches Discord Bot JLG et les traces de secours ont été vidés.', 'discord-bot-jlg'));
     }
 }

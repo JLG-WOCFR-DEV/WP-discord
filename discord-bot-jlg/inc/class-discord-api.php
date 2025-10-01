@@ -634,6 +634,7 @@ class Discord_Bot_JLG_API {
         $this->clear_client_rate_limits();
         $this->reset_runtime_cache();
         $this->flush_options_cache();
+        $this->clear_last_fallback_details();
     }
 
     private function get_runtime_cache_key($args) {
