@@ -10,6 +10,7 @@
     --discord-logo-width: clamp(36px, 10vw, 52px);
     --discord-logo-height: clamp(26px, 7vw, 36px);
     --discord-badge-scale: 1;
+    --discord-avatar-size: clamp(52px, 14vw, 88px);
 }
 
 .screen-reader-text {
@@ -88,6 +89,47 @@
     align-items: center;
     gap: var(--discord-gap);
     flex-wrap: wrap;
+}
+
+.discord-stats-container .discord-server-header {
+    display: flex;
+    align-items: center;
+    gap: calc(var(--discord-gap) * 0.6);
+    flex: 0 0 100%;
+    margin-bottom: calc(var(--discord-gap) * 0.5);
+}
+
+.discord-stats-container.discord-align-center .discord-server-header {
+    justify-content: center;
+    text-align: center;
+}
+
+.discord-stats-container.discord-align-right .discord-server-header {
+    justify-content: flex-end;
+    text-align: right;
+}
+
+.discord-stats-container .discord-server-avatar {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 999px;
+    overflow: hidden;
+    background: rgba(255, 255, 255, 0.08);
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.12);
+}
+
+.discord-stats-container .discord-server-avatar__image {
+    display: block;
+    width: var(--discord-avatar-size);
+    height: auto;
+    max-width: 100%;
+}
+
+.discord-stats-container .discord-server-name {
+    flex: 1 1 auto;
+    min-width: 0;
 }
 
 .discord-stats-container .discord-logo-container {
@@ -335,16 +377,14 @@
     font-size: clamp(12px, 2.6vw, 16px);
     font-weight: 600;
     letter-spacing: 0.02em;
-    margin-bottom: 8px;
     display: flex;
     align-items: center;
     gap: 6px;
     line-height: 1.4;
     color: inherit;
-    flex: 0 0 auto;
-    flex-basis: 100%;
-    width: 100%;
-    order: -1;
+    flex: 1 1 auto;
+    min-width: 0;
+    margin: 0;
 }
 
 .discord-stats-container .discord-server-name__text {
@@ -369,6 +409,7 @@
     .discord-stats-container {
         --discord-gap: clamp(10px, 5vw, 16px);
         --discord-padding: clamp(10px, 4vw, 18px);
+        --discord-avatar-size: clamp(46px, 20vw, 72px);
     }
 
     .discord-stats-container .discord-stats-wrapper {
@@ -392,6 +433,7 @@
         --discord-logo-width: clamp(28px, 18vw, 36px);
         --discord-logo-height: clamp(20px, 12vw, 26px);
         --discord-badge-scale: 0.85;
+        --discord-avatar-size: clamp(42px, 24vw, 64px);
     }
 
     .discord-stats-container .discord-stats-main {

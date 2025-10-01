@@ -804,11 +804,11 @@ class Discord_Bot_JLG_Admin {
      * Affiche les prévisualisations du shortcode en mode démo.
      */
     private function render_demo_previews() {
-        $previews = array(
-            array(
-                'title' => __('Standard horizontal :', 'discord-bot-jlg'),
-                'shortcode' => '[discord_stats demo="true"]',
-            ),
+            $previews = array(
+                array(
+                    'title' => __('Standard horizontal :', 'discord-bot-jlg'),
+                    'shortcode' => '[discord_stats demo="true"]',
+                ),
             array(
                 'title' => __('Vertical pour sidebar :', 'discord-bot-jlg'),
                 'shortcode' => '[discord_stats demo="true" layout="vertical" theme="minimal"]',
@@ -830,11 +830,16 @@ class Discord_Bot_JLG_Admin {
                 'title' => __('Minimaliste (nombres uniquement) :', 'discord-bot-jlg'),
                 'shortcode' => '[discord_stats demo="true" hide_labels="true" hide_icons="true" theme="minimal"]',
             ),
-            array(
-                'title' => __('Nom du serveur mis en avant :', 'discord-bot-jlg'),
-                'shortcode' => '[discord_stats demo="true" show_server_name="true" show_discord_icon="true" align="center"]',
-            ),
-        );
+                array(
+                    'title' => __('Nom du serveur mis en avant :', 'discord-bot-jlg'),
+                    'shortcode' => '[discord_stats demo="true" show_server_name="true" show_discord_icon="true" align="center"]',
+                ),
+                array(
+                    'title' => __('Nom + avatar du serveur :', 'discord-bot-jlg'),
+                    'shortcode' => '[discord_stats demo="true" show_server_name="true" show_server_avatar="true" avatar_size="96" align="center" theme="discord"]',
+                    'inner_wrapper_style' => 'max-width: 360px;',
+                ),
+            );
         ?>
         <div style="background: #e3f2fd; padding: 20px; border-radius: 8px;">
             <h2><?php esc_html_e('🎨 Prévisualisation en direct', 'discord-bot-jlg'); ?></h2>
@@ -865,7 +870,7 @@ class Discord_Bot_JLG_Admin {
             <code style="background: white; padding: 10px; display: inline-block; border-radius: 4px;"><?php echo esc_html__('[discord_stats]', 'discord-bot-jlg'); ?></code>
 
             <h4><?php esc_html_e('Exemples avec paramètres :', 'discord-bot-jlg'); ?></h4>
-            <pre style="background: white; padding: 15px; border-radius: 4px; overflow-x: auto;"><?php echo esc_html__("// BASIQUES\n// Layout vertical pour sidebar\n[discord_stats layout=\"vertical\"]\n\n// Compact avec titre\n[discord_stats compact=\"true\" show_title=\"true\" title=\"Rejoignez-nous !\"]\n\n// Theme sombre centré\n[discord_stats theme=\"dark\" align=\"center\"]\n\n// AVEC LOGO DISCORD\n// Logo à gauche (classique)\n[discord_stats show_discord_icon=\"true\"]\n\n// Logo à droite avec thème sombre\n[discord_stats show_discord_icon=\"true\" discord_icon_position=\"right\" theme=\"dark\"]\n\n// Logo centré en haut (parfait pour widgets)\n[discord_stats show_discord_icon=\"true\" discord_icon_position=\"top\" align=\"center\"]\n\n// Nom du serveur + logo\n[discord_stats show_server_name=\"true\" show_discord_icon=\"true\" align=\"center\"]\n\n// PERSONNALISATION AVANCÉE\n// Bannière complète pour header\n[discord_stats show_discord_icon=\"true\" show_title=\"true\" title=\"🎮 Rejoignez notre Discord !\" width=\"100%\" align=\"center\" theme=\"discord\"]\n\n// Sidebar élégante avec logo\n[discord_stats layout=\"vertical\" show_discord_icon=\"true\" discord_icon_position=\"top\" theme=\"minimal\" compact=\"true\"]\n\n// Gaming style avec icônes custom\n[discord_stats show_discord_icon=\"true\" icon_online=\"🎮\" label_online=\"Joueurs actifs\" icon_total=\"⚔️\" label_total=\"Guerriers\" theme=\"dark\"]\n\n// Minimaliste avec logo seul\n[discord_stats hide_labels=\"true\" hide_icons=\"true\" show_discord_icon=\"true\" discord_icon_position=\"top\" align=\"center\" theme=\"minimal\"]\n\n// Footer discret\n[discord_stats compact=\"true\" show_discord_icon=\"true\" discord_icon_position=\"left\" theme=\"light\"]\n\n// FONCTIONNALITÉS SPÉCIALES\n// Auto-refresh toutes les 30 secondes (minimum 10 secondes)\n[discord_stats refresh=\"true\" refresh_interval=\"30\" show_discord_icon=\"true\"]\n\n// Afficher seulement les membres en ligne avec logo\n[discord_stats show_online=\"true\" show_total=\"false\" show_discord_icon=\"true\"]\n\n// MODE DÉMO (pour tester l'apparence)\n[discord_stats demo=\"true\" show_discord_icon=\"true\" theme=\"dark\" layout=\"vertical\"]", 'discord-bot-jlg'); ?></pre>
+            <pre style="background: white; padding: 15px; border-radius: 4px; overflow-x: auto;"><?php echo esc_html__("// BASIQUES\n// Layout vertical pour sidebar\n[discord_stats layout=\"vertical\"]\n\n// Compact avec titre\n[discord_stats compact=\"true\" show_title=\"true\" title=\"Rejoignez-nous !\"]\n\n// Theme sombre centré\n[discord_stats theme=\"dark\" align=\"center\"]\n\n// AVEC LOGO DISCORD\n// Logo à gauche (classique)\n[discord_stats show_discord_icon=\"true\"]\n\n// Logo à droite avec thème sombre\n[discord_stats show_discord_icon=\"true\" discord_icon_position=\"right\" theme=\"dark\"]\n\n// Logo centré en haut (parfait pour widgets)\n[discord_stats show_discord_icon=\"true\" discord_icon_position=\"top\" align=\"center\"]\n\n// Nom du serveur + logo\n[discord_stats show_server_name=\"true\" show_discord_icon=\"true\" align=\"center\"]\n\n// Nom + avatar du serveur\n[discord_stats show_server_name=\"true\" show_server_avatar=\"true\" avatar_size=\"128\" align=\"center\"]\n\n// PERSONNALISATION AVANCÉE\n// Bannière complète pour header\n[discord_stats show_discord_icon=\"true\" show_title=\"true\" title=\"🎮 Rejoignez notre Discord !\" width=\"100%\" align=\"center\" theme=\"discord\"]\n\n// Sidebar élégante avec logo\n[discord_stats layout=\"vertical\" show_discord_icon=\"true\" discord_icon_position=\"top\" theme=\"minimal\" compact=\"true\"]\n\n// Gaming style avec icônes custom\n[discord_stats show_discord_icon=\"true\" icon_online=\"🎮\" label_online=\"Joueurs actifs\" icon_total=\"⚔️\" label_total=\"Guerriers\" theme=\"dark\"]\n\n// Minimaliste avec logo seul\n[discord_stats hide_labels=\"true\" hide_icons=\"true\" show_discord_icon=\"true\" discord_icon_position=\"top\" align=\"center\" theme=\"minimal\"]\n\n// Footer discret\n[discord_stats compact=\"true\" show_discord_icon=\"true\" discord_icon_position=\"left\" theme=\"light\"]\n\n// FONCTIONNALITÉS SPÉCIALES\n// Auto-refresh toutes les 30 secondes (minimum 10 secondes)\n[discord_stats refresh=\"true\" refresh_interval=\"30\" show_discord_icon=\"true\"]\n\n// Afficher seulement les membres en ligne avec logo\n[discord_stats show_online=\"true\" show_total=\"false\" show_discord_icon=\"true\"]\n\n// MODE DÉMO (pour tester l'apparence)\n[discord_stats demo=\"true\" show_discord_icon=\"true\" theme=\"dark\" layout=\"vertical\"]", 'discord-bot-jlg'); ?></pre>
 
             <p style="margin-top: 10px;"><em><?php echo esc_html__('ℹ️ L\'auto-refresh nécessite un intervalle d\'au moins 10 secondes (10 000 ms). Toute valeur inférieure est automatiquement ajustée pour éviter les erreurs 429.', 'discord-bot-jlg'); ?></em></p>
             <p style="margin-top: 10px;"><em><?php echo esc_html__('🔐 Les rafraîchissements publics n\'utilisent plus de nonce WordPress. Un jeton reste exigé uniquement pour les requêtes effectuées par des utilisateurs connectés (administration).', 'discord-bot-jlg'); ?></em></p>
@@ -899,11 +904,13 @@ class Discord_Bot_JLG_Admin {
                     <li><?php echo wp_kses_post(__('<strong>show_total</strong> : true/false', 'discord-bot-jlg')); ?></li>
                     <li><?php echo wp_kses_post(__('<strong>show_title</strong> : true/false', 'discord-bot-jlg')); ?></li>
                     <li><?php echo wp_kses_post(__('<strong>show_server_name</strong> : true/false (afficher le nom du serveur si disponible)', 'discord-bot-jlg')); ?></li>
+                    <li><?php echo wp_kses_post(__('<strong>show_server_avatar</strong> : true/false (afficher l\'avatar du serveur lorsqu\'il est disponible)', 'discord-bot-jlg')); ?></li>
+                    <li><?php echo wp_kses_post(__('<strong>avatar_size</strong> : pixels (puissance de deux entre 16 et 4096 pour ajuster la résolution de l\'avatar)', 'discord-bot-jlg')); ?></li>
                     <li><?php echo wp_kses_post(__('<strong>title</strong> : texte du titre', 'discord-bot-jlg')); ?></li>
                     <li><?php echo wp_kses_post(__('<strong>hide_labels</strong> : true/false', 'discord-bot-jlg')); ?></li>
                     <li><?php echo wp_kses_post(__('<strong>hide_icons</strong> : true/false', 'discord-bot-jlg')); ?></li>
                 </ul>
-                <p><?php echo wp_kses_post(__('💡 Astuce : combinez <code>show_server_name="true"</code> avec vos propres classes CSS (ex. <code>.discord-server-name--muted</code>) pour harmoniser l\'entête avec votre charte graphique.', 'discord-bot-jlg')); ?></p>
+                <p><?php echo wp_kses_post(__('💡 Astuce : combinez <code>show_server_name="true"</code> et <code>show_server_avatar="true"</code> avec vos propres classes CSS (ex. <code>.discord-server-name--muted</code>) pour créer un en-tête harmonisé à votre charte graphique.', 'discord-bot-jlg')); ?></p>
 
                 <h5><?php esc_html_e('✏️ Personnalisation textes/icônes :', 'discord-bot-jlg'); ?></h5>
                 <ul style="columns: 2; column-gap: 30px;">

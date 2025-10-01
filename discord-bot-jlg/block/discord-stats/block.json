@@ -122,6 +122,14 @@
         "show_server_name": {
             "type": "boolean",
             "default": false
+        },
+        "show_server_avatar": {
+            "type": "boolean",
+            "default": false
+        },
+        "avatar_size": {
+            "type": "number",
+            "default": 128
         }
     }
 }

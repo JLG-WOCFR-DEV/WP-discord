@@ -9,6 +9,12 @@
     var SERVER_NAME_SELECTOR = '[data-role="discord-server-name"]';
     var SERVER_NAME_CLASS = 'discord-server-name';
     var SERVER_NAME_TEXT_CLASS = 'discord-server-name__text';
+    var SERVER_HEADER_SELECTOR = '[data-role="discord-server-header"]';
+    var SERVER_HEADER_CLASS = 'discord-server-header';
+    var SERVER_AVATAR_SELECTOR = '[data-role="discord-server-avatar"]';
+    var SERVER_AVATAR_CLASS = 'discord-server-avatar';
+    var SERVER_AVATAR_IMAGE_CLASS = 'discord-server-avatar__image';
+    var ALLOWED_AVATAR_SIZES = [16, 32, 64, 128, 256, 512, 1024, 2048, 4096];
 
     if (typeof window !== 'undefined' && window.discordBotJlg) {
         globalConfig = window.discordBotJlg;
@@ -175,6 +181,51 @@
         return container.querySelector('.discord-stats-wrapper');
     }
 
+    function getServerHeader(container) {
+        var wrapper = getServerNameWrapper(container);
+        if (!wrapper) {
+            return null;
+        }
+
+        return wrapper.querySelector(SERVER_HEADER_SELECTOR);
+    }
+
+    function ensureServerHeader(container) {
+        var wrapper = getServerNameWrapper(container);
+        if (!wrapper) {
+            return null;
+        }
+
+        var header = wrapper.querySelector(SERVER_HEADER_SELECTOR);
+        if (!header) {
+            header = document.createElement('div');
+            header.className = SERVER_HEADER_CLASS;
+            header.setAttribute('data-role', 'discord-server-header');
+            var firstStat = wrapper.querySelector('.discord-stat');
+            wrapper.insertBefore(header, firstStat || wrapper.firstChild);
+        }
+
+        return header;
+    }
+
+    function cleanupServerHeader(container) {
+        var wrapper = getServerNameWrapper(container);
+        if (!wrapper) {
+            return;
+        }
+
+        var header = wrapper.querySelector(SERVER_HEADER_SELECTOR);
+        if (!header) {
+            return;
+        }
+
+        var hasContent = header.querySelector(SERVER_NAME_SELECTOR) || header.querySelector(SERVER_AVATAR_SELECTOR);
+
+        if (!hasContent && header.parentNode) {
+            header.parentNode.removeChild(header);
+        }
+    }
+
     function removeServerNameElement(container) {
         if (!container) {
             return;
@@ -188,6 +239,8 @@
         if (container.dataset) {
             delete container.dataset.serverName;
         }
+
+        cleanupServerHeader(container);
     }
 
     function ensureServerNameElement(container) {
@@ -196,13 +249,17 @@
             return null;
         }
 
-        var element = wrapper.querySelector(SERVER_NAME_SELECTOR);
+        var header = ensureServerHeader(container);
+        if (!header) {
+            return null;
+        }
+
+        var element = header.querySelector(SERVER_NAME_SELECTOR);
         if (!element) {
             element = document.createElement('div');
             element.className = SERVER_NAME_CLASS;
             element.setAttribute('data-role', 'discord-server-name');
-            var firstStat = wrapper.querySelector('.discord-stat');
-            wrapper.insertBefore(element, firstStat || wrapper.firstChild);
+            header.appendChild(element);
         }
 
         var textElement = element.querySelector('.' + SERVER_NAME_TEXT_CLASS);
@@ -245,6 +302,196 @@
         if (container.dataset) {
             container.dataset.serverName = safeName;
         }
+    }
+
+    function ensureServerAvatarElement(container) {
+        if (!container) {
+            return null;
+        }
+
+        var header = ensureServerHeader(container);
+        if (!header) {
+            return null;
+        }
+
+        var avatarWrapper = header.querySelector(SERVER_AVATAR_SELECTOR);
+        if (!avatarWrapper) {
+            avatarWrapper = document.createElement('div');
+            avatarWrapper.className = SERVER_AVATAR_CLASS;
+            avatarWrapper.setAttribute('data-role', 'discord-server-avatar');
+            header.insertBefore(avatarWrapper, header.firstChild);
+        }
+
+        var image = avatarWrapper.querySelector('.' + SERVER_AVATAR_IMAGE_CLASS);
+        if (!image) {
+            image = document.createElement('img');
+            image.className = SERVER_AVATAR_IMAGE_CLASS;
+            image.setAttribute('loading', 'lazy');
+            image.setAttribute('decoding', 'async');
+            avatarWrapper.appendChild(image);
+        }
+
+        return {
+            wrapper: avatarWrapper,
+            image: image
+        };
+    }
+
+    function removeServerAvatarElement(container) {
+        if (!container) {
+            return;
+        }
+
+        var avatarWrapper = container.querySelector(SERVER_AVATAR_SELECTOR);
+        if (avatarWrapper && avatarWrapper.parentNode) {
+            avatarWrapper.parentNode.removeChild(avatarWrapper);
+        }
+
+        if (container.dataset) {
+            delete container.dataset.serverAvatarUrl;
+            delete container.dataset.serverAvatarBaseUrl;
+        }
+
+        cleanupServerHeader(container);
+    }
+
+    function normalizeAvatarSize(value, fallback) {
+        var parsed = parseInt(value, 10);
+        if (isNaN(parsed) || parsed <= 0) {
+            parsed = typeof fallback === 'number' && !isNaN(fallback) && fallback > 0 ? fallback : 128;
+        }
+
+        for (var i = 0; i < ALLOWED_AVATAR_SIZES.length; i++) {
+            if (parsed <= ALLOWED_AVATAR_SIZES[i]) {
+                return ALLOWED_AVATAR_SIZES[i];
+            }
+        }
+
+        return ALLOWED_AVATAR_SIZES[ALLOWED_AVATAR_SIZES.length - 1];
+    }
+
+    function stripSizeParameter(url) {
+        if (!url) {
+            return '';
+        }
+
+        var stripped = url.replace(/([?&])size=\d+/g, function (match, prefix) {
+            return prefix === '?' ? '?' : '';
+        });
+
+        stripped = stripped.replace(/\?&/, '?');
+
+        if (stripped.slice(-1) === '?' || stripped.slice(-1) === '&') {
+            stripped = stripped.slice(0, -1);
+        }
+
+        return stripped;
+    }
+
+    function buildAvatarUrl(baseUrl, size) {
+        if (!baseUrl) {
+            return '';
+        }
+
+        var normalizedSize = normalizeAvatarSize(size, size);
+        var withoutSize = stripSizeParameter(baseUrl);
+        var separator = withoutSize.indexOf('?') === -1 ? '?' : '&';
+
+        return withoutSize + separator + 'size=' + normalizedSize;
+    }
+
+    function updateServerAvatar(container, avatarUrl, avatarBaseUrl, serverName) {
+        if (!container || !container.dataset || container.dataset.showServerAvatar !== 'true') {
+            removeServerAvatarElement(container);
+            if (container && container.classList) {
+                container.classList.remove('discord-has-server-avatar');
+                container.classList.remove('discord-avatar-enabled');
+            }
+            return;
+        }
+
+        if (container.classList) {
+            container.classList.add('discord-avatar-enabled');
+        }
+
+        var normalizedSize = normalizeAvatarSize(container.dataset.avatarSize, 128);
+        container.dataset.avatarSize = String(normalizedSize);
+
+        var baseUrl = '';
+        if (typeof avatarBaseUrl === 'string' && avatarBaseUrl) {
+            baseUrl = stripSizeParameter(avatarBaseUrl);
+        } else if (container.dataset.serverAvatarBaseUrl) {
+            baseUrl = container.dataset.serverAvatarBaseUrl;
+        }
+
+        var rawUrl = '';
+        if (typeof avatarUrl === 'string' && avatarUrl) {
+            rawUrl = avatarUrl;
+        } else if (container.dataset.serverAvatarUrl) {
+            rawUrl = container.dataset.serverAvatarUrl;
+        }
+
+        var finalUrl = '';
+
+        if (baseUrl) {
+            finalUrl = buildAvatarUrl(baseUrl, normalizedSize);
+        } else if (rawUrl) {
+            finalUrl = buildAvatarUrl(rawUrl, normalizedSize);
+            baseUrl = stripSizeParameter(rawUrl);
+        }
+
+        if (!finalUrl) {
+            removeServerAvatarElement(container);
+            if (container.classList) {
+                container.classList.remove('discord-has-server-avatar');
+            }
+            return;
+        }
+
+        var dataset = container.dataset || {};
+        dataset.serverAvatarUrl = finalUrl;
+        if (baseUrl) {
+            dataset.serverAvatarBaseUrl = stripSizeParameter(baseUrl);
+        }
+
+        var elements = ensureServerAvatarElement(container);
+        if (!elements) {
+            return;
+        }
+
+        if (container.classList) {
+            container.classList.add('discord-has-server-avatar');
+        }
+
+        if (elements.image.getAttribute('src') !== finalUrl) {
+            elements.image.setAttribute('src', finalUrl);
+        }
+
+        var fallbackAlt = getLocalizedString('serverAvatarAltFallback', 'Avatar du serveur Discord');
+        var altTemplate = getLocalizedString('serverAvatarAltTemplate', 'Avatar du serveur Discord %s');
+        var safeName = '';
+
+        if (typeof serverName === 'string' && serverName.trim()) {
+            safeName = serverName.trim();
+        } else if (dataset.serverName && dataset.serverName.trim()) {
+            safeName = dataset.serverName.trim();
+        }
+
+        var altText = fallbackAlt;
+
+        if (altTemplate && altTemplate.indexOf('%s') !== -1) {
+            if (safeName) {
+                altText = altTemplate.replace('%s', safeName);
+            } else {
+                altText = altTemplate.replace('%s', '').trim() || fallbackAlt;
+            }
+        } else if (safeName) {
+            altText = fallbackAlt + ' ' + safeName;
+        }
+
+        elements.image.setAttribute('alt', altText);
+        elements.image.setAttribute('width', String(normalizedSize));
+        elements.image.setAttribute('height', String(normalizedSize));
     }
 
     var DEFAULT_NUMBER_FORMATTER = {
@@ -801,6 +1048,17 @@
                     serverNameValue = data.data.server_name;
                 }
 
+                var serverAvatarUrlValue = '';
+                var serverAvatarBaseValue = '';
+
+                if (data.data && typeof data.data.server_avatar_url === 'string') {
+                    serverAvatarUrlValue = data.data.server_avatar_url;
+                }
+
+                if (data.data && typeof data.data.server_avatar_base_url === 'string') {
+                    serverAvatarBaseValue = data.data.server_avatar_base_url;
+                }
+
                 var onlineValue = typeof data.data.online === 'number' ? data.data.online : null;
                 var totalValue = typeof data.data.total === 'number' ? data.data.total : null;
 
@@ -823,6 +1081,7 @@
                 updateStaleNotice(container, isStale, lastUpdated, locale);
 
                 updateServerName(container, serverNameValue);
+                updateServerAvatar(container, serverAvatarUrlValue, serverAvatarBaseValue, serverNameValue);
 
                 ensureOnlineLabelElement(container);
                 updateStatElement(container, '.discord-online .discord-number', onlineValue, formatter);
