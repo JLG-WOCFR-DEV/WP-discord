@@ -293,7 +293,7 @@ class Discord_Bot_JLG_Shortcode {
                         <?php if (!$hide_icons): ?>
                         <span class="discord-icon"><?php echo esc_html($atts['icon_online']); ?></span>
                         <?php endif; ?>
-                        <span class="discord-number"><?php echo esc_html(number_format_i18n((int) $stats['online'])); ?></span>
+                        <span class="discord-number" role="status" aria-live="polite"><?php echo esc_html(number_format_i18n((int) $stats['online'])); ?></span>
                         <?php if (!$hide_labels): ?>
                         <span class="discord-label"><?php echo esc_html($atts['label_online']); ?></span>
                         <?php endif; ?>
@@ -328,7 +328,7 @@ class Discord_Bot_JLG_Shortcode {
                         <?php if (!$hide_icons): ?>
                         <span class="discord-icon"><?php echo esc_html($atts['icon_total']); ?></span>
                         <?php endif; ?>
-                        <span class="discord-number"><?php echo $has_total ? esc_html(number_format_i18n((int) $stats['total'])) : '&mdash;'; ?></span>
+                        <span class="discord-number" role="status" aria-live="polite"><?php echo $has_total ? esc_html(number_format_i18n((int) $stats['total'])) : '&mdash;'; ?></span>
                         <span class="discord-approx-indicator" aria-hidden="true"<?php echo $total_is_approximate ? '' : ' hidden'; ?>>≈</span>
                         <span class="<?php echo esc_attr(implode(' ', $label_classes)); ?>">
                             <span class="discord-label-text"><?php echo esc_html($has_total ? $atts['label_total'] : $label_unavailable); ?></span>
