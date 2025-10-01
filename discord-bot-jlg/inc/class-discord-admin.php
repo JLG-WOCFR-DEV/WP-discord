@@ -624,7 +624,7 @@ class Discord_Bot_JLG_Admin {
             <?php settings_errors('discord_stats_settings'); ?>
             <?php $this->handle_test_connection_request(); ?>
 
-            <div style="display: flex; gap: 20px; margin-top: 20px;">
+            <div class="discord-bot-settings-layout">
                 <?php
                 $this->render_options_form();
                 $this->render_options_sidebar();
@@ -663,7 +663,7 @@ class Discord_Bot_JLG_Admin {
      */
     private function render_options_form() {
         ?>
-        <div style="flex: 1;">
+        <div class="discord-bot-settings-main">
             <form action="options.php" method="post">
                 <?php
                 settings_fields('discord_stats_settings');
@@ -680,7 +680,7 @@ class Discord_Bot_JLG_Admin {
      */
     private function render_options_sidebar() {
         ?>
-        <div style="width: 300px;">
+        <div class="discord-bot-settings-sidebar">
             <?php
             $this->render_connection_test_panel();
             $this->render_quick_links_panel();
