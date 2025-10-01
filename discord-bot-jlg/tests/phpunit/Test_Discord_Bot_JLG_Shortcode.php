@@ -30,6 +30,7 @@ class Test_Discord_Bot_JLG_Shortcode extends TestCase {
                     'stale'              => false,
                     'fallback_demo'      => false,
                     'is_demo'            => false,
+                    'instant_invite'     => 'https://discord.gg/example',
                 );
             }
 
@@ -100,5 +101,19 @@ class Test_Discord_Bot_JLG_Shortcode extends TestCase {
         $this->assertStringContainsString('width: 100%', $html);
         $this->assertStringContainsString('max-width: 600px', $html);
         $this->assertStringContainsString('width: 100%; max-width: 600px', $html);
+    }
+
+    public function test_render_shortcode_outputs_invite_button_when_enabled() {
+        $shortcode = $this->get_shortcode_instance();
+
+        $html = $shortcode->render_shortcode(array(
+            'show_invite_button' => 'true',
+            'invite_label'       => '<strong>Rejoindre</strong>',
+        ));
+
+        $this->assertStringContainsString('discord-invite-button', $html);
+        $this->assertStringContainsString('role="button"', $html);
+        $this->assertStringContainsString('href="https://discord.gg/example"', $html);
+        $this->assertStringContainsString('>Rejoindre<', $html);
     }
 }

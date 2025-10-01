@@ -67,6 +67,62 @@
     justify-content: center;
 }
 
+.discord-stats-container .discord-invite-cta {
+    margin-top: 20px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.discord-stats-container.discord-compact .discord-invite-cta {
+    margin-top: 12px;
+}
+
+.discord-stats-container.discord-align-center .discord-invite-cta {
+    justify-content: center;
+}
+
+.discord-stats-container.discord-align-right .discord-invite-cta {
+    justify-content: flex-end;
+}
+
+.discord-stats-container .discord-invite-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: 10px 18px;
+    border-radius: 999px;
+    background: #5865F2;
+    color: #ffffff;
+    font-weight: 600;
+    text-decoration: none;
+    box-shadow: 0 2px 6px rgba(0, 0, 0, 0.15);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background-color 0.2s ease;
+}
+
+.discord-stats-container .discord-invite-button:hover {
+    background: #4752C4;
+    box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+    transform: translateY(-1px);
+}
+
+.discord-stats-container .discord-invite-button:focus,
+.discord-stats-container .discord-invite-button:focus-visible {
+    outline: 3px solid rgba(88, 101, 242, 0.45);
+    outline-offset: 2px;
+}
+
+.discord-stats-container .discord-invite-button:active {
+    transform: translateY(0);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+}
+
+.discord-invite-button__label {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
 @media (max-width: 600px) {
     .discord-stats-wrapper {
         flex-direction: column;

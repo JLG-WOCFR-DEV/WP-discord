@@ -75,6 +75,7 @@ class Discord_Stats_Widget extends WP_Widget {
             'theme'                => $theme,
             'refresh'              => !empty($instance['refresh']) ? 'true' : 'false',
             'show_title'           => !empty($instance['show_card_title']) ? 'true' : 'false',
+            'show_invite_button'   => !empty($instance['show_invite_button']) ? 'true' : 'false',
         );
 
         if (!empty($instance['refresh'])) {
@@ -83,6 +84,16 @@ class Discord_Stats_Widget extends WP_Widget {
 
         if (!empty($instance['show_card_title'])) {
             $shortcode_atts['title'] = $card_title;
+        }
+
+        if (!empty($instance['show_invite_button'])) {
+            if (!empty($instance['invite_label'])) {
+                $shortcode_atts['invite_label'] = $instance['invite_label'];
+            }
+
+            if (!empty($instance['invite_url'])) {
+                $shortcode_atts['invite_url'] = $instance['invite_url'];
+            }
         }
 
         $attr_parts = array();
@@ -138,6 +149,23 @@ class Discord_Stats_Widget extends WP_Widget {
 
         $instance['show_card_title'] = !empty($new_instance['show_card_title']) ? 1 : 0;
         $instance['card_title']      = isset($new_instance['card_title']) ? sanitize_text_field($new_instance['card_title']) : '';
+
+        $instance['show_invite_button'] = !empty($new_instance['show_invite_button']) ? 1 : 0;
+        $instance['invite_label']       = isset($new_instance['invite_label']) ? sanitize_text_field($new_instance['invite_label']) : '';
+
+        $instance['invite_url'] = '';
+        if (isset($new_instance['invite_url'])) {
+            $raw_url = trim((string) $new_instance['invite_url']);
+
+            if ('' !== $raw_url) {
+                if (function_exists('esc_url_raw')) {
+                    $sanitized_url = esc_url_raw($raw_url);
+                    $instance['invite_url'] = is_string($sanitized_url) ? $sanitized_url : '';
+                } else {
+                    $instance['invite_url'] = $raw_url;
+                }
+            }
+        }
 
         return $instance;
     }
@@ -249,6 +277,27 @@ class Discord_Stats_Widget extends WP_Widget {
                    name="<?php echo esc_attr($this->get_field_name('card_title')); ?>" type="text"
                    value="<?php echo esc_attr($instance['card_title']); ?>" />
         </p>
+
+        <p>
+            <input type="checkbox" id="<?php echo esc_attr($this->get_field_id('show_invite_button')); ?>"
+                   name="<?php echo esc_attr($this->get_field_name('show_invite_button')); ?>" value="1" <?php checked($instance['show_invite_button'], 1); ?> />
+            <label for="<?php echo esc_attr($this->get_field_id('show_invite_button')); ?>"><?php esc_html_e('Afficher un bouton d\'invitation', 'discord-bot-jlg'); ?></label>
+        </p>
+
+        <p>
+            <label for="<?php echo esc_attr($this->get_field_id('invite_label')); ?>"><?php esc_html_e('Texte du bouton', 'discord-bot-jlg'); ?></label>
+            <input class="widefat" id="<?php echo esc_attr($this->get_field_id('invite_label')); ?>"
+                   name="<?php echo esc_attr($this->get_field_name('invite_label')); ?>" type="text"
+                   value="<?php echo esc_attr($instance['invite_label']); ?>" />
+        </p>
+
+        <p>
+            <label for="<?php echo esc_attr($this->get_field_id('invite_url')); ?>"><?php esc_html_e('URL d\'invitation personnalisée', 'discord-bot-jlg'); ?></label>
+            <input class="widefat" id="<?php echo esc_attr($this->get_field_id('invite_url')); ?>"
+                   name="<?php echo esc_attr($this->get_field_name('invite_url')); ?>" type="url"
+                   value="<?php echo esc_attr($instance['invite_url']); ?>" />
+            <span class="description"><?php esc_html_e('Laissez vide pour utiliser l\'invitation instantanée fournie par Discord.', 'discord-bot-jlg'); ?></span>
+        </p>
         <?php
     }
 
@@ -288,6 +337,9 @@ class Discord_Stats_Widget extends WP_Widget {
             'refresh_interval'     => $cache_duration,
             'show_card_title'      => 0,
             'card_title'           => '',
+            'show_invite_button'   => 0,
+            'invite_label'         => '',
+            'invite_url'           => '',
         );
     }
 }

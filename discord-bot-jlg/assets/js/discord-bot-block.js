@@ -72,7 +72,10 @@
         demo: false,
         show_discord_icon: false,
         discord_icon_position: 'left',
-        show_server_name: false
+        show_server_name: false,
+        show_invite_button: false,
+        invite_label: __('Rejoindre le serveur', 'discord-bot-jlg'),
+        invite_url: ''
     };
 
     function attributesToShortcode(attributes) {
@@ -188,6 +191,22 @@
                             value: attributes.discord_icon_position,
                             options: iconPositionOptions,
                             onChange: updateAttribute(setAttributes, 'discord_icon_position')
+                        }),
+                        createElement(ToggleControl, {
+                            label: __('Afficher le bouton d\'invitation', 'discord-bot-jlg'),
+                            checked: !!attributes.show_invite_button,
+                            onChange: updateAttribute(setAttributes, 'show_invite_button')
+                        }),
+                        !!attributes.show_invite_button && createElement(TextControl, {
+                            label: __('Texte du bouton', 'discord-bot-jlg'),
+                            value: attributes.invite_label,
+                            onChange: updateAttribute(setAttributes, 'invite_label')
+                        }),
+                        !!attributes.show_invite_button && createElement(TextControl, {
+                            label: __('URL d\'invitation personnalisée', 'discord-bot-jlg'),
+                            value: attributes.invite_url,
+                            onChange: updateAttribute(setAttributes, 'invite_url'),
+                            help: __('Laissez vide pour utiliser l\'invitation instantanée détectée automatiquement.', 'discord-bot-jlg')
                         }),
                         createElement(RangeControl, {
                             label: __('Rayon des bords (px)', 'discord-bot-jlg'),

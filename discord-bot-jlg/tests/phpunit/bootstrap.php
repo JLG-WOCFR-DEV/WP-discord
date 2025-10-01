@@ -73,6 +73,32 @@ if (!function_exists('esc_attr')) {
     }
 }
 
+if (!function_exists('esc_url_raw')) {
+    function esc_url_raw($url, $protocols = null) {
+        if (!is_string($url)) {
+            return '';
+        }
+
+        $url = trim($url);
+
+        if ('' === $url) {
+            return '';
+        }
+
+        $sanitized = filter_var($url, FILTER_VALIDATE_URL);
+
+        return false === $sanitized ? '' : $sanitized;
+    }
+}
+
+if (!function_exists('esc_url')) {
+    function esc_url($url, $protocols = null, $_context = 'display') {
+        $sanitized = esc_url_raw($url, $protocols);
+
+        return is_string($sanitized) ? $sanitized : '';
+    }
+}
+
 if (!function_exists('do_shortcode')) {
     function do_shortcode($shortcode) {
         $GLOBALS['discord_bot_jlg_last_shortcode'] = $shortcode;
@@ -230,7 +256,14 @@ function sanitize_text_field($value) {
         return array_map('sanitize_text_field', $value);
     }
 
-    return is_string($value) ? trim($value) : $value;
+    if (!is_string($value)) {
+        return $value;
+    }
+
+    $value = strip_tags($value);
+    $value = preg_replace('/[\r\n\t ]+/', ' ', $value);
+
+    return trim($value);
 }
 
 function sanitize_key($key) {

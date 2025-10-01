@@ -193,6 +193,7 @@ class Discord_Bot_JLG_API {
                             : (isset($bot_stats['server_name']) ? $bot_stats['server_name'] : ''),
                         'has_total'            => $has_total,
                         'total_is_approximate' => $total_approximate,
+                        'instant_invite'       => isset($widget_stats['instant_invite']) ? $widget_stats['instant_invite'] : '',
                     );
                 } elseif (false === $stats) {
                     $stats = $bot_stats;
@@ -1114,6 +1115,7 @@ class Discord_Bot_JLG_API {
             'fallback_demo'        => (bool) $is_fallback,
             'has_total'            => true,
             'total_is_approximate' => false,
+            'instant_invite'       => '',
         );
     }
 
@@ -1452,12 +1454,19 @@ class Discord_Bot_JLG_API {
 
         $server_name = isset($data['name']) ? $data['name'] : '';
 
+        $instant_invite = '';
+
+        if (!empty($data['instant_invite']) && is_string($data['instant_invite'])) {
+            $instant_invite = trim((string) $data['instant_invite']);
+        }
+
         $stats = array(
             'online'               => $online,
             'total'                => null,
             'server_name'          => $server_name,
             'has_total'            => false,
             'total_is_approximate' => false,
+            'instant_invite'       => $instant_invite,
         );
 
         if (isset($data['member_count'])) {
@@ -1757,6 +1766,26 @@ class Discord_Bot_JLG_API {
         if (!isset($stats['total_is_approximate'])) {
             $stats['total_is_approximate'] = false;
         }
+
+        $instant_invite = isset($stats['instant_invite']) ? $stats['instant_invite'] : '';
+
+        if (!is_string($instant_invite)) {
+            $instant_invite = '';
+        }
+
+        $instant_invite = trim($instant_invite);
+
+        if ('' !== $instant_invite && function_exists('esc_url_raw')) {
+            $sanitized_invite = esc_url_raw($instant_invite);
+
+            if (is_string($sanitized_invite)) {
+                $instant_invite = $sanitized_invite;
+            } else {
+                $instant_invite = '';
+            }
+        }
+
+        $stats['instant_invite'] = $instant_invite;
 
         return $stats;
     }

@@ -55,6 +55,8 @@ L'attribut optionnel `width` accepte uniquement des longueurs CSS valides comme 
 
 Le paramètre `refresh_interval` est exprimé en secondes et doit être d'au moins 10 secondes (10 000 ms). Toute valeur plus basse est automatiquement portée à 10 secondes pour éviter les erreurs 429 de Discord.
 
+Pour afficher un appel à l'action menant vers votre serveur, ajoutez `show_invite_button="true"`. Le libellé du bouton peut être personnalisé via `invite_label` et l'URL peut être forcée grâce à `invite_url`. Sans URL personnalisée, le plugin utilise automatiquement l'invitation instantanée exposée par l'API Discord lorsqu'elle est disponible.
+
 Les rafraîchissements publics (visiteurs non connectés) n'exigent plus de nonce WordPress ; seuls les administrateurs connectés utilisent un jeton de sécurité pour l'action AJAX `refresh_discord_stats`.
 
 ### Ré-initialisation manuelle du widget

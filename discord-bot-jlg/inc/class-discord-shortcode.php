@@ -67,6 +67,9 @@ class Discord_Bot_JLG_Shortcode {
                 'show_discord_icon'    => false,
                 'discord_icon_position'=> 'left',
                 'show_server_name'     => false,
+                'show_invite_button'   => false,
+                'invite_label'         => __('Rejoindre le serveur', 'discord-bot-jlg'),
+                'invite_url'           => '',
             ),
             $atts,
             'discord_stats'
@@ -83,6 +86,26 @@ class Discord_Bot_JLG_Shortcode {
         $force_demo         = filter_var($atts['demo'], FILTER_VALIDATE_BOOLEAN);
         $show_discord_icon  = filter_var($atts['show_discord_icon'], FILTER_VALIDATE_BOOLEAN);
         $show_server_name   = filter_var($atts['show_server_name'], FILTER_VALIDATE_BOOLEAN);
+        $show_invite_button = filter_var($atts['show_invite_button'], FILTER_VALIDATE_BOOLEAN);
+
+        $invite_label = sanitize_text_field($atts['invite_label']);
+        if ('' === $invite_label) {
+            $invite_label = __('Rejoindre le serveur', 'discord-bot-jlg');
+        }
+
+        $invite_url = '';
+        if (isset($atts['invite_url']) && '' !== $atts['invite_url']) {
+            $raw_invite = is_array($atts['invite_url']) ? '' : trim((string) $atts['invite_url']);
+
+            if ('' !== $raw_invite) {
+                if (function_exists('esc_url_raw')) {
+                    $sanitized_invite = esc_url_raw($raw_invite);
+                    $invite_url       = is_string($sanitized_invite) ? $sanitized_invite : '';
+                } else {
+                    $invite_url = $raw_invite;
+                }
+            }
+        }
 
         if ($force_demo) {
             $stats = $this->api->get_demo_stats();
@@ -112,6 +135,22 @@ class Discord_Bot_JLG_Shortcode {
         $is_stale             = !empty($stats['stale']);
         $last_updated         = isset($stats['last_updated']) ? (int) $stats['last_updated'] : 0;
         $server_name          = isset($stats['server_name']) ? trim((string) $stats['server_name']) : '';
+        $instant_invite       = isset($stats['instant_invite']) && is_string($stats['instant_invite'])
+            ? trim($stats['instant_invite'])
+            : '';
+
+        if ('' !== $instant_invite) {
+            if (function_exists('esc_url_raw')) {
+                $sanitized_instant = esc_url_raw($instant_invite);
+                $instant_invite    = is_string($sanitized_instant) ? $sanitized_instant : '';
+            }
+        }
+
+        if ('' === $invite_url && '' !== $instant_invite) {
+            $invite_url = $instant_invite;
+        }
+
+        $should_render_invite_button = ($show_invite_button && '' !== $invite_url);
 
         $container_classes = array('discord-stats-container');
 
@@ -140,6 +179,10 @@ class Discord_Bot_JLG_Shortcode {
 
         if ($is_demo) {
             $container_classes[] = 'discord-demo-mode';
+        }
+
+        if ($should_render_invite_button) {
+            $container_classes[] = 'discord-has-invite';
         }
 
         $logo_position_class = '';
@@ -363,6 +406,14 @@ class Discord_Bot_JLG_Shortcode {
                 </div>
                 <?php endif; ?>
             </div>
+
+            <?php if ($should_render_invite_button): ?>
+            <div class="discord-invite-cta">
+                <a class="discord-invite-button" role="button" href="<?php echo esc_url($invite_url); ?>">
+                    <span class="discord-invite-button__label"><?php echo esc_html($invite_label); ?></span>
+                </a>
+            </div>
+            <?php endif; ?>
         </div>
 
         <?php

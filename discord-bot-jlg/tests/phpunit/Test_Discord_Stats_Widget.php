@@ -45,4 +45,30 @@ class Test_Discord_Stats_Widget extends TestCase {
         $this->assertNotNull($GLOBALS['discord_bot_jlg_last_shortcode']);
         $this->assertStringContainsString('theme="minimal"', $GLOBALS['discord_bot_jlg_last_shortcode']);
     }
+
+    public function test_widget_shortcode_includes_invite_button_attributes() {
+        $widget = new Discord_Stats_Widget();
+
+        $args = array(
+            'before_widget' => '',
+            'after_widget'  => '',
+            'before_title'  => '',
+            'after_title'   => '',
+        );
+
+        $instance = array(
+            'show_invite_button' => 1,
+            'invite_label'       => 'Rejoignez-nous',
+            'invite_url'         => 'https://discord.gg/widget',
+        );
+
+        ob_start();
+        $widget->widget($args, $instance);
+        ob_end_clean();
+
+        $this->assertNotNull($GLOBALS['discord_bot_jlg_last_shortcode']);
+        $this->assertStringContainsString('show_invite_button="true"', $GLOBALS['discord_bot_jlg_last_shortcode']);
+        $this->assertStringContainsString('invite_label="Rejoignez-nous"', $GLOBALS['discord_bot_jlg_last_shortcode']);
+        $this->assertStringContainsString('invite_url="https://discord.gg/widget"', $GLOBALS['discord_bot_jlg_last_shortcode']);
+    }
 }
