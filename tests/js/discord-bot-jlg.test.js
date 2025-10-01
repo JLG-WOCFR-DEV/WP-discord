@@ -241,9 +241,63 @@ describe('discord-bot-jlg integration', () => {
         expect(container.dataset.serverName).toBe('Test Server');
         expect(container.classList.contains('discord-stats-error')).toBe(false);
         expect(demoBadge).toBeNull();
+        expect(container.dataset.refreshing).toBe('false');
+        expect(container.querySelector('.discord-refresh-status')).toBeNull();
 
         const setTimeoutCalls = setTimeoutSpy.mock.calls;
         expect(setTimeoutCalls[setTimeoutCalls.length - 1][1]).toBe(15000);
+    });
+
+    test('refresh indicator toggles while stats request is in flight', async () => {
+        const container = createContainer();
+
+        window.discordBotJlg = {
+            ajaxUrl: 'https://example.com/wp-admin/admin-ajax.php',
+            nonce: 'nonce',
+            requiresNonce: true,
+            locale: 'en-US',
+            minRefreshInterval: '5',
+            refreshingStatus: 'Refreshing…'
+        };
+
+        let resolveFetch;
+        global.fetch.mockImplementation(() => new Promise((resolve) => {
+            resolveFetch = resolve;
+        }));
+
+        loadScript();
+
+        runTimerByDelay(15000);
+
+        expect(typeof resolveFetch).toBe('function');
+        expect(container.dataset.refreshing).toBe('true');
+
+        let status = container.querySelector('.discord-refresh-status');
+        expect(status).not.toBeNull();
+        expect(status.getAttribute('role')).toBe('status');
+        expect(status.textContent).toBe('Refreshing…');
+
+        resolveFetch({
+            ok: true,
+            json: () => Promise.resolve({
+                success: true,
+                data: {
+                    online: 5,
+                    total: 10,
+                    has_total: true,
+                    total_is_approximate: false,
+                    stale: false,
+                    is_demo: false,
+                    fallback_demo: false
+                }
+            })
+        });
+
+        await flushPromises();
+
+        expect(container.dataset.refreshing).toBe('false');
+        status = container.querySelector('.discord-refresh-status');
+        expect(status).toBeNull();
     });
 
     test('hidden label remains available for assistive technologies across refreshes', async () => {
@@ -382,6 +436,8 @@ describe('discord-bot-jlg integration', () => {
         expect(errorMessage).not.toBeNull();
         expect(errorMessage.textContent).toBe('Please slow down');
         expect(container.classList.contains('discord-stats-error')).toBe(true);
+        expect(container.dataset.refreshing).toBe('false');
+        expect(container.querySelector('.discord-refresh-status')).toBeNull();
 
         const lastCall = setTimeoutSpy.mock.calls[setTimeoutSpy.mock.calls.length - 1];
         expect(lastCall[1]).toBe(60000);

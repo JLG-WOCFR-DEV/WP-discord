@@ -4,6 +4,7 @@
     var ERROR_CLASS = 'discord-stats-error';
     var ERROR_MESSAGE_CLASS = 'discord-error-message';
     var STALE_NOTICE_CLASS = 'discord-stale-notice';
+    var REFRESH_STATUS_CLASS = 'discord-refresh-status';
     var globalConfig = {};
     var SERVER_NAME_SELECTOR = '[data-role="discord-server-name"]';
     var SERVER_NAME_CLASS = 'discord-server-name';
@@ -529,6 +530,45 @@
         }
     }
 
+    function showRefreshIndicator(container) {
+        if (!container) {
+            return;
+        }
+
+        if (container.dataset) {
+            container.dataset.refreshing = 'true';
+        }
+
+        var status = container.querySelector('.' + REFRESH_STATUS_CLASS);
+        var label = getLocalizedString('refreshingStatus', 'Actualisation…');
+
+        if (!status) {
+            status = document.createElement('div');
+            status.className = REFRESH_STATUS_CLASS;
+            status.setAttribute('role', 'status');
+            status.setAttribute('aria-live', 'polite');
+            status.textContent = label;
+            container.appendChild(status);
+        } else {
+            status.textContent = label;
+        }
+    }
+
+    function hideRefreshIndicator(container) {
+        if (!container) {
+            return;
+        }
+
+        if (container.dataset) {
+            container.dataset.refreshing = 'false';
+        }
+
+        var status = container.querySelector('.' + REFRESH_STATUS_CLASS);
+        if (status && status.parentNode) {
+            status.parentNode.removeChild(status);
+        }
+    }
+
     function applyDemoState(container, isDemo, isFallbackDemo) {
         if (!container) {
             return;
@@ -1010,6 +1050,8 @@
 
             state.inFlight = true;
 
+            showRefreshIndicator(container);
+
             function resetInFlight() {
                 state.inFlight = false;
             }
@@ -1025,9 +1067,11 @@
 
                 scheduleNextRefresh(container, state, nextDelay);
                 resetInFlight();
+                hideRefreshIndicator(container);
             }).catch(function () {
                 scheduleNextRefresh(container, state, state.intervalMs);
                 resetInFlight();
+                hideRefreshIndicator(container);
             });
         }
 
