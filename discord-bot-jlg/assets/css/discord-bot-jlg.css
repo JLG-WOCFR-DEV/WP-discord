@@ -9,7 +9,8 @@
 }
 
 .discord-server-name {
-    flex: 0 0 100%;
+    flex: 0 0 auto;
+    flex-basis: 100%;
     width: 100%;
     order: -1;
 }
