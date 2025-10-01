@@ -192,6 +192,9 @@
     gap: 6px;
     line-height: 1.4;
     color: inherit;
+    flex: 0 0 100%;
+    width: 100%;
+    order: -1;
 }
 
 .discord-stats-container .discord-server-name__text {
