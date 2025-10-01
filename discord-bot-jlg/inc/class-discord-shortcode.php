@@ -444,7 +444,7 @@ class Discord_Bot_JLG_Shortcode {
         wp_register_script(
             'discord-bot-jlg-frontend',
             DISCORD_BOT_JLG_PLUGIN_URL . 'assets/js/discord-bot-jlg.js',
-            array(),
+            array('wp-polyfill', 'wp-api-fetch'),
             DISCORD_BOT_JLG_VERSION,
             true
         );

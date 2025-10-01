@@ -846,12 +846,35 @@
     }
 
     function initializeDiscordBot() {
-        if (typeof window.fetch !== 'function' || typeof window.FormData !== 'function') {
-            return;
-        }
-
         var config = window.discordBotJlg || {};
         globalConfig = config;
+        var missingFeatures = [];
+
+        if (typeof window.fetch !== 'function') {
+            missingFeatures.push('fetch');
+        }
+
+        if (typeof window.Promise !== 'function') {
+            missingFeatures.push('Promise');
+        }
+
+        if (typeof window.FormData !== 'function') {
+            missingFeatures.push('FormData');
+        }
+
+        if (missingFeatures.length) {
+            config.autoRefreshDisabled = true;
+
+            if (typeof console !== 'undefined' && typeof console.warn === 'function') {
+                console.warn(
+                    'Discord Bot JLG auto-refresh disabled: missing browser APIs ('
+                    + missingFeatures.join(', ')
+                    + ').'
+                );
+            }
+
+            return;
+        }
 
         var requiresNonce = typeof config.requiresNonce === 'undefined'
             ? true
