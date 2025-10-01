@@ -61,7 +61,8 @@ class Test_Discord_Bot_JLG_Shortcode extends TestCase {
         ));
 
         $this->assertStringContainsString('style="', $html);
-        $this->assertStringContainsString('width: min(100%, 50vw)', $html);
+        $this->assertStringContainsString('width: 100%', $html);
+        $this->assertStringContainsString('max-width: min(100%, 50vw)', $html);
     }
 
     public function test_render_shortcode_accepts_max_function_width() {
@@ -72,7 +73,8 @@ class Test_Discord_Bot_JLG_Shortcode extends TestCase {
         ));
 
         $this->assertStringContainsString('style="', $html);
-        $this->assertStringContainsString('width: max(300px, var(--discord-width))', $html);
+        $this->assertStringContainsString('width: 100%', $html);
+        $this->assertStringContainsString('max-width: max(300px, var(--discord-width))', $html);
     }
 
     public function test_render_shortcode_accepts_clamp_function_width() {
@@ -83,6 +85,20 @@ class Test_Discord_Bot_JLG_Shortcode extends TestCase {
         ));
 
         $this->assertStringContainsString('style="', $html);
-        $this->assertStringContainsString('width: clamp(200px, 50%, var(--max-width))', $html);
+        $this->assertStringContainsString('width: 100%', $html);
+        $this->assertStringContainsString('max-width: clamp(200px, 50%, var(--max-width))', $html);
+    }
+
+    public function test_render_shortcode_adds_max_width_and_fluid_width() {
+        $shortcode = $this->get_shortcode_instance();
+
+        $html = $shortcode->render_shortcode(array(
+            'width' => '600px',
+        ));
+
+        $this->assertStringContainsString('style="', $html);
+        $this->assertStringContainsString('width: 100%', $html);
+        $this->assertStringContainsString('max-width: 600px', $html);
+        $this->assertStringContainsString('width: 100%; max-width: 600px', $html);
     }
 }
