@@ -423,8 +423,17 @@ class Discord_Bot_JLG_Shortcode {
         $this->register_assets();
 
         if (!self::$inline_css_added && is_array($options) && !empty($options['custom_css'])) {
-            wp_add_inline_style('discord-bot-jlg-inline', $options['custom_css']);
-            self::$inline_css_added = true;
+            $custom_css = discord_bot_jlg_sanitize_custom_css($options['custom_css']);
+
+            if (
+                '' !== $custom_css
+                && false === strpos($custom_css, '</')
+                && false === stripos($custom_css, '<script')
+                && false === stripos($custom_css, '<style')
+            ) {
+                wp_add_inline_style('discord-bot-jlg-inline', $custom_css);
+                self::$inline_css_added = true;
+            }
         }
 
         wp_enqueue_style('discord-bot-jlg');

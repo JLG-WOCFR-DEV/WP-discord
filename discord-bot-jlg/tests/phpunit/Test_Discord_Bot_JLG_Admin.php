@@ -81,7 +81,10 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
     }
 
     public function sanitize_options_data_provider(): array {
-        $sanitized_css = sanitize_textarea_field("body { color: red; }\n<script>alert('test');</script>");
+        $malicious_css     = "body { color: red; }\n<script>alert('test');</script>";
+        $sanitized_css     = discord_bot_jlg_sanitize_custom_css($malicious_css);
+        $media_query_css   = "@media (min-width: 600px) {\n  .wrapper > .item { color: red; }\n}\n";
+        $sanitized_media   = discord_bot_jlg_sanitize_custom_css($media_query_css);
 
         return array(
             'invalid-server-id' => array(
@@ -93,7 +96,7 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
                     'show_total'   => '',
                     'widget_title' => ' <strong>Stats</strong> ',
                     'cache_duration' => '45',
-                    'custom_css'   => "body { color: red; }\n<script>alert('test');</script>",
+                    'custom_css'   => $malicious_css,
                 ),
                 array(
                     'server_id'    => '',
@@ -136,6 +139,22 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
                 ),
                 array(
                     'cache_duration' => 450,
+                ),
+            ),
+            'custom-css-media-query-preserved' => array(
+                array(
+                    'custom_css' => $media_query_css,
+                ),
+                array(
+                    'custom_css' => $sanitized_media,
+                ),
+            ),
+            'custom-css-script-removed' => array(
+                array(
+                    'custom_css' => $malicious_css,
+                ),
+                array(
+                    'custom_css' => $sanitized_css,
                 ),
             ),
         );
