@@ -166,10 +166,14 @@ describe('discord-bot-jlg integration', () => {
             setTimeoutSpy.mockRestore();
             setTimeoutSpy = null;
         }
+        if (typeof window.discordBotJlgInit === 'function') {
+            document.removeEventListener('DOMContentLoaded', window.discordBotJlgInit);
+        }
         delete global.fetch;
         delete window.fetch;
         delete global.FormData;
         delete window.FormData;
+        delete window.discordBotJlgInit;
         delete window.discordBotJlg;
         if (readyStateDescriptor) {
             Object.defineProperty(document, 'readyState', readyStateDescriptor);
@@ -450,6 +454,47 @@ describe('discord-bot-jlg integration', () => {
 
         const setTimeoutCalls = setTimeoutSpy.mock.calls;
         expect(setTimeoutCalls[setTimeoutCalls.length - 1][1]).toBe(15000);
+    });
+
+    test('auto refresh is disabled gracefully when required browser APIs are missing', () => {
+        createContainer();
+
+        window.discordBotJlg = {
+            ajaxUrl: 'https://example.com/wp-admin/admin-ajax.php',
+            nonce: 'nonce',
+            requiresNonce: true,
+            locale: 'en-US',
+            minRefreshInterval: '5'
+        };
+
+        const warnSpy = jest.spyOn(console, 'warn').mockImplementation(() => {});
+        const originalPromise = window.Promise;
+
+        delete global.fetch;
+        delete window.fetch;
+        delete global.FormData;
+        delete window.FormData;
+        window.Promise = undefined;
+
+        try {
+            expect(() => loadScript()).not.toThrow();
+
+            const matchingCalls = warnSpy.mock.calls.filter((args) => {
+                return args.length && String(args[0]).indexOf('auto-refresh disabled') !== -1;
+            });
+
+            expect(matchingCalls.length).toBe(1);
+            expect(window.discordBotJlg.autoRefreshDisabled).toBe(true);
+            expect(setTimeoutSpy).not.toHaveBeenCalled();
+        } finally {
+            warnSpy.mockRestore();
+
+            if (typeof originalPromise === 'undefined') {
+                delete window.Promise;
+            } else {
+                window.Promise = originalPromise;
+            }
+        }
     });
 
     test('failed refresh clears inFlight flag and allows subsequent refresh', async () => {
