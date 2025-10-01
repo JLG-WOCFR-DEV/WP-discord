@@ -58,3 +58,14 @@
 .widget .discord-stat {
     justify-content: center;
 }
+
+@media (max-width: 600px) {
+    .discord-stats-wrapper {
+        flex-direction: column;
+    }
+
+    .discord-stat {
+        flex: 1 1 100%;
+        width: 100%;
+    }
+}

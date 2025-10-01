@@ -211,3 +211,14 @@
 .discord-server-name--muted {
     opacity: 0.75;
 }
+
+@media (max-width: 600px) {
+    .discord-stats-container .discord-stats-wrapper {
+        flex-direction: column;
+    }
+
+    .discord-stats-container .discord-stat {
+        flex: 1 1 100%;
+        width: 100%;
+    }
+}
