@@ -29,7 +29,8 @@ function createContainer(options = {}) {
         stale = false,
         lastUpdated = null,
         fallbackDemo = 'false',
-        demo = 'false'
+        demo = 'false',
+        hideLabels = false
     } = options;
 
     const container = document.createElement('div');
@@ -38,6 +39,7 @@ function createContainer(options = {}) {
     container.dataset.showServerName = showServerName;
     container.dataset.fallbackDemo = fallbackDemo;
     container.dataset.demo = demo;
+    container.dataset.hideLabels = hideLabels ? 'true' : 'false';
     if (stale) {
         container.dataset.stale = 'true';
         if (lastUpdated !== null) {
@@ -49,7 +51,9 @@ function createContainer(options = {}) {
     wrapper.className = 'discord-stats-wrapper';
 
     const online = document.createElement('div');
-    online.className = 'discord-online';
+    online.className = 'discord-stat discord-online';
+    online.dataset.labelOnline = 'En ligne';
+    online.dataset.hideLabels = hideLabels ? 'true' : 'false';
     const onlineNumber = document.createElement('span');
     onlineNumber.className = 'discord-number';
     onlineNumber.setAttribute('role', 'status');
@@ -57,8 +61,19 @@ function createContainer(options = {}) {
     onlineNumber.textContent = '0';
     online.appendChild(onlineNumber);
 
+    const onlineLabel = document.createElement('span');
+    onlineLabel.className = 'discord-label';
+    if (hideLabels) {
+        onlineLabel.classList.add('screen-reader-text');
+    }
+    const onlineLabelText = document.createElement('span');
+    onlineLabelText.className = 'discord-label-text';
+    onlineLabelText.textContent = 'En ligne';
+    onlineLabel.appendChild(onlineLabelText);
+    online.appendChild(onlineLabel);
+
     const total = document.createElement('div');
-    total.className = 'discord-total';
+    total.className = 'discord-stat discord-total';
     total.dataset.placeholder = '—';
     total.dataset.labelTotal = 'Total';
     total.dataset.labelUnavailable = 'Unavailable';
@@ -70,20 +85,30 @@ function createContainer(options = {}) {
     totalNumber.setAttribute('aria-live', 'polite');
     totalNumber.textContent = '0';
 
-    const totalLabelText = document.createElement('span');
-    totalLabelText.className = 'discord-label-text';
-
-    const totalLabelExtra = document.createElement('span');
-    totalLabelExtra.className = 'discord-label-extra';
-
     const indicator = document.createElement('span');
     indicator.className = 'discord-approx-indicator';
     indicator.hidden = true;
+    indicator.setAttribute('aria-hidden', 'true');
+
+    const totalLabel = document.createElement('span');
+    totalLabel.className = 'discord-label';
+    if (hideLabels) {
+        totalLabel.classList.add('screen-reader-text');
+    }
+
+    const totalLabelText = document.createElement('span');
+    totalLabelText.className = 'discord-label-text';
+    totalLabelText.textContent = 'Total';
+
+    const totalLabelExtra = document.createElement('span');
+    totalLabelExtra.className = 'discord-label-extra screen-reader-text';
+    totalLabelExtra.textContent = '';
 
     total.appendChild(totalNumber);
-    total.appendChild(totalLabelText);
-    total.appendChild(totalLabelExtra);
     total.appendChild(indicator);
+    totalLabel.appendChild(totalLabelText);
+    totalLabel.appendChild(totalLabelExtra);
+    total.appendChild(totalLabel);
 
     wrapper.appendChild(online);
     wrapper.appendChild(total);
@@ -215,6 +240,59 @@ describe('discord-bot-jlg integration', () => {
 
         const setTimeoutCalls = setTimeoutSpy.mock.calls;
         expect(setTimeoutCalls[setTimeoutCalls.length - 1][1]).toBe(15000);
+    });
+
+    test('hidden label remains available for assistive technologies across refreshes', async () => {
+        const container = createContainer({ hideLabels: true });
+
+        window.discordBotJlg = {
+            ajaxUrl: 'https://example.com/wp-admin/admin-ajax.php',
+            nonce: 'nonce',
+            requiresNonce: true,
+            locale: 'fr-FR',
+            minRefreshInterval: '5'
+        };
+
+        global.fetch.mockResolvedValue({
+            ok: true,
+            json: () => Promise.resolve({
+                success: true,
+                data: {
+                    online: 21,
+                    total: 84,
+                    has_total: true,
+                    total_is_approximate: false,
+                    stale: false,
+                    is_demo: false,
+                    fallback_demo: false
+                }
+            })
+        });
+
+        loadScript();
+
+        runTimerByDelay(15000);
+        await flushPromises();
+
+        let onlineLabel = container.querySelector('.discord-online .discord-label');
+        let onlineLabelText = container.querySelector('.discord-online .discord-label-text');
+
+        expect(onlineLabel).not.toBeNull();
+        expect(onlineLabelText).not.toBeNull();
+        expect(onlineLabel.classList.contains('screen-reader-text')).toBe(true);
+        expect(onlineLabelText.textContent).toBe('En ligne');
+
+        runTimerByDelay(15000);
+        await flushPromises();
+
+        onlineLabel = container.querySelector('.discord-online .discord-label');
+        onlineLabelText = container.querySelector('.discord-online .discord-label-text');
+
+        expect(onlineLabel).not.toBeNull();
+        expect(onlineLabel.classList.contains('screen-reader-text')).toBe(true);
+        expect(onlineLabelText.textContent).toBe('En ligne');
+
+        expect(global.fetch).toHaveBeenCalledTimes(2);
     });
 
     test('stats update does not animate when container is not marked animated', async () => {

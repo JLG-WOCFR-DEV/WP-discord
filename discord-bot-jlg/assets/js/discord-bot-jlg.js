@@ -400,6 +400,77 @@
         }, 300);
     }
 
+    function ensureOnlineLabelElement(container) {
+        if (!container) {
+            return;
+        }
+
+        var onlineStat = container.querySelector('.discord-online');
+        if (!onlineStat) {
+            return;
+        }
+
+        var hideLabels = false;
+        if (onlineStat.dataset && Object.prototype.hasOwnProperty.call(onlineStat.dataset, 'hideLabels')) {
+            hideLabels = onlineStat.dataset.hideLabels === 'true';
+        } else if (container.dataset && Object.prototype.hasOwnProperty.call(container.dataset, 'hideLabels')) {
+            hideLabels = container.dataset.hideLabels === 'true';
+        }
+
+        var labelText = '';
+        if (onlineStat.dataset && Object.prototype.hasOwnProperty.call(onlineStat.dataset, 'labelOnline')) {
+            labelText = onlineStat.dataset.labelOnline;
+        }
+
+        if (!labelText) {
+            labelText = getLocalizedString('labelOnline', 'En ligne');
+        }
+
+        var labelElement = onlineStat.querySelector('.discord-label');
+        if (!labelElement) {
+            labelElement = document.createElement('span');
+            labelElement.className = 'discord-label';
+            onlineStat.appendChild(labelElement);
+        }
+
+        if (hideLabels) {
+            if (labelElement.classList && !labelElement.classList.contains('screen-reader-text')) {
+                labelElement.classList.add('screen-reader-text');
+            } else if (!labelElement.classList && typeof labelElement.className === 'string') {
+                var existingClasses = labelElement.className.trim();
+                if (existingClasses) {
+                    var classParts = existingClasses.split(/\s+/);
+                    if (classParts.indexOf('screen-reader-text') === -1) {
+                        classParts.push('screen-reader-text');
+                        labelElement.className = classParts.join(' ');
+                    }
+                } else {
+                    labelElement.className = 'screen-reader-text';
+                }
+            }
+        } else if (labelElement.classList) {
+            labelElement.classList.remove('screen-reader-text');
+        } else if (typeof labelElement.className === 'string' && labelElement.className) {
+            labelElement.className = labelElement.className
+                .split(/\s+/)
+                .filter(function (cls) {
+                    return cls && cls !== 'screen-reader-text';
+                })
+                .join(' ');
+        }
+
+        var labelTextElement = labelElement.querySelector('.discord-label-text');
+        if (!labelTextElement) {
+            labelTextElement = document.createElement('span');
+            labelTextElement.className = 'discord-label-text';
+            labelElement.appendChild(labelTextElement);
+        }
+
+        if (labelTextElement.textContent !== labelText) {
+            labelTextElement.textContent = labelText;
+        }
+    }
+
     function getDemoBadgeLabel(container) {
         var fallbackLabel = getLocalizedString('demoBadgeLabel', 'Mode Démo');
 
@@ -702,6 +773,7 @@
 
                 updateServerName(container, serverNameValue);
 
+                ensureOnlineLabelElement(container);
                 updateStatElement(container, '.discord-online .discord-number', onlineValue, formatter);
 
                 var totalElement = container.querySelector('.discord-total');
