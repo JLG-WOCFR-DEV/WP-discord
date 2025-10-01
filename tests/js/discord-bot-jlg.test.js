@@ -52,6 +52,8 @@ function createContainer(options = {}) {
     online.className = 'discord-online';
     const onlineNumber = document.createElement('span');
     onlineNumber.className = 'discord-number';
+    onlineNumber.setAttribute('role', 'status');
+    onlineNumber.setAttribute('aria-live', 'polite');
     onlineNumber.textContent = '0';
     online.appendChild(onlineNumber);
 
@@ -64,6 +66,8 @@ function createContainer(options = {}) {
 
     const totalNumber = document.createElement('span');
     totalNumber.className = 'discord-number';
+    totalNumber.setAttribute('role', 'status');
+    totalNumber.setAttribute('aria-live', 'polite');
     totalNumber.textContent = '0';
 
     const totalLabelText = document.createElement('span');
@@ -200,6 +204,10 @@ describe('discord-bot-jlg integration', () => {
         );
         expect(onlineNumber.textContent).toBe('42');
         expect(totalNumber.textContent).toBe('128');
+        expect(onlineNumber.getAttribute('role')).toBe('status');
+        expect(onlineNumber.getAttribute('aria-live')).toBe('polite');
+        expect(totalNumber.getAttribute('role')).toBe('status');
+        expect(totalNumber.getAttribute('aria-live')).toBe('polite');
         expect(labelExtra.textContent).toBe('');
         expect(container.dataset.serverName).toBe('Test Server');
         expect(container.classList.contains('discord-stats-error')).toBe(false);
