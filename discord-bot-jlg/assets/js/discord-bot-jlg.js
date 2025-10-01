@@ -322,6 +322,21 @@
             : DEFAULT_NUMBER_FORMATTER;
 
         element.textContent = safeFormatter.format(value);
+
+        var prefersReducedMotion = false;
+        if (typeof window !== 'undefined' && typeof window.matchMedia === 'function') {
+            try {
+                prefersReducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            } catch (error) {
+                prefersReducedMotion = false;
+            }
+        }
+
+        if (prefersReducedMotion) {
+            element.style.transform = 'scale(1)';
+            return;
+        }
+
         element.style.transform = 'scale(1.2)';
         setTimeout(function () {
             element.style.transform = 'scale(1)';

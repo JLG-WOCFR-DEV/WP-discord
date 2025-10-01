@@ -86,6 +86,20 @@
     }
 }
 
+@media (prefers-reduced-motion: reduce) {
+    .discord-stats-container .discord-demo-badge {
+        animation: none;
+    }
+
+    .discord-stats-container.discord-animated .discord-logo-svg {
+        transition: none;
+    }
+
+    .discord-stats-container.discord-animated .discord-logo-svg:hover {
+        transform: none;
+    }
+}
+
 .discord-stats-container.discord-demo-mode .discord-online .discord-number {
     animation: demo-variation 10s ease-in-out infinite;
 }
