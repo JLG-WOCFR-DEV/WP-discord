@@ -16,6 +16,7 @@ Accédez à la page **Discord Bot** dans l’administration pour :
 - Saisir le token de votre bot Discord ;
 - Indiquer l’ID du serveur à surveiller ;
 - Définir la durée du cache des statistiques ;
+- Activer et personnaliser le bouton d’invitation ;
 - Ajouter du CSS personnalisé.
 
 ### Définir le token via une constante
@@ -45,6 +46,11 @@ Le callback reçoit la valeur par défaut (1 048 576), l’URL ciblée et le c
 ```
 Options disponibles : `layout`, `theme`, `demo`, `refresh`, etc.
 
+Nouveaux attributs utiles pour l’invitation :
+
+- `show_invite_button="true"` affiche un bouton « Rejoindre » lorsque le widget Discord expose un lien `instant_invite`.
+- `invite_label="Rejoindre notre communauté"` remplace le libellé par défaut du bouton.
+
 Pour activer l'auto-actualisation, utilisez par exemple :
 
 ```
@@ -58,6 +64,8 @@ Le paramètre `refresh_interval` est exprimé en secondes et doit être d'au moi
 Pendant une requête d'actualisation, le conteneur affiche désormais un indicateur d'état (`role="status"`) et applique l'attribut `data-refreshing="true"`. L'opacité des statistiques diminue légèrement, les interactions sont bloquées et une pastille sombre (contraste élevé) accompagnée d'un spinner discret signalent l'opération. Dès que la réponse est reçue — succès ou erreur — l'indicateur est retiré et `data-refreshing` repasse automatiquement à `false`. L'animation est désactivée lorsque le visiteur préfère réduire les mouvements (`prefers-reduced-motion`).
 
 Les rafraîchissements publics (visiteurs non connectés) n'exigent plus de nonce WordPress ; seuls les administrateurs connectés utilisent un jeton de sécurité pour l'action AJAX `refresh_discord_stats`.
+
+Chaque clic sur le bouton d’invitation déclenche également l’évènement `discordBotJlg:inviteClick` sur `window`, ce qui facilite l’intégration avec vos outils d’analytics ou de tracking.
 
 ### Accessibilité
 
@@ -80,6 +88,7 @@ Un widget « Discord Bot - JLG » est disponible via le menu « Widgets ».
 
 ## Fonctionnalités
 - Affichage du nombre de membres en ligne et du total ;
+- Bouton d’invitation optionnel avec libellé personnalisable ;
 - Mise en cache des statistiques ;
 - Journalisation des erreurs de communication avec l'API Discord (accessible via `WP_DEBUG_LOG`) ;
 - Page de démonstration intégrée.

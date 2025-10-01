@@ -74,7 +74,9 @@
         demo: false,
         show_discord_icon: false,
         discord_icon_position: 'left',
-        show_server_name: false
+        show_server_name: false,
+        show_invite_button: false,
+        invite_label: ''
     };
 
     var REFRESH_INTERVAL_MIN = 10;
@@ -293,6 +295,17 @@
                             label: __('Afficher le nom du serveur', 'discord-bot-jlg'),
                             checked: !!attributes.show_server_name,
                             onChange: updateAttribute(setAttributes, 'show_server_name')
+                        }),
+                        createElement(ToggleControl, {
+                            label: __('Afficher le bouton d\'invitation', 'discord-bot-jlg'),
+                            checked: !!attributes.show_invite_button,
+                            onChange: updateAttribute(setAttributes, 'show_invite_button')
+                        }),
+                        !!attributes.show_invite_button && createElement(TextControl, {
+                            label: __('Libellé du bouton d\'invitation', 'discord-bot-jlg'),
+                            value: attributes.invite_label,
+                            onChange: updateAttribute(setAttributes, 'invite_label'),
+                            placeholder: __('Rejoindre le serveur', 'discord-bot-jlg')
                         })
                     ),
                     createElement(

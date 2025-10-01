@@ -67,6 +67,8 @@ class Discord_Bot_JLG_Shortcode {
                 'show_discord_icon'    => false,
                 'discord_icon_position'=> 'left',
                 'show_server_name'     => false,
+                'show_invite_button'   => !empty($options['show_invite_button']),
+                'invite_label'         => isset($options['invite_button_label']) ? $options['invite_button_label'] : '',
             ),
             $atts,
             'discord_stats'
@@ -83,6 +85,7 @@ class Discord_Bot_JLG_Shortcode {
         $force_demo         = filter_var($atts['demo'], FILTER_VALIDATE_BOOLEAN);
         $show_discord_icon  = filter_var($atts['show_discord_icon'], FILTER_VALIDATE_BOOLEAN);
         $show_server_name   = filter_var($atts['show_server_name'], FILTER_VALIDATE_BOOLEAN);
+        $show_invite_button = filter_var($atts['show_invite_button'], FILTER_VALIDATE_BOOLEAN);
 
         if ($force_demo) {
             $stats = $this->api->get_demo_stats();
@@ -112,6 +115,33 @@ class Discord_Bot_JLG_Shortcode {
         $is_stale             = !empty($stats['stale']);
         $last_updated         = isset($stats['last_updated']) ? (int) $stats['last_updated'] : 0;
         $server_name          = isset($stats['server_name']) ? trim((string) $stats['server_name']) : '';
+        $invite_url_raw       = isset($stats['instant_invite']) ? trim((string) $stats['instant_invite']) : '';
+        $invite_url           = '';
+
+        if ('' !== $invite_url_raw) {
+            $invite_url = esc_url($invite_url_raw);
+
+            if ('' === $invite_url) {
+                $invite_url_raw = '';
+            }
+        }
+
+        $invite_label = '';
+
+        if (isset($stats['invite_label']) && is_string($stats['invite_label'])) {
+            $invite_label = trim($stats['invite_label']);
+        }
+
+        if (isset($atts['invite_label']) && is_string($atts['invite_label'])) {
+            $custom_label = trim($atts['invite_label']);
+            if ('' !== $custom_label) {
+                $invite_label = $custom_label;
+            }
+        }
+
+        if ('' === $invite_label) {
+            $invite_label = $this->get_default_invite_label();
+        }
 
         $container_classes = array('discord-stats-container');
 
@@ -154,6 +184,10 @@ class Discord_Bot_JLG_Shortcode {
 
         if (!$has_total) {
             $container_classes[] = 'discord-total-missing';
+        }
+
+        if ($show_invite_button && '' !== $invite_url) {
+            $container_classes[] = 'discord-with-invite';
         }
 
         if (!empty($atts['class'])) {
@@ -213,6 +247,18 @@ class Discord_Bot_JLG_Shortcode {
 
             if ('' !== $server_name) {
                 $attributes[] = sprintf('data-server-name="%s"', esc_attr($server_name));
+            }
+        }
+
+        $attributes[] = sprintf('data-show-invite-button="%s"', esc_attr($show_invite_button ? 'true' : 'false'));
+
+        if ($show_invite_button) {
+            if ('' !== $invite_label) {
+                $attributes[] = sprintf('data-invite-label="%s"', esc_attr($invite_label));
+            }
+
+            if ('' !== $invite_url) {
+                $attributes[] = sprintf('data-invite-url="%s"', esc_url($invite_url));
             }
         }
 
@@ -363,10 +409,26 @@ class Discord_Bot_JLG_Shortcode {
                 </div>
                 <?php endif; ?>
             </div>
+
+            <?php if ($show_invite_button && '' !== $invite_url): ?>
+            <div class="discord-invite-action">
+                <a class="discord-invite-button"
+                    data-role="discord-invite-button"
+                    href="<?php echo esc_url($invite_url); ?>"
+                    target="_blank"
+                    rel="nofollow noopener noreferrer">
+                    <span class="discord-invite-button__label"><?php echo esc_html($invite_label); ?></span>
+                </a>
+            </div>
+            <?php endif; ?>
         </div>
 
         <?php
         return ob_get_clean();
+    }
+
+    private function get_default_invite_label() {
+        return __('Rejoindre le serveur', 'discord-bot-jlg');
     }
 
     private function validate_width_value($raw_width) {
@@ -499,6 +561,7 @@ class Discord_Bot_JLG_Shortcode {
                 'consoleErrorPrefix'   => __('Erreur lors de la mise à jour des statistiques Discord :', 'discord-bot-jlg'),
                 'staleNotice'          => __('Données mises en cache du %s', 'discord-bot-jlg'),
                 'rateLimited'          => __('Actualisation trop fréquente, veuillez patienter avant de réessayer.', 'discord-bot-jlg'),
+                'inviteButtonDefaultLabel' => __('Rejoindre le serveur', 'discord-bot-jlg'),
             )
         );
 

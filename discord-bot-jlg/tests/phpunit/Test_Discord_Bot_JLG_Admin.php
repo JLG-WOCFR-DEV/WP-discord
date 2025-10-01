@@ -58,6 +58,8 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
             'demo_mode'      => 1,
             'show_online'    => 1,
             'show_total'     => 1,
+            'show_invite_button' => 1,
+            'invite_button_label' => 'Rejoins-nous !',
             'widget_title'   => 'Existing title',
             'cache_duration' => 450,
             'custom_css'     => '.existing { color: blue; }',
@@ -155,6 +157,16 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
                 ),
                 array(
                     'custom_css' => $sanitized_css,
+                ),
+            ),
+            'invite-button-options' => array(
+                array(
+                    'show_invite_button'   => '1',
+                    'invite_button_label'  => '  <strong>Rejoindre</strong> ',
+                ),
+                array(
+                    'show_invite_button'   => 1,
+                    'invite_button_label'  => sanitize_text_field('  <strong>Rejoindre</strong> '),
                 ),
             ),
         );
@@ -360,12 +372,14 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
             'demo_mode'      => 0,
             'show_online'    => 0,
             'show_total'     => 0,
+            'show_invite_button' => 0,
             'widget_title'   => '',
             'cache_duration' => max(
                 Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL,
                 min(3600, (int) $this->saved_options['cache_duration'])
             ),
             'custom_css'     => '',
+            'invite_button_label' => sanitize_text_field($this->saved_options['invite_button_label']),
         );
     }
 }

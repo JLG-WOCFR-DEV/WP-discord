@@ -9,6 +9,10 @@
     var SERVER_NAME_SELECTOR = '[data-role="discord-server-name"]';
     var SERVER_NAME_CLASS = 'discord-server-name';
     var SERVER_NAME_TEXT_CLASS = 'discord-server-name__text';
+    var INVITE_ACTION_CLASS = 'discord-invite-action';
+    var INVITE_BUTTON_SELECTOR = '[data-role="discord-invite-button"]';
+    var INVITE_BUTTON_CLASS = 'discord-invite-button';
+    var INVITE_LABEL_CLASS = 'discord-invite-button__label';
 
     if (typeof window !== 'undefined' && window.discordBotJlg) {
         globalConfig = window.discordBotJlg;
@@ -67,6 +71,200 @@
         if (notice && notice.parentNode) {
             notice.parentNode.removeChild(notice);
         }
+    }
+
+    function getInviteActionElement(container) {
+        if (!container) {
+            return null;
+        }
+
+        return container.querySelector('.' + INVITE_ACTION_CLASS);
+    }
+
+    function ensureInviteStructure(container) {
+        if (!container) {
+            return null;
+        }
+
+        var action = getInviteActionElement(container);
+
+        if (!action) {
+            action = document.createElement('div');
+            action.className = INVITE_ACTION_CLASS;
+
+            var mainSection = container.querySelector('.discord-stats-main');
+            if (mainSection && mainSection.parentNode) {
+                if (mainSection.nextSibling) {
+                    mainSection.parentNode.insertBefore(action, mainSection.nextSibling);
+                } else {
+                    mainSection.parentNode.appendChild(action);
+                }
+            } else {
+                container.appendChild(action);
+            }
+        }
+
+        var button = action.querySelector(INVITE_BUTTON_SELECTOR);
+        if (!button) {
+            button = document.createElement('a');
+            button.className = INVITE_BUTTON_CLASS;
+            button.setAttribute('data-role', 'discord-invite-button');
+            button.setAttribute('target', '_blank');
+            button.setAttribute('rel', 'nofollow noopener noreferrer');
+            action.appendChild(button);
+        }
+
+        var label = button.querySelector('.' + INVITE_LABEL_CLASS);
+        if (!label) {
+            label = document.createElement('span');
+            label.className = INVITE_LABEL_CLASS;
+            button.appendChild(label);
+        }
+
+        return {
+            action: action,
+            button: button,
+            label: label
+        };
+    }
+
+    function removeInviteButton(container) {
+        if (!container) {
+            return;
+        }
+
+        if (container.classList) {
+            container.classList.remove('discord-with-invite');
+        }
+
+        var action = getInviteActionElement(container);
+        if (action && action.parentNode) {
+            action.parentNode.removeChild(action);
+        }
+
+        if (container.dataset) {
+            delete container.dataset.inviteUrl;
+        }
+    }
+
+    function dispatchInviteClick(container, url) {
+        if (typeof window === 'undefined') {
+            return;
+        }
+
+        var detail = {
+            container: container,
+            url: url
+        };
+
+        var eventName = 'discordBotJlg:inviteClick';
+        var inviteEvent = null;
+
+        if (typeof window.CustomEvent === 'function') {
+            try {
+                inviteEvent = new CustomEvent(eventName, { detail: detail });
+            } catch (error) {
+                inviteEvent = null;
+            }
+        }
+
+        if (!inviteEvent && typeof document !== 'undefined' && typeof document.createEvent === 'function') {
+            try {
+                inviteEvent = document.createEvent('CustomEvent');
+                if (inviteEvent && typeof inviteEvent.initCustomEvent === 'function') {
+                    inviteEvent.initCustomEvent(eventName, true, true, detail);
+                }
+            } catch (error) {
+                inviteEvent = null;
+            }
+        }
+
+        if (inviteEvent) {
+            try {
+                window.dispatchEvent(inviteEvent);
+            } catch (dispatchError) {
+                if (typeof console !== 'undefined' && typeof console.warn === 'function') {
+                    console.warn('Failed to dispatch invite click event', dispatchError);
+                }
+            }
+        }
+    }
+
+    function attachInviteTracking(button, container) {
+        if (!button || !container) {
+            return;
+        }
+
+        if (button.dataset && button.dataset.inviteTrackingBound === 'true') {
+            return;
+        }
+
+        button.addEventListener('click', function () {
+            dispatchInviteClick(container, button.href);
+        });
+
+        if (button.dataset) {
+            button.dataset.inviteTrackingBound = 'true';
+        }
+    }
+
+    function updateInviteButton(container, inviteUrl, inviteLabel) {
+        if (!container) {
+            return;
+        }
+
+        var shouldShow = false;
+        if (container.dataset && Object.prototype.hasOwnProperty.call(container.dataset, 'showInviteButton')) {
+            shouldShow = container.dataset.showInviteButton === 'true';
+        }
+
+        var resolvedUrl = '';
+        if (typeof inviteUrl === 'string') {
+            resolvedUrl = inviteUrl.trim();
+        }
+
+        if (!resolvedUrl && container.dataset && typeof container.dataset.inviteUrl === 'string') {
+            resolvedUrl = container.dataset.inviteUrl.trim();
+        }
+
+        var resolvedLabel = '';
+        if (typeof inviteLabel === 'string') {
+            resolvedLabel = inviteLabel.trim();
+        }
+
+        if (!resolvedLabel && container.dataset && typeof container.dataset.inviteLabel === 'string') {
+            resolvedLabel = container.dataset.inviteLabel.trim();
+        }
+
+        if (!resolvedLabel) {
+            resolvedLabel = getLocalizedString('inviteButtonDefaultLabel', 'Rejoindre le serveur');
+        }
+
+        if (!shouldShow || !resolvedUrl) {
+            removeInviteButton(container);
+            return;
+        }
+
+        if (container.dataset) {
+            container.dataset.inviteUrl = resolvedUrl;
+            container.dataset.inviteLabel = resolvedLabel;
+        }
+
+        if (container.classList) {
+            container.classList.add('discord-with-invite');
+        }
+
+        var elements = ensureInviteStructure(container);
+        if (!elements) {
+            return;
+        }
+
+        elements.button.setAttribute('href', resolvedUrl);
+        elements.button.setAttribute('target', '_blank');
+        elements.button.setAttribute('rel', 'nofollow noopener noreferrer');
+        elements.label.textContent = resolvedLabel;
+
+        attachInviteTracking(elements.button, container);
     }
 
     function formatStaleMessage(timestamp, locale) {
@@ -789,6 +987,8 @@
                 var isStale = !!(data.data && data.data.stale);
                 var lastUpdated = null;
                 var serverNameValue = '';
+                var inviteUrlValue = '';
+                var inviteLabelValue = '';
 
                 if (data.data && typeof data.data.last_updated !== 'undefined') {
                     var parsed = parseInt(data.data.last_updated, 10);
@@ -799,6 +999,14 @@
 
                 if (data.data && typeof data.data.server_name === 'string') {
                     serverNameValue = data.data.server_name;
+                }
+
+                if (data.data && typeof data.data.instant_invite === 'string') {
+                    inviteUrlValue = data.data.instant_invite;
+                }
+
+                if (data.data && typeof data.data.invite_label === 'string') {
+                    inviteLabelValue = data.data.invite_label;
                 }
 
                 var onlineValue = typeof data.data.online === 'number' ? data.data.online : null;
@@ -823,6 +1031,8 @@
                 updateStaleNotice(container, isStale, lastUpdated, locale);
 
                 updateServerName(container, serverNameValue);
+
+                updateInviteButton(container, inviteUrlValue, inviteLabelValue);
 
                 ensureOnlineLabelElement(container);
                 updateStatElement(container, '.discord-online .discord-number', onlineValue, formatter);
@@ -1102,6 +1312,21 @@
         }
 
         Array.prototype.forEach.call(containers, function (container) {
+            var initialInviteUrl = '';
+            var initialInviteLabel = '';
+
+            if (container && container.dataset) {
+                if (typeof container.dataset.inviteUrl === 'string') {
+                    initialInviteUrl = container.dataset.inviteUrl;
+                }
+
+                if (typeof container.dataset.inviteLabel === 'string') {
+                    initialInviteLabel = container.dataset.inviteLabel;
+                }
+            }
+
+            updateInviteButton(container, initialInviteUrl, initialInviteLabel);
+
             var isForcedDemo = container.dataset.demo === 'true' && container.dataset.fallbackDemo !== 'true';
 
             if (isForcedDemo) {

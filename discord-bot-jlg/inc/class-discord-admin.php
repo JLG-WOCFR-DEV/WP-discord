@@ -133,6 +133,22 @@ class Discord_Bot_JLG_Admin {
         );
 
         add_settings_field(
+            'show_invite_button',
+            __('Afficher le bouton d\'invitation', 'discord-bot-jlg'),
+            array($this, 'show_invite_button_render'),
+            'discord_stats_settings',
+            'discord_stats_display_section'
+        );
+
+        add_settings_field(
+            'invite_button_label',
+            __('Libellé du bouton d\'invitation', 'discord-bot-jlg'),
+            array($this, 'invite_button_label_render'),
+            'discord_stats_settings',
+            'discord_stats_display_section'
+        );
+
+        add_settings_field(
             'widget_title',
             __('Titre du widget', 'discord-bot-jlg'),
             array($this, 'widget_title_render'),
@@ -185,6 +201,10 @@ class Discord_Bot_JLG_Admin {
                 ? (int) $current_options['cache_duration']
                 : 300,
             'custom_css'     => '',
+            'show_invite_button' => 0,
+            'invite_button_label' => isset($current_options['invite_button_label'])
+                ? sanitize_text_field($current_options['invite_button_label'])
+                : '',
         );
 
         if (isset($input['server_id'])) {
@@ -246,9 +266,14 @@ class Discord_Bot_JLG_Admin {
         $sanitized['demo_mode']   = !empty($input['demo_mode']) ? 1 : 0;
         $sanitized['show_online'] = !empty($input['show_online']) ? 1 : 0;
         $sanitized['show_total']  = !empty($input['show_total']) ? 1 : 0;
+        $sanitized['show_invite_button'] = !empty($input['show_invite_button']) ? 1 : 0;
 
         if (isset($input['widget_title'])) {
             $sanitized['widget_title'] = sanitize_text_field($input['widget_title']);
+        }
+
+        if (array_key_exists('invite_button_label', $input)) {
+            $sanitized['invite_button_label'] = sanitize_text_field($input['invite_button_label']);
         }
 
         if (array_key_exists('cache_duration', $input)) {
@@ -558,6 +583,36 @@ class Discord_Bot_JLG_Admin {
         <input type="checkbox" name="<?php echo esc_attr($this->option_name); ?>[show_total]"
                value="1" <?php checked($value, 1); ?> />
         <label><?php esc_html_e('Afficher le nombre total de membres', 'discord-bot-jlg'); ?></label>
+        <?php
+    }
+
+    /**
+     * Rend la case à cocher pour activer l'affichage du bouton d'invitation.
+     *
+     * @return void
+     */
+    public function show_invite_button_render() {
+        $options = get_option($this->option_name);
+        $value   = isset($options['show_invite_button']) ? (int) $options['show_invite_button'] : 0;
+        ?>
+        <input type="checkbox" name="<?php echo esc_attr($this->option_name); ?>[show_invite_button]"
+               value="1" <?php checked($value, 1); ?> />
+        <label><?php esc_html_e('Afficher un bouton d\'invitation si un lien est disponible', 'discord-bot-jlg'); ?></label>
+        <?php
+    }
+
+    /**
+     * Rend le champ texte configurant le libellé du bouton d'invitation.
+     *
+     * @return void
+     */
+    public function invite_button_label_render() {
+        $options = get_option($this->option_name);
+        $value   = isset($options['invite_button_label']) ? $options['invite_button_label'] : '';
+        ?>
+        <input type="text" name="<?php echo esc_attr($this->option_name); ?>[invite_button_label]"
+               value="<?php echo esc_attr($value); ?>" class="regular-text" />
+        <p class="description"><?php esc_html_e('Texte affiché sur le bouton d\'invitation.', 'discord-bot-jlg'); ?></p>
         <?php
     }
 

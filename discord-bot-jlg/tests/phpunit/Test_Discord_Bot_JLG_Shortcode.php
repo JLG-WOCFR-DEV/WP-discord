@@ -38,6 +38,8 @@ class Test_Discord_Bot_JLG_Shortcode extends TestCase {
             'show_total'    => true,
             'widget_title'  => 'Mon serveur',
             'custom_css'    => $custom_css,
+            'show_invite_button' => true,
+            'invite_button_label' => 'Rejoindre',
         );
 
         $stats = array(
@@ -48,6 +50,8 @@ class Test_Discord_Bot_JLG_Shortcode extends TestCase {
             'stale'                => false,
             'fallback_demo'        => false,
             'is_demo'              => false,
+            'instant_invite'       => 'https://discord.gg/example',
+            'invite_label'         => 'Rejoindre le serveur',
         );
 
         $api->method('get_plugin_options')->willReturn($options);
@@ -116,6 +120,25 @@ class Test_Discord_Bot_JLG_Shortcode extends TestCase {
         $this->assertStringContainsString('width: 100%', $html);
         $this->assertStringContainsString('max-width: 600px', $html);
         $this->assertStringContainsString('width: 100%; max-width: 600px', $html);
+    }
+
+    public function test_render_shortcode_outputs_invite_button_when_enabled() {
+        $shortcode = $this->get_shortcode_instance();
+
+        $html = $shortcode->render_shortcode(array());
+
+        $this->assertStringContainsString('<a class="discord-invite-button"', $html);
+        $this->assertStringContainsString('https://discord.gg/example', $html);
+    }
+
+    public function test_render_shortcode_hides_invite_button_when_disabled() {
+        $shortcode = $this->get_shortcode_instance();
+
+        $html = $shortcode->render_shortcode(array(
+            'show_invite_button' => 'false',
+        ));
+
+        $this->assertStringNotContainsString('<a class="discord-invite-button"', $html);
     }
 
     public function test_enqueue_assets_preserves_media_query_css() {

@@ -122,6 +122,14 @@
         "show_server_name": {
             "type": "boolean",
             "default": false
+        },
+        "show_invite_button": {
+            "type": "boolean",
+            "default": false
+        },
+        "invite_label": {
+            "type": "string",
+            "default": ""
         }
     }
 }

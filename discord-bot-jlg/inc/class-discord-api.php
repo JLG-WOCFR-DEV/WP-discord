@@ -125,21 +125,29 @@ class Discord_Bot_JLG_API {
             return $this->runtime_cache[$runtime_key];
         }
 
+        $options = $this->get_plugin_options();
+
         if (true === $args['force_demo']) {
             $demo_stats = $this->get_demo_stats(false);
+            $demo_stats = $this->apply_invite_metadata($demo_stats, $options);
+            $demo_stats = $this->normalize_stats($demo_stats);
             return $this->remember_runtime_result($runtime_key, $demo_stats);
         }
 
-        $options = $this->get_plugin_options();
-
         if (!empty($options['demo_mode'])) {
             $demo_stats = $this->get_demo_stats(false);
+            $demo_stats = $this->apply_invite_metadata($demo_stats, $options);
+            $demo_stats = $this->normalize_stats($demo_stats);
             return $this->remember_runtime_result($runtime_key, $demo_stats);
         }
 
         if (false === $args['bypass_cache']) {
             $cached_stats = get_transient($this->cache_key);
             if (false !== $cached_stats) {
+                if (is_array($cached_stats)) {
+                    $cached_stats = $this->apply_invite_metadata($cached_stats, $options);
+                    $cached_stats = $this->normalize_stats($cached_stats);
+                }
                 return $this->remember_runtime_result($runtime_key, $cached_stats);
             }
         }
@@ -147,6 +155,8 @@ class Discord_Bot_JLG_API {
         if (empty($options['server_id'])) {
             $this->last_error = __('Aucun identifiant de serveur Discord n\'est configuré.', 'discord-bot-jlg');
             $demo_stats = $this->persist_fallback_stats($this->get_demo_stats(true), $options, $this->last_error);
+            $demo_stats = $this->apply_invite_metadata($demo_stats, $options);
+            $demo_stats = $this->normalize_stats($demo_stats);
             return $this->remember_runtime_result($runtime_key, $demo_stats);
         }
 
@@ -193,6 +203,12 @@ class Discord_Bot_JLG_API {
                             : (isset($bot_stats['server_name']) ? $bot_stats['server_name'] : ''),
                         'has_total'            => $has_total,
                         'total_is_approximate' => $total_approximate,
+                        'instant_invite'       => isset($widget_stats['instant_invite'])
+                            ? $widget_stats['instant_invite']
+                            : (isset($bot_stats['instant_invite']) ? $bot_stats['instant_invite'] : ''),
+                        'invite_label'         => isset($widget_stats['invite_label'])
+                            ? $widget_stats['invite_label']
+                            : (isset($bot_stats['invite_label']) ? $bot_stats['invite_label'] : ''),
                     );
                 } elseif (false === $stats) {
                     $stats = $bot_stats;
@@ -201,6 +217,7 @@ class Discord_Bot_JLG_API {
         }
 
         if (is_array($stats)) {
+            $stats = $this->apply_invite_metadata($stats, $options);
             $stats = $this->normalize_stats($stats);
         }
 
@@ -210,6 +227,8 @@ class Discord_Bot_JLG_API {
             }
             $this->store_api_retry_after_delay($this->last_retry_after);
             $demo_stats = $this->persist_fallback_stats($this->get_demo_stats(true), $options, $this->last_error);
+            $demo_stats = $this->apply_invite_metadata($demo_stats, $options);
+            $demo_stats = $this->normalize_stats($demo_stats);
             return $this->remember_runtime_result($runtime_key, $demo_stats);
         }
 
@@ -1114,6 +1133,8 @@ class Discord_Bot_JLG_API {
             'fallback_demo'        => (bool) $is_fallback,
             'has_total'            => true,
             'total_is_approximate' => false,
+            'instant_invite'       => '',
+            'invite_label'         => $this->get_default_invite_label(),
         );
     }
 
@@ -1138,6 +1159,9 @@ class Discord_Bot_JLG_API {
         if (!isset($stats['last_updated']) || !is_numeric($stats['last_updated'])) {
             $stats['last_updated'] = time();
         }
+
+        $stats = $this->apply_invite_metadata($stats, $options);
+        $stats = $this->normalize_stats($stats);
 
         $ttl = $this->get_fallback_cache_ttl($options);
 
@@ -1472,6 +1496,18 @@ class Discord_Bot_JLG_API {
             $stats['total_is_approximate'] = true;
         }
 
+        $invite_url = '';
+        if (isset($data['instant_invite']) && is_string($data['instant_invite'])) {
+            $invite_url = esc_url_raw(trim($data['instant_invite']));
+        }
+
+        $stats['instant_invite'] = $invite_url;
+
+        $stats['invite_label'] = '';
+        if (isset($options['invite_button_label']) && is_string($options['invite_button_label'])) {
+            $stats['invite_label'] = trim($options['invite_button_label']);
+        }
+
         return $stats;
     }
 
@@ -1723,6 +1759,49 @@ class Discord_Bot_JLG_API {
         return $decrypted;
     }
 
+    private function get_default_invite_label() {
+        return __('Rejoindre le serveur', 'discord-bot-jlg');
+    }
+
+    private function apply_invite_metadata($stats, $options) {
+        if (!is_array($stats)) {
+            return $stats;
+        }
+
+        $invite_url = '';
+        if (isset($stats['instant_invite']) && is_string($stats['instant_invite'])) {
+            $invite_url = trim($stats['instant_invite']);
+        }
+
+        if ('' !== $invite_url) {
+            $stats['instant_invite'] = esc_url_raw($invite_url);
+        } else {
+            $stats['instant_invite'] = '';
+        }
+
+        $option_label = '';
+        if (isset($options['invite_button_label']) && is_string($options['invite_button_label'])) {
+            $option_label = trim($options['invite_button_label']);
+        }
+
+        $label = '';
+        if (isset($stats['invite_label']) && is_string($stats['invite_label'])) {
+            $label = trim($stats['invite_label']);
+        }
+
+        if ('' !== $option_label) {
+            $label = $option_label;
+        }
+
+        if ('' === $label) {
+            $label = $this->get_default_invite_label();
+        }
+
+        $stats['invite_label'] = $label;
+
+        return $stats;
+    }
+
     private function get_cache_duration($options) {
         if (isset($options['cache_duration'])) {
             $duration = (int) $options['cache_duration'];
@@ -1756,6 +1835,14 @@ class Discord_Bot_JLG_API {
 
         if (!isset($stats['total_is_approximate'])) {
             $stats['total_is_approximate'] = false;
+        }
+
+        if (!isset($stats['instant_invite']) || !is_string($stats['instant_invite'])) {
+            $stats['instant_invite'] = '';
+        }
+
+        if (!isset($stats['invite_label']) || !is_string($stats['invite_label'])) {
+            $stats['invite_label'] = $this->get_default_invite_label();
         }
 
         return $stats;
