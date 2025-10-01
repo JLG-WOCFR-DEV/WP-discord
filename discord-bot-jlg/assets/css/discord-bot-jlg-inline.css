@@ -44,7 +44,7 @@
 
 .discord-stats-container .discord-stats-wrapper {
     gap: var(--discord-gap);
-    transition: opacity 0.2s ease;
+    transition: opacity 0.2s ease, filter 0.2s ease;
 }
 
 .discord-stats-container .discord-stat {
@@ -147,9 +147,17 @@
 }
 
 .discord-stats-container[data-refreshing="true"] .discord-stats-wrapper {
-    opacity: 0.55;
-    filter: saturate(0.85);
-    transition: opacity 0.2s ease;
+    opacity: 0.6;
+    filter: saturate(0.85) brightness(0.96);
+    transition: opacity 0.2s ease, filter 0.2s ease;
+}
+
+.discord-stats-container[data-refreshing="true"] {
+    cursor: progress;
+}
+
+.discord-stats-container[data-refreshing="true"] .discord-stat {
+    pointer-events: none;
 }
 
 .discord-refresh-status {
@@ -161,12 +169,14 @@
     gap: 8px;
     padding: 6px 12px;
     border-radius: 999px;
-    background: rgba(17, 24, 39, 0.9);
+    background: rgba(15, 23, 42, 0.92);
     color: #f9fafb;
     font-size: 13px;
     font-weight: 600;
     letter-spacing: 0.01em;
     box-shadow: 0 6px 18px rgba(15, 23, 42, 0.4);
+    border: 1px solid rgba(255, 255, 255, 0.25);
+    backdrop-filter: blur(6px);
     z-index: 15;
 }
 
@@ -178,11 +188,8 @@
     border: 2px solid currentColor;
     border-bottom-color: transparent;
     border-left-color: transparent;
+    opacity: 0.85;
     animation: discord-spin 0.9s linear infinite;
-}
-
-.discord-stats-container[data-refreshing="true"] {
-    cursor: progress;
 }
 
 @keyframes pulse {
@@ -221,6 +228,10 @@
 
     .discord-refresh-status::before {
         animation: none;
+    }
+
+    .discord-stats-container .discord-stats-wrapper {
+        transition: none;
     }
 }
 
