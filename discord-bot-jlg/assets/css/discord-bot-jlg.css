@@ -88,6 +88,119 @@
     min-width: 0;
 }
 
+.discord-cta {
+    margin-top: calc(var(--discord-gap) * 0.75);
+    display: flex;
+    flex: 0 0 100%;
+}
+
+.discord-align-center .discord-cta {
+    justify-content: center;
+    text-align: center;
+}
+
+.discord-align-right .discord-cta {
+    justify-content: flex-end;
+    text-align: right;
+}
+
+.discord-cta-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5em;
+    padding: calc(var(--discord-padding) * 0.75) calc(var(--discord-padding) * 1.5);
+    border-radius: calc(var(--discord-radius) * 1.3);
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    text-decoration: none;
+    line-height: 1.35;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, background 0.2s ease, color 0.2s ease, border-color 0.2s ease;
+    min-width: 0;
+    border: 2px solid transparent;
+}
+
+.discord-cta-button:focus-visible {
+    outline: 3px solid rgba(255, 255, 255, 0.85);
+    outline-offset: 3px;
+}
+
+.discord-cta-button--solid {
+    color: #ffffff;
+    background: linear-gradient(135deg, #5865f2, #4750c7);
+    box-shadow: 0 4px 12px rgba(88, 101, 242, 0.35);
+}
+
+.discord-cta-button--solid:hover,
+.discord-cta-button--solid:focus-visible {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(88, 101, 242, 0.4);
+    filter: brightness(1.05);
+}
+
+.discord-cta-button--outline {
+    background: transparent;
+    color: #4750c7;
+    border-color: currentColor;
+    box-shadow: none;
+}
+
+.discord-cta-button--outline:hover,
+.discord-cta-button--outline:focus-visible {
+    transform: translateY(-1px);
+    color: #2f3aa8;
+    border-color: #2f3aa8;
+}
+
+.discord-theme-dark .discord-cta-button--outline {
+    color: #d6dcff;
+    border-color: rgba(214, 220, 255, 0.7);
+}
+
+.discord-theme-dark .discord-cta-button--outline:hover,
+.discord-theme-dark .discord-cta-button--outline:focus-visible {
+    color: #ffffff;
+    border-color: rgba(255, 255, 255, 0.85);
+}
+
+.discord-theme-light .discord-cta-button--solid,
+.discord-theme-minimal .discord-cta-button--solid {
+    background: linear-gradient(135deg, #5561ec, #3941b4);
+}
+
+.discord-theme-light .discord-cta-button--outline,
+.discord-theme-minimal .discord-cta-button--outline {
+    color: #3b4acb;
+    border-color: rgba(59, 74, 203, 0.85);
+}
+
+.discord-cta-button__label {
+    font-size: clamp(14px, 3.4vw, 18px);
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.35em;
+}
+
+.discord-compact .discord-cta-button {
+    padding: calc(var(--discord-padding) * 0.6) calc(var(--discord-padding) * 1.2);
+}
+
+.discord-compact .discord-cta {
+    margin-top: calc(var(--discord-gap) * 0.5);
+}
+
+@media (max-width: 600px) {
+    .discord-cta {
+        justify-content: flex-start;
+    }
+
+    .discord-cta-button {
+        width: 100%;
+        max-width: 100%;
+    }
+}
+
 .discord-invite {
     margin-top: calc(var(--discord-gap) * 0.75);
     display: flex;

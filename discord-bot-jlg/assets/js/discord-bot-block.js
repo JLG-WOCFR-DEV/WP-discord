@@ -48,6 +48,11 @@
         { label: __('À droite', 'discord-bot-jlg'), value: 'right' }
     ];
 
+    var ctaStyleOptions = [
+        { label: __('Plein', 'discord-bot-jlg'), value: 'solid' },
+        { label: __('Contour', 'discord-bot-jlg'), value: 'outline' }
+    ];
+
     var defaultAttributes = {
         layout: 'horizontal',
         show_online: true,
@@ -78,7 +83,13 @@
         show_server_avatar: false,
         avatar_size: 128,
         invite_url: '',
-        invite_label: ''
+        invite_label: '',
+        cta_enabled: false,
+        cta_label: '',
+        cta_url: '',
+        cta_style: 'solid',
+        cta_new_tab: true,
+        cta_tooltip: ''
     };
 
     var REFRESH_INTERVAL_MIN = 10;
@@ -332,6 +343,43 @@
                                 updateAttribute(setAttributes, 'avatar_size')(value);
                             },
                             help: __('Utilisez une puissance de deux (ex. 128, 256, 512) pour une image nette.', 'discord-bot-jlg')
+                        }),
+                        createElement(ToggleControl, {
+                            label: __('Afficher le bouton d\'action', 'discord-bot-jlg'),
+                            checked: !!attributes.cta_enabled,
+                            onChange: updateAttribute(setAttributes, 'cta_enabled')
+                        }),
+                        !!attributes.cta_enabled && createElement(TextControl, {
+                            label: __('Libellé du bouton', 'discord-bot-jlg'),
+                            value: attributes.cta_label,
+                            onChange: updateAttribute(setAttributes, 'cta_label'),
+                            placeholder: __('Rejoindre la communauté', 'discord-bot-jlg')
+                        }),
+                        !!attributes.cta_enabled && createElement(TextControl, {
+                            label: __('URL du bouton', 'discord-bot-jlg'),
+                            value: attributes.cta_url,
+                            onChange: updateAttribute(setAttributes, 'cta_url'),
+                            type: 'url',
+                            placeholder: 'https://discord.gg/xxxx',
+                            help: __('Incluez l’URL complète (avec https://).', 'discord-bot-jlg')
+                        }),
+                        !!attributes.cta_enabled && createElement(SelectControl, {
+                            label: __('Style du bouton', 'discord-bot-jlg'),
+                            value: attributes.cta_style,
+                            options: ctaStyleOptions,
+                            onChange: updateAttribute(setAttributes, 'cta_style')
+                        }),
+                        !!attributes.cta_enabled && createElement(ToggleControl, {
+                            label: __('Ouvrir dans un nouvel onglet', 'discord-bot-jlg'),
+                            checked: !!attributes.cta_new_tab,
+                            onChange: updateAttribute(setAttributes, 'cta_new_tab'),
+                            help: __('Ajoute les attributs target="_blank" et rel="noopener".', 'discord-bot-jlg')
+                        }),
+                        !!attributes.cta_enabled && createElement(TextControl, {
+                            label: __('Info-bulle (optionnel)', 'discord-bot-jlg'),
+                            value: attributes.cta_tooltip,
+                            onChange: updateAttribute(setAttributes, 'cta_tooltip'),
+                            placeholder: __('Découvrir le serveur Discord', 'discord-bot-jlg')
                         })
                     ),
                     createElement(
