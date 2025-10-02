@@ -35,6 +35,50 @@
         return fallback;
     }
 
+    function collectConnectionOverrides(container, config) {
+        var overrides = {
+            profileKey: '',
+            serverId: '',
+            botToken: ''
+        };
+
+        if (config && typeof config === 'object') {
+            if (typeof config.profileKey === 'string' && config.profileKey) {
+                overrides.profileKey = config.profileKey;
+            }
+
+            if (typeof config.serverId === 'string' && config.serverId) {
+                overrides.serverId = config.serverId;
+            }
+
+            if (typeof config.botToken === 'string' && config.botToken) {
+                overrides.botToken = config.botToken;
+            }
+        }
+
+        var dataset = container && container.dataset ? container.dataset : null;
+
+        if (dataset) {
+            if (typeof dataset.profileKey === 'string' && dataset.profileKey) {
+                overrides.profileKey = dataset.profileKey;
+            }
+
+            if (typeof dataset.serverIdOverride === 'string' && dataset.serverIdOverride) {
+                overrides.serverId = dataset.serverIdOverride;
+            }
+
+            if (typeof dataset.botTokenOverride === 'string' && dataset.botTokenOverride) {
+                overrides.botToken = dataset.botTokenOverride;
+            }
+        }
+
+        overrides.profileKey = overrides.profileKey ? String(overrides.profileKey).trim() : '';
+        overrides.serverId = overrides.serverId ? String(overrides.serverId).trim() : '';
+        overrides.botToken = overrides.botToken ? String(overrides.botToken).trim() : '';
+
+        return overrides;
+    }
+
     function getOrCreateErrorMessageElement(container) {
         if (!container) {
             return null;
@@ -881,6 +925,20 @@
 
         if (config.requiresNonce && config.nonce) {
             formData.append('_ajax_nonce', config.nonce);
+        }
+
+        var overrides = collectConnectionOverrides(container, config);
+
+        if (overrides.profileKey) {
+            formData.append('profile_key', overrides.profileKey);
+        }
+
+        if (overrides.serverId) {
+            formData.append('server_id', overrides.serverId);
+        }
+
+        if (overrides.botToken) {
+            formData.append('bot_token', overrides.botToken);
         }
 
         var requestPromise = fetch(config.ajaxUrl, {

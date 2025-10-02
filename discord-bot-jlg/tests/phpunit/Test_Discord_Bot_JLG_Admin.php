@@ -331,6 +331,77 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
         $this->assertSame($expected, $result);
     }
 
+    public function test_sanitize_options_updates_existing_server_profile() {
+        $existing_options = $this->saved_options;
+        $existing_options['server_profiles'] = array(
+            'main' => array(
+                'key'       => 'main',
+                'label'     => 'Profil existant',
+                'server_id' => '111222333',
+                'bot_token' => discord_bot_jlg_encrypt_secret('profil-token'),
+            ),
+        );
+
+        update_option(DISCORD_BOT_JLG_OPTION_NAME, $existing_options);
+
+        $input = array(
+            'server_profiles' => array(
+                'main' => array(
+                    'key'       => 'main',
+                    'label'     => ' Nouveau libellé ',
+                    'server_id' => ' 987abc654 ',
+                    'bot_token' => ' nouveau-token ',
+                ),
+            ),
+        );
+
+        $result = $this->admin->sanitize_options($input);
+
+        $this->assertArrayHasKey('server_profiles', $result);
+        $this->assertArrayHasKey('main', $result['server_profiles']);
+
+        $profile = $result['server_profiles']['main'];
+
+        $this->assertSame('main', $profile['key']);
+        $this->assertSame('Nouveau libellé', $profile['label']);
+        $this->assertSame('987654', $profile['server_id']);
+        $this->assertTrue(discord_bot_jlg_is_encrypted_secret($profile['bot_token']));
+
+        $decrypted = discord_bot_jlg_decrypt_secret($profile['bot_token']);
+        $this->assertFalse(is_wp_error($decrypted));
+        $this->assertSame('nouveau-token', $decrypted);
+    }
+
+    public function test_sanitize_options_adds_new_profile() {
+        $input = array(
+            'new_profile' => array(
+                'label'     => 'Serveur Communauté',
+                'server_id' => ' 123 456 ',
+                'bot_token' => ' token-temporaire ',
+            ),
+        );
+
+        $result = $this->admin->sanitize_options($input);
+
+        $this->assertArrayHasKey('server_profiles', $result);
+        $this->assertNotEmpty($result['server_profiles']);
+
+        $keys = array_keys($result['server_profiles']);
+        $this->assertNotEmpty($keys);
+
+        $profile_key = $keys[0];
+        $profile     = $result['server_profiles'][$profile_key];
+
+        $this->assertSame($profile_key, $profile['key']);
+        $this->assertSame('Serveur Communauté', $profile['label']);
+        $this->assertSame('123456', $profile['server_id']);
+        $this->assertTrue(discord_bot_jlg_is_encrypted_secret($profile['bot_token']));
+
+        $decrypted = discord_bot_jlg_decrypt_secret($profile['bot_token']);
+        $this->assertFalse(is_wp_error($decrypted));
+        $this->assertSame('token-temporaire', $decrypted);
+    }
+
     public function test_fallback_notice_cleared_after_successful_refresh() {
         $options = $this->saved_options;
         $options['demo_mode'] = 0;
@@ -462,6 +533,7 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
             'accent_color'       => '#654321',
             'accent_color_alt'   => '#765432',
             'accent_text_color'  => '#111111',
+            'server_profiles'    => array(),
         );
     }
 }

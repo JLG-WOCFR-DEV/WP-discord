@@ -131,6 +131,9 @@ class Discord_Bot_JLG_Shortcode {
                 'cta_style'            => 'solid',
                 'cta_new_tab'          => true,
                 'cta_tooltip'          => '',
+                'profile'              => '',
+                'server_id'            => '',
+                'bot_token'            => '',
             ),
             $atts,
             'discord_stats'
@@ -180,10 +183,23 @@ class Discord_Bot_JLG_Shortcode {
             $cta_enabled = false;
         }
 
+        $profile_key        = $this->sanitize_profile_key($atts['profile']);
+        $override_server_id = $this->sanitize_server_id_attribute($atts['server_id']);
+        $override_bot_token = $this->sanitize_bot_token_attribute($atts['bot_token']);
+
         if ($force_demo) {
             $stats = $this->api->get_demo_stats();
         } else {
-            $stats = $this->api->get_stats();
+            $stats = $this->api->get_stats(
+                array_filter(
+                    array(
+                        'profile_key' => $profile_key,
+                        'server_id'   => $override_server_id,
+                        'bot_token'   => $override_bot_token,
+                    ),
+                    'strlen'
+                )
+            );
         }
 
         if (!is_array($stats)) {
@@ -436,6 +452,18 @@ class Discord_Bot_JLG_Shortcode {
             }
         }
 
+        if ('' !== $profile_key) {
+            $attributes[] = sprintf('data-profile-key="%s"', esc_attr($profile_key));
+        }
+
+        if ('' !== $override_server_id) {
+            $attributes[] = sprintf('data-server-id-override="%s"', esc_attr($override_server_id));
+        }
+
+        if ('' !== $override_bot_token) {
+            $attributes[] = sprintf('data-bot-token-override="%s"', esc_attr($override_bot_token));
+        }
+
         $refresh_interval = 0;
         $min_refresh_interval = $min_refresh_option;
 
@@ -673,6 +701,44 @@ class Discord_Bot_JLG_Shortcode {
         $base = remove_query_arg('size', $base);
 
         return add_query_arg('size', $this->sanitize_avatar_size($size), $base);
+    }
+
+    private function sanitize_profile_key($value) {
+        if (!is_string($value)) {
+            return '';
+        }
+
+        $value = trim($value);
+
+        if ('' === $value) {
+            return '';
+        }
+
+        return sanitize_key($value);
+    }
+
+    private function sanitize_server_id_attribute($value) {
+        if (!is_string($value) && !is_numeric($value)) {
+            return '';
+        }
+
+        $value = preg_replace('/[^0-9]/', '', (string) $value);
+
+        return (string) $value;
+    }
+
+    private function sanitize_bot_token_attribute($value) {
+        if (!is_string($value) && !is_numeric($value)) {
+            return '';
+        }
+
+        $value = trim((string) $value);
+
+        if ('' === $value) {
+            return '';
+        }
+
+        return sanitize_text_field($value);
     }
 
     private function validate_width_value($raw_width) {

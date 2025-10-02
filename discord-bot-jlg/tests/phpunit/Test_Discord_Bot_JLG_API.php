@@ -389,6 +389,63 @@ class Test_Discord_Bot_JLG_API extends TestCase {
         $this->assertGreaterThan(0, $last_good_entry['value']['timestamp']);
     }
 
+    public function test_get_stats_uses_distinct_cache_key_for_server_override() {
+        $option_name = 'discord_server_stats_options';
+        $cache_key   = 'discord_server_stats_cache';
+
+        $GLOBALS['wp_test_options'][$option_name] = array(
+            'server_id'      => '246810',
+            'cache_duration' => 120,
+            'bot_token'      => 'token-123',
+        );
+
+        $widget_payload = array(
+            'presence_count' => 4,
+            'name'           => 'Override Guild',
+            'members'        => array(
+                array('id' => 1),
+            ),
+        );
+
+        $bot_payload = array(
+            'approximate_presence_count' => 8,
+            'approximate_member_count'   => 24,
+            'name'                       => 'Override Guild',
+        );
+
+        $http_client = new Successful_Mock_Discord_Bot_JLG_Http_Client($widget_payload, $bot_payload);
+        $api         = new Discord_Bot_JLG_API($option_name, $cache_key, 60, $http_client);
+
+        $override_id = '999888777';
+
+        $stats = $api->get_stats(
+            array(
+                'bypass_cache' => true,
+                'server_id'    => $override_id,
+            )
+        );
+
+        $this->assertIsArray($stats);
+        $this->assertSame(2, count($http_client->requests));
+
+        $signature          = 'server:' . $override_id;
+        $override_cache_key = $cache_key . '_' . md5($signature);
+
+        $this->assertArrayHasKey($override_cache_key, $GLOBALS['wp_test_transients']);
+        $this->assertArrayNotHasKey($cache_key, $GLOBALS['wp_test_transients']);
+
+        $initial_request_count = count($http_client->requests);
+
+        $cached_stats = $api->get_stats(
+            array(
+                'server_id' => $override_id,
+            )
+        );
+
+        $this->assertSame($initial_request_count, count($http_client->requests));
+        $this->assertSame($stats, $cached_stats);
+    }
+
     public function test_get_stats_treats_string_force_demo_as_true() {
         $option_name = 'discord_server_stats_options';
         $cache_key   = 'discord_server_stats_cache';

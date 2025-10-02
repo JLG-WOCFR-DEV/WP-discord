@@ -45,4 +45,46 @@ class Test_Discord_Stats_Widget extends TestCase {
         $this->assertNotNull($GLOBALS['discord_bot_jlg_last_shortcode']);
         $this->assertStringContainsString('theme="minimal"', $GLOBALS['discord_bot_jlg_last_shortcode']);
     }
+
+    public function test_update_sanitizes_connection_overrides() {
+        $widget = new Discord_Stats_Widget();
+
+        $new_instance = array(
+            'profile_key'        => 'Profil Personnel',
+            'server_id_override' => 'abc123456',
+            'bot_token_override' => " token\n",
+        );
+
+        $updated = $widget->update($new_instance, array());
+
+        $this->assertSame('profil-personnel', $updated['profile_key']);
+        $this->assertSame('123456', $updated['server_id_override']);
+        $this->assertSame('token', $updated['bot_token_override']);
+    }
+
+    public function test_widget_shortcode_includes_connection_overrides() {
+        $widget = new Discord_Stats_Widget();
+
+        $args = array(
+            'before_widget' => '',
+            'after_widget'  => '',
+            'before_title'  => '',
+            'after_title'   => '',
+        );
+
+        $instance = array(
+            'profile_key'        => 'profil-special',
+            'server_id_override' => '987654321',
+            'bot_token_override' => 'widget-token',
+        );
+
+        ob_start();
+        $widget->widget($args, $instance);
+        ob_end_clean();
+
+        $this->assertNotNull($GLOBALS['discord_bot_jlg_last_shortcode']);
+        $this->assertStringContainsString('profile="profil-special"', $GLOBALS['discord_bot_jlg_last_shortcode']);
+        $this->assertStringContainsString('server_id="987654321"', $GLOBALS['discord_bot_jlg_last_shortcode']);
+        $this->assertStringContainsString('bot_token="widget-token"', $GLOBALS['discord_bot_jlg_last_shortcode']);
+    }
 }
