@@ -38,6 +38,11 @@ class Test_Discord_Bot_JLG_Shortcode extends TestCase {
             'show_total'    => true,
             'widget_title'  => 'Mon serveur',
             'custom_css'    => $custom_css,
+            'show_server_name' => true,
+            'show_server_avatar' => true,
+            'default_refresh_enabled' => true,
+            'default_refresh_interval' => 45,
+            'default_theme' => 'dark',
         );
 
         $stats = array(
@@ -48,6 +53,9 @@ class Test_Discord_Bot_JLG_Shortcode extends TestCase {
             'stale'                => false,
             'fallback_demo'        => false,
             'is_demo'              => false,
+            'server_name'          => 'Test Guild',
+            'server_avatar_base_url' => 'https://cdn.discordapp.com/icons/123456789/abcdef.png',
+            'server_avatar_url'    => 'https://cdn.discordapp.com/icons/123456789/abcdef.png?size=64',
         );
 
         $api->method('get_plugin_options')->willReturn($options);
@@ -145,5 +153,18 @@ class Test_Discord_Bot_JLG_Shortcode extends TestCase {
         $this->assertSame(discord_bot_jlg_sanitize_custom_css($custom_css), $injected_css);
         $this->assertStringNotContainsString('<script', $injected_css);
         $this->assertStringNotContainsString('</', $injected_css);
+    }
+
+    public function test_render_shortcode_inherits_defaults_from_options() {
+        $shortcode = $this->get_shortcode_instance();
+
+        $html = $shortcode->render_shortcode(array());
+
+        $this->assertStringContainsString('discord-theme-dark', $html);
+        $this->assertStringContainsString('data-refresh="45"', $html);
+        $this->assertStringContainsString('data-show-server-name="true"', $html);
+        $this->assertStringContainsString('data-show-server-avatar="true"', $html);
+        $this->assertStringContainsString('data-server-name="Test Guild"', $html);
+        $this->assertStringContainsString('data-server-avatar-url="https://cdn.discordapp.com/icons/123456789/abcdef.png?size=128"', $html);
     }
 }

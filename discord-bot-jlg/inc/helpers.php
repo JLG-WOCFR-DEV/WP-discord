@@ -7,6 +7,49 @@ if (!defined('DISCORD_BOT_JLG_SECRET_PREFIX')) {
     define('DISCORD_BOT_JLG_SECRET_PREFIX', 'dbjlg_enc_v1:');
 }
 
+if (!function_exists('discord_bot_jlg_get_available_themes')) {
+    /**
+     * Returns the list of allowed themes for the public components.
+     *
+     * @return string[]
+     */
+    function discord_bot_jlg_get_available_themes() {
+        $themes = array('discord', 'dark', 'light', 'minimal');
+
+        if (function_exists('apply_filters')) {
+            $filtered = apply_filters('discord_bot_jlg_available_themes', $themes);
+
+            if (is_array($filtered)) {
+                $themes = $filtered;
+            }
+        }
+
+        $themes = array_map('strval', $themes);
+        $themes = array_filter($themes, function ($theme) {
+            return '' !== $theme;
+        });
+
+        return array_values(array_unique($themes));
+    }
+}
+
+if (!function_exists('discord_bot_jlg_is_allowed_theme')) {
+    /**
+     * Checks whether the provided theme identifier is part of the allowed list.
+     *
+     * @param string $theme Theme identifier to validate.
+     *
+     * @return bool
+     */
+    function discord_bot_jlg_is_allowed_theme($theme) {
+        if (!is_string($theme) || '' === $theme) {
+            return false;
+        }
+
+        return in_array($theme, discord_bot_jlg_get_available_themes(), true);
+    }
+}
+
 if (!function_exists('discord_bot_jlg_validate_bool')) {
     /**
      * Normalizes a value to a boolean, falling back when wp_validate_boolean() is unavailable.

@@ -39,6 +39,32 @@ class Discord_Bot_JLG_Shortcode {
     public function render_shortcode($atts) {
         $options = $this->api->get_plugin_options();
 
+        $default_theme = 'discord';
+        if (
+            isset($options['default_theme'])
+            && discord_bot_jlg_is_allowed_theme($options['default_theme'])
+        ) {
+            $default_theme = $options['default_theme'];
+        }
+
+        $min_refresh_option = defined('Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL')
+            ? Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL
+            : 10;
+        $max_refresh_option = 3600;
+
+        $default_refresh_interval = isset($options['default_refresh_interval'])
+            ? absint($options['default_refresh_interval'])
+            : 60;
+
+        if ($default_refresh_interval <= 0) {
+            $default_refresh_interval = 60;
+        }
+
+        $default_refresh_interval = max(
+            $min_refresh_option,
+            min($max_refresh_option, $default_refresh_interval)
+        );
+
         $atts = shortcode_atts(
             array(
                 'layout'               => 'horizontal',
@@ -46,10 +72,10 @@ class Discord_Bot_JLG_Shortcode {
                 'show_total'           => !empty($options['show_total']),
                 'show_title'           => false,
                 'title'                => isset($options['widget_title']) ? $options['widget_title'] : '',
-                'theme'                => 'discord',
+                'theme'                => $default_theme,
                 'animated'             => true,
-                'refresh'              => false,
-                'refresh_interval'     => '60',
+                'refresh'              => !empty($options['default_refresh_enabled']),
+                'refresh_interval'     => (string) $default_refresh_interval,
                 'compact'              => false,
                 'align'                => 'left',
                 'width'                => '',
@@ -66,8 +92,8 @@ class Discord_Bot_JLG_Shortcode {
                 'demo'                 => false,
                 'show_discord_icon'    => false,
                 'discord_icon_position'=> 'left',
-                'show_server_name'     => false,
-                'show_server_avatar'   => false,
+                'show_server_name'     => !empty($options['show_server_name']),
+                'show_server_avatar'   => !empty($options['show_server_avatar']),
                 'avatar_size'          => '128',
             ),
             $atts,
@@ -249,9 +275,7 @@ class Discord_Bot_JLG_Shortcode {
         }
 
         $refresh_interval = 0;
-        $min_refresh_interval = defined('Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL')
-            ? Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL
-            : 10;
+        $min_refresh_interval = $min_refresh_option;
 
         if ($refresh && (!$is_demo || $is_fallback_demo)) {
             $refresh_interval = max($min_refresh_interval, intval($atts['refresh_interval']));

@@ -61,6 +61,8 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
             'widget_title'   => 'Existing title',
             'cache_duration' => 450,
             'custom_css'     => '.existing { color: blue; }',
+            'default_theme'  => 'dark',
+            'default_refresh_interval' => 120,
         );
 
         update_option(DISCORD_BOT_JLG_OPTION_NAME, $this->saved_options);
@@ -155,6 +157,66 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
                 ),
                 array(
                     'custom_css' => $sanitized_css,
+                ),
+            ),
+            'server-header-checkboxes' => array(
+                array(
+                    'show_server_name'       => 'yes',
+                    'show_server_avatar'     => '1',
+                    'default_refresh_enabled'=> 'on',
+                ),
+                array(
+                    'show_server_name'       => 1,
+                    'show_server_avatar'     => 1,
+                    'default_refresh_enabled'=> 1,
+                ),
+            ),
+            'default-theme-valid' => array(
+                array(
+                    'default_theme' => 'light',
+                ),
+                array(
+                    'default_theme' => 'light',
+                ),
+            ),
+            'default-theme-empty' => array(
+                array(
+                    'default_theme' => '',
+                ),
+                array(
+                    'default_theme' => 'dark',
+                ),
+            ),
+            'default-theme-invalid' => array(
+                array(
+                    'default_theme' => 'neon',
+                ),
+                array(
+                    'default_theme' => 'discord',
+                ),
+            ),
+            'refresh-interval-below-min' => array(
+                array(
+                    'default_refresh_interval' => '5',
+                ),
+                array(
+                    'default_refresh_interval' => Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL,
+                ),
+            ),
+            'refresh-interval-above-max' => array(
+                array(
+                    'default_refresh_interval' => 7200,
+                ),
+                array(
+                    'default_refresh_interval' => 3600,
+                ),
+            ),
+            'refresh-interval-empty-fallback' => array(
+                array(
+                    'default_refresh_interval' => '',
+                ),
+                array(
+                    'default_refresh_interval' => 120,
                 ),
             ),
         );
@@ -360,12 +422,20 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
             'demo_mode'      => 0,
             'show_online'    => 0,
             'show_total'     => 0,
+            'show_server_name'   => 0,
+            'show_server_avatar' => 0,
+            'default_refresh_enabled' => 0,
+            'default_theme'   => 'dark',
             'widget_title'   => '',
             'cache_duration' => max(
                 Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL,
                 min(3600, (int) $this->saved_options['cache_duration'])
             ),
             'custom_css'     => '',
+            'default_refresh_interval' => max(
+                Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL,
+                min(3600, (int) $this->saved_options['default_refresh_interval'])
+            ),
         );
     }
 }
