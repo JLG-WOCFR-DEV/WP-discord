@@ -63,6 +63,11 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
             'custom_css'     => '.existing { color: blue; }',
             'default_theme'  => 'dark',
             'default_refresh_interval' => 120,
+            'stat_bg_color'      => '#123456',
+            'stat_text_color'    => 'rgba(255, 255, 255, 0.9)',
+            'accent_color'       => '#654321',
+            'accent_color_alt'   => '#765432',
+            'accent_text_color'  => '#111111',
         );
 
         update_option(DISCORD_BOT_JLG_OPTION_NAME, $this->saved_options);
@@ -217,6 +222,22 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
                 ),
                 array(
                     'default_refresh_interval' => 120,
+                ),
+            ),
+            'color-options' => array(
+                array(
+                    'stat_bg_color'     => '#ABCDEF',
+                    'stat_text_color'   => 'rgba(10, 20, 30, 0.5)',
+                    'accent_color'      => 'not-a-color',
+                    'accent_color_alt'  => 'rgb(255,255,255)',
+                    'accent_text_color' => '',
+                ),
+                array(
+                    'stat_bg_color'     => '#abcdef',
+                    'stat_text_color'   => 'rgba(10, 20, 30, 0.5)',
+                    'accent_color'      => '',
+                    'accent_color_alt'  => 'rgb(255, 255, 255)',
+                    'accent_text_color' => '',
                 ),
             ),
         );
@@ -436,6 +457,11 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
                 Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL,
                 min(3600, (int) $this->saved_options['default_refresh_interval'])
             ),
+            'stat_bg_color'      => '#123456',
+            'stat_text_color'    => 'rgba(255, 255, 255, 0.9)',
+            'accent_color'       => '#654321',
+            'accent_color_alt'   => '#765432',
+            'accent_text_color'  => '#111111',
         );
     }
 }

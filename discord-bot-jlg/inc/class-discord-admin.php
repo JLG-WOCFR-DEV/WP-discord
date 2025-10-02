@@ -257,6 +257,14 @@ class Discord_Bot_JLG_Admin {
             min($max_refresh_interval, $current_refresh_interval)
         );
 
+        $existing_colors = array(
+            'stat_bg_color'      => isset($current_options['stat_bg_color']) ? discord_bot_jlg_sanitize_color($current_options['stat_bg_color']) : '',
+            'stat_text_color'    => isset($current_options['stat_text_color']) ? discord_bot_jlg_sanitize_color($current_options['stat_text_color']) : '',
+            'accent_color'       => isset($current_options['accent_color']) ? discord_bot_jlg_sanitize_color($current_options['accent_color']) : '',
+            'accent_color_alt'   => isset($current_options['accent_color_alt']) ? discord_bot_jlg_sanitize_color($current_options['accent_color_alt']) : '',
+            'accent_text_color'  => isset($current_options['accent_text_color']) ? discord_bot_jlg_sanitize_color($current_options['accent_text_color']) : '',
+        );
+
         $sanitized = array(
             'server_id'      => '',
             'bot_token'      => isset($current_options['bot_token']) ? $current_options['bot_token'] : '',
@@ -279,6 +287,11 @@ class Discord_Bot_JLG_Admin {
                 : 300,
             'custom_css'     => '',
             'default_refresh_interval' => $current_refresh_interval,
+            'stat_bg_color'      => $existing_colors['stat_bg_color'],
+            'stat_text_color'    => $existing_colors['stat_text_color'],
+            'accent_color'       => $existing_colors['accent_color'],
+            'accent_color_alt'   => $existing_colors['accent_color_alt'],
+            'accent_text_color'  => $existing_colors['accent_text_color'],
         );
 
         if (isset($input['server_id'])) {
@@ -413,6 +426,25 @@ class Discord_Bot_JLG_Admin {
 
         if (isset($input['custom_css'])) {
             $sanitized['custom_css'] = discord_bot_jlg_sanitize_custom_css($input['custom_css']);
+        }
+
+        $color_fields = array('stat_bg_color', 'stat_text_color', 'accent_color', 'accent_color_alt', 'accent_text_color');
+
+        foreach ($color_fields as $color_field) {
+            if (!array_key_exists($color_field, $input)) {
+                continue;
+            }
+
+            $raw_color = is_string($input[$color_field]) ? trim($input[$color_field]) : '';
+
+            if ('' === $raw_color) {
+                $sanitized[$color_field] = '';
+                continue;
+            }
+
+            $sanitized_color = discord_bot_jlg_sanitize_color($raw_color);
+
+            $sanitized[$color_field] = $sanitized_color;
         }
 
         if (array_key_exists('default_refresh_interval', $input)) {
@@ -1134,10 +1166,15 @@ class Discord_Bot_JLG_Admin {
                 'title' => __('Minimaliste (nombres uniquement) :', 'discord-bot-jlg'),
                 'shortcode' => '[discord_stats demo="true" hide_labels="true" hide_icons="true" theme="minimal"]',
             ),
-                array(
-                    'title' => __('Nom du serveur mis en avant :', 'discord-bot-jlg'),
-                    'shortcode' => '[discord_stats demo="true" show_server_name="true" show_discord_icon="true" align="center"]',
-                ),
+            array(
+                'title' => __('Palette personnalisée :', 'discord-bot-jlg'),
+                'shortcode' => '[discord_stats demo="true" stat_bg_color="#111827" stat_text_color="rgba(255,255,255,0.92)" accent_color="#38bdf8" accent_text_color="#0b1120" align="center"]',
+                'inner_wrapper_style' => 'max-width: 360px;',
+            ),
+            array(
+                'title' => __('Nom du serveur mis en avant :', 'discord-bot-jlg'),
+                'shortcode' => '[discord_stats demo="true" show_server_name="true" show_discord_icon="true" align="center"]',
+            ),
                 array(
                     'title' => __('Nom + avatar du serveur :', 'discord-bot-jlg'),
                     'shortcode' => '[discord_stats demo="true" show_server_name="true" show_server_avatar="true" avatar_size="96" align="center" theme="discord"]',
@@ -1184,6 +1221,7 @@ class Discord_Bot_JLG_Admin {
             <h3><?php esc_html_e('Option 2 : Bloc Éditeur Gutenberg', 'discord-bot-jlg'); ?></h3>
             <p><?php echo wp_kses_post(__('Ajoutez le bloc <strong>« Discord Server Stats »</strong> depuis l\'inserteur Gutenberg pour configurer vos statistiques en mode visuel. Toutes les options du shortcode sont disponibles via la barre latérale (mise en page, couleurs, libellés, rafraîchissement automatique, etc.).', 'discord-bot-jlg')); ?></p>
             <p><?php echo wp_kses_post(__('Le bloc affiche immédiatement un aperçu rendu côté serveur. Lors de l\'enregistrement avec l\'éditeur classique, un shortcode équivalent est automatiquement inséré pour conserver la compatibilité.', 'discord-bot-jlg')); ?></p>
+            <p><?php echo wp_kses_post(__('Le panneau <strong>« Couleurs »</strong> du bloc utilise les <code>ColorPalette</code> de Gutenberg pour renseigner automatiquement les attributs <code>stat_bg_color</code>, <code>stat_text_color</code>, <code>accent_color</code>, <code>accent_color_alt</code> et <code>accent_text_color</code> (valeurs hex ou RGBa).', 'discord-bot-jlg')); ?></p>
 
             <h4><?php esc_html_e('Tous les paramètres disponibles :', 'discord-bot-jlg'); ?></h4>
             <div style="background: white; padding: 15px; border-radius: 4px;">
@@ -1196,6 +1234,11 @@ class Discord_Bot_JLG_Admin {
                     <li><?php echo wp_kses_post(__('<strong>compact</strong> : true/false (version réduite)', 'discord-bot-jlg')); ?></li>
                     <li><?php echo wp_kses_post(__('<strong>animated</strong> : true/false (animations hover)', 'discord-bot-jlg')); ?></li>
                     <li><?php echo wp_kses_post(__('<strong>class</strong> : classes CSS additionnelles', 'discord-bot-jlg')); ?></li>
+                    <li><?php echo wp_kses_post(__('<strong>stat_bg_color</strong> : couleur hex/RGBa des cartes (var CSS <code>--discord-surface-background</code>)', 'discord-bot-jlg')); ?></li>
+                    <li><?php echo wp_kses_post(__('<strong>stat_text_color</strong> : couleur hex/RGBa du texte des cartes (<code>--discord-surface-text</code>)', 'discord-bot-jlg')); ?></li>
+                    <li><?php echo wp_kses_post(__('<strong>accent_color</strong> : couleur principale du bouton/logo (<code>--discord-accent</code>)', 'discord-bot-jlg')); ?></li>
+                    <li><?php echo wp_kses_post(__('<strong>accent_color_alt</strong> : seconde couleur du dégradé du bouton (<code>--discord-accent-secondary</code>)', 'discord-bot-jlg')); ?></li>
+                    <li><?php echo wp_kses_post(__('<strong>accent_text_color</strong> : couleur du texte du bouton (<code>--discord-accent-contrast</code>)', 'discord-bot-jlg')); ?></li>
                 </ul>
 
                 <h5><?php esc_html_e('🎯 Logo Discord :', 'discord-bot-jlg'); ?></h5>

@@ -107,6 +107,26 @@
             "type": "number",
             "default": 15
         },
+        "stat_bg_color": {
+            "type": "string",
+            "default": ""
+        },
+        "stat_text_color": {
+            "type": "string",
+            "default": ""
+        },
+        "accent_color": {
+            "type": "string",
+            "default": ""
+        },
+        "accent_color_alt": {
+            "type": "string",
+            "default": ""
+        },
+        "accent_text_color": {
+            "type": "string",
+            "default": ""
+        },
         "demo": {
             "type": "boolean",
             "default": false

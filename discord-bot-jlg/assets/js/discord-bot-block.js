@@ -15,6 +15,9 @@
     var SelectControl = components.SelectControl;
     var RangeControl = components.RangeControl;
     var NumberControl = components.NumberControl || components.__experimentalNumberControl;
+    var BaseControl = components.BaseControl;
+    var PanelColorSettings = blockEditor.PanelColorSettings || blockEditor.__experimentalPanelColorSettings;
+    var ColorPalette = (blockEditor && blockEditor.ColorPalette) || components.ColorPalette;
     var RefreshIntervalControl = NumberControl || RangeControl || TextControl;
     var ServerSideRender = serverSideRender;
 
@@ -71,6 +74,11 @@
         border_radius: 8,
         gap: 20,
         padding: 15,
+        stat_bg_color: '',
+        stat_text_color: '',
+        accent_color: '',
+        accent_color_alt: '',
+        accent_text_color: '',
         demo: false,
         show_discord_icon: false,
         discord_icon_position: 'left',
@@ -163,6 +171,20 @@
         };
     }
 
+    function updateColorAttribute(setAttributes, name) {
+        return function (value) {
+            var newValue = value;
+
+            if (!newValue || typeof newValue !== 'string') {
+                newValue = '';
+            }
+
+            var update = {};
+            update[name] = newValue;
+            setAttributes(update);
+        };
+    }
+
     registerBlockType(blockName, {
         edit: function (props) {
             var attributes = props.attributes || {};
@@ -175,6 +197,78 @@
                     attributes: attributes
                 })
                 : createElement('div', { className: 'discord-bot-jlg-block-placeholder' }, __('Prévisualisation indisponible.', 'discord-bot-jlg'));
+
+            var colorPanel = null;
+
+            if (ColorPalette) {
+                var colorSettings = [
+                    {
+                        value: attributes.stat_bg_color,
+                        onChange: updateColorAttribute(setAttributes, 'stat_bg_color'),
+                        label: __('Fond des cartes', 'discord-bot-jlg')
+                    },
+                    {
+                        value: attributes.stat_text_color,
+                        onChange: updateColorAttribute(setAttributes, 'stat_text_color'),
+                        label: __('Texte des cartes', 'discord-bot-jlg')
+                    },
+                    {
+                        value: attributes.accent_color,
+                        onChange: updateColorAttribute(setAttributes, 'accent_color'),
+                        label: __('Couleur principale (bouton/logo)', 'discord-bot-jlg')
+                    },
+                    {
+                        value: attributes.accent_color_alt,
+                        onChange: updateColorAttribute(setAttributes, 'accent_color_alt'),
+                        label: __('Couleur secondaire du bouton', 'discord-bot-jlg')
+                    },
+                    {
+                        value: attributes.accent_text_color,
+                        onChange: updateColorAttribute(setAttributes, 'accent_text_color'),
+                        label: __('Texte du bouton', 'discord-bot-jlg')
+                    }
+                ];
+
+                if (PanelColorSettings) {
+                    colorPanel = createElement(PanelColorSettings, {
+                        title: __('Couleurs', 'discord-bot-jlg'),
+                        initialOpen: false,
+                        colorSettings: colorSettings
+                    });
+                } else {
+                    var fallbackControls = colorSettings.map(function (setting, index) {
+                        if (BaseControl) {
+                            return createElement(
+                                BaseControl,
+                                {
+                                    label: setting.label,
+                                    key: 'color-control-' + index
+                                },
+                                createElement(ColorPalette, {
+                                    value: setting.value,
+                                    onChange: setting.onChange
+                                })
+                            );
+                        }
+
+                        return createElement(
+                            'div',
+                            { className: 'discord-bot-jlg-color-control', key: 'color-control-' + index },
+                            createElement('p', null, setting.label),
+                            createElement(ColorPalette, {
+                                value: setting.value,
+                                onChange: setting.onChange
+                            })
+                        );
+                    });
+
+                    colorPanel = createElement(
+                        PanelBody,
+                        { title: __('Couleurs', 'discord-bot-jlg'), initialOpen: false },
+                        fallbackControls
+                    );
+                }
+            }
 
             return createElement(
                 Fragment,
@@ -257,6 +351,7 @@
                             max: 80
                         })
                     ),
+                    colorPanel,
                     createElement(
                         PanelBody,
                         { title: __('Contenu', 'discord-bot-jlg'), initialOpen: false },

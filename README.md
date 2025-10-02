@@ -58,6 +58,24 @@ L'attribut optionnel `width` accepte uniquement des longueurs CSS valides comme 
 
 Le paramètre `refresh_interval` est exprimé en secondes et doit être d'au moins 10 secondes (10 000 ms). Toute valeur plus basse est automatiquement portée à 10 secondes pour éviter les erreurs 429 de Discord. L’interface du bloc Gutenberg impose également cette limite via un champ numérique (incréments de 5, valeur minimale : 10).
 
+#### Couleurs personnalisées
+
+Les attributs suivants alimentent les variables CSS du composant et acceptent des couleurs hexadécimales (`#112233`) ou des notations `rgb()/rgba()` :
+
+- `stat_bg_color` : couleur de fond des cartes statistiques (`--discord-surface-background`).
+- `stat_text_color` : couleur du texte des cartes (`--discord-surface-text`).
+- `accent_color` : couleur principale du bouton et du logo (`--discord-accent`, `--discord-logo-color`).
+- `accent_color_alt` : seconde couleur du dégradé du bouton (`--discord-accent-secondary`).
+- `accent_text_color` : couleur du texte du bouton (`--discord-accent-contrast`).
+
+Exemple :
+
+```
+[discord_stats demo="true" stat_bg_color="#0f172a" stat_text_color="rgba(255,255,255,0.92)" accent_color="#38bdf8" accent_text_color="#0b1120" align="center"]
+```
+
+Le bloc Gutenberg expose ces réglages via un panneau « Couleurs » basé sur les `ColorPalette`, ce qui permet d’ajuster rapidement la charte sans écrire de CSS additionnel.
+
 Pendant une requête d'actualisation, le conteneur affiche désormais un indicateur d'état (`role="status"`) et applique l'attribut `data-refreshing="true"`. L'opacité des statistiques diminue légèrement, les interactions sont bloquées et une pastille sombre (contraste élevé) accompagnée d'un spinner discret signalent l'opération. Dès que la réponse est reçue — succès ou erreur — l'indicateur est retiré et `data-refreshing` repasse automatiquement à `false`. L'animation est désactivée lorsque le visiteur préfère réduire les mouvements (`prefers-reduced-motion`).
 
 Les rafraîchissements publics (visiteurs non connectés) n'exigent plus de nonce WordPress ; seuls les administrateurs connectés utilisent un jeton de sécurité pour l'action AJAX `refresh_discord_stats`.

@@ -107,6 +107,65 @@ if (!function_exists('discord_bot_jlg_has_wp_date')) {
     }
 }
 
+if (!function_exists('discord_bot_jlg_sanitize_color')) {
+    /**
+     * Sanitizes a color value ensuring it is a safe HEX, RGB or RGBA string.
+     *
+     * @param mixed $color Color value to sanitize.
+     *
+     * @return string Sanitized color or empty string when invalid.
+     */
+    function discord_bot_jlg_sanitize_color($color) {
+        if (!is_string($color)) {
+            return '';
+        }
+
+        $color = trim($color);
+
+        if ('' === $color) {
+            return '';
+        }
+
+        $hex = sanitize_hex_color($color);
+        if (is_string($hex)) {
+            return $hex;
+        }
+
+        if (preg_match('/^#([0-9a-fA-F]{4}|[0-9a-fA-F]{8})$/', $color, $matches)) {
+            return '#' . strtolower($matches[1]);
+        }
+
+        if (preg_match('/^rgba?\(\s*([0-9]{1,3})\s*,\s*([0-9]{1,3})\s*,\s*([0-9]{1,3})(?:\s*,\s*([0-9]*\.?[0-9]+))?\s*\)$/i', $color, $matches)) {
+            $red   = min(255, (int) $matches[1]);
+            $green = min(255, (int) $matches[2]);
+            $blue  = min(255, (int) $matches[3]);
+
+            $has_alpha = (isset($matches[4]) && '' !== $matches[4]);
+
+            if ($has_alpha) {
+                $alpha = (float) $matches[4];
+                if ($alpha < 0) {
+                    $alpha = 0;
+                } elseif ($alpha > 1) {
+                    $alpha = 1;
+                }
+
+                $alpha_string = rtrim(rtrim(sprintf('%.3f', $alpha), '0'), '.');
+
+                if ('' === $alpha_string) {
+                    $alpha_string = '0';
+                }
+
+                return sprintf('rgba(%d, %d, %d, %s)', $red, $green, $blue, $alpha_string);
+            }
+
+            return sprintf('rgb(%d, %d, %d)', $red, $green, $blue);
+        }
+
+        return '';
+    }
+}
+
 if (!function_exists('discord_bot_jlg_format_datetime')) {
     /**
      * Formats a timestamp using wp_date() when available, falling back to date_i18n().
