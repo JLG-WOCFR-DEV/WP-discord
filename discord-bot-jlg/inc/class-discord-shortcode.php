@@ -102,6 +102,7 @@ class Discord_Bot_JLG_Shortcode {
                 'align'                => 'left',
                 'width'                => '',
                 'class'                => '',
+                'className'            => '',
                 'icon_online'          => '🟢',
                 'icon_total'           => '👥',
                 'label_online'         => __('En ligne', 'discord-bot-jlg'),
@@ -287,15 +288,37 @@ class Discord_Bot_JLG_Shortcode {
             $container_classes[] = 'discord-total-missing';
         }
 
-        if (!empty($atts['class'])) {
-            $custom_classes = preg_split('/\s+/', $atts['class'], -1, PREG_SPLIT_NO_EMPTY);
+        $custom_class_sources = array();
 
-            if (!empty($custom_classes)) {
+        if (!empty($atts['className'])) {
+            $custom_class_sources[] = $atts['className'];
+        }
+
+        if (!empty($atts['class'])) {
+            $custom_class_sources[] = $atts['class'];
+        }
+
+        if (!empty($custom_class_sources)) {
+            $collected_custom_classes = array();
+
+            foreach ($custom_class_sources as $custom_class_value) {
+                $custom_classes = preg_split('/\s+/', $custom_class_value, -1, PREG_SPLIT_NO_EMPTY);
+
+                if (empty($custom_classes)) {
+                    continue;
+                }
+
                 $custom_classes = array_filter(array_map('sanitize_html_class', $custom_classes));
 
-                if (!empty($custom_classes)) {
-                    $container_classes = array_merge($container_classes, $custom_classes);
+                if (empty($custom_classes)) {
+                    continue;
                 }
+
+                $collected_custom_classes = array_merge($collected_custom_classes, $custom_classes);
+            }
+
+            if (!empty($collected_custom_classes)) {
+                $container_classes = array_merge($container_classes, array_unique($collected_custom_classes));
             }
         }
 

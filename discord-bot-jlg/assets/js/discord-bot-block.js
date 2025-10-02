@@ -70,6 +70,7 @@
         align: 'left',
         width: '',
         class: '',
+        className: '',
         icon_online: '🟢',
         icon_total: '👥',
         label_online: 'En ligne',
@@ -200,7 +201,17 @@
         edit: function (props) {
             var attributes = props.attributes || {};
             var setAttributes = props.setAttributes;
-            var blockProps = useBlockProps ? useBlockProps() : {};
+            var blockProps = useBlockProps
+                ? useBlockProps()
+                : { className: props.className || '' };
+
+            if (!blockProps) {
+                blockProps = {};
+            }
+
+            if (setAttributes && attributes.class && !attributes.className) {
+                setAttributes({ className: attributes.class });
+            }
 
             var preview = ServerSideRender
                 ? createElement(ServerSideRender, {
@@ -313,11 +324,6 @@
                             value: attributes.width,
                             onChange: updateAttribute(setAttributes, 'width'),
                             help: __('Utilisez une valeur CSS valide, ex. 100% ou 320px.', 'discord-bot-jlg')
-                        }),
-                        createElement(TextControl, {
-                            label: __('Classe(s) supplémentaire(s)', 'discord-bot-jlg'),
-                            value: attributes.class,
-                            onChange: updateAttribute(setAttributes, 'class')
                         }),
                         createElement(ToggleControl, {
                             label: __('Mode compact', 'discord-bot-jlg'),

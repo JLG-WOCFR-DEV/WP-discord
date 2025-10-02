@@ -16,7 +16,11 @@
     "style": "discord-bot-jlg-inline",
     "supports": {
         "html": false,
-        "customClassName": false
+        "customClassName": true,
+        "align": [
+            "wide",
+            "full"
+        ]
     },
     "attributes": {
         "layout": {
