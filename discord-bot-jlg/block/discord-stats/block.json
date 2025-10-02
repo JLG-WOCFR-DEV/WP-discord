@@ -130,6 +130,14 @@
         "avatar_size": {
             "type": "number",
             "default": 128
+        },
+        "invite_url": {
+            "type": "string",
+            "default": ""
+        },
+        "invite_label": {
+            "type": "string",
+            "default": ""
         }
     }
 }

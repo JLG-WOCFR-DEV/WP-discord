@@ -47,6 +47,15 @@ class Discord_Bot_JLG_Shortcode {
             $default_theme = $options['default_theme'];
         }
 
+        $default_invite_url = isset($options['invite_url']) ? esc_url_raw($options['invite_url']) : '';
+        $default_invite_label = isset($options['invite_label'])
+            ? sanitize_text_field($options['invite_label'])
+            : '';
+
+        if ('' === $default_invite_label) {
+            $default_invite_label = __('Rejoindre le serveur', 'discord-bot-jlg');
+        }
+
         $min_refresh_option = defined('Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL')
             ? Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL
             : 10;
@@ -95,6 +104,8 @@ class Discord_Bot_JLG_Shortcode {
                 'show_server_name'     => !empty($options['show_server_name']),
                 'show_server_avatar'   => !empty($options['show_server_avatar']),
                 'avatar_size'          => '128',
+                'invite_url'           => $default_invite_url,
+                'invite_label'         => $default_invite_label,
             ),
             $atts,
             'discord_stats'
@@ -113,6 +124,12 @@ class Discord_Bot_JLG_Shortcode {
         $show_server_name   = filter_var($atts['show_server_name'], FILTER_VALIDATE_BOOLEAN);
         $show_server_avatar = filter_var($atts['show_server_avatar'], FILTER_VALIDATE_BOOLEAN);
         $avatar_size        = $this->sanitize_avatar_size($atts['avatar_size']);
+        $invite_url         = esc_url_raw(is_string($atts['invite_url']) ? trim($atts['invite_url']) : '');
+        $invite_label       = isset($atts['invite_label']) ? sanitize_text_field($atts['invite_label']) : '';
+
+        if ('' === $invite_label) {
+            $invite_label = __('Rejoindre le serveur', 'discord-bot-jlg');
+        }
 
         if ($force_demo) {
             $stats = $this->api->get_demo_stats();
@@ -177,6 +194,10 @@ class Discord_Bot_JLG_Shortcode {
 
         if ($is_demo) {
             $container_classes[] = 'discord-demo-mode';
+        }
+
+        if ('' !== $invite_url) {
+            $container_classes[] = 'discord-has-invite';
         }
 
         $logo_position_class = '';
@@ -440,6 +461,14 @@ class Discord_Bot_JLG_Shortcode {
                 <?php endif; ?>
             </div>
         </div>
+
+        <?php if ('' !== $invite_url) : ?>
+        <div class="discord-invite">
+            <a class="discord-invite-button" href="<?php echo esc_url($invite_url); ?>" target="_blank" rel="noopener noreferrer nofollow">
+                <span class="discord-invite-button__label"><?php echo esc_html($invite_label); ?></span>
+            </a>
+        </div>
+        <?php endif; ?>
 
         <?php
         return ob_get_clean();

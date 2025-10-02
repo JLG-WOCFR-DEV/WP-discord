@@ -132,6 +132,59 @@
     min-width: 0;
 }
 
+.discord-stats-container .discord-invite {
+    margin-top: calc(var(--discord-gap) * 0.75);
+    display: flex;
+    flex-wrap: wrap;
+    gap: calc(var(--discord-gap) * 0.25);
+}
+
+.discord-stats-container.discord-align-center .discord-invite {
+    justify-content: center;
+    text-align: center;
+}
+
+.discord-stats-container.discord-align-right .discord-invite {
+    justify-content: flex-end;
+    text-align: right;
+}
+
+.discord-stats-container .discord-invite-button {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    padding: calc(var(--discord-padding) * 0.75) calc(var(--discord-padding) * 1.6);
+    border-radius: calc(var(--discord-radius) * 1.25);
+    background: linear-gradient(135deg, #5865F2, #4750c7);
+    color: #ffffff;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    text-decoration: none;
+    box-shadow: 0 4px 12px rgba(88, 101, 242, 0.35);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+    line-height: 1.4;
+    white-space: nowrap;
+}
+
+.discord-stats-container .discord-invite-button:hover,
+.discord-stats-container .discord-invite-button:focus-visible {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(88, 101, 242, 0.4);
+    filter: brightness(1.05);
+}
+
+.discord-stats-container .discord-invite-button:focus-visible {
+    outline: 3px solid rgba(255, 255, 255, 0.85);
+    outline-offset: 3px;
+}
+
+.discord-stats-container .discord-invite-button__label {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35em;
+    font-size: clamp(14px, 3.4vw, 18px);
+}
+
 .discord-stats-container .discord-logo-container {
     flex-shrink: 0;
 }
@@ -421,6 +474,16 @@
     .discord-stats-container .discord-stat {
         flex: 1 1 100%;
         width: 100%;
+    }
+
+    .discord-stats-container .discord-invite {
+        width: 100%;
+    }
+
+    .discord-stats-container .discord-invite-button {
+        width: 100%;
+        white-space: normal;
+        padding: clamp(12px, 4.5vw, 18px);
     }
 
     .discord-stats-container .discord-refresh-status {

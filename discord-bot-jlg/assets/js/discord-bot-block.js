@@ -76,7 +76,9 @@
         discord_icon_position: 'left',
         show_server_name: false,
         show_server_avatar: false,
-        avatar_size: 128
+        avatar_size: 128,
+        invite_url: '',
+        invite_label: ''
     };
 
     var REFRESH_INTERVAL_MIN = 10;
@@ -330,6 +332,23 @@
                                 updateAttribute(setAttributes, 'avatar_size')(value);
                             },
                             help: __('Utilisez une puissance de deux (ex. 128, 256, 512) pour une image nette.', 'discord-bot-jlg')
+                        })
+                    ),
+                    createElement(
+                        PanelBody,
+                        { title: __('Invitation', 'discord-bot-jlg'), initialOpen: false },
+                        createElement(TextControl, {
+                            label: __('URL d\'invitation', 'discord-bot-jlg'),
+                            value: attributes.invite_url,
+                            onChange: updateAttribute(setAttributes, 'invite_url'),
+                            type: 'url',
+                            placeholder: 'https://discord.gg/xxxx'
+                        }),
+                        createElement(TextControl, {
+                            label: __('Libellé du bouton', 'discord-bot-jlg'),
+                            value: attributes.invite_label,
+                            onChange: updateAttribute(setAttributes, 'invite_label'),
+                            placeholder: __('Rejoindre le serveur', 'discord-bot-jlg')
                         })
                     ),
                     createElement(
