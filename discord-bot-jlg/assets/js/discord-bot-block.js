@@ -70,8 +70,6 @@
         compact: false,
         align: 'left',
         width: '',
-        class: '',
-        className: '',
         icon_online: '🟢',
         icon_total: '👥',
         label_online: 'En ligne',
@@ -669,6 +667,33 @@
             pairs.push(key + '="' + normalized + '"');
         }
 
+        var normalizedClassName = '';
+
+        if (
+            attributes
+            && Object.prototype.hasOwnProperty.call(attributes, 'className')
+            && attributes.className
+        ) {
+            normalizedClassName = String(attributes.className);
+        }
+
+        if (
+            !normalizedClassName
+            && attributes
+            && Object.prototype.hasOwnProperty.call(attributes, 'class')
+            && attributes.class
+        ) {
+            normalizedClassName = String(attributes.class);
+        }
+
+        if (normalizedClassName) {
+            var sanitizedClassName = normalizedClassName.trim();
+
+            if (sanitizedClassName) {
+                pairs.push('className="' + sanitizedClassName.replace(/"/g, '&quot;') + '"');
+            }
+        }
+
         return '[discord_stats' + (pairs.length ? ' ' + pairs.join(' ') : '') + ']';
     }
 
@@ -716,7 +741,13 @@
                 blockProps = {};
             }
 
-            if (setAttributes && attributes.class && !attributes.className) {
+            var hasClassNameAttribute = Object.prototype.hasOwnProperty.call(attributes, 'className');
+
+            if (
+                setAttributes
+                && attributes.class
+                && (!hasClassNameAttribute || typeof attributes.className === 'undefined')
+            ) {
                 setAttributes({ className: attributes.class });
             }
 
