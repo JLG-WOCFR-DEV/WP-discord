@@ -181,6 +181,22 @@ class Discord_Bot_JLG_Admin {
         );
 
         add_settings_field(
+            'invite_url',
+            __('URL d\'invitation Discord', 'discord-bot-jlg'),
+            array($this, 'invite_url_render'),
+            'discord_stats_settings',
+            'discord_stats_display_section'
+        );
+
+        add_settings_field(
+            'invite_label',
+            __('Libellé du bouton d\'invitation', 'discord-bot-jlg'),
+            array($this, 'invite_label_render'),
+            'discord_stats_settings',
+            'discord_stats_display_section'
+        );
+
+        add_settings_field(
             'cache_duration',
             __('Durée du cache (secondes)', 'discord-bot-jlg'),
             array($this, 'cache_duration_render'),
@@ -252,6 +268,12 @@ class Discord_Bot_JLG_Admin {
             'default_refresh_enabled' => 0,
             'default_theme'   => $current_theme,
             'widget_title'   => '',
+            'invite_url'     => isset($current_options['invite_url'])
+                ? esc_url_raw($current_options['invite_url'])
+                : '',
+            'invite_label'   => isset($current_options['invite_label'])
+                ? sanitize_text_field($current_options['invite_label'])
+                : '',
             'cache_duration' => isset($current_options['cache_duration'])
                 ? (int) $current_options['cache_duration']
                 : 300,
@@ -338,6 +360,33 @@ class Discord_Bot_JLG_Admin {
 
         if (isset($input['widget_title'])) {
             $sanitized['widget_title'] = sanitize_text_field($input['widget_title']);
+        }
+
+        if (array_key_exists('invite_url', $input)) {
+            $raw_invite_url = is_string($input['invite_url'])
+                ? trim($input['invite_url'])
+                : '';
+
+            if ('' === $raw_invite_url) {
+                $sanitized['invite_url'] = '';
+            } else {
+                $invite_url = esc_url_raw($raw_invite_url);
+
+                if ('' !== $invite_url) {
+                    $sanitized['invite_url'] = $invite_url;
+                } else {
+                    add_settings_error(
+                        'discord_stats_settings',
+                        'discord_bot_jlg_invite_url_invalid',
+                        esc_html__('L\'URL d\'invitation Discord semble invalide. Veuillez saisir une URL complète commençant par http ou https.', 'discord-bot-jlg'),
+                        'error'
+                    );
+                }
+            }
+        }
+
+        if (isset($input['invite_label'])) {
+            $sanitized['invite_label'] = sanitize_text_field($input['invite_label']);
         }
 
         if (array_key_exists('cache_duration', $input)) {
@@ -797,6 +846,36 @@ class Discord_Bot_JLG_Admin {
         <input type="text" name="<?php echo esc_attr($this->option_name); ?>[widget_title]"
                value="<?php echo esc_attr(isset($options['widget_title']) ? $options['widget_title'] : ''); ?>"
                class="regular-text" />
+        <?php
+    }
+
+    /**
+     * Rend le champ de saisie de l'URL d'invitation Discord.
+     */
+    public function invite_url_render() {
+        $options = get_option($this->option_name);
+        $value   = isset($options['invite_url']) ? esc_url($options['invite_url']) : '';
+        ?>
+        <input type="url" name="<?php echo esc_attr($this->option_name); ?>[invite_url]"
+               value="<?php echo esc_attr($value); ?>"
+               class="regular-text"
+               placeholder="https://discord.gg/xxxx" />
+        <p class="description"><?php esc_html_e('Lien d\'invitation utilisé pour le bouton d\'appel à l\'action.', 'discord-bot-jlg'); ?></p>
+        <?php
+    }
+
+    /**
+     * Rend le champ texte pour personnaliser le libellé du bouton d'invitation.
+     */
+    public function invite_label_render() {
+        $options = get_option($this->option_name);
+        $value   = isset($options['invite_label']) ? $options['invite_label'] : '';
+        ?>
+        <input type="text" name="<?php echo esc_attr($this->option_name); ?>[invite_label]"
+               value="<?php echo esc_attr($value); ?>"
+               class="regular-text"
+               placeholder="<?php echo esc_attr__('Rejoindre le serveur', 'discord-bot-jlg'); ?>" />
+        <p class="description"><?php esc_html_e('Texte du bouton permettant aux visiteurs de rejoindre votre serveur.', 'discord-bot-jlg'); ?></p>
         <?php
     }
 
