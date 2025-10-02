@@ -5,6 +5,8 @@
     var ERROR_MESSAGE_CLASS = 'discord-error-message';
     var STALE_NOTICE_CLASS = 'discord-stale-notice';
     var REFRESH_STATUS_CLASS = 'discord-refresh-status';
+    var REFRESH_OVERLAY_CLASS = 'has-refresh-overlay';
+    var DEMO_BADGE_CLASS = 'discord-demo-badge';
     var globalConfig = {};
     var SERVER_NAME_SELECTOR = '[data-role="discord-server-name"]';
     var SERVER_NAME_CLASS = 'discord-server-name';
@@ -730,7 +732,7 @@
             return container.dataset.demoBadgeLabel || fallbackLabel;
         }
 
-        var existingBadge = container.querySelector('.discord-demo-badge');
+        var existingBadge = container.querySelector('.' + DEMO_BADGE_CLASS);
         if (existingBadge && existingBadge.textContent) {
             var label = existingBadge.textContent;
             if (container.dataset) {
@@ -748,23 +750,35 @@
         return defaultLabel;
     }
 
+    function syncRefreshOverlayClass(container) {
+        if (!container || !container.classList) {
+            return;
+        }
+
+        var hasRefreshStatus = !!container.querySelector('.' + REFRESH_STATUS_CLASS);
+        var hasDemoBadge = !!container.querySelector('.' + DEMO_BADGE_CLASS);
+
+        container.classList.toggle(REFRESH_OVERLAY_CLASS, hasRefreshStatus || hasDemoBadge);
+    }
+
     function updateDemoBadge(container, shouldShow) {
         if (!container) {
             return;
         }
 
-        var badge = container.querySelector('.discord-demo-badge');
+        var badge = container.querySelector('.' + DEMO_BADGE_CLASS);
 
         if (shouldShow) {
             if (!badge) {
                 badge = document.createElement('div');
-                badge.className = 'discord-demo-badge';
+                badge.className = DEMO_BADGE_CLASS;
                 badge.textContent = getDemoBadgeLabel(container);
                 container.insertBefore(badge, container.firstChild);
             } else if (!badge.textContent) {
                 badge.textContent = getDemoBadgeLabel(container);
             }
 
+            syncRefreshOverlayClass(container);
             return;
         }
 
@@ -775,6 +789,8 @@
 
             badge.parentNode.removeChild(badge);
         }
+
+        syncRefreshOverlayClass(container);
     }
 
     function showRefreshIndicator(container) {
@@ -799,6 +815,8 @@
         } else {
             status.textContent = label;
         }
+
+        syncRefreshOverlayClass(container);
     }
 
     function hideRefreshIndicator(container) {
@@ -814,6 +832,8 @@
         if (status && status.parentNode) {
             status.parentNode.removeChild(status);
         }
+
+        syncRefreshOverlayClass(container);
     }
 
     function applyDemoState(container, isDemo, isFallbackDemo) {
@@ -1242,10 +1262,27 @@
         return requestPromise;
     }
 
+    function applyInitialOverlayClasses() {
+        if (typeof document === 'undefined') {
+            return;
+        }
+
+        var containers = document.querySelectorAll('.discord-stats-container');
+        if (!containers.length) {
+            return;
+        }
+
+        Array.prototype.forEach.call(containers, function (container) {
+            syncRefreshOverlayClass(container);
+        });
+    }
+
     function initializeDiscordBot() {
         var config = window.discordBotJlg || {};
         globalConfig = config;
         var missingFeatures = [];
+
+        applyInitialOverlayClasses();
 
         if (typeof window.fetch !== 'function') {
             missingFeatures.push('fetch');

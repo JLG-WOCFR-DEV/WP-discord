@@ -587,6 +587,9 @@
         --discord-gap: clamp(10px, 5vw, 16px);
         --discord-padding: clamp(10px, 4vw, 18px);
         --discord-avatar-size: clamp(46px, 20vw, 72px);
+    }
+
+    .discord-stats-container.has-refresh-overlay {
         padding-bottom: calc(var(--discord-padding) * 2.5 + 48px);
     }
 
@@ -646,6 +649,9 @@
         --discord-logo-height: clamp(20px, 12vw, 26px);
         --discord-badge-scale: 0.85;
         --discord-avatar-size: clamp(42px, 24vw, 64px);
+    }
+
+    .discord-stats-container.has-refresh-overlay {
         padding-bottom: calc(var(--discord-padding) * 3 + 58px);
     }
 
