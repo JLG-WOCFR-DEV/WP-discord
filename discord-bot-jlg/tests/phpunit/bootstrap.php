@@ -18,9 +18,18 @@ require_once __DIR__ . '/../../inc/class-discord-http.php';
 require_once __DIR__ . '/../../inc/class-discord-api.php';
 require_once __DIR__ . '/../../inc/class-discord-widget.php';
 require_once __DIR__ . '/../../inc/class-discord-shortcode.php';
+require_once __DIR__ . '/../../inc/class-discord-site-health.php';
 
 if (!defined('DISCORD_BOT_JLG_OPTION_NAME')) {
     define('DISCORD_BOT_JLG_OPTION_NAME', 'discord_server_stats_options');
+}
+
+if (!defined('DISCORD_BOT_JLG_CACHE_KEY')) {
+    define('DISCORD_BOT_JLG_CACHE_KEY', 'discord_server_stats_cache');
+}
+
+if (!defined('DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION')) {
+    define('DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION', 300);
 }
 
 if (!defined('DISCORD_BOT_JLG_PLUGIN_URL')) {
