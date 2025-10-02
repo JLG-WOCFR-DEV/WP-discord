@@ -1170,6 +1170,12 @@ class Discord_Bot_JLG_Admin {
             <h2><?php esc_html_e('📖 Guide d\'utilisation', 'discord-bot-jlg'); ?></h2>
 
             <p><?php echo wp_kses_post(__('Les choix effectués dans l\'onglet <strong>Configuration</strong> (nom/avatar du serveur, thème, auto-rafraîchissement) remplissent automatiquement les attributs équivalents du shortcode, du bloc et du widget. Vous pouvez toujours les modifier manuellement pour un cas précis.', 'discord-bot-jlg')); ?></p>
+            <ul>
+                <li><?php echo wp_kses_post(__('« Afficher le nom du serveur » pré-renseigne <code>show_server_name="true"</code>.', 'discord-bot-jlg')); ?></li>
+                <li><?php echo wp_kses_post(__('« Afficher l\'avatar » active <code>show_server_avatar="true"</code> et ajuste la taille depuis la barre latérale du bloc.', 'discord-bot-jlg')); ?></li>
+                <li><?php echo wp_kses_post(__('Le thème choisi devient la valeur par défaut de l\'attribut <code>theme</code>.', 'discord-bot-jlg')); ?></li>
+                <li><?php echo wp_kses_post(__('En cochant « Rafraîchissement auto », le shortcode/ bloc utilise <code>refresh="true"</code> et l\'intervalle numérique saisi pour <code>refresh_interval</code>.', 'discord-bot-jlg')); ?></li>
+            </ul>
 
             <h3><?php esc_html_e('Option 1 : Shortcode (avec paramètres)', 'discord-bot-jlg'); ?></h3>
             <p><?php esc_html_e('Copiez ce code dans n\'importe quelle page ou article :', 'discord-bot-jlg'); ?></p>
