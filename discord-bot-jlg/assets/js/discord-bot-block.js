@@ -57,6 +57,33 @@
         { label: __('Contour', 'discord-bot-jlg'), value: 'outline' }
     ];
 
+    var blockConfig = window.discordBotJlgBlockConfig || {};
+    var profileChoices = Array.isArray(blockConfig.profiles) ? blockConfig.profiles : [];
+    var profileOptions = profileChoices.map(function (choice) {
+        if (!choice || typeof choice !== 'object') {
+            return { label: '', value: '' };
+        }
+
+        var value = choice.key || '';
+        var baseLabel = choice.label || '';
+        var serverId = choice.server_id || '';
+        var computedLabel = baseLabel || serverId || value;
+
+        if (serverId) {
+            computedLabel += ' (' + serverId + ')';
+        }
+
+        return {
+            label: computedLabel,
+            value: value
+        };
+    });
+
+    profileOptions.unshift({
+        label: __('Configuration globale', 'discord-bot-jlg'),
+        value: ''
+    });
+
     var defaultAttributes = {
         layout: 'horizontal',
         show_online: true,
@@ -97,7 +124,10 @@
         cta_url: '',
         cta_style: 'solid',
         cta_new_tab: true,
-        cta_tooltip: ''
+        cta_tooltip: '',
+        profile: '',
+        server_id: '',
+        bot_token: ''
     };
 
     var REFRESH_INTERVAL_MIN = 10;
@@ -918,6 +948,32 @@
                             max: REFRESH_INTERVAL_MAX,
                             step: 5,
                             help: __('Minimum 10 secondes afin d’éviter les limitations de Discord.', 'discord-bot-jlg')
+                        })
+                    ),
+                    createElement(
+                        PanelBody,
+                        { title: __('Connexion au serveur', 'discord-bot-jlg'), initialOpen: false },
+                        createElement(SelectControl, {
+                            label: __('Profil enregistré', 'discord-bot-jlg'),
+                            value: attributes.profile || '',
+                            options: profileOptions,
+                            onChange: updateAttribute(setAttributes, 'profile'),
+                            help: profileOptions.length > 1
+                                ? __('Sélectionnez un profil sauvegardé pour utiliser ses identifiants.', 'discord-bot-jlg')
+                                : __('Gérez vos profils depuis la page d’administration du plugin.', 'discord-bot-jlg')
+                        }),
+                        createElement(TextControl, {
+                            label: __('ID du serveur (prioritaire)', 'discord-bot-jlg'),
+                            value: attributes.server_id || '',
+                            onChange: updateAttribute(setAttributes, 'server_id'),
+                            help: __('Remplace l’ID défini globalement ou dans le profil sélectionné.', 'discord-bot-jlg')
+                        }),
+                        createElement(TextControl, {
+                            label: __('Token du bot (prioritaire)', 'discord-bot-jlg'),
+                            type: 'password',
+                            value: attributes.bot_token || '',
+                            onChange: updateAttribute(setAttributes, 'bot_token'),
+                            help: __('Laisser vide pour conserver le token fourni par le profil ou la configuration globale.', 'discord-bot-jlg')
                         })
                     ),
                     createElement(

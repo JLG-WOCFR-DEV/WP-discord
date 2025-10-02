@@ -186,6 +186,18 @@
         "cta_tooltip": {
             "type": "string",
             "default": ""
+        },
+        "profile": {
+            "type": "string",
+            "default": ""
+        },
+        "server_id": {
+            "type": "string",
+            "default": ""
+        },
+        "bot_token": {
+            "type": "string",
+            "default": ""
         }
     }
 }

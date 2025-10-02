@@ -102,6 +102,21 @@ class Discord_Bot_JLG_Admin {
         );
 
         add_settings_section(
+            'discord_stats_profiles_section',
+            __('Profils de serveur', 'discord-bot-jlg'),
+            array($this, 'profiles_section_callback'),
+            'discord_stats_settings'
+        );
+
+        add_settings_field(
+            'server_profiles',
+            __('Profils enregistrés', 'discord-bot-jlg'),
+            array($this, 'server_profiles_render'),
+            'discord_stats_settings',
+            'discord_stats_profiles_section'
+        );
+
+        add_settings_section(
             'discord_stats_display_section',
             esc_html__('Options d\'affichage', 'discord-bot-jlg'),
             array($this, 'display_section_callback'),
@@ -268,6 +283,9 @@ class Discord_Bot_JLG_Admin {
         $sanitized = array(
             'server_id'      => '',
             'bot_token'      => isset($current_options['bot_token']) ? $current_options['bot_token'] : '',
+            'server_profiles'=> isset($current_options['server_profiles']) && is_array($current_options['server_profiles'])
+                ? $current_options['server_profiles']
+                : array(),
             'demo_mode'      => 0,
             'show_online'    => 0,
             'show_total'     => 0,
@@ -453,6 +471,19 @@ class Discord_Bot_JLG_Admin {
             $sanitized[$color_field] = $sanitized_color;
         }
 
+        $existing_profiles = isset($current_options['server_profiles']) && is_array($current_options['server_profiles'])
+            ? $current_options['server_profiles']
+            : array();
+
+        $submitted_profiles = isset($input['server_profiles']) ? $input['server_profiles'] : array();
+        $new_profile_input  = isset($input['new_profile']) ? $input['new_profile'] : array();
+
+        $sanitized['server_profiles'] = $this->sanitize_server_profiles(
+            $submitted_profiles,
+            $new_profile_input,
+            $existing_profiles
+        );
+
         if (array_key_exists('default_refresh_interval', $input)) {
             $raw_refresh_interval = is_string($input['default_refresh_interval'])
                 ? trim($input['default_refresh_interval'])
@@ -473,6 +504,281 @@ class Discord_Bot_JLG_Admin {
         }
 
         return $sanitized;
+    }
+
+    private function sanitize_server_profiles($submitted_profiles, $new_profile_input, $existing_profiles) {
+        $result = array();
+
+        if (!is_array($submitted_profiles)) {
+            $submitted_profiles = array();
+        }
+
+        if (!is_array($existing_profiles)) {
+            $existing_profiles = array();
+        }
+
+        foreach ($submitted_profiles as $raw_key => $profile_input) {
+            if (!is_array($profile_input)) {
+                continue;
+            }
+
+            $profile_key = '';
+
+            if (isset($profile_input['key'])) {
+                $profile_key = sanitize_key($profile_input['key']);
+            }
+
+            if ('' === $profile_key) {
+                $profile_key = sanitize_key($raw_key);
+            }
+
+            if ('' === $profile_key) {
+                continue;
+            }
+
+            if (!empty($profile_input['delete'])) {
+                continue;
+            }
+
+            $label = isset($profile_input['label']) ? sanitize_text_field($profile_input['label']) : '';
+            $server_id = isset($profile_input['server_id'])
+                ? $this->sanitize_profile_server_id($profile_input['server_id'])
+                : '';
+
+            $existing_token = '';
+            if (isset($existing_profiles[$profile_key]) && is_array($existing_profiles[$profile_key])) {
+                $existing_token = isset($existing_profiles[$profile_key]['bot_token'])
+                    ? (string) $existing_profiles[$profile_key]['bot_token']
+                    : '';
+            }
+
+            $token_to_store = $existing_token;
+
+            if (!empty($profile_input['bot_token_delete'])) {
+                $token_to_store = '';
+            } elseif (array_key_exists('bot_token', $profile_input)) {
+                $raw_token = is_string($profile_input['bot_token'])
+                    ? trim($profile_input['bot_token'])
+                    : '';
+
+                if ('' !== $raw_token) {
+                    $token_candidate = sanitize_text_field($raw_token);
+                    $encrypted       = discord_bot_jlg_encrypt_secret($token_candidate);
+
+                    if (is_wp_error($encrypted)) {
+                        add_settings_error(
+                            'discord_stats_settings',
+                            'discord_bot_jlg_profile_token_encrypt_' . $profile_key,
+                            $encrypted->get_error_message(),
+                            'error'
+                        );
+                    } else {
+                        $token_to_store = $encrypted;
+                    }
+                }
+            }
+
+            $result[$profile_key] = array(
+                'key'       => $profile_key,
+                'label'     => $label,
+                'server_id' => $server_id,
+                'bot_token' => $token_to_store,
+            );
+        }
+
+        if (!is_array($new_profile_input)) {
+            $new_profile_input = array();
+        }
+
+        $has_new_profile_data = false;
+        foreach (array('key', 'label', 'server_id', 'bot_token') as $field) {
+            if (!empty($new_profile_input[$field])) {
+                $has_new_profile_data = true;
+                break;
+            }
+        }
+
+        if ($has_new_profile_data) {
+            $profile_key = isset($new_profile_input['key']) ? sanitize_key($new_profile_input['key']) : '';
+            $label       = isset($new_profile_input['label']) ? sanitize_text_field($new_profile_input['label']) : '';
+
+            if ('' === $profile_key && '' !== $label) {
+                $profile_key = sanitize_key(sanitize_title($label));
+            }
+
+            if ('' === $profile_key) {
+                $profile_key = sanitize_key('profil_' . uniqid());
+            }
+
+            if ('' === $profile_key || isset($result[$profile_key])) {
+                add_settings_error(
+                    'discord_stats_settings',
+                    'discord_bot_jlg_profile_duplicate_' . $profile_key,
+                    esc_html__('Impossible d’enregistrer le nouveau profil : la clé est manquante ou déjà utilisée.', 'discord-bot-jlg'),
+                    'error'
+                );
+            } else {
+                $server_id = isset($new_profile_input['server_id'])
+                    ? $this->sanitize_profile_server_id($new_profile_input['server_id'])
+                    : '';
+
+                $token_to_store = '';
+                if (!empty($new_profile_input['bot_token'])) {
+                    $token_candidate = sanitize_text_field($new_profile_input['bot_token']);
+                    $encrypted       = discord_bot_jlg_encrypt_secret($token_candidate);
+
+                    if (is_wp_error($encrypted)) {
+                        add_settings_error(
+                            'discord_stats_settings',
+                            'discord_bot_jlg_profile_token_encrypt_new',
+                            $encrypted->get_error_message(),
+                            'error'
+                        );
+                    } else {
+                        $token_to_store = $encrypted;
+                    }
+                }
+
+                $result[$profile_key] = array(
+                    'key'       => $profile_key,
+                    'label'     => $label,
+                    'server_id' => $server_id,
+                    'bot_token' => $token_to_store,
+                );
+            }
+        }
+
+        return $result;
+    }
+
+    private function sanitize_profile_server_id($value) {
+        if (!is_string($value) && !is_numeric($value)) {
+            return '';
+        }
+
+        $value = preg_replace('/[^0-9]/', '', (string) $value);
+
+        return (string) $value;
+    }
+
+    /**
+     * Présente la section de gestion des profils de serveur.
+     */
+    public function profiles_section_callback() {
+        ?>
+        <p>
+            <?php esc_html_e('Enregistrez plusieurs connexions Discord et réutilisez-les facilement dans vos blocs, shortcodes et widgets.', 'discord-bot-jlg'); ?>
+        </p>
+        <?php
+    }
+
+    public function server_profiles_render() {
+        $options = get_option($this->option_name);
+        $profiles = array();
+
+        if (is_array($options) && isset($options['server_profiles']) && is_array($options['server_profiles'])) {
+            $profiles = $options['server_profiles'];
+        }
+
+        if (!is_array($profiles)) {
+            $profiles = array();
+        }
+
+        ?>
+        <table class="widefat striped">
+            <thead>
+                <tr>
+                    <th scope="col"><?php esc_html_e('Profil', 'discord-bot-jlg'); ?></th>
+                    <th scope="col"><?php esc_html_e('ID du serveur', 'discord-bot-jlg'); ?></th>
+                    <th scope="col"><?php esc_html_e('Token du bot', 'discord-bot-jlg'); ?></th>
+                    <th scope="col"><?php esc_html_e('Actions', 'discord-bot-jlg'); ?></th>
+                </tr>
+            </thead>
+            <tbody>
+                <?php if (!empty($profiles)) : ?>
+                    <?php foreach ($profiles as $key => $profile) :
+                        if (!is_array($profile)) {
+                            continue;
+                        }
+
+                        $profile_key   = isset($profile['key']) ? sanitize_key($profile['key']) : sanitize_key($key);
+                        if ('' === $profile_key) {
+                            continue;
+                        }
+
+                        $profile_label = isset($profile['label']) ? sanitize_text_field($profile['label']) : '';
+                        $server_id     = isset($profile['server_id']) ? preg_replace('/[^0-9]/', '', (string) $profile['server_id']) : '';
+                        $has_token     = !empty($profile['bot_token']);
+                        ?>
+                        <tr>
+                            <td>
+                                <input type="hidden" name="<?php echo esc_attr($this->option_name); ?>[server_profiles][<?php echo esc_attr($profile_key); ?>][key]" value="<?php echo esc_attr($profile_key); ?>" />
+                                <label>
+                                    <span class="screen-reader-text"><?php esc_html_e('Nom du profil', 'discord-bot-jlg'); ?></span>
+                                    <input type="text" class="regular-text" name="<?php echo esc_attr($this->option_name); ?>[server_profiles][<?php echo esc_attr($profile_key); ?>][label]" value="<?php echo esc_attr($profile_label); ?>" placeholder="<?php esc_attr_e('Nom du profil', 'discord-bot-jlg'); ?>" />
+                                </label>
+                                <p class="description">
+                                    <?php esc_html_e('Utilisez un nom parlant (ex. “Serveur Communauté”).', 'discord-bot-jlg'); ?>
+                                </p>
+                            </td>
+                            <td>
+                                <label>
+                                    <span class="screen-reader-text"><?php esc_html_e('ID du serveur', 'discord-bot-jlg'); ?></span>
+                                    <input type="text" class="regular-text" name="<?php echo esc_attr($this->option_name); ?>[server_profiles][<?php echo esc_attr($profile_key); ?>][server_id]" value="<?php echo esc_attr($server_id); ?>" placeholder="1234567890" />
+                                </label>
+                                <p class="description"><?php esc_html_e('Saisissez l’identifiant numérique de votre serveur Discord.', 'discord-bot-jlg'); ?></p>
+                            </td>
+                            <td>
+                                <input type="password" class="regular-text" name="<?php echo esc_attr($this->option_name); ?>[server_profiles][<?php echo esc_attr($profile_key); ?>][bot_token]" value="" autocomplete="new-password" placeholder="<?php esc_attr_e('Nouveau token (optionnel)', 'discord-bot-jlg'); ?>" />
+                                <p class="description">
+                                    <?php esc_html_e('Laisser vide pour conserver le token existant.', 'discord-bot-jlg'); ?>
+                                </p>
+                                <?php if ($has_token) : ?>
+                                <p class="description" style="margin-top: -8px;">
+                                    <?php esc_html_e('Un token est actuellement enregistré.', 'discord-bot-jlg'); ?>
+                                </p>
+                                <?php endif; ?>
+                                <label>
+                                    <input type="checkbox" name="<?php echo esc_attr($this->option_name); ?>[server_profiles][<?php echo esc_attr($profile_key); ?>][bot_token_delete]" value="1" />
+                                    <?php esc_html_e('Supprimer le token enregistré', 'discord-bot-jlg'); ?>
+                                </label>
+                            </td>
+                            <td>
+                                <label>
+                                    <input type="checkbox" name="<?php echo esc_attr($this->option_name); ?>[server_profiles][<?php echo esc_attr($profile_key); ?>][delete]" value="1" />
+                                    <?php esc_html_e('Supprimer ce profil', 'discord-bot-jlg'); ?>
+                                </label>
+                            </td>
+                        </tr>
+                    <?php endforeach; ?>
+                <?php else : ?>
+                    <tr>
+                        <td colspan="4">
+                            <em><?php esc_html_e('Aucun profil enregistré pour le moment.', 'discord-bot-jlg'); ?></em>
+                        </td>
+                    </tr>
+                <?php endif; ?>
+            </tbody>
+            <tfoot>
+                <tr>
+                    <th scope="row"><?php esc_html_e('Nouveau profil', 'discord-bot-jlg'); ?></th>
+                    <td>
+                        <input type="text" class="regular-text" name="<?php echo esc_attr($this->option_name); ?>[new_profile][server_id]" placeholder="1234567890" />
+                        <p class="description"><?php esc_html_e('Identifiant du serveur Discord.', 'discord-bot-jlg'); ?></p>
+                    </td>
+                    <td>
+                        <input type="password" class="regular-text" name="<?php echo esc_attr($this->option_name); ?>[new_profile][bot_token]" placeholder="<?php esc_attr_e('Token du bot', 'discord-bot-jlg'); ?>" autocomplete="new-password" />
+                        <p class="description"><?php esc_html_e('Le token sera chiffré automatiquement avant sauvegarde.', 'discord-bot-jlg'); ?></p>
+                    </td>
+                    <td>
+                        <input type="text" class="regular-text" name="<?php echo esc_attr($this->option_name); ?>[new_profile][label]" placeholder="<?php esc_attr_e('Nom du profil', 'discord-bot-jlg'); ?>" />
+                        <input type="text" class="regular-text" name="<?php echo esc_attr($this->option_name); ?>[new_profile][key]" placeholder="<?php esc_attr_e('Clé unique (optionnel)', 'discord-bot-jlg'); ?>" />
+                        <p class="description"><?php esc_html_e('La clé est utilisée dans les shortcodes (ex. profil communautaire).', 'discord-bot-jlg'); ?></p>
+                    </td>
+                </tr>
+            </tfoot>
+        </table>
+        <?php
     }
 
     /**

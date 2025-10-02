@@ -25,6 +25,7 @@ class Discord_Bot_JLG_API {
 
     private $option_name;
     private $cache_key;
+    private $base_cache_key;
     private $default_cache_duration;
     private $last_error;
     private $runtime_cache;
@@ -46,6 +47,7 @@ class Discord_Bot_JLG_API {
      */
     public function __construct($option_name, $cache_key, $default_cache_duration = 300, $http_client = null) {
         $this->option_name = $option_name;
+        $this->base_cache_key = $cache_key;
         $this->cache_key = $cache_key;
         $this->default_cache_duration = (int) $default_cache_duration;
         $this->last_error = '';
@@ -90,6 +92,60 @@ class Discord_Bot_JLG_API {
         return $this->options_cache;
     }
 
+    public function get_server_profiles($include_sensitive = false) {
+        $options = $this->get_plugin_options();
+        if (!is_array($options)) {
+            $options = array();
+        }
+
+        $profiles = array();
+
+        if (isset($options['server_profiles']) && is_array($options['server_profiles'])) {
+            foreach ($options['server_profiles'] as $stored_key => $profile) {
+                if (!is_array($profile)) {
+                    continue;
+                }
+
+                $profile_key = '';
+
+                if (isset($profile['key'])) {
+                    $profile_key = sanitize_key($profile['key']);
+                }
+
+                if ('' === $profile_key) {
+                    $profile_key = sanitize_key($stored_key);
+                }
+
+                if ('' === $profile_key) {
+                    continue;
+                }
+
+                $label = isset($profile['label']) ? sanitize_text_field($profile['label']) : '';
+                if ('' === $label) {
+                    $label = $profile_key;
+                }
+
+                $server_id = isset($profile['server_id']) ? $this->sanitize_server_id($profile['server_id']) : '';
+                $stored_token = isset($profile['bot_token']) ? (string) $profile['bot_token'] : '';
+
+                $entry = array(
+                    'key'       => $profile_key,
+                    'label'     => $label,
+                    'server_id' => $server_id,
+                    'has_token' => ('' !== $stored_token),
+                );
+
+                if (true === $include_sensitive) {
+                    $entry['bot_token'] = $stored_token;
+                }
+
+                $profiles[$profile_key] = $entry;
+            }
+        }
+
+        return $profiles;
+    }
+
     /**
      * Récupère les statistiques du serveur en tenant compte du cache, du mode démo ou d'un forçage explicite.
      *
@@ -111,130 +167,177 @@ class Discord_Bot_JLG_API {
             array(
                 'force_demo'   => false,
                 'bypass_cache' => false,
+                'profile_key'  => '',
+                'server_id'    => '',
+                'bot_token'    => '',
             )
         );
 
         $args['force_demo']   = discord_bot_jlg_validate_bool($args['force_demo']);
         $args['bypass_cache'] = discord_bot_jlg_validate_bool($args['bypass_cache']);
+        $args['profile_key']  = isset($args['profile_key']) ? sanitize_key($args['profile_key']) : '';
+        $args['server_id']    = isset($args['server_id']) ? $this->sanitize_server_id($args['server_id']) : '';
+        $args['bot_token']    = isset($args['bot_token']) ? $this->sanitize_token_override($args['bot_token']) : '';
 
-        $runtime_key = $this->get_runtime_cache_key($args);
+        if (true === $args['force_demo']) {
+            $demo_stats = $this->get_demo_stats(false);
+            return $this->remember_runtime_result(
+                $this->get_runtime_cache_key(
+                    array(
+                        'force_demo'   => true,
+                        'bypass_cache' => $args['bypass_cache'],
+                        'signature'    => 'forced-demo',
+                    )
+                ),
+                $demo_stats
+            );
+        }
+
+        $options = $this->get_plugin_options();
+
+        $context = $this->resolve_connection_context($args, $options);
+        $options = $context['options'];
+
+        $runtime_args = array(
+            'force_demo'   => $args['force_demo'],
+            'bypass_cache' => $args['bypass_cache'],
+            'signature'    => $context['signature'],
+        );
+
+        $runtime_key = $this->get_runtime_cache_key($runtime_args);
 
         if (array_key_exists($runtime_key, $this->runtime_cache)) {
-            $this->last_error = isset($this->runtime_errors[$runtime_key]) ? $this->runtime_errors[$runtime_key] : '';
+            $this->last_error      = isset($this->runtime_errors[$runtime_key]) ? $this->runtime_errors[$runtime_key] : '';
             $this->last_retry_after = isset($this->runtime_retry_after[$runtime_key]) ? (int) $this->runtime_retry_after[$runtime_key] : 0;
             return $this->runtime_cache[$runtime_key];
         }
 
-        if (true === $args['force_demo']) {
-            $demo_stats = $this->get_demo_stats(false);
+        if (!empty($context['error'])) {
+            $error_message = ($context['error'] instanceof WP_Error)
+                ? $context['error']->get_error_message()
+                : (string) $context['error'];
+
+            if ('' === $error_message) {
+                $error_message = __('Profil de serveur introuvable.', 'discord-bot-jlg');
+            }
+
+            $this->last_error = $error_message;
+
+            $demo_stats = $this->get_demo_stats(true);
+
             return $this->remember_runtime_result($runtime_key, $demo_stats);
         }
-
-        $options = $this->get_plugin_options();
 
         if (!empty($options['demo_mode'])) {
             $demo_stats = $this->get_demo_stats(false);
             return $this->remember_runtime_result($runtime_key, $demo_stats);
         }
 
-        if (false === $args['bypass_cache']) {
-            $cached_stats = get_transient($this->cache_key);
-            if (false !== $cached_stats) {
-                return $this->remember_runtime_result($runtime_key, $cached_stats);
-            }
-        }
+        $original_cache_key = $this->cache_key;
+        $this->cache_key     = $context['cache_key'];
 
-        if (empty($options['server_id'])) {
-            $this->last_error = __('Aucun identifiant de serveur Discord n\'est configuré.', 'discord-bot-jlg');
-            $demo_stats = $this->persist_fallback_stats($this->get_demo_stats(true), $options, $this->last_error);
-            return $this->remember_runtime_result($runtime_key, $demo_stats);
-        }
-
-        $stats = false;
-        $widget_stats = $this->get_stats_from_widget($options);
-
-        if (is_array($widget_stats)) {
-            $widget_stats = $this->normalize_stats($widget_stats);
-            $stats        = $widget_stats;
-        }
-
-        $widget_incomplete = $this->stats_need_completion($widget_stats);
-
-        $bot_stats  = false;
-        $bot_token = $this->get_bot_token($options);
-        $should_call_bot = (!empty($bot_token) && ($widget_incomplete || empty($widget_stats)));
-
-        if ($should_call_bot) {
-            $bot_stats = $this->get_stats_from_bot($options);
-
-            if (is_array($bot_stats)) {
-                $bot_stats = $this->normalize_stats($bot_stats);
-
-                if (true === $widget_incomplete && is_array($widget_stats)) {
-                    $total             = null;
-                    $has_total         = false;
-                    $total_approximate = false;
-
-                    if (!empty($widget_stats['has_total'])) {
-                        $total             = $widget_stats['total'];
-                        $has_total         = true;
-                        $total_approximate = !empty($widget_stats['total_is_approximate']);
-                    } elseif (!empty($bot_stats['has_total'])) {
-                        $total             = $bot_stats['total'];
-                        $has_total         = true;
-                        $total_approximate = !empty($bot_stats['total_is_approximate']);
-                    }
-
-                    $stats = array(
-                        'online'               => isset($widget_stats['online']) ? (int) $widget_stats['online'] : (isset($bot_stats['online']) ? (int) $bot_stats['online'] : 0),
-                        'total'                => $has_total ? $total : null,
-                        'server_name'          => !empty($widget_stats['server_name'])
-                            ? $widget_stats['server_name']
-                            : (isset($bot_stats['server_name']) ? $bot_stats['server_name'] : ''),
-                        'has_total'            => $has_total,
-                        'total_is_approximate' => $total_approximate,
-                        'server_avatar_url'    => '',
-                        'server_avatar_base_url' => '',
-                    );
-
-                    if (!empty($widget_stats['server_avatar_url'])) {
-                        $stats['server_avatar_url'] = $widget_stats['server_avatar_url'];
-                    } elseif (!empty($bot_stats['server_avatar_url'])) {
-                        $stats['server_avatar_url'] = $bot_stats['server_avatar_url'];
-                    }
-
-                    if (!empty($widget_stats['server_avatar_base_url'])) {
-                        $stats['server_avatar_base_url'] = $widget_stats['server_avatar_base_url'];
-                    } elseif (!empty($bot_stats['server_avatar_base_url'])) {
-                        $stats['server_avatar_base_url'] = $bot_stats['server_avatar_base_url'];
-                    }
-                } elseif (false === $stats) {
-                    $stats = $bot_stats;
+        try {
+            if (false === $args['bypass_cache']) {
+                $cached_stats = get_transient($this->cache_key);
+                if (false !== $cached_stats) {
+                    return $this->remember_runtime_result($runtime_key, $cached_stats);
                 }
             }
-        }
 
-        if (is_array($stats)) {
-            $stats = $this->normalize_stats($stats);
-        }
-
-        if (false === $this->has_usable_stats($stats)) {
-            if (empty($this->last_error)) {
-                $this->last_error = __('Impossible d\'obtenir des statistiques exploitables depuis Discord.', 'discord-bot-jlg');
+            if (empty($options['server_id'])) {
+                $this->last_error = __('Aucun identifiant de serveur Discord n\'est configuré.', 'discord-bot-jlg');
+                $demo_stats = $this->persist_fallback_stats($this->get_demo_stats(true), $options, $this->last_error);
+                return $this->remember_runtime_result($runtime_key, $demo_stats);
             }
-            $this->store_api_retry_after_delay($this->last_retry_after);
-            $demo_stats = $this->persist_fallback_stats($this->get_demo_stats(true), $options, $this->last_error);
-            return $this->remember_runtime_result($runtime_key, $demo_stats);
+
+            $stats = false;
+            $widget_stats = $this->get_stats_from_widget($options);
+
+            if (is_array($widget_stats)) {
+                $widget_stats = $this->normalize_stats($widget_stats);
+                $stats        = $widget_stats;
+            }
+
+            $widget_incomplete = $this->stats_need_completion($widget_stats);
+
+            $bot_stats  = false;
+            $bot_token = $this->get_bot_token($options);
+            $should_call_bot = (!empty($bot_token) && ($widget_incomplete || empty($widget_stats)));
+
+            if ($should_call_bot) {
+                $bot_stats = $this->get_stats_from_bot($options);
+
+                if (is_array($bot_stats)) {
+                    $bot_stats = $this->normalize_stats($bot_stats);
+
+                    if (true === $widget_incomplete && is_array($widget_stats)) {
+                        $total             = null;
+                        $has_total         = false;
+                        $total_approximate = false;
+
+                        if (!empty($widget_stats['has_total'])) {
+                            $total             = $widget_stats['total'];
+                            $has_total         = true;
+                            $total_approximate = !empty($widget_stats['total_is_approximate']);
+                        } elseif (!empty($bot_stats['has_total'])) {
+                            $total             = $bot_stats['total'];
+                            $has_total         = true;
+                            $total_approximate = !empty($bot_stats['total_is_approximate']);
+                        }
+
+                        $stats = array(
+                            'online'               => isset($widget_stats['online']) ? (int) $widget_stats['online'] : (isset($bot_stats['online']) ? (int) $bot_stats['online'] : 0),
+                            'total'                => $has_total ? $total : null,
+                            'server_name'          => !empty($widget_stats['server_name'])
+                                ? $widget_stats['server_name']
+                                : (isset($bot_stats['server_name']) ? $bot_stats['server_name'] : ''),
+                            'has_total'            => $has_total,
+                            'total_is_approximate' => $total_approximate,
+                            'server_avatar_url'    => '',
+                            'server_avatar_base_url' => '',
+                        );
+
+                        if (!empty($widget_stats['server_avatar_url'])) {
+                            $stats['server_avatar_url'] = $widget_stats['server_avatar_url'];
+                        } elseif (!empty($bot_stats['server_avatar_url'])) {
+                            $stats['server_avatar_url'] = $bot_stats['server_avatar_url'];
+                        }
+
+                        if (!empty($widget_stats['server_avatar_base_url'])) {
+                            $stats['server_avatar_base_url'] = $widget_stats['server_avatar_base_url'];
+                        } elseif (!empty($bot_stats['server_avatar_base_url'])) {
+                            $stats['server_avatar_base_url'] = $bot_stats['server_avatar_base_url'];
+                        }
+                    } elseif (false === $stats) {
+                        $stats = $bot_stats;
+                    }
+                }
+            }
+
+            if (is_array($stats)) {
+                $stats = $this->normalize_stats($stats);
+            }
+
+            if (false === $this->has_usable_stats($stats)) {
+                if (empty($this->last_error)) {
+                    $this->last_error = __('Impossible d\'obtenir des statistiques exploitables depuis Discord.', 'discord-bot-jlg');
+                }
+                $this->store_api_retry_after_delay($this->last_retry_after);
+                $demo_stats = $this->persist_fallback_stats($this->get_demo_stats(true), $options, $this->last_error);
+                return $this->remember_runtime_result($runtime_key, $demo_stats);
+            }
+
+            $this->last_error = '';
+            $this->set_last_retry_after(0);
+            $this->clear_api_retry_after_delay();
+            set_transient($this->cache_key, $stats, $this->get_cache_duration($options));
+            $this->store_last_good_stats($stats);
+            $this->clear_last_fallback_details();
+
+            return $this->remember_runtime_result($runtime_key, $stats);
+        } finally {
+            $this->cache_key = $original_cache_key;
         }
-
-        $this->last_error = '';
-        $this->set_last_retry_after(0);
-        $this->clear_api_retry_after_delay();
-        set_transient($this->cache_key, $stats, $this->get_cache_duration($options));
-        $this->store_last_good_stats($stats);
-        $this->clear_last_fallback_details();
-
-        return $this->remember_runtime_result($runtime_key, $stats);
     }
 
     /**
@@ -312,7 +415,49 @@ class Discord_Bot_JLG_API {
             }
         }
 
+        $profile_key_override = '';
+        if (isset($_POST['profile_key'])) {
+            $profile_key_override = sanitize_key(wp_unslash($_POST['profile_key']));
+        }
+
+        $server_id_override = '';
+        if (isset($_POST['server_id'])) {
+            $server_id_override = $this->sanitize_server_id(wp_unslash($_POST['server_id']));
+        }
+
+        $bot_token_override = '';
+        if (isset($_POST['bot_token'])) {
+            $bot_token_override = $this->sanitize_token_override(wp_unslash($_POST['bot_token']));
+        }
+
+        $connection_args = array(
+            'profile_key' => $profile_key_override,
+            'server_id'   => $server_id_override,
+            'bot_token'   => $bot_token_override,
+        );
+
         $options = $this->get_plugin_options();
+
+        $context = $this->resolve_connection_context($connection_args, $options);
+
+        if (!empty($context['error'])) {
+            $error_message = ($context['error'] instanceof WP_Error)
+                ? $context['error']->get_error_message()
+                : (string) $context['error'];
+
+            if ('' === $error_message) {
+                $error_message = __('Profil de serveur introuvable.', 'discord-bot-jlg');
+            }
+
+            wp_send_json_error(
+                array(
+                    'message' => $error_message,
+                ),
+                400
+            );
+        }
+
+        $options = $context['options'];
 
         if (!empty($options['demo_mode'])) {
             wp_send_json_error(
@@ -322,183 +467,213 @@ class Discord_Bot_JLG_API {
             );
         }
 
-        $rate_limit_key        = $this->cache_key . self::REFRESH_LOCK_SUFFIX;
-        $client_rate_limit_key = $this->get_client_rate_limit_key($is_public_request);
-        $cache_duration        = $this->get_cache_duration($options);
-        $default_public_refresh = max(self::MIN_PUBLIC_REFRESH_INTERVAL, (int) $cache_duration);
-        $rate_limit_window = (int) apply_filters('discord_bot_jlg_public_refresh_interval', $default_public_refresh, $options);
-        if ($rate_limit_window < self::MIN_PUBLIC_REFRESH_INTERVAL) {
-            $rate_limit_window = self::MIN_PUBLIC_REFRESH_INTERVAL;
-        }
+        $original_cache_key = $this->cache_key;
+        $this->cache_key     = $context['cache_key'];
 
-        $refresh_requires_remote_call = false;
-        $cached_stats                = get_transient($this->cache_key);
-        $cached_stats_is_fallback    = (
-            is_array($cached_stats)
-            && !empty($cached_stats['is_demo'])
-            && !empty($cached_stats['fallback_demo'])
-        );
-
-        $fallback_retry_key   = $this->get_fallback_retry_key();
-        $fallback_retry_after = (int) get_transient($fallback_retry_key);
-        if ($fallback_retry_after > 0) {
-            $this->set_runtime_fallback_retry_timestamp($fallback_retry_after);
-        }
-        $now                  = time();
-
-        if (true === $cached_stats_is_fallback && $fallback_retry_after <= 0) {
-            $fallback_retry_after = $this->schedule_next_fallback_retry($cache_duration, $options);
-        }
-
-        $bypass_cache = false;
-
-        if (true === $is_public_request) {
-            if (!empty($client_rate_limit_key)) {
-                $client_retry_after = $this->get_retry_after($client_rate_limit_key, $rate_limit_window);
-
-                if ($client_retry_after > 0) {
-                    $message = sprintf(
-                        /* translators: %d: number of seconds to wait before the next refresh. */
-                        __('Veuillez patienter %d secondes avant la prochaine actualisation.', 'discord-bot-jlg'),
-                        $client_retry_after
-                    );
-
-                    wp_send_json_error(
-                        array(
-                            'rate_limited' => true,
-                            'message'      => $message,
-                            'retry_after'  => $client_retry_after,
-                        ),
-                        429
-                    );
-                }
+        try {
+            $rate_limit_key        = $this->cache_key . self::REFRESH_LOCK_SUFFIX;
+            $client_rate_limit_key = $this->get_client_rate_limit_key($is_public_request);
+            $cache_duration        = $this->get_cache_duration($options);
+            $default_public_refresh = max(self::MIN_PUBLIC_REFRESH_INTERVAL, (int) $cache_duration);
+            $rate_limit_window = (int) apply_filters('discord_bot_jlg_public_refresh_interval', $default_public_refresh, $options);
+            if ($rate_limit_window < self::MIN_PUBLIC_REFRESH_INTERVAL) {
+                $rate_limit_window = self::MIN_PUBLIC_REFRESH_INTERVAL;
             }
 
-            $last_refresh = get_transient($rate_limit_key);
-            if (false !== $last_refresh) {
-                $elapsed = time() - (int) $last_refresh;
-                if ($elapsed < $rate_limit_window) {
-                    $retry_after = max(0, $rate_limit_window - $elapsed);
-                    $message = sprintf(
-                        /* translators: %d: number of seconds to wait before the next refresh. */
-                        __('Veuillez patienter %d secondes avant la prochaine actualisation.', 'discord-bot-jlg'),
-                        $retry_after
-                    );
+            $refresh_requires_remote_call = false;
+            $cached_stats                = get_transient($this->cache_key);
+            $cached_stats_is_fallback    = (
+                is_array($cached_stats)
+                && !empty($cached_stats['is_demo'])
+                && !empty($cached_stats['fallback_demo'])
+            );
 
-                    wp_send_json_error(
-                        array(
-                            'rate_limited' => true,
-                            'message'      => $message,
-                            'retry_after'  => $retry_after,
-                        ),
-                        429
-                    );
-                }
+            $fallback_retry_key   = $this->get_fallback_retry_key();
+            $fallback_retry_after = (int) get_transient($fallback_retry_key);
+            if ($fallback_retry_after > 0) {
+                $this->set_runtime_fallback_retry_timestamp($fallback_retry_after);
+            }
+            $now                  = time();
+
+            if (true === $cached_stats_is_fallback && $fallback_retry_after <= 0) {
+                $fallback_retry_after = $this->schedule_next_fallback_retry($cache_duration, $options);
             }
 
-            if ($cached_stats_is_fallback) {
-                if ($fallback_retry_after > $now) {
-                    $response_payload = $cached_stats;
+            $bypass_cache = false;
 
-                    if (is_array($response_payload)) {
-                        $next_retry = $this->get_runtime_fallback_retry_timestamp();
-                        if ($next_retry <= 0) {
-                            $next_retry = (int) $fallback_retry_after;
+            if (true === $is_public_request) {
+                if (!empty($client_rate_limit_key)) {
+                    $client_retry_after = $this->get_retry_after($client_rate_limit_key, $rate_limit_window);
+
+                    if ($client_retry_after > 0) {
+                        $message = sprintf(
+                            /* translators: %d: number of seconds to wait before the next refresh. */
+                            __('Veuillez patienter %d secondes avant la prochaine actualisation.', 'discord-bot-jlg'),
+                            $client_retry_after
+                        );
+
+                        wp_send_json_error(
+                            array(
+                                'rate_limited' => true,
+                                'message'      => $message,
+                                'retry_after'  => $client_retry_after,
+                            ),
+                            429
+                        );
+                    }
+                }
+
+                $last_refresh = get_transient($rate_limit_key);
+                if (false !== $last_refresh) {
+                    $elapsed = time() - (int) $last_refresh;
+                    if ($elapsed < $rate_limit_window) {
+                        $retry_after = max(0, $rate_limit_window - $elapsed);
+                        $message = sprintf(
+                            /* translators: %d: number of seconds to wait before the next refresh. */
+                            __('Veuillez patienter %d secondes avant la prochaine actualisation.', 'discord-bot-jlg'),
+                            $retry_after
+                        );
+
+                        wp_send_json_error(
+                            array(
+                                'rate_limited' => true,
+                                'message'      => $message,
+                                'retry_after'  => $retry_after,
+                            ),
+                            429
+                        );
+                    }
+                }
+
+                if ($cached_stats_is_fallback) {
+                    if ($fallback_retry_after > $now) {
+                        $response_payload = $cached_stats;
+
+                        if (is_array($response_payload)) {
+                            $next_retry = $this->get_runtime_fallback_retry_timestamp();
+                            if ($next_retry <= 0) {
+                                $next_retry = (int) $fallback_retry_after;
+                            }
+                            $response_payload['retry_after'] = max(0, (int) $next_retry - time());
                         }
-                        $response_payload['retry_after'] = max(0, (int) $next_retry - time());
+
+                        wp_send_json_success($response_payload);
                     }
 
-                    wp_send_json_success($response_payload);
+                    $refresh_requires_remote_call = true;
+                    $bypass_cache = true;
+                } elseif (is_array($cached_stats) && empty($cached_stats['is_demo'])) {
+                    wp_send_json_success($cached_stats);
+                } else {
+                    $refresh_requires_remote_call = true;
                 }
+            }
 
+            if (false === $is_public_request && $cached_stats_is_fallback) {
                 $refresh_requires_remote_call = true;
                 $bypass_cache = true;
-            } elseif (is_array($cached_stats) && empty($cached_stats['is_demo'])) {
-                wp_send_json_success($cached_stats);
-            } else {
-                $refresh_requires_remote_call = true;
             }
-        }
 
-        if (false === $is_public_request && $cached_stats_is_fallback) {
-            $refresh_requires_remote_call = true;
-            $bypass_cache = true;
-        }
+            if (isset($_POST['force_refresh'])) {
+                $force_refresh = discord_bot_jlg_validate_bool(wp_unslash($_POST['force_refresh']));
 
-        if (isset($_POST['force_refresh'])) {
-            $force_refresh = discord_bot_jlg_validate_bool(wp_unslash($_POST['force_refresh']));
+                if (
+                    true === $force_refresh
+                    && false === $is_public_request
+                    && current_user_can('manage_options')
+                ) {
+                    $bypass_cache = true;
+                    $refresh_requires_remote_call = true;
+                }
+            }
+
+            $stats = $this->get_stats(
+                array(
+                    'bypass_cache' => $bypass_cache,
+                    'profile_key'  => $profile_key_override,
+                    'server_id'    => $server_id_override,
+                    'bot_token'    => $bot_token_override,
+                )
+            );
+
+            $last_error_message = $this->get_last_error_message();
 
             if (
-                true === $force_refresh
-                && false === $is_public_request
-                && current_user_can('manage_options')
+                is_array($stats)
+                && !empty($stats['is_demo'])
+                && !empty($stats['fallback_demo'])
             ) {
-                $bypass_cache = true;
-                $refresh_requires_remote_call = true;
+                $this->schedule_next_fallback_retry($cache_duration, $options);
+            } else {
+                $this->clear_fallback_retry_schedule();
             }
-        }
 
-        $stats = $this->get_stats(
-            array(
-                'bypass_cache' => $bypass_cache,
-            )
-        );
+            if (
+                is_array($stats)
+                && !empty($stats['is_demo'])
+                && !empty($stats['fallback_demo'])
+            ) {
+                if (true === $is_public_request) {
+                    delete_transient($rate_limit_key);
+                    if (!empty($client_rate_limit_key)) {
+                        $this->delete_client_rate_limit($client_rate_limit_key);
+                    }
+                }
 
-        $last_error_message = $this->get_last_error_message();
+                $next_retry = $this->get_runtime_fallback_retry_timestamp();
+                if ($next_retry > 0) {
+                    $stats['retry_after'] = max(0, (int) $next_retry - time());
+                }
 
-        if (
-            is_array($stats)
-            && !empty($stats['is_demo'])
-            && !empty($stats['fallback_demo'])
-        ) {
-            $this->schedule_next_fallback_retry($cache_duration, $options);
-        } else {
-            $this->clear_fallback_retry_schedule();
-        }
+                wp_send_json_success($stats);
+            }
 
-        if (
-            is_array($stats)
-            && !empty($stats['is_demo'])
-            && !empty($stats['fallback_demo'])
-        ) {
+            if (is_array($stats) && empty($stats['is_demo'])) {
+                if (
+                    true === $is_public_request
+                    && true === $refresh_requires_remote_call
+                ) {
+                    set_transient($rate_limit_key, time(), $rate_limit_window);
+                    if (!empty($client_rate_limit_key)) {
+                        $this->set_client_rate_limit($client_rate_limit_key, $rate_limit_window);
+                    }
+                }
+
+                wp_send_json_success($stats);
+            }
+
             if (true === $is_public_request) {
+                $cached_stats = get_transient($this->cache_key);
+                if (is_array($cached_stats) && empty($cached_stats['is_demo'])) {
+                    wp_send_json_success($cached_stats);
+                }
+
                 delete_transient($rate_limit_key);
                 if (!empty($client_rate_limit_key)) {
                     $this->delete_client_rate_limit($client_rate_limit_key);
                 }
-            }
 
-            $next_retry = $this->get_runtime_fallback_retry_timestamp();
-            if ($next_retry > 0) {
-                $stats['retry_after'] = max(0, (int) $next_retry - time());
-            }
+                $error_payload = array(
+                    'rate_limited' => false,
+                    'message'      => __('Actualisation en cours, veuillez réessayer dans quelques instants.', 'discord-bot-jlg'),
+                );
 
-            wp_send_json_success($stats);
-        }
+                $error_payload['retry_after'] = max(0, (int) $this->last_retry_after);
 
-        if (is_array($stats) && empty($stats['is_demo'])) {
-            if (
-                true === $is_public_request
-                && true === $refresh_requires_remote_call
-            ) {
-                set_transient($rate_limit_key, time(), $rate_limit_window);
-                if (!empty($client_rate_limit_key)) {
-                    $this->set_client_rate_limit($client_rate_limit_key, $rate_limit_window);
+                if (!empty($last_error_message)) {
+                    $this->log_debug(
+                        sprintf(
+                            'ajax_refresh_stats error (public request): %s',
+                            $last_error_message
+                        )
+                    );
+
+                    if (false === $is_public_request) {
+                        $error_payload['diagnostic'] = $last_error_message;
+                    }
                 }
-            }
 
-            wp_send_json_success($stats);
-        }
-
-        if (true === $is_public_request) {
-            $cached_stats = get_transient($this->cache_key);
-            if (is_array($cached_stats) && empty($cached_stats['is_demo'])) {
-                wp_send_json_success($cached_stats);
-            }
-
-            delete_transient($rate_limit_key);
-            if (!empty($client_rate_limit_key)) {
-                $this->delete_client_rate_limit($client_rate_limit_key);
+                wp_send_json_error($error_payload, 503);
             }
 
             $error_payload = array(
@@ -506,49 +681,18 @@ class Discord_Bot_JLG_API {
                 'message'      => __('Actualisation en cours, veuillez réessayer dans quelques instants.', 'discord-bot-jlg'),
             );
 
-            $error_payload['retry_after'] = max(0, (int) $this->last_retry_after);
+            if ($this->last_retry_after > 0) {
+                $error_payload['retry_after'] = (int) $this->last_retry_after;
+            }
 
             if (!empty($last_error_message)) {
-                $this->log_debug(
-                    sprintf(
-                        'ajax_refresh_stats error (public request): %s',
-                        $last_error_message
-                    )
-                );
-
-                if (false === $is_public_request) {
-                    $error_payload['diagnostic'] = $last_error_message;
-                }
+                $error_payload['diagnostic'] = $last_error_message;
             }
 
             wp_send_json_error($error_payload, 503);
+        } finally {
+            $this->cache_key = $original_cache_key;
         }
-
-        delete_transient($rate_limit_key);
-        if (!empty($client_rate_limit_key)) {
-            $this->delete_client_rate_limit($client_rate_limit_key);
-        }
-
-        $error_payload = array(
-            'message' => __('Impossible de récupérer les stats', 'discord-bot-jlg'),
-        );
-
-        if (!empty($last_error_message)) {
-            $this->log_debug(
-                sprintf(
-                    'ajax_refresh_stats error (authenticated request): %s',
-                    $last_error_message
-                )
-            );
-
-            if (false === $is_public_request) {
-                $error_payload['diagnostic'] = $last_error_message;
-            }
-        }
-
-        $error_payload['retry_after'] = max(0, (int) $this->last_retry_after);
-
-        wp_send_json_error($error_payload);
     }
 
     /**
@@ -618,11 +762,16 @@ class Discord_Bot_JLG_API {
             return;
         }
 
+        $original_cache_key = $this->cache_key;
+        $this->cache_key     = $this->base_cache_key;
+
         delete_transient($this->cache_key);
         delete_transient($this->cache_key . self::REFRESH_LOCK_SUFFIX);
         $this->clear_client_rate_limits();
         $this->reset_runtime_cache();
         $this->flush_options_cache();
+
+        $this->cache_key = $original_cache_key;
     }
 
     /**
@@ -640,6 +789,9 @@ class Discord_Bot_JLG_API {
      * @return void
      */
     public function clear_all_cached_data() {
+        $original_cache_key = $this->cache_key;
+        $this->cache_key     = $this->base_cache_key;
+
         delete_transient($this->cache_key);
         delete_transient($this->cache_key . self::REFRESH_LOCK_SUFFIX);
         $this->clear_fallback_retry_schedule();
@@ -649,6 +801,8 @@ class Discord_Bot_JLG_API {
         $this->reset_runtime_cache();
         $this->flush_options_cache();
         $this->clear_last_fallback_details();
+
+        $this->cache_key = $original_cache_key;
     }
 
     private function get_runtime_cache_key($args) {
@@ -659,6 +813,7 @@ class Discord_Bot_JLG_API {
         $normalized_args = array(
             'force_demo'   => isset($args['force_demo']) ? (bool) $args['force_demo'] : false,
             'bypass_cache' => isset($args['bypass_cache']) ? (bool) $args['bypass_cache'] : false,
+            'signature'    => isset($args['signature']) ? (string) $args['signature'] : '',
         );
 
         return md5(wp_json_encode($normalized_args));
@@ -1799,7 +1954,9 @@ class Discord_Bot_JLG_API {
     }
 
     private function get_bot_token($options) {
-        if (defined('DISCORD_BOT_JLG_TOKEN') && '' !== DISCORD_BOT_JLG_TOKEN) {
+        $override_requested = (is_array($options) && !empty($options['__bot_token_override']));
+
+        if (!$override_requested && defined('DISCORD_BOT_JLG_TOKEN') && '' !== DISCORD_BOT_JLG_TOKEN) {
             return DISCORD_BOT_JLG_TOKEN;
         }
 
@@ -1827,6 +1984,145 @@ class Discord_Bot_JLG_API {
         }
 
         return $decrypted;
+    }
+
+    private function resolve_connection_context($args, $options) {
+        $options = is_array($options) ? $options : array();
+        $effective_options = $options;
+        $signature_parts = array();
+
+        $profile_key = isset($args['profile_key']) ? sanitize_key($args['profile_key']) : '';
+        $server_id_override = isset($args['server_id']) ? $this->sanitize_server_id($args['server_id']) : '';
+        $bot_token_override = isset($args['bot_token']) ? $this->sanitize_token_override($args['bot_token']) : '';
+
+        if ('' !== $profile_key) {
+            $profile = $this->find_server_profile($profile_key, $options);
+
+            if (null === $profile) {
+                $signature = 'profile-missing:' . $profile_key;
+
+                return array(
+                    'options'   => $effective_options,
+                    'cache_key' => $this->build_cache_key_from_signature($signature),
+                    'signature' => $signature,
+                    'error'     => new WP_Error(
+                        'discord_bot_jlg_profile_not_found',
+                        sprintf(
+                            /* translators: %s: server profile key. */
+                            __('Le profil de serveur « %s » est introuvable.', 'discord-bot-jlg'),
+                            $profile_key
+                        )
+                    ),
+                );
+            }
+
+            if (!empty($profile['server_id'])) {
+                $effective_options['server_id'] = $this->sanitize_server_id($profile['server_id']);
+            }
+
+            if (isset($profile['bot_token']) && '' !== $profile['bot_token']) {
+                $effective_options['bot_token'] = $profile['bot_token'];
+                $effective_options['__bot_token_override'] = true;
+            }
+
+            $signature_parts[] = 'profile:' . $profile_key;
+        }
+
+        if ('' !== $server_id_override) {
+            $effective_options['server_id'] = $server_id_override;
+            $signature_parts[] = 'server:' . $server_id_override;
+        }
+
+        if ('' !== $bot_token_override) {
+            $effective_options['bot_token'] = $bot_token_override;
+            $effective_options['__bot_token_override'] = true;
+            $signature_parts[] = 'token:' . sha1($bot_token_override);
+        }
+
+        if (!isset($effective_options['server_id'])) {
+            $effective_options['server_id'] = '';
+        } else {
+            $effective_options['server_id'] = $this->sanitize_server_id($effective_options['server_id']);
+        }
+
+        $signature = 'default';
+
+        if (!empty($signature_parts)) {
+            $signature = implode('|', $signature_parts);
+        }
+
+        return array(
+            'options'   => $effective_options,
+            'cache_key' => $this->build_cache_key_from_signature($signature),
+            'signature' => $signature,
+        );
+    }
+
+    private function build_cache_key_from_signature($signature) {
+        if ('' === $signature || 'default' === $signature) {
+            return $this->base_cache_key;
+        }
+
+        return $this->base_cache_key . '_' . md5($signature);
+    }
+
+    private function sanitize_server_id($value) {
+        if (!is_string($value) && !is_numeric($value)) {
+            return '';
+        }
+
+        $value = preg_replace('/[^0-9]/', '', (string) $value);
+
+        return (string) $value;
+    }
+
+    private function sanitize_token_override($token) {
+        if (!is_string($token) && !is_numeric($token)) {
+            return '';
+        }
+
+        $token = trim((string) $token);
+
+        if ('' === $token) {
+            return '';
+        }
+
+        return sanitize_text_field($token);
+    }
+
+    private function find_server_profile($profile_key, $options) {
+        if (!is_array($options) || !isset($options['server_profiles']) || !is_array($options['server_profiles'])) {
+            return null;
+        }
+
+        foreach ($options['server_profiles'] as $stored_key => $profile) {
+            if (!is_array($profile)) {
+                continue;
+            }
+
+            $candidate_key = '';
+
+            if (isset($profile['key'])) {
+                $candidate_key = sanitize_key($profile['key']);
+            }
+
+            if ('' === $candidate_key) {
+                $candidate_key = sanitize_key($stored_key);
+            }
+
+            if ('' === $candidate_key || $candidate_key !== $profile_key) {
+                continue;
+            }
+
+            return array(
+                'key'       => $candidate_key,
+                'label'     => isset($profile['label']) ? sanitize_text_field($profile['label']) : '',
+                'server_id' => isset($profile['server_id']) ? $this->sanitize_server_id($profile['server_id']) : '',
+                'bot_token' => isset($profile['bot_token']) ? (string) $profile['bot_token'] : '',
+            );
+        }
+
+        return null;
     }
 
     private function get_cache_duration($options) {

@@ -102,6 +102,7 @@ if (!function_exists('discord_bot_jlg_get_default_options')) {
         return array(
             'server_id'      => '',
             'bot_token'      => '',
+            'server_profiles'=> array(),
             'demo_mode'      => false,
             'show_online'    => true,
             'show_total'     => true,
@@ -233,6 +234,38 @@ class DiscordServerStats {
             true
         );
 
+        $profiles_for_block = array();
+        $stored_profiles    = $this->api->get_server_profiles(false);
+
+        if (is_array($stored_profiles)) {
+            foreach ($stored_profiles as $profile) {
+                if (!is_array($profile)) {
+                    continue;
+                }
+
+                $key = isset($profile['key']) ? sanitize_key($profile['key']) : '';
+
+                if ('' === $key) {
+                    continue;
+                }
+
+                $profiles_for_block[] = array(
+                    'key'        => $key,
+                    'label'      => isset($profile['label']) ? sanitize_text_field($profile['label']) : $key,
+                    'server_id'  => isset($profile['server_id']) ? preg_replace('/[^0-9]/', '', (string) $profile['server_id']) : '',
+                    'has_token'  => !empty($profile['has_token']),
+                );
+            }
+        }
+
+        wp_localize_script(
+            $script_handle,
+            'discordBotJlgBlockConfig',
+            array(
+                'profiles' => $profiles_for_block,
+            )
+        );
+
         wp_register_style(
             'discord-bot-jlg',
             DISCORD_BOT_JLG_PLUGIN_URL . 'assets/css/discord-bot-jlg.css',
@@ -359,6 +392,8 @@ class DiscordServerStats {
         $new_server_id = isset($value['server_id']) ? (string) $value['server_id'] : '';
         $old_bot_token = isset($old_value['bot_token']) ? (string) $old_value['bot_token'] : '';
         $new_bot_token = isset($value['bot_token']) ? (string) $value['bot_token'] : '';
+        $old_profiles  = isset($old_value['server_profiles']) ? $old_value['server_profiles'] : array();
+        $new_profiles  = isset($value['server_profiles']) ? $value['server_profiles'] : array();
         $old_cache_duration = isset($old_value['cache_duration']) ? $old_value['cache_duration'] : DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION;
         $new_cache_duration = isset($value['cache_duration']) ? $value['cache_duration'] : DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION;
 
@@ -368,6 +403,16 @@ class DiscordServerStats {
         $cache_duration_changed = ($old_cache_duration !== $new_cache_duration);
 
         if ($old_server_id !== $new_server_id || $old_bot_token !== $new_bot_token) {
+            $this->api->clear_all_cached_data();
+
+            if ($cache_duration_changed) {
+                $this->reschedule_cron_event($new_cache_duration);
+            }
+
+            return;
+        }
+
+        if ($old_profiles !== $new_profiles) {
             $this->api->clear_all_cached_data();
 
             if ($cache_duration_changed) {

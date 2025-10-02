@@ -85,6 +85,25 @@ class Discord_Stats_Widget extends WP_Widget {
             $shortcode_atts['title'] = $card_title;
         }
 
+        $profile_key = isset($instance['profile_key']) ? sanitize_key($instance['profile_key']) : '';
+        if ('' !== $profile_key) {
+            $shortcode_atts['profile'] = $profile_key;
+        }
+
+        $server_id_override = isset($instance['server_id_override'])
+            ? preg_replace('/[^0-9]/', '', (string) $instance['server_id_override'])
+            : '';
+        if ('' !== $server_id_override) {
+            $shortcode_atts['server_id'] = $server_id_override;
+        }
+
+        $bot_token_override = isset($instance['bot_token_override'])
+            ? sanitize_text_field($instance['bot_token_override'])
+            : '';
+        if ('' !== $bot_token_override) {
+            $shortcode_atts['bot_token'] = $bot_token_override;
+        }
+
         $attr_parts = array();
         foreach ($shortcode_atts as $key => $value) {
             if ('' === $value) {
@@ -138,6 +157,19 @@ class Discord_Stats_Widget extends WP_Widget {
 
         $instance['show_card_title'] = !empty($new_instance['show_card_title']) ? 1 : 0;
         $instance['card_title']      = isset($new_instance['card_title']) ? sanitize_text_field($new_instance['card_title']) : '';
+
+        $profile_key = isset($new_instance['profile_key']) ? sanitize_key($new_instance['profile_key']) : '';
+        $instance['profile_key'] = $profile_key;
+
+        $server_id_override = isset($new_instance['server_id_override'])
+            ? preg_replace('/[^0-9]/', '', (string) $new_instance['server_id_override'])
+            : '';
+        $instance['server_id_override'] = $server_id_override;
+
+        $bot_token_override = isset($new_instance['bot_token_override'])
+            ? sanitize_text_field($new_instance['bot_token_override'])
+            : '';
+        $instance['bot_token_override'] = $bot_token_override;
 
         return $instance;
     }
@@ -249,6 +281,68 @@ class Discord_Stats_Widget extends WP_Widget {
                    name="<?php echo esc_attr($this->get_field_name('card_title')); ?>" type="text"
                    value="<?php echo esc_attr($instance['card_title']); ?>" />
         </p>
+
+        <?php
+        $options  = get_option(DISCORD_BOT_JLG_OPTION_NAME);
+        $profiles = array();
+
+        if (is_array($options) && isset($options['server_profiles']) && is_array($options['server_profiles'])) {
+            foreach ($options['server_profiles'] as $stored_key => $profile) {
+                if (!is_array($profile)) {
+                    continue;
+                }
+
+                $profile_key = isset($profile['key']) ? sanitize_key($profile['key']) : sanitize_key($stored_key);
+
+                if ('' === $profile_key) {
+                    continue;
+                }
+
+                $label = isset($profile['label']) ? sanitize_text_field($profile['label']) : $profile_key;
+
+                $profiles[$profile_key] = $label;
+            }
+        }
+        ?>
+
+        <fieldset style="margin-top: 1.5em;">
+            <legend><?php esc_html_e('Connexion au serveur', 'discord-bot-jlg'); ?></legend>
+
+            <p>
+                <label for="<?php echo esc_attr($this->get_field_id('profile_key')); ?>"><?php esc_html_e('Profil enregistré', 'discord-bot-jlg'); ?></label>
+                <select class="widefat" id="<?php echo esc_attr($this->get_field_id('profile_key')); ?>"
+                        name="<?php echo esc_attr($this->get_field_name('profile_key')); ?>">
+                    <option value="">&mdash; <?php esc_html_e('Utiliser la configuration générale', 'discord-bot-jlg'); ?> &mdash;</option>
+                    <?php foreach ($profiles as $profile_key => $label) : ?>
+                        <option value="<?php echo esc_attr($profile_key); ?>" <?php selected($instance['profile_key'], $profile_key); ?>>
+                            <?php echo esc_html($label); ?>
+                        </option>
+                    <?php endforeach; ?>
+                </select>
+            </p>
+
+            <p class="description">
+                <?php esc_html_e('Le profil sélectionné fournit l’ID de serveur et, si disponible, un token dédié.', 'discord-bot-jlg'); ?>
+            </p>
+
+            <p>
+                <label for="<?php echo esc_attr($this->get_field_id('server_id_override')); ?>"><?php esc_html_e('Remplacer l’ID du serveur', 'discord-bot-jlg'); ?></label>
+                <input class="widefat" id="<?php echo esc_attr($this->get_field_id('server_id_override')); ?>"
+                       name="<?php echo esc_attr($this->get_field_name('server_id_override')); ?>" type="text"
+                       value="<?php echo esc_attr($instance['server_id_override']); ?>" placeholder="1234567890" />
+            </p>
+
+            <p>
+                <label for="<?php echo esc_attr($this->get_field_id('bot_token_override')); ?>"><?php esc_html_e('Token du bot (prioritaire)', 'discord-bot-jlg'); ?></label>
+                <input class="widefat" id="<?php echo esc_attr($this->get_field_id('bot_token_override')); ?>"
+                       name="<?php echo esc_attr($this->get_field_name('bot_token_override')); ?>" type="text"
+                       value="<?php echo esc_attr($instance['bot_token_override']); ?>" autocomplete="off" />
+            </p>
+
+            <p class="description">
+                <?php esc_html_e('Les champs ci-dessus remplacent le profil sélectionné ou la configuration globale uniquement pour ce widget.', 'discord-bot-jlg'); ?>
+            </p>
+        </fieldset>
         <?php
     }
 
@@ -288,6 +382,9 @@ class Discord_Stats_Widget extends WP_Widget {
             'refresh_interval'     => $cache_duration,
             'show_card_title'      => 0,
             'card_title'           => '',
+            'profile_key'          => '',
+            'server_id_override'   => '',
+            'bot_token_override'   => '',
         );
     }
 }
