@@ -135,6 +135,7 @@ require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-api.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-admin.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-shortcode.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-widget.php';
+require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-site-health.php';
 
 if (defined('WP_CLI') && WP_CLI) {
     require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-cli.php';
@@ -165,6 +166,7 @@ class DiscordServerStats {
     private $admin;
     private $shortcode;
     private $widget;
+    private $site_health;
 
     public function __construct() {
         $this->default_options = discord_bot_jlg_get_default_options();
@@ -173,6 +175,7 @@ class DiscordServerStats {
         $this->admin     = new Discord_Bot_JLG_Admin(DISCORD_BOT_JLG_OPTION_NAME, $this->api);
         $this->shortcode = new Discord_Bot_JLG_Shortcode(DISCORD_BOT_JLG_OPTION_NAME, $this->api);
         $this->widget    = new Discord_Bot_JLG_Widget();
+        $this->site_health = new Discord_Bot_JLG_Site_Health($this->api);
 
         add_filter('default_option_' . DISCORD_BOT_JLG_OPTION_NAME, array($this, 'provide_default_options'));
         add_filter('option_' . DISCORD_BOT_JLG_OPTION_NAME, array($this, 'merge_options_with_defaults'));
