@@ -133,6 +133,46 @@ class Discord_Bot_JLG_Admin {
         );
 
         add_settings_field(
+            'show_server_name',
+            __('Afficher le nom du serveur', 'discord-bot-jlg'),
+            array($this, 'show_server_name_render'),
+            'discord_stats_settings',
+            'discord_stats_display_section'
+        );
+
+        add_settings_field(
+            'show_server_avatar',
+            __('Afficher l\'avatar du serveur', 'discord-bot-jlg'),
+            array($this, 'show_server_avatar_render'),
+            'discord_stats_settings',
+            'discord_stats_display_section'
+        );
+
+        add_settings_field(
+            'default_theme',
+            __('Thème par défaut', 'discord-bot-jlg'),
+            array($this, 'default_theme_render'),
+            'discord_stats_settings',
+            'discord_stats_display_section'
+        );
+
+        add_settings_field(
+            'default_refresh_enabled',
+            __('Rafraîchissement auto par défaut', 'discord-bot-jlg'),
+            array($this, 'default_refresh_enabled_render'),
+            'discord_stats_settings',
+            'discord_stats_display_section'
+        );
+
+        add_settings_field(
+            'default_refresh_interval',
+            __('Intervalle d\'auto-rafraîchissement (secondes)', 'discord-bot-jlg'),
+            array($this, 'default_refresh_interval_render'),
+            'discord_stats_settings',
+            'discord_stats_display_section'
+        );
+
+        add_settings_field(
             'widget_title',
             __('Titre du widget', 'discord-bot-jlg'),
             array($this, 'widget_title_render'),
@@ -174,17 +214,49 @@ class Discord_Bot_JLG_Admin {
             $current_options = array();
         }
 
+        $current_theme = 'discord';
+
+        if (
+            isset($current_options['default_theme'])
+            && discord_bot_jlg_is_allowed_theme($current_options['default_theme'])
+        ) {
+            $current_theme = $current_options['default_theme'];
+        }
+
+        $min_refresh_interval = defined('Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL')
+            ? Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL
+            : 10;
+        $max_refresh_interval = 3600;
+
+        $current_refresh_interval = isset($current_options['default_refresh_interval'])
+            ? absint($current_options['default_refresh_interval'])
+            : 60;
+
+        if ($current_refresh_interval <= 0) {
+            $current_refresh_interval = 60;
+        }
+
+        $current_refresh_interval = max(
+            $min_refresh_interval,
+            min($max_refresh_interval, $current_refresh_interval)
+        );
+
         $sanitized = array(
             'server_id'      => '',
             'bot_token'      => isset($current_options['bot_token']) ? $current_options['bot_token'] : '',
             'demo_mode'      => 0,
             'show_online'    => 0,
             'show_total'     => 0,
+            'show_server_name'   => 0,
+            'show_server_avatar' => 0,
+            'default_refresh_enabled' => 0,
+            'default_theme'   => $current_theme,
             'widget_title'   => '',
             'cache_duration' => isset($current_options['cache_duration'])
                 ? (int) $current_options['cache_duration']
                 : 300,
             'custom_css'     => '',
+            'default_refresh_interval' => $current_refresh_interval,
         );
 
         if (isset($input['server_id'])) {
@@ -243,9 +315,26 @@ class Discord_Bot_JLG_Admin {
             }
         }
 
-        $sanitized['demo_mode']   = !empty($input['demo_mode']) ? 1 : 0;
-        $sanitized['show_online'] = !empty($input['show_online']) ? 1 : 0;
-        $sanitized['show_total']  = !empty($input['show_total']) ? 1 : 0;
+        $sanitized['demo_mode']              = !empty($input['demo_mode']) ? 1 : 0;
+        $sanitized['show_online']            = !empty($input['show_online']) ? 1 : 0;
+        $sanitized['show_total']             = !empty($input['show_total']) ? 1 : 0;
+        $sanitized['show_server_name']       = !empty($input['show_server_name']) ? 1 : 0;
+        $sanitized['show_server_avatar']     = !empty($input['show_server_avatar']) ? 1 : 0;
+        $sanitized['default_refresh_enabled'] = !empty($input['default_refresh_enabled']) ? 1 : 0;
+
+        if (isset($input['default_theme'])) {
+            $raw_theme = is_string($input['default_theme'])
+                ? trim($input['default_theme'])
+                : '';
+
+            if ('' === $raw_theme) {
+                $sanitized['default_theme'] = $current_theme;
+            } elseif (discord_bot_jlg_is_allowed_theme($raw_theme)) {
+                $sanitized['default_theme'] = $raw_theme;
+            } else {
+                $sanitized['default_theme'] = 'discord';
+            }
+        }
 
         if (isset($input['widget_title'])) {
             $sanitized['widget_title'] = sanitize_text_field($input['widget_title']);
@@ -275,6 +364,25 @@ class Discord_Bot_JLG_Admin {
 
         if (isset($input['custom_css'])) {
             $sanitized['custom_css'] = discord_bot_jlg_sanitize_custom_css($input['custom_css']);
+        }
+
+        if (array_key_exists('default_refresh_interval', $input)) {
+            $raw_refresh_interval = is_string($input['default_refresh_interval'])
+                ? trim($input['default_refresh_interval'])
+                : $input['default_refresh_interval'];
+
+            if ('' === $raw_refresh_interval) {
+                $sanitized['default_refresh_interval'] = $current_refresh_interval;
+            } else {
+                $interval = absint($raw_refresh_interval);
+
+                if ($interval > 0) {
+                    $sanitized['default_refresh_interval'] = max(
+                        $min_refresh_interval,
+                        min($max_refresh_interval, $interval)
+                    );
+                }
+            }
         }
 
         return $sanitized;
@@ -559,6 +667,123 @@ class Discord_Bot_JLG_Admin {
                value="1" <?php checked($value, 1); ?> />
         <label><?php esc_html_e('Afficher le nombre total de membres', 'discord-bot-jlg'); ?></label>
         <?php
+    }
+
+    /**
+     * Rend la case à cocher pour afficher le nom du serveur.
+     */
+    public function show_server_name_render() {
+        $options = get_option($this->option_name);
+        $value   = isset($options['show_server_name']) ? (int) $options['show_server_name'] : 0;
+        ?>
+        <input type="checkbox" name="<?php echo esc_attr($this->option_name); ?>[show_server_name]"
+               value="1" <?php checked($value, 1); ?> />
+        <label><?php esc_html_e('Afficher le nom du serveur lorsque disponible', 'discord-bot-jlg'); ?></label>
+        <p class="description"><?php esc_html_e('Permet d\'afficher automatiquement l\'entête du serveur dans le shortcode et le bloc.', 'discord-bot-jlg'); ?></p>
+        <?php
+    }
+
+    /**
+     * Rend la case à cocher pour afficher l'avatar du serveur.
+     */
+    public function show_server_avatar_render() {
+        $options = get_option($this->option_name);
+        $value   = isset($options['show_server_avatar']) ? (int) $options['show_server_avatar'] : 0;
+        ?>
+        <input type="checkbox" name="<?php echo esc_attr($this->option_name); ?>[show_server_avatar]"
+               value="1" <?php checked($value, 1); ?> />
+        <label><?php esc_html_e('Afficher l\'avatar du serveur (si disponible)', 'discord-bot-jlg'); ?></label>
+        <p class="description"><?php esc_html_e('L\'avatar est récupéré via l\'API Discord. Il sera redimensionné selon la taille choisie dans le bloc ou le shortcode.', 'discord-bot-jlg'); ?></p>
+        <?php
+    }
+
+    /**
+     * Rend le sélecteur de thème par défaut.
+     */
+    public function default_theme_render() {
+        $options = get_option($this->option_name);
+        $current = isset($options['default_theme']) && discord_bot_jlg_is_allowed_theme($options['default_theme'])
+            ? $options['default_theme']
+            : 'discord';
+        $choices = $this->get_theme_choices();
+        ?>
+        <select name="<?php echo esc_attr($this->option_name); ?>[default_theme]">
+            <?php foreach ($choices as $value => $label) : ?>
+                <option value="<?php echo esc_attr($value); ?>" <?php selected($current, $value); ?>>
+                    <?php echo esc_html($label); ?>
+                </option>
+            <?php endforeach; ?>
+        </select>
+        <p class="description"><?php esc_html_e('Ce thème sera appliqué par défaut au shortcode, au widget et au bloc Gutenberg.', 'discord-bot-jlg'); ?></p>
+        <?php
+    }
+
+    /**
+     * Rend la case à cocher contrôlant l'auto-rafraîchissement par défaut.
+     */
+    public function default_refresh_enabled_render() {
+        $options = get_option($this->option_name);
+        $value   = isset($options['default_refresh_enabled']) ? (int) $options['default_refresh_enabled'] : 0;
+        ?>
+        <input type="checkbox" name="<?php echo esc_attr($this->option_name); ?>[default_refresh_enabled]"
+               value="1" <?php checked($value, 1); ?> />
+        <label><?php esc_html_e('Activer l\'auto-rafraîchissement pour les nouveaux blocs/shortcodes', 'discord-bot-jlg'); ?></label>
+        <?php
+    }
+
+    /**
+     * Rend le champ numérique dédié à l'intervalle d'auto-rafraîchissement par défaut.
+     */
+    public function default_refresh_interval_render() {
+        $options = get_option($this->option_name);
+        $value   = isset($options['default_refresh_interval'])
+            ? (int) $options['default_refresh_interval']
+            : 60;
+        $min_refresh = Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL;
+        ?>
+        <input type="number" name="<?php echo esc_attr($this->option_name); ?>[default_refresh_interval]"
+               value="<?php echo esc_attr($value); ?>"
+               min="<?php echo esc_attr($min_refresh); ?>" max="3600" class="small-text" />
+        <p class="description">
+            <?php
+            printf(
+                /* translators: 1: minimum refresh interval in seconds, 2: maximum refresh interval in seconds. */
+                esc_html__('Entre %1$s et %2$s secondes. Utilisé lorsque l\'auto-rafraîchissement est activé par défaut.', 'discord-bot-jlg'),
+                esc_html($min_refresh),
+                esc_html(number_format_i18n(3600))
+            );
+            ?>
+        </p>
+        <?php
+    }
+
+    /**
+     * Retourne la liste des thèmes disponibles avec leur libellé traduit.
+     *
+     * @return array<string, string>
+     */
+    private function get_theme_choices() {
+        $labels = array(
+            'discord' => __('Discord', 'discord-bot-jlg'),
+            'dark'    => __('Sombre', 'discord-bot-jlg'),
+            'light'   => __('Clair', 'discord-bot-jlg'),
+            'minimal' => __('Minimal', 'discord-bot-jlg'),
+        );
+
+        $choices = array();
+        foreach (discord_bot_jlg_get_available_themes() as $theme) {
+            if (isset($labels[$theme])) {
+                $choices[$theme] = $labels[$theme];
+            } else {
+                $choices[$theme] = ucfirst($theme);
+            }
+        }
+
+        if (empty($choices)) {
+            $choices = $labels;
+        }
+
+        return $choices;
     }
 
     /**
@@ -864,6 +1089,8 @@ class Discord_Bot_JLG_Admin {
         ?>
         <div style="background: #e8f5e9; padding: 20px; border-radius: 8px;">
             <h2><?php esc_html_e('📖 Guide d\'utilisation', 'discord-bot-jlg'); ?></h2>
+
+            <p><?php echo wp_kses_post(__('Les choix effectués dans l\'onglet <strong>Configuration</strong> (nom/avatar du serveur, thème, auto-rafraîchissement) remplissent automatiquement les attributs équivalents du shortcode, du bloc et du widget. Vous pouvez toujours les modifier manuellement pour un cas précis.', 'discord-bot-jlg')); ?></p>
 
             <h3><?php esc_html_e('Option 1 : Shortcode (avec paramètres)', 'discord-bot-jlg'); ?></h3>
             <p><?php esc_html_e('Copiez ce code dans n\'importe quelle page ou article :', 'discord-bot-jlg'); ?></p>

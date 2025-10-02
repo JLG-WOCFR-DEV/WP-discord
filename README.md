@@ -16,6 +16,7 @@ Accédez à la page **Discord Bot** dans l’administration pour :
 - Saisir le token de votre bot Discord ;
 - Indiquer l’ID du serveur à surveiller ;
 - Définir la durée du cache des statistiques ;
+- Choisir les éléments affichés par défaut (nom/avatar du serveur, rafraîchissement automatique, thème) ;
 - Ajouter du CSS personnalisé.
 
 ### Définir le token via une constante
@@ -50,6 +51,8 @@ Pour activer l'auto-actualisation, utilisez par exemple :
 ```
 [discord_stats refresh="true" refresh_interval="60"]
 ```
+
+💡 Les cases à cocher et listes de la page **Configuration** servent de pré-sélection lors de l’insertion du shortcode, du bloc ou du widget. Par exemple, « Afficher le nom du serveur » force `show_server_name="true"` tant que l’attribut n’est pas surchargé manuellement. Le thème par défaut et l’intervalle d’auto-rafraîchissement sont également appliqués aux nouveaux blocs Gutenberg.
 
 L'attribut optionnel `width` accepte uniquement des longueurs CSS valides comme `320px`, `75%`, `42rem`, ainsi que les mots-clés `auto`, `fit-content`, `min-content` et `max-content`. Les expressions `calc(...)` sont prises en charge lorsqu'elles ne contiennent que des nombres, des unités usuelles et les opérateurs arithmétiques de base. Toute valeur non conforme est ignorée afin d'éviter l'injection de styles indésirables.
 
