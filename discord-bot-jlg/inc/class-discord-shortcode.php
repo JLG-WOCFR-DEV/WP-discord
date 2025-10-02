@@ -56,6 +56,9 @@ class Discord_Bot_JLG_Shortcode {
             $default_invite_label = __('Rejoindre le serveur', 'discord-bot-jlg');
         }
 
+        $default_cta_label = __('Rejoindre la communauté', 'discord-bot-jlg');
+        $default_cta_tooltip = __('Découvrir le serveur Discord', 'discord-bot-jlg');
+
         $min_refresh_option = defined('Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL')
             ? Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL
             : 10;
@@ -73,6 +76,8 @@ class Discord_Bot_JLG_Shortcode {
             $min_refresh_option,
             min($max_refresh_option, $default_refresh_interval)
         );
+
+        $received_atts = is_array($atts) ? $atts : array();
 
         $atts = shortcode_atts(
             array(
@@ -106,6 +111,12 @@ class Discord_Bot_JLG_Shortcode {
                 'avatar_size'          => '128',
                 'invite_url'           => $default_invite_url,
                 'invite_label'         => $default_invite_label,
+                'cta_enabled'          => false,
+                'cta_label'            => $default_cta_label,
+                'cta_url'              => '',
+                'cta_style'            => 'solid',
+                'cta_new_tab'          => true,
+                'cta_tooltip'          => '',
             ),
             $atts,
             'discord_stats'
@@ -126,9 +137,33 @@ class Discord_Bot_JLG_Shortcode {
         $avatar_size        = $this->sanitize_avatar_size($atts['avatar_size']);
         $invite_url         = esc_url_raw(is_string($atts['invite_url']) ? trim($atts['invite_url']) : '');
         $invite_label       = isset($atts['invite_label']) ? sanitize_text_field($atts['invite_label']) : '';
+        $cta_enabled        = filter_var($atts['cta_enabled'], FILTER_VALIDATE_BOOLEAN);
+        $cta_label          = isset($atts['cta_label']) ? sanitize_text_field($atts['cta_label']) : '';
+        $cta_url            = esc_url_raw(is_string($atts['cta_url']) ? trim($atts['cta_url']) : '');
+        $cta_style          = isset($atts['cta_style']) ? sanitize_key($atts['cta_style']) : 'solid';
+        $cta_new_tab        = filter_var($atts['cta_new_tab'], FILTER_VALIDATE_BOOLEAN);
+        $cta_tooltip_raw    = array_key_exists('cta_tooltip', $received_atts) ? $received_atts['cta_tooltip'] : null;
+        $cta_tooltip        = isset($atts['cta_tooltip']) ? sanitize_text_field($atts['cta_tooltip']) : '';
+
+        $allowed_cta_styles = array('solid', 'outline');
+        if (!in_array($cta_style, $allowed_cta_styles, true)) {
+            $cta_style = 'solid';
+        }
 
         if ('' === $invite_label) {
             $invite_label = __('Rejoindre le serveur', 'discord-bot-jlg');
+        }
+
+        if ('' === $cta_label) {
+            $cta_label = $default_cta_label;
+        }
+
+        if (null === $cta_tooltip_raw && '' === $cta_tooltip) {
+            $cta_tooltip = $default_cta_tooltip;
+        }
+
+        if (!$cta_enabled || '' === $cta_url) {
+            $cta_enabled = false;
         }
 
         if ($force_demo) {
@@ -198,6 +233,31 @@ class Discord_Bot_JLG_Shortcode {
 
         if ('' !== $invite_url) {
             $container_classes[] = 'discord-has-invite';
+        }
+
+        if ($cta_enabled) {
+            $container_classes[] = 'discord-has-cta';
+            $container_classes[] = 'discord-cta-style-' . $cta_style;
+        }
+
+        $cta_button_attributes = array();
+
+        if ($cta_enabled) {
+            $cta_button_attributes[] = sprintf(
+                'class="%s"',
+                esc_attr('discord-cta-button discord-cta-button--' . $cta_style)
+            );
+            $cta_button_attributes[] = sprintf('href="%s"', esc_url($cta_url));
+
+            if ($cta_new_tab) {
+                $cta_button_attributes[] = 'target="_blank"';
+                $cta_button_attributes[] = 'rel="noopener noreferrer"';
+            }
+
+            if ('' !== $cta_tooltip) {
+                $cta_button_attributes[] = sprintf('title="%s"', esc_attr($cta_tooltip));
+                $cta_button_attributes[] = sprintf('aria-label="%s"', esc_attr($cta_tooltip));
+            }
         }
 
         $logo_position_class = '';
@@ -457,6 +517,13 @@ class Discord_Bot_JLG_Shortcode {
                 <?php if ($show_discord_icon && $logo_position_class === 'right'): ?>
                 <div class="discord-logo-container">
                     <?php echo $discord_svg; ?>
+                </div>
+                <?php endif; ?>
+                <?php if ($cta_enabled): ?>
+                <div class="discord-cta" data-role="discord-cta">
+                    <a <?php echo implode(' ', $cta_button_attributes); ?>>
+                        <span class="discord-cta-button__label"><?php echo esc_html($cta_label); ?></span>
+                    </a>
                 </div>
                 <?php endif; ?>
             </div>
