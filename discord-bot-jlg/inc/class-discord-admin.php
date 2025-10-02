@@ -371,8 +371,14 @@ class Discord_Bot_JLG_Admin {
                 $sanitized['invite_url'] = '';
             } else {
                 $invite_url = esc_url_raw($raw_invite_url);
+                $http_validator_available = function_exists('wp_http_validate_url');
+                $is_valid_invite_url = (
+                    '' !== $invite_url
+                    && preg_match('#^https?://#i', $invite_url)
+                    && (!$http_validator_available || wp_http_validate_url($invite_url))
+                );
 
-                if ('' !== $invite_url) {
+                if ($is_valid_invite_url) {
                     $sanitized['invite_url'] = $invite_url;
                 } else {
                     add_settings_error(

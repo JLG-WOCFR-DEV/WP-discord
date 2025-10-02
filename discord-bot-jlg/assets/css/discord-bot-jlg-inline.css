@@ -164,6 +164,11 @@
     transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
     line-height: 1.4;
     white-space: nowrap;
+    border: none;
+    cursor: pointer;
+    flex: 1 1 clamp(220px, 40vw, 320px);
+    min-width: min(240px, 100%);
+    max-width: 100%;
 }
 
 .discord-stats-container .discord-invite-button:hover,
@@ -183,6 +188,12 @@
     align-items: center;
     gap: 0.35em;
     font-size: clamp(14px, 3.4vw, 18px);
+}
+
+.discord-stats-container .discord-invite-button--compact {
+    padding: calc(var(--discord-padding) * 0.55) calc(var(--discord-padding) * 1.25);
+    flex: 0 1 auto;
+    min-width: auto;
 }
 
 .discord-stats-container .discord-logo-container {
@@ -484,6 +495,8 @@
         width: 100%;
         white-space: normal;
         padding: clamp(12px, 4.5vw, 18px);
+        flex: 1 1 auto;
+        min-width: 0;
     }
 
     .discord-stats-container .discord-refresh-status {
