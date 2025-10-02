@@ -841,11 +841,16 @@ describe('discord-bot-jlg block editor', () => {
                 })
             },
             element: {
-                createElement: () => ({}),
+                createElement: (type, props, ...children) => ({
+                    type,
+                    props: props || {},
+                    children
+                }),
                 Fragment: 'fragment'
             },
             components: {
                 PanelBody: function PanelBody() { return null; },
+                PanelRow: function PanelRow() { return null; },
                 ToggleControl: function ToggleControl() { return null; },
                 TextControl: function TextControl() { return null; },
                 SelectControl: function SelectControl() { return null; },
@@ -886,5 +891,57 @@ describe('discord-bot-jlg block editor', () => {
         });
 
         expect(shortcode).toBe('[discord_stats refresh="true" refresh_interval="10"]');
+    });
+
+    function findNode(node, predicate) {
+        if (!node) {
+            return null;
+        }
+
+        if (predicate(node)) {
+            return node;
+        }
+
+        if (!node.children || !node.children.length) {
+            return null;
+        }
+
+        for (let i = 0; i < node.children.length; i += 1) {
+            const child = node.children[i];
+            const result = findNode(child, predicate);
+
+            if (result) {
+                return result;
+            }
+        }
+
+        return null;
+    }
+
+    test('falls back to static preview when ServerSideRender is unavailable', () => {
+        require('../../discord-bot-jlg/assets/js/discord-bot-block.js');
+
+        const settings = window.wp.blocks.lastRegisteredSettings;
+        expect(settings).toBeTruthy();
+
+        const result = settings.edit({
+            attributes: {
+                show_online: true,
+                show_total: true,
+                show_title: true,
+                title: 'Aperçu'
+            },
+            setAttributes: jest.fn()
+        });
+
+        const preview = findNode(result, (node) => node && node.props && node.props['data-static-preview'] === 'true');
+
+        expect(preview).toBeTruthy();
+        expect(preview.props.className).toContain('discord-stats-container');
+        expect(preview.props['data-demo']).toBe('true');
+
+        const titleNode = findNode(preview, (node) => node && node.props && node.props.className === 'discord-stats-title');
+        expect(titleNode).toBeTruthy();
+        expect(titleNode.children[0]).toBe('Aperçu');
     });
 });

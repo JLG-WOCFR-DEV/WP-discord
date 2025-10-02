@@ -134,6 +134,512 @@
         return allowedSizes[allowedSizes.length - 1];
     }
 
+    var STATIC_PREVIEW_AVATAR_BASE = 'https://cdn.discordapp.com/embed/avatars/0.png';
+    var DISCORD_LOGO_SVG = '<svg class="discord-logo-svg" aria-hidden="true" focusable="false" viewBox="0 0 127.14 96.36" xmlns="http://www.w3.org/2000/svg"><path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.25,105.25,0,0,0,126.6,80.22h0C129.24,52.84,122.09,29.11,107.7,8.07ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.25,60,73.25,53s5-12.74,11.44-12.74S96.23,46,96.12,53,91.08,65.69,84.69,65.69Z"/></svg>';
+
+    function mergeAttributesWithDefaults(attributes) {
+        var merged = {};
+
+        for (var key in defaultAttributes) {
+            if (Object.prototype.hasOwnProperty.call(defaultAttributes, key)) {
+                merged[key] = defaultAttributes[key];
+            }
+        }
+
+        if (attributes && typeof attributes === 'object') {
+            for (var attrKey in attributes) {
+                if (Object.prototype.hasOwnProperty.call(attributes, attrKey)) {
+                    merged[attrKey] = attributes[attrKey];
+                }
+            }
+        }
+
+        return merged;
+    }
+
+    function formatStaticNumber(value) {
+        var parsed = parseInt(value, 10);
+
+        if (isNaN(parsed)) {
+            return '0';
+        }
+
+        if (typeof parsed.toLocaleString === 'function') {
+            return parsed.toLocaleString();
+        }
+
+        return String(parsed);
+    }
+
+    function generateStaticPreviewData(attributes) {
+        var mergedAttributes = mergeAttributesWithDefaults(attributes);
+        mergedAttributes.avatar_size = normalizeAvatarSize(mergedAttributes.avatar_size);
+
+        var baseOnline = 42;
+        var baseTotal = 256;
+        var date = new Date();
+        var hour = date.getUTCHours ? date.getUTCHours() : date.getHours();
+        var variation = Math.sin(hour * 0.26) * 10;
+        var onlineValue = Math.round(baseOnline + variation);
+
+        if (!isFinite(onlineValue)) {
+            onlineValue = baseOnline;
+        }
+
+        var demoServerName = __('Serveur Démo', 'discord-bot-jlg');
+        var avatarUrl = STATIC_PREVIEW_AVATAR_BASE + '?size=' + mergedAttributes.avatar_size;
+
+        var stats = {
+            online: onlineValue,
+            total: baseTotal,
+            has_total: true,
+            total_is_approximate: false,
+            is_demo: true,
+            fallback_demo: false,
+            stale: false,
+            last_updated: null,
+            server_name: demoServerName,
+            server_avatar_url: avatarUrl,
+            server_avatar_base_url: STATIC_PREVIEW_AVATAR_BASE
+        };
+
+        return {
+            attributes: mergedAttributes,
+            stats: stats
+        };
+    }
+
+    function sanitizeClassName(value) {
+        if (typeof value !== 'string') {
+            return '';
+        }
+
+        return value.trim().replace(/\s+/g, '-');
+    }
+
+    function createLogoElement(position) {
+        if (!position) {
+            return null;
+        }
+
+        var className = 'discord-logo-container';
+
+        if (position === 'top') {
+            className += ' discord-logo-top';
+        }
+
+        return createElement('div', {
+            className: className,
+            dangerouslySetInnerHTML: { __html: DISCORD_LOGO_SVG }
+        });
+    }
+
+    function createServerHeaderElement(createAvatar, showName, stats, attributes) {
+        if (!createAvatar && !showName) {
+            return null;
+        }
+
+        var children = [];
+
+        if (createAvatar) {
+            var avatarAlt = __('Avatar du serveur Discord', 'discord-bot-jlg');
+
+            if (stats.server_name) {
+                avatarAlt = avatarAlt + ' ' + stats.server_name;
+            }
+
+            children.push(createElement(
+                'div',
+                { className: 'discord-server-avatar', 'data-role': 'discord-server-avatar' },
+                createElement('img', {
+                    className: 'discord-server-avatar__image',
+                    src: stats.server_avatar_url,
+                    alt: avatarAlt,
+                    loading: 'lazy',
+                    decoding: 'async',
+                    width: attributes.avatar_size,
+                    height: attributes.avatar_size
+                })
+            ));
+        }
+
+        if (showName && stats.server_name) {
+            children.push(createElement(
+                'div',
+                { className: 'discord-server-name', 'data-role': 'discord-server-name' },
+                createElement('span', { className: 'discord-server-name__text' }, stats.server_name)
+            ));
+        }
+
+        if (!children.length) {
+            return null;
+        }
+
+        return createElementWithChildren('div', { className: 'discord-server-header', 'data-role': 'discord-server-header' }, children);
+    }
+
+    function createElementWithChildren(type, props, children) {
+        var args = [type, props || null];
+
+        if (Array.isArray(children)) {
+            for (var i = 0; i < children.length; i++) {
+                if (typeof children[i] === 'undefined' || children[i] === null) {
+                    continue;
+                }
+
+                args.push(children[i]);
+            }
+        } else if (typeof children !== 'undefined') {
+            args.push(children);
+        }
+
+        return createElement.apply(null, args);
+    }
+
+    function renderStaticPreview(attributes) {
+        var previewData = generateStaticPreviewData(attributes);
+        var previewAttributes = previewData.attributes;
+        var stats = previewData.stats;
+
+        var hideLabels = !!previewAttributes.hide_labels;
+        var hideIcons = !!previewAttributes.hide_icons;
+        var showOnline = !!previewAttributes.show_online;
+        var showTotal = !!previewAttributes.show_total;
+        var showTitle = !!previewAttributes.show_title && previewAttributes.title;
+        var showDiscordIcon = !!previewAttributes.show_discord_icon;
+        var showServerName = !!previewAttributes.show_server_name;
+        var showServerAvatar = !!previewAttributes.show_server_avatar;
+        var hasTotal = !!stats.has_total;
+
+        var layoutClass = (previewAttributes.layout || 'horizontal').toString().toLowerCase();
+        var themeClass = (previewAttributes.theme || 'discord').toString().toLowerCase();
+        var alignClass = (previewAttributes.align || 'left').toString().toLowerCase();
+        var logoPosition = showDiscordIcon
+            ? (previewAttributes.discord_icon_position || 'left').toString().toLowerCase()
+            : '';
+
+        var containerClasses = ['discord-stats-container'];
+
+        if (layoutClass) {
+            containerClasses.push('discord-layout-' + sanitizeClassName(layoutClass));
+        }
+
+        if (themeClass) {
+            containerClasses.push('discord-theme-' + sanitizeClassName(themeClass));
+        }
+
+        if (alignClass) {
+            containerClasses.push('discord-align-' + sanitizeClassName(alignClass));
+        }
+
+        if (previewAttributes.compact) {
+            containerClasses.push('discord-compact');
+        }
+
+        if (previewAttributes.animated) {
+            containerClasses.push('discord-animated');
+        }
+
+        containerClasses.push('discord-demo-mode');
+
+        if (!hasTotal) {
+            containerClasses.push('discord-total-missing');
+        }
+
+        if (showDiscordIcon) {
+            containerClasses.push('discord-with-logo');
+
+            if (logoPosition) {
+                containerClasses.push('discord-logo-' + sanitizeClassName(logoPosition));
+            }
+        }
+
+        if (previewAttributes.invite_url) {
+            containerClasses.push('discord-has-invite');
+        }
+
+        if (previewAttributes.cta_enabled) {
+            containerClasses.push('discord-has-cta');
+            containerClasses.push('discord-cta-style-' + sanitizeClassName(previewAttributes.cta_style || 'solid'));
+        }
+
+        if (showServerAvatar) {
+            containerClasses.push('discord-avatar-enabled');
+
+            if (stats.server_avatar_url) {
+                containerClasses.push('discord-has-server-avatar');
+            }
+        }
+
+        var customClassSources = [];
+
+        if (previewAttributes.className) {
+            customClassSources.push(previewAttributes.className);
+        }
+
+        if (previewAttributes.class) {
+            customClassSources.push(previewAttributes.class);
+        }
+
+        if (customClassSources.length) {
+            for (var i = 0; i < customClassSources.length; i++) {
+                var value = customClassSources[i];
+
+                if (typeof value !== 'string') {
+                    continue;
+                }
+
+                var parts = value.split(/\s+/);
+
+                for (var j = 0; j < parts.length; j++) {
+                    if (parts[j]) {
+                        containerClasses.push(parts[j]);
+                    }
+                }
+            }
+        }
+
+        var style = {};
+
+        var gapValue = parseInt(previewAttributes.gap, 10);
+        if (isNaN(gapValue)) {
+            gapValue = parseInt(defaultAttributes.gap, 10) || 20;
+        }
+        style['--discord-gap'] = gapValue + 'px';
+
+        var paddingValue = parseInt(previewAttributes.padding, 10);
+        if (isNaN(paddingValue)) {
+            paddingValue = parseInt(defaultAttributes.padding, 10) || 15;
+        }
+        style['--discord-padding'] = paddingValue + 'px';
+
+        var radiusValue = parseInt(previewAttributes.border_radius, 10);
+        if (isNaN(radiusValue)) {
+            radiusValue = parseInt(defaultAttributes.border_radius, 10) || 8;
+        }
+        style['--discord-radius'] = radiusValue + 'px';
+
+        if (previewAttributes.stat_bg_color) {
+            style['--discord-surface-background'] = previewAttributes.stat_bg_color;
+        }
+
+        if (previewAttributes.stat_text_color) {
+            style['--discord-surface-text'] = previewAttributes.stat_text_color;
+        }
+
+        if (previewAttributes.accent_color) {
+            style['--discord-accent'] = previewAttributes.accent_color;
+            style['--discord-logo-color'] = previewAttributes.accent_color;
+        }
+
+        if (previewAttributes.accent_color_alt) {
+            style['--discord-accent-secondary'] = previewAttributes.accent_color_alt;
+        }
+
+        if (previewAttributes.accent_text_color) {
+            style['--discord-accent-contrast'] = previewAttributes.accent_text_color;
+        }
+
+        if (previewAttributes.width) {
+            var widthValue = String(previewAttributes.width);
+            style.maxWidth = widthValue;
+
+            var keywords = ['auto', 'fit-content', 'max-content', 'min-content'];
+            if (keywords.indexOf(widthValue.toLowerCase()) >= 0) {
+                style.width = widthValue;
+            } else {
+                style.width = '100%';
+            }
+        }
+
+        var containerProps = {
+            className: containerClasses.join(' '),
+            'data-demo': 'true',
+            'data-fallback-demo': 'false',
+            'data-stale': 'false',
+            'data-hide-labels': hideLabels ? 'true' : 'false',
+            'data-static-preview': 'true',
+            style: style
+        };
+
+        if (showServerName) {
+            containerProps['data-show-server-name'] = 'true';
+
+            if (stats.server_name) {
+                containerProps['data-server-name'] = stats.server_name;
+            }
+        }
+
+        if (showServerAvatar) {
+            containerProps['data-show-server-avatar'] = 'true';
+            containerProps['data-avatar-size'] = previewAttributes.avatar_size;
+
+            if (stats.server_avatar_url) {
+                containerProps['data-server-avatar-url'] = stats.server_avatar_url;
+            }
+
+            if (stats.server_avatar_base_url) {
+                containerProps['data-server-avatar-base-url'] = stats.server_avatar_base_url;
+            }
+        }
+
+        var children = [];
+
+        children.push(createElement('div', {
+            className: 'discord-demo-badge discord-static-preview-badge'
+        }, __('Mode Démo', 'discord-bot-jlg') + ' · ' + __('Aperçu statique', 'discord-bot-jlg')));
+
+        if (showTitle) {
+            children.push(createElement('div', { className: 'discord-stats-title' }, previewAttributes.title));
+        }
+
+        var statsMainChildren = [];
+
+        if (showDiscordIcon && logoPosition === 'left') {
+            statsMainChildren.push(createLogoElement('left'));
+        }
+
+        if (showDiscordIcon && logoPosition === 'top') {
+            statsMainChildren.push(createLogoElement('top'));
+        }
+
+        var statsWrapperChildren = [];
+        var headerElement = createServerHeaderElement(
+            showServerAvatar && !!stats.server_avatar_url,
+            showServerName,
+            stats,
+            previewAttributes
+        );
+
+        if (headerElement) {
+            statsWrapperChildren.push(headerElement);
+        }
+
+        if (showOnline) {
+            var onlineLabelClasses = ['discord-label'];
+
+            if (hideLabels) {
+                onlineLabelClasses.push('screen-reader-text');
+            }
+
+            var onlineStatChildren = [];
+
+            if (!hideIcons) {
+                onlineStatChildren.push(createElement('span', { className: 'discord-icon' }, previewAttributes.icon_online));
+            }
+
+            onlineStatChildren.push(createElement('span', {
+                className: 'discord-number',
+                role: 'status',
+                'aria-live': 'polite'
+            }, formatStaticNumber(stats.online)));
+
+            onlineStatChildren.push(createElement('span', { className: onlineLabelClasses.join(' ') },
+                createElement('span', { className: 'discord-label-text' }, previewAttributes.label_online)
+            ));
+
+            statsWrapperChildren.push(createElementWithChildren('div', {
+                className: 'discord-stat discord-online',
+                'data-value': stats.online,
+                'data-label-online': previewAttributes.label_online,
+                'data-hide-labels': hideLabels ? 'true' : 'false'
+            }, onlineStatChildren));
+        }
+
+        if (showTotal) {
+            var totalClasses = ['discord-stat', 'discord-total'];
+
+            if (!hasTotal) {
+                totalClasses.push('discord-total-unavailable');
+            } else if (stats.total_is_approximate) {
+                totalClasses.push('discord-total-approximate');
+            }
+
+            var totalLabelClasses = ['discord-label'];
+
+            if (hideLabels) {
+                totalLabelClasses.push('screen-reader-text');
+            }
+
+            var totalChildren = [];
+
+            if (!hideIcons) {
+                totalChildren.push(createElement('span', { className: 'discord-icon' }, previewAttributes.icon_total));
+            }
+
+            totalChildren.push(createElement('span', {
+                className: 'discord-number',
+                role: 'status',
+                'aria-live': 'polite'
+            }, hasTotal ? formatStaticNumber(stats.total) : '—'));
+
+            totalChildren.push(createElement('span', {
+                className: 'discord-approx-indicator',
+                'aria-hidden': 'true',
+                hidden: !stats.total_is_approximate
+            }, '≈'));
+
+            totalChildren.push(createElement('span', { className: totalLabelClasses.join(' ') },
+                createElement('span', { className: 'discord-label-text' }, hasTotal ? previewAttributes.label_total : __('Total indisponible', 'discord-bot-jlg')),
+                createElement('span', { className: 'discord-label-extra screen-reader-text' }, stats.total_is_approximate ? __('approx.', 'discord-bot-jlg') : '')
+            ));
+
+            var totalProps = {
+                className: totalClasses.join(' '),
+                'data-label-total': previewAttributes.label_total,
+                'data-label-unavailable': __('Total indisponible', 'discord-bot-jlg'),
+                'data-label-approx': __('approx.', 'discord-bot-jlg'),
+                'data-placeholder': '—'
+            };
+
+            if (hasTotal) {
+                totalProps['data-value'] = stats.total;
+            }
+
+            statsWrapperChildren.push(createElementWithChildren('div', totalProps, totalChildren));
+        }
+
+        statsMainChildren.push(createElementWithChildren('div', { className: 'discord-stats-wrapper' }, statsWrapperChildren));
+
+        if (showDiscordIcon && logoPosition === 'right') {
+            statsMainChildren.push(createLogoElement('right'));
+        }
+
+        if (previewAttributes.cta_enabled && previewAttributes.cta_url) {
+            statsMainChildren.push(createElement('div', { className: 'discord-cta', 'data-role': 'discord-cta' },
+                createElement('a', {
+                    className: 'discord-cta-button discord-cta-button--' + sanitizeClassName(previewAttributes.cta_style || 'solid'),
+                    href: previewAttributes.cta_url,
+                    target: previewAttributes.cta_new_tab ? '_blank' : null,
+                    rel: previewAttributes.cta_new_tab ? 'noopener noreferrer' : null,
+                    title: previewAttributes.cta_tooltip || null,
+                    'aria-label': previewAttributes.cta_tooltip || null
+                }, createElement('span', { className: 'discord-cta-button__label' }, previewAttributes.cta_label || __('Rejoindre la communauté', 'discord-bot-jlg')))
+            ));
+        }
+
+        children.push(createElementWithChildren('div', { className: 'discord-stats-main' }, statsMainChildren));
+
+        if (previewAttributes.invite_url) {
+            var inviteButtonClasses = ['discord-invite-button', 'wp-element-button'];
+
+            if (previewAttributes.compact) {
+                inviteButtonClasses.push('discord-invite-button--compact');
+            }
+
+            children.push(createElement('div', { className: 'discord-invite' },
+                createElement('a', {
+                    className: inviteButtonClasses.join(' '),
+                    href: previewAttributes.invite_url,
+                    target: '_blank',
+                    rel: 'noopener noreferrer nofollow'
+                }, createElement('span', { className: 'discord-invite-button__label' }, previewAttributes.invite_label || __('Rejoindre le serveur', 'discord-bot-jlg')))
+            ));
+        }
+
+        return createElementWithChildren('div', containerProps, children);
+    }
+
     function attributesToShortcode(attributes) {
         var pairs = [];
 
@@ -219,7 +725,7 @@
                     block: blockName,
                     attributes: attributes
                 })
-                : createElement('div', { className: 'discord-bot-jlg-block-placeholder' }, __('Prévisualisation indisponible.', 'discord-bot-jlg'));
+                : renderStaticPreview(attributes);
 
             var colorPanel = null;
 
