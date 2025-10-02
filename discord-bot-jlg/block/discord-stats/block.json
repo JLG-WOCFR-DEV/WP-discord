@@ -35,6 +35,26 @@
             "type": "boolean",
             "default": true
         },
+        "show_idle": {
+            "type": "boolean",
+            "default": false
+        },
+        "show_dnd": {
+            "type": "boolean",
+            "default": false
+        },
+        "show_offline": {
+            "type": "boolean",
+            "default": false
+        },
+        "show_voice": {
+            "type": "boolean",
+            "default": false
+        },
+        "show_boosts": {
+            "type": "boolean",
+            "default": false
+        },
         "show_title": {
             "type": "boolean",
             "default": false
@@ -83,6 +103,26 @@
             "type": "string",
             "default": "\ud83d\udc65"
         },
+        "icon_idle": {
+            "type": "string",
+            "default": "\ud83c\udf19"
+        },
+        "icon_dnd": {
+            "type": "string",
+            "default": "\u26d4\ufe0f"
+        },
+        "icon_offline": {
+            "type": "string",
+            "default": "\u26aa\ufe0f"
+        },
+        "icon_voice": {
+            "type": "string",
+            "default": "\ud83c\udfa7"
+        },
+        "icon_boosts": {
+            "type": "string",
+            "default": "\ud83d\ude80"
+        },
         "label_online": {
             "type": "string",
             "default": "En ligne"
@@ -90,6 +130,26 @@
         "label_total": {
             "type": "string",
             "default": "Membres"
+        },
+        "label_idle": {
+            "type": "string",
+            "default": "Inactifs"
+        },
+        "label_dnd": {
+            "type": "string",
+            "default": "Ne pas déranger"
+        },
+        "label_offline": {
+            "type": "string",
+            "default": "Hors ligne"
+        },
+        "label_voice": {
+            "type": "string",
+            "default": "En vocal"
+        },
+        "label_boosts": {
+            "type": "string",
+            "default": "Boosts"
         },
         "hide_labels": {
             "type": "boolean",

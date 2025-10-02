@@ -170,46 +170,10 @@ class Discord_Bot_JLG_API {
             if (is_array($bot_stats)) {
                 $bot_stats = $this->normalize_stats($bot_stats);
 
-                if (true === $widget_incomplete && is_array($widget_stats)) {
-                    $total             = null;
-                    $has_total         = false;
-                    $total_approximate = false;
-
-                    if (!empty($widget_stats['has_total'])) {
-                        $total             = $widget_stats['total'];
-                        $has_total         = true;
-                        $total_approximate = !empty($widget_stats['total_is_approximate']);
-                    } elseif (!empty($bot_stats['has_total'])) {
-                        $total             = $bot_stats['total'];
-                        $has_total         = true;
-                        $total_approximate = !empty($bot_stats['total_is_approximate']);
-                    }
-
-                    $stats = array(
-                        'online'               => isset($widget_stats['online']) ? (int) $widget_stats['online'] : (isset($bot_stats['online']) ? (int) $bot_stats['online'] : 0),
-                        'total'                => $has_total ? $total : null,
-                        'server_name'          => !empty($widget_stats['server_name'])
-                            ? $widget_stats['server_name']
-                            : (isset($bot_stats['server_name']) ? $bot_stats['server_name'] : ''),
-                        'has_total'            => $has_total,
-                        'total_is_approximate' => $total_approximate,
-                        'server_avatar_url'    => '',
-                        'server_avatar_base_url' => '',
-                    );
-
-                    if (!empty($widget_stats['server_avatar_url'])) {
-                        $stats['server_avatar_url'] = $widget_stats['server_avatar_url'];
-                    } elseif (!empty($bot_stats['server_avatar_url'])) {
-                        $stats['server_avatar_url'] = $bot_stats['server_avatar_url'];
-                    }
-
-                    if (!empty($widget_stats['server_avatar_base_url'])) {
-                        $stats['server_avatar_base_url'] = $widget_stats['server_avatar_base_url'];
-                    } elseif (!empty($bot_stats['server_avatar_base_url'])) {
-                        $stats['server_avatar_base_url'] = $bot_stats['server_avatar_base_url'];
-                    }
-                } elseif (false === $stats) {
+                if (false === $stats) {
                     $stats = $bot_stats;
+                } else {
+                    $stats = $this->merge_stats($stats, $bot_stats, $widget_incomplete);
                 }
             }
         }
@@ -1123,16 +1087,34 @@ class Discord_Bot_JLG_API {
         $demo_avatar_base = 'https://cdn.discordapp.com/embed/avatars/0.png';
         $demo_avatar_url  = add_query_arg('size', 256, $demo_avatar_base);
 
+        $online_value = (int) round($base_online + $variation);
+        $idle_value   = max(0, (int) round($online_value * 0.2));
+        $dnd_value    = max(0, (int) round($online_value * 0.1));
+        $pure_online  = max(0, $online_value - $idle_value - $dnd_value);
+        $voice_participants = max(0, (int) round($online_value * 0.35));
+        $voice_channels     = min(3, max(0, (int) round($voice_participants / 4)));
+
         return array(
-            'online'               => (int) round($base_online + $variation),
-            'total'                => (int) $base_total,
-            'server_name'          => __('Serveur Démo', 'discord-bot-jlg'),
-            'is_demo'              => true,
-            'fallback_demo'        => (bool) $is_fallback,
-            'has_total'            => true,
-            'total_is_approximate' => false,
-            'server_avatar_url'    => $demo_avatar_url,
-            'server_avatar_base_url' => $demo_avatar_base,
+            'online'                     => $online_value,
+            'total'                      => (int) $base_total,
+            'server_name'                => __('Serveur Démo', 'discord-bot-jlg'),
+            'is_demo'                    => true,
+            'fallback_demo'              => (bool) $is_fallback,
+            'has_total'                  => true,
+            'total_is_approximate'       => false,
+            'server_avatar_url'          => $demo_avatar_url,
+            'server_avatar_base_url'     => $demo_avatar_base,
+            'approximate_presence_count' => $online_value,
+            'status_counts'              => array(
+                'online'  => $pure_online,
+                'idle'    => $idle_value,
+                'dnd'     => $dnd_value,
+            ),
+            'voice_stats'                => array(
+                'participants' => $voice_participants,
+                'channels'     => $voice_channels,
+            ),
+            'boost_count'                => 5,
         );
     }
 
@@ -1471,12 +1453,66 @@ class Discord_Bot_JLG_API {
 
         $server_name = isset($data['name']) ? $data['name'] : '';
 
+        $status_counts = array(
+            'online'  => 0,
+            'idle'    => 0,
+            'dnd'     => 0,
+            'offline' => 0,
+            'unknown' => 0,
+        );
+
+        $voice_participants = 0;
+        $voice_channels     = array();
+
+        if ($has_members_list) {
+            foreach ($data['members'] as $member) {
+                if (!is_array($member)) {
+                    continue;
+                }
+
+                $status = isset($member['status']) ? strtolower((string) $member['status']) : '';
+
+                switch ($status) {
+                    case 'online':
+                        $status_counts['online']++;
+                        break;
+                    case 'idle':
+                        $status_counts['idle']++;
+                        break;
+                    case 'dnd':
+                        $status_counts['dnd']++;
+                        break;
+                    case 'offline':
+                        $status_counts['offline']++;
+                        break;
+                    default:
+                        if ('' !== $status) {
+                            $status_counts['unknown']++;
+                        }
+                        break;
+                }
+
+                $channel_id = isset($member['channel_id']) ? trim((string) $member['channel_id']) : '';
+
+                if ('' !== $channel_id) {
+                    $voice_participants++;
+                    $voice_channels[$channel_id] = true;
+                }
+            }
+        }
+
         $stats = array(
-            'online'               => $online,
-            'total'                => null,
-            'server_name'          => $server_name,
-            'has_total'            => false,
-            'total_is_approximate' => false,
+            'online'                     => $online,
+            'total'                      => null,
+            'server_name'                => $server_name,
+            'has_total'                  => false,
+            'total_is_approximate'       => false,
+            'approximate_presence_count' => $has_presence_count ? (int) $data['presence_count'] : $online,
+            'status_counts'              => $status_counts,
+            'voice_stats'                => array(
+                'participants' => $voice_participants,
+                'channels'     => count($voice_channels),
+            ),
         );
 
         if (isset($data['member_count'])) {
@@ -1632,14 +1668,20 @@ class Discord_Bot_JLG_API {
         }
 
         return array(
-            'online'               => (int) $data['approximate_presence_count'],
-            'total'                => (int) $data['approximate_member_count'],
-            'server_name'          => isset($data['name']) ? $data['name'] : '',
-            'has_total'            => true,
+            'online'                     => (int) $data['approximate_presence_count'],
+            'total'                      => (int) $data['approximate_member_count'],
+            'server_name'                => isset($data['name']) ? $data['name'] : '',
+            'has_total'                  => true,
             // Discord renvoie uniquement un total approximatif via approximate_member_count.
-            'total_is_approximate' => true,
-            'server_avatar_url'    => $server_avatar_url,
-            'server_avatar_base_url' => $server_avatar_base_url,
+            'total_is_approximate'       => true,
+            'server_avatar_url'          => $server_avatar_url,
+            'server_avatar_base_url'     => $server_avatar_base_url,
+            'approximate_presence_count' => isset($data['approximate_presence_count'])
+                ? (int) $data['approximate_presence_count']
+                : null,
+            'boost_count'                => isset($data['premium_subscription_count'])
+                ? (int) $data['premium_subscription_count']
+                : 0,
         );
     }
 
@@ -1843,6 +1885,105 @@ class Discord_Bot_JLG_API {
         return $this->default_cache_duration;
     }
 
+    private function merge_stats($primary, $secondary, $widget_incomplete = false) {
+        if (!is_array($primary)) {
+            return $this->normalize_stats($secondary);
+        }
+
+        if (!is_array($secondary)) {
+            return $this->normalize_stats($primary);
+        }
+
+        $merged = $primary;
+
+        if ((empty($merged['server_name']) || '' === trim((string) $merged['server_name'])) && !empty($secondary['server_name'])) {
+            $merged['server_name'] = $secondary['server_name'];
+        }
+
+        $primary_has_total   = !empty($merged['has_total']) && isset($merged['total']) && null !== $merged['total'];
+        $secondary_has_total = !empty($secondary['has_total']) && isset($secondary['total']) && null !== $secondary['total'];
+
+        if (!$primary_has_total && $secondary_has_total) {
+            $merged['total']                = (int) $secondary['total'];
+            $merged['has_total']            = true;
+            $merged['total_is_approximate'] = !empty($secondary['total_is_approximate']);
+        } elseif ($primary_has_total && $secondary_has_total && !empty($secondary['total_is_approximate'])) {
+            $merged['total_is_approximate'] = true;
+        }
+
+        if (empty($merged['server_avatar_url']) && !empty($secondary['server_avatar_url'])) {
+            $merged['server_avatar_url'] = $secondary['server_avatar_url'];
+        }
+
+        if (empty($merged['server_avatar_base_url']) && !empty($secondary['server_avatar_base_url'])) {
+            $merged['server_avatar_base_url'] = $secondary['server_avatar_base_url'];
+        }
+
+        $primary_presence   = isset($merged['approximate_presence_count']) ? (int) $merged['approximate_presence_count'] : null;
+        $secondary_presence = isset($secondary['approximate_presence_count']) ? (int) $secondary['approximate_presence_count'] : null;
+
+        if ((null === $primary_presence || $primary_presence <= 0) && null !== $secondary_presence) {
+            $merged['approximate_presence_count'] = $secondary_presence;
+        } elseif (null !== $secondary_presence && null !== $primary_presence) {
+            $merged['approximate_presence_count'] = max($primary_presence, $secondary_presence);
+        }
+
+        if ($widget_incomplete && isset($secondary['online']) && isset($merged['online'])) {
+            $merged['online'] = max((int) $merged['online'], (int) $secondary['online']);
+        }
+
+        if (isset($secondary['status_counts']) && is_array($secondary['status_counts'])) {
+            if (!isset($merged['status_counts']) || !is_array($merged['status_counts'])) {
+                $merged['status_counts'] = $secondary['status_counts'];
+            } else {
+                foreach ($secondary['status_counts'] as $status_key => $status_value) {
+                    if (!isset($merged['status_counts'][$status_key])) {
+                        $merged['status_counts'][$status_key] = $status_value;
+                        continue;
+                    }
+
+                    $merged['status_counts'][$status_key] = max(
+                        (int) $merged['status_counts'][$status_key],
+                        (int) $status_value
+                    );
+                }
+            }
+        }
+
+        if (isset($secondary['voice_stats']) && is_array($secondary['voice_stats'])) {
+            $merged_voice = array('participants' => 0, 'channels' => 0);
+
+            if (isset($merged['voice_stats']) && is_array($merged['voice_stats'])) {
+                $merged_voice['participants'] = isset($merged['voice_stats']['participants'])
+                    ? (int) $merged['voice_stats']['participants']
+                    : 0;
+                $merged_voice['channels'] = isset($merged['voice_stats']['channels'])
+                    ? (int) $merged['voice_stats']['channels']
+                    : 0;
+            }
+
+            $merged_voice['participants'] = max(
+                $merged_voice['participants'],
+                isset($secondary['voice_stats']['participants']) ? (int) $secondary['voice_stats']['participants'] : 0
+            );
+            $merged_voice['channels'] = max(
+                $merged_voice['channels'],
+                isset($secondary['voice_stats']['channels']) ? (int) $secondary['voice_stats']['channels'] : 0
+            );
+
+            $merged['voice_stats'] = $merged_voice;
+        }
+
+        if (isset($secondary['boost_count'])) {
+            $merged['boost_count'] = max(
+                isset($merged['boost_count']) ? (int) $merged['boost_count'] : 0,
+                (int) $secondary['boost_count']
+            );
+        }
+
+        return $merged;
+    }
+
     private function normalize_stats($stats) {
         if (!is_array($stats)) {
             return $stats;
@@ -1871,6 +2012,96 @@ class Discord_Bot_JLG_API {
         if (!isset($stats['server_avatar_base_url'])) {
             $stats['server_avatar_base_url'] = '';
         }
+
+        if (isset($stats['approximate_presence_count']) && is_numeric($stats['approximate_presence_count'])) {
+            $stats['approximate_presence_count'] = (int) $stats['approximate_presence_count'];
+        } elseif (isset($stats['online']) && is_numeric($stats['online'])) {
+            $stats['approximate_presence_count'] = (int) $stats['online'];
+        } else {
+            $stats['approximate_presence_count'] = null;
+        }
+
+        $default_status_counts = array(
+            'online'  => isset($stats['online']) && is_numeric($stats['online']) ? (int) $stats['online'] : 0,
+            'idle'    => 0,
+            'dnd'     => 0,
+            'offline' => 0,
+            'unknown' => 0,
+        );
+
+        $status_counts = array();
+        if (isset($stats['status_counts']) && is_array($stats['status_counts'])) {
+            foreach ($stats['status_counts'] as $key => $value) {
+                $status_counts[$key] = (int) $value;
+            }
+        }
+
+        $stats['status_counts'] = array_merge($default_status_counts, $status_counts);
+
+        foreach ($stats['status_counts'] as $key => $value) {
+            $stats['status_counts'][$key] = max(0, (int) $value);
+        }
+
+        $default_voice_stats = array(
+            'participants' => 0,
+            'channels'     => 0,
+        );
+
+        $voice_stats = array();
+        if (isset($stats['voice_stats']) && is_array($stats['voice_stats'])) {
+            foreach ($stats['voice_stats'] as $key => $value) {
+                $voice_stats[$key] = (int) $value;
+            }
+        }
+
+        $stats['voice_stats'] = array_merge($default_voice_stats, $voice_stats);
+
+        foreach ($stats['voice_stats'] as $key => $value) {
+            $stats['voice_stats'][$key] = max(0, (int) $value);
+        }
+
+        if (!isset($stats['voice_participants']) || !is_numeric($stats['voice_participants'])) {
+            $stats['voice_participants'] = $stats['voice_stats']['participants'];
+        } else {
+            $stats['voice_participants'] = max(0, (int) $stats['voice_participants']);
+        }
+
+        if (!isset($stats['voice_channels_active']) || !is_numeric($stats['voice_channels_active'])) {
+            $stats['voice_channels_active'] = $stats['voice_stats']['channels'];
+        } else {
+            $stats['voice_channels_active'] = max(0, (int) $stats['voice_channels_active']);
+        }
+
+        if (!isset($stats['boost_count']) || !is_numeric($stats['boost_count'])) {
+            $stats['boost_count'] = 0;
+        } else {
+            $stats['boost_count'] = max(0, (int) $stats['boost_count']);
+        }
+
+        $offline_value = isset($stats['status_counts']['offline']) ? (int) $stats['status_counts']['offline'] : 0;
+        $presence_for_offline = (null !== $stats['approximate_presence_count'])
+            ? (int) $stats['approximate_presence_count']
+            : (isset($stats['online']) && is_numeric($stats['online']) ? (int) $stats['online'] : 0);
+
+        $derived_offline = false;
+
+        if ($offline_value < 0) {
+            $offline_value = 0;
+        }
+
+        if ($offline_value <= 0 && !empty($stats['has_total']) && isset($stats['total']) && null !== $stats['total']) {
+            $calculated_offline = (int) $stats['total'] - $presence_for_offline;
+            if ($calculated_offline < 0) {
+                $calculated_offline = 0;
+            }
+
+            $offline_value   = $calculated_offline;
+            $derived_offline = true;
+        }
+
+        $stats['status_counts']['offline'] = $offline_value;
+        $stats['offline_count']            = $offline_value;
+        $stats['offline_is_approximate']   = !empty($stats['total_is_approximate']) || $derived_offline;
 
         return $stats;
     }

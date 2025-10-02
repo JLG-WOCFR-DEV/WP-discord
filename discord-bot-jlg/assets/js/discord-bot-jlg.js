@@ -1171,6 +1171,138 @@
                     }
                 }
 
+                var statusCountsData = (data.data && data.data.status_counts && typeof data.data.status_counts === 'object')
+                    ? data.data.status_counts
+                    : null;
+
+                if (statusCountsData) {
+                    if (typeof statusCountsData.idle !== 'undefined') {
+                        var idleNumber = parseInt(statusCountsData.idle, 10);
+                        if (!isNaN(idleNumber)) {
+                            updateStatElement(container, '.discord-idle .discord-number', idleNumber, formatter);
+                            var idleElement = container.querySelector('.discord-idle');
+                            if (idleElement && idleElement.dataset) {
+                                idleElement.dataset.value = idleNumber;
+                            }
+                        }
+                    }
+
+                    if (typeof statusCountsData.dnd !== 'undefined') {
+                        var dndNumber = parseInt(statusCountsData.dnd, 10);
+                        if (!isNaN(dndNumber)) {
+                            updateStatElement(container, '.discord-dnd .discord-number', dndNumber, formatter);
+                            var dndElement = container.querySelector('.discord-dnd');
+                            if (dndElement && dndElement.dataset) {
+                                dndElement.dataset.value = dndNumber;
+                            }
+                        }
+                    }
+                }
+
+                var offlineElement = container.querySelector('.discord-offline');
+                if (offlineElement) {
+                    var offlineCountValue = null;
+                    if (data.data && typeof data.data.offline_count !== 'undefined') {
+                        offlineCountValue = parseInt(data.data.offline_count, 10);
+                    } else if (statusCountsData && typeof statusCountsData.offline !== 'undefined') {
+                        offlineCountValue = parseInt(statusCountsData.offline, 10);
+                    }
+
+                    if (!isNaN(offlineCountValue) && offlineCountValue !== null) {
+                        updateStatElement(container, '.discord-offline .discord-number', offlineCountValue, formatter);
+                        if (offlineElement.dataset) {
+                            offlineElement.dataset.value = offlineCountValue;
+                        }
+                    }
+
+                    var offlineIndicator = offlineElement.querySelector('.discord-approx-indicator');
+                    var offlineIsApproximate = !!(data.data && data.data.offline_is_approximate);
+                    if (offlineIndicator) {
+                        offlineIndicator.hidden = !offlineIsApproximate;
+                    }
+
+                    var offlineLabelExtra = offlineElement.querySelector('.discord-label-extra');
+                    if (offlineLabelExtra) {
+                        var approxLabelText = offlineElement.dataset && offlineElement.dataset.labelApprox
+                            ? offlineElement.dataset.labelApprox
+                            : '';
+                        offlineLabelExtra.textContent = offlineIsApproximate ? approxLabelText : '';
+                    }
+
+                    if (offlineElement.dataset) {
+                        offlineElement.dataset.approximate = offlineIsApproximate ? 'true' : 'false';
+                    }
+                }
+
+                var voiceElement = container.querySelector('.discord-voice');
+                if (voiceElement) {
+                    var voiceParticipantsValue = null;
+                    var voiceChannelsValue = null;
+
+                    if (data.data) {
+                        if (typeof data.data.voice_participants !== 'undefined') {
+                            voiceParticipantsValue = parseInt(data.data.voice_participants, 10);
+                        }
+
+                        if (typeof data.data.voice_channels_active !== 'undefined') {
+                            voiceChannelsValue = parseInt(data.data.voice_channels_active, 10);
+                        }
+
+                        if (voiceChannelsValue === null && data.data.voice_stats && typeof data.data.voice_stats.channels !== 'undefined') {
+                            voiceChannelsValue = parseInt(data.data.voice_stats.channels, 10);
+                        }
+
+                        if (voiceParticipantsValue === null && data.data.voice_stats && typeof data.data.voice_stats.participants !== 'undefined') {
+                            voiceParticipantsValue = parseInt(data.data.voice_stats.participants, 10);
+                        }
+                    }
+
+                    if (!isNaN(voiceParticipantsValue) && voiceParticipantsValue !== null) {
+                        updateStatElement(container, '.discord-voice .discord-number', voiceParticipantsValue, formatter);
+                        if (voiceElement.dataset) {
+                            voiceElement.dataset.value = voiceParticipantsValue;
+                        }
+                    }
+
+                    if (isNaN(voiceChannelsValue) || voiceChannelsValue === null) {
+                        voiceChannelsValue = null;
+                    }
+
+                    if (voiceChannelsValue !== null) {
+                        if (voiceElement.dataset) {
+                            voiceElement.dataset.voiceChannels = voiceChannelsValue;
+                        }
+
+                        var voiceExtraElement = voiceElement.querySelector('[data-role="discord-voice-extra"]');
+                        if (voiceExtraElement) {
+                            var voiceSingular = voiceElement.dataset && voiceElement.dataset.labelVoiceExtraSingular
+                                ? voiceElement.dataset.labelVoiceExtraSingular
+                                : '%d salon actif';
+                            var voicePlural = voiceElement.dataset && voiceElement.dataset.labelVoiceExtraPlural
+                                ? voiceElement.dataset.labelVoiceExtraPlural
+                                : '%d salons actifs';
+
+                            if (voiceChannelsValue > 0) {
+                                var template = voiceChannelsValue === 1 ? voiceSingular : voicePlural;
+                                voiceExtraElement.textContent = template.replace('%d', voiceChannelsValue);
+                            } else {
+                                voiceExtraElement.textContent = '';
+                            }
+                        }
+                    }
+                }
+
+                var boostElement = container.querySelector('.discord-boosts');
+                if (boostElement && data.data && typeof data.data.boost_count !== 'undefined') {
+                    var boostValue = parseInt(data.data.boost_count, 10);
+                    if (!isNaN(boostValue)) {
+                        updateStatElement(container, '.discord-boosts .discord-number', boostValue, formatter);
+                        if (boostElement.dataset) {
+                            boostElement.dataset.value = boostValue;
+                        }
+                    }
+                }
+
                 resultInfo.success = true;
 
                 return resultInfo;

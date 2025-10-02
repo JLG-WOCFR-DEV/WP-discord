@@ -92,6 +92,11 @@ class Discord_Bot_JLG_Shortcode {
                 'layout'               => 'horizontal',
                 'show_online'          => !empty($options['show_online']),
                 'show_total'           => !empty($options['show_total']),
+                'show_idle'            => false,
+                'show_dnd'             => false,
+                'show_offline'         => false,
+                'show_voice'           => false,
+                'show_boosts'          => false,
                 'show_title'           => false,
                 'title'                => isset($options['widget_title']) ? $options['widget_title'] : '',
                 'theme'                => $default_theme,
@@ -105,8 +110,18 @@ class Discord_Bot_JLG_Shortcode {
                 'className'            => '',
                 'icon_online'          => '🟢',
                 'icon_total'           => '👥',
+                'icon_idle'            => '🌙',
+                'icon_dnd'             => '⛔️',
+                'icon_offline'         => '⚪️',
+                'icon_voice'           => '🎧',
+                'icon_boosts'          => '🚀',
                 'label_online'         => __('En ligne', 'discord-bot-jlg'),
                 'label_total'          => __('Membres', 'discord-bot-jlg'),
+                'label_idle'           => __('Inactifs', 'discord-bot-jlg'),
+                'label_dnd'            => __('Ne pas déranger', 'discord-bot-jlg'),
+                'label_offline'        => __('Hors ligne', 'discord-bot-jlg'),
+                'label_voice'          => __('En vocal', 'discord-bot-jlg'),
+                'label_boosts'         => __('Boosts', 'discord-bot-jlg'),
                 'hide_labels'          => false,
                 'hide_icons'           => false,
                 'border_radius'        => '8',
@@ -138,6 +153,11 @@ class Discord_Bot_JLG_Shortcode {
 
         $show_online        = filter_var($atts['show_online'], FILTER_VALIDATE_BOOLEAN);
         $show_total         = filter_var($atts['show_total'], FILTER_VALIDATE_BOOLEAN);
+        $show_idle          = filter_var($atts['show_idle'], FILTER_VALIDATE_BOOLEAN);
+        $show_dnd           = filter_var($atts['show_dnd'], FILTER_VALIDATE_BOOLEAN);
+        $show_offline       = filter_var($atts['show_offline'], FILTER_VALIDATE_BOOLEAN);
+        $show_voice         = filter_var($atts['show_voice'], FILTER_VALIDATE_BOOLEAN);
+        $show_boosts        = filter_var($atts['show_boosts'], FILTER_VALIDATE_BOOLEAN);
         $show_title         = filter_var($atts['show_title'], FILTER_VALIDATE_BOOLEAN);
         $animated           = filter_var($atts['animated'], FILTER_VALIDATE_BOOLEAN);
         $refresh            = filter_var($atts['refresh'], FILTER_VALIDATE_BOOLEAN);
@@ -190,6 +210,51 @@ class Discord_Bot_JLG_Shortcode {
             return sprintf(
                 '<div class="discord-stats-error">%s</div>',
                 esc_html__('Impossible de récupérer les stats Discord', 'discord-bot-jlg')
+            );
+        }
+
+        $status_counts = array(
+            'online'  => 0,
+            'idle'    => 0,
+            'dnd'     => 0,
+            'offline' => 0,
+            'unknown' => 0,
+        );
+
+        if (isset($stats['status_counts']) && is_array($stats['status_counts'])) {
+            foreach ($stats['status_counts'] as $key => $value) {
+                if (array_key_exists($key, $status_counts)) {
+                    $status_counts[$key] = max(0, (int) $value);
+                }
+            }
+        }
+
+        $idle_count    = max(0, isset($status_counts['idle']) ? (int) $status_counts['idle'] : 0);
+        $dnd_count     = max(0, isset($status_counts['dnd']) ? (int) $status_counts['dnd'] : 0);
+        $offline_count = max(0, isset($stats['offline_count']) ? (int) $stats['offline_count'] : (isset($status_counts['offline']) ? (int) $status_counts['offline'] : 0));
+        $offline_is_approximate = !empty($stats['offline_is_approximate']);
+
+        $voice_stats = array(
+            'participants' => 0,
+            'channels'     => 0,
+        );
+
+        if (isset($stats['voice_stats']) && is_array($stats['voice_stats'])) {
+            $voice_stats['participants'] = max(0, isset($stats['voice_stats']['participants']) ? (int) $stats['voice_stats']['participants'] : 0);
+            $voice_stats['channels']     = max(0, isset($stats['voice_stats']['channels']) ? (int) $stats['voice_stats']['channels'] : 0);
+        }
+
+        $voice_participants     = max(0, isset($stats['voice_participants']) ? (int) $stats['voice_participants'] : $voice_stats['participants']);
+        $voice_channels_active  = max(0, isset($stats['voice_channels_active']) ? (int) $stats['voice_channels_active'] : $voice_stats['channels']);
+        $boost_count            = max(0, isset($stats['boost_count']) ? (int) $stats['boost_count'] : 0);
+        $voice_extra_singular   = __('%d salon actif', 'discord-bot-jlg');
+        $voice_extra_plural     = __('%d salons actifs', 'discord-bot-jlg');
+        $voice_extra_text       = '';
+
+        if ($voice_channels_active > 0) {
+            $voice_extra_text = sprintf(
+                _n('%d salon actif', '%d salons actifs', $voice_channels_active, 'discord-bot-jlg'),
+                $voice_channels_active
             );
         }
 
@@ -590,6 +655,119 @@ class Discord_Bot_JLG_Shortcode {
                         <span class="<?php echo esc_attr(implode(' ', $label_classes)); ?>">
                             <span class="discord-label-text"><?php echo esc_html($has_total ? $atts['label_total'] : $label_unavailable); ?></span>
                             <span class="discord-label-extra screen-reader-text"><?php echo $total_is_approximate ? esc_html__('approx.', 'discord-bot-jlg') : ''; ?></span>
+                        </span>
+                    </div>
+                    <?php endif; ?>
+
+                    <?php if ($show_idle) : ?>
+                    <?php
+                    $idle_label_classes = array('discord-label');
+                    if ($hide_labels) {
+                        $idle_label_classes[] = 'screen-reader-text';
+                    }
+                    ?>
+                    <div class="discord-stat discord-idle"
+                        data-value="<?php echo esc_attr($idle_count); ?>"
+                        data-label-idle="<?php echo esc_attr($atts['label_idle']); ?>"
+                        data-hide-labels="<?php echo esc_attr($hide_labels ? 'true' : 'false'); ?>">
+                        <?php if (!$hide_icons): ?>
+                        <span class="discord-icon"><?php echo esc_html($atts['icon_idle']); ?></span>
+                        <?php endif; ?>
+                        <span class="discord-number" role="status" aria-live="polite"><?php echo esc_html(number_format_i18n($idle_count)); ?></span>
+                        <span class="<?php echo esc_attr(implode(' ', $idle_label_classes)); ?>">
+                            <span class="discord-label-text"><?php echo esc_html($atts['label_idle']); ?></span>
+                        </span>
+                    </div>
+                    <?php endif; ?>
+
+                    <?php if ($show_dnd) : ?>
+                    <?php
+                    $dnd_label_classes = array('discord-label');
+                    if ($hide_labels) {
+                        $dnd_label_classes[] = 'screen-reader-text';
+                    }
+                    ?>
+                    <div class="discord-stat discord-dnd"
+                        data-value="<?php echo esc_attr($dnd_count); ?>"
+                        data-label-dnd="<?php echo esc_attr($atts['label_dnd']); ?>"
+                        data-hide-labels="<?php echo esc_attr($hide_labels ? 'true' : 'false'); ?>">
+                        <?php if (!$hide_icons): ?>
+                        <span class="discord-icon"><?php echo esc_html($atts['icon_dnd']); ?></span>
+                        <?php endif; ?>
+                        <span class="discord-number" role="status" aria-live="polite"><?php echo esc_html(number_format_i18n($dnd_count)); ?></span>
+                        <span class="<?php echo esc_attr(implode(' ', $dnd_label_classes)); ?>">
+                            <span class="discord-label-text"><?php echo esc_html($atts['label_dnd']); ?></span>
+                        </span>
+                    </div>
+                    <?php endif; ?>
+
+                    <?php if ($show_offline) : ?>
+                    <?php
+                    $offline_label_classes = array('discord-label');
+                    if ($hide_labels) {
+                        $offline_label_classes[] = 'screen-reader-text';
+                    }
+                    ?>
+                    <div class="discord-stat discord-offline<?php echo $offline_is_approximate ? ' discord-offline-approximate' : ''; ?>"
+                        data-value="<?php echo esc_attr($offline_count); ?>"
+                        data-label-offline="<?php echo esc_attr($atts['label_offline']); ?>"
+                        data-label-approx="<?php echo esc_attr__('approx.', 'discord-bot-jlg'); ?>"
+                        data-approximate="<?php echo esc_attr($offline_is_approximate ? 'true' : 'false'); ?>"
+                        data-hide-labels="<?php echo esc_attr($hide_labels ? 'true' : 'false'); ?>">
+                        <?php if (!$hide_icons): ?>
+                        <span class="discord-icon"><?php echo esc_html($atts['icon_offline']); ?></span>
+                        <?php endif; ?>
+                        <span class="discord-number" role="status" aria-live="polite"><?php echo esc_html(number_format_i18n($offline_count)); ?></span>
+                        <span class="discord-approx-indicator" aria-hidden="true"<?php echo $offline_is_approximate ? '' : ' hidden'; ?>>≈</span>
+                        <span class="<?php echo esc_attr(implode(' ', $offline_label_classes)); ?>">
+                            <span class="discord-label-text"><?php echo esc_html($atts['label_offline']); ?></span>
+                            <span class="discord-label-extra screen-reader-text"><?php echo $offline_is_approximate ? esc_html__('approx.', 'discord-bot-jlg') : ''; ?></span>
+                        </span>
+                    </div>
+                    <?php endif; ?>
+
+                    <?php if ($show_voice) : ?>
+                    <?php
+                    $voice_label_classes = array('discord-label');
+                    if ($hide_labels) {
+                        $voice_label_classes[] = 'screen-reader-text';
+                    }
+                    ?>
+                    <div class="discord-stat discord-voice"
+                        data-value="<?php echo esc_attr($voice_participants); ?>"
+                        data-label-voice="<?php echo esc_attr($atts['label_voice']); ?>"
+                        data-voice-channels="<?php echo esc_attr($voice_channels_active); ?>"
+                        data-label-voice-extra-singular="<?php echo esc_attr($voice_extra_singular); ?>"
+                        data-label-voice-extra-plural="<?php echo esc_attr($voice_extra_plural); ?>"
+                        data-hide-labels="<?php echo esc_attr($hide_labels ? 'true' : 'false'); ?>">
+                        <?php if (!$hide_icons): ?>
+                        <span class="discord-icon"><?php echo esc_html($atts['icon_voice']); ?></span>
+                        <?php endif; ?>
+                        <span class="discord-number" role="status" aria-live="polite"><?php echo esc_html(number_format_i18n($voice_participants)); ?></span>
+                        <span class="<?php echo esc_attr(implode(' ', $voice_label_classes)); ?>">
+                            <span class="discord-label-text"><?php echo esc_html($atts['label_voice']); ?></span>
+                            <span class="discord-label-extra screen-reader-text" data-role="discord-voice-extra"><?php echo esc_html($voice_extra_text); ?></span>
+                        </span>
+                    </div>
+                    <?php endif; ?>
+
+                    <?php if ($show_boosts) : ?>
+                    <?php
+                    $boost_label_classes = array('discord-label');
+                    if ($hide_labels) {
+                        $boost_label_classes[] = 'screen-reader-text';
+                    }
+                    ?>
+                    <div class="discord-stat discord-boosts"
+                        data-value="<?php echo esc_attr($boost_count); ?>"
+                        data-label-boosts="<?php echo esc_attr($atts['label_boosts']); ?>"
+                        data-hide-labels="<?php echo esc_attr($hide_labels ? 'true' : 'false'); ?>">
+                        <?php if (!$hide_icons): ?>
+                        <span class="discord-icon"><?php echo esc_html($atts['icon_boosts']); ?></span>
+                        <?php endif; ?>
+                        <span class="discord-number" role="status" aria-live="polite"><?php echo esc_html(number_format_i18n($boost_count)); ?></span>
+                        <span class="<?php echo esc_attr(implode(' ', $boost_label_classes)); ?>">
+                            <span class="discord-label-text"><?php echo esc_html($atts['label_boosts']); ?></span>
                         </span>
                     </div>
                     <?php endif; ?>

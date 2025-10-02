@@ -7,6 +7,13 @@
     var createElement = element.createElement;
     var Fragment = element.Fragment;
     var __ = i18n.__;
+    var translatePlural = function (single, plural, number) {
+        if (i18n && typeof i18n._n === 'function') {
+            return i18n._n(single, plural, number, 'discord-bot-jlg');
+        }
+
+        return number === 1 ? single : plural;
+    };
     var InspectorControls = blockEditor.InspectorControls;
     var useBlockProps = blockEditor.useBlockProps || function () { return {}; };
     var PanelBody = components.PanelBody;
@@ -72,8 +79,18 @@
         width: '',
         icon_online: '🟢',
         icon_total: '👥',
+        icon_idle: '🌙',
+        icon_dnd: '⛔️',
+        icon_offline: '⚪️',
+        icon_voice: '🎧',
+        icon_boosts: '🚀',
         label_online: 'En ligne',
         label_total: 'Membres',
+        label_idle: 'Inactifs',
+        label_dnd: 'Ne pas déranger',
+        label_offline: 'Hors ligne',
+        label_voice: 'En vocal',
+        label_boosts: 'Boosts',
         hide_labels: false,
         hide_icons: false,
         border_radius: 8,
@@ -97,7 +114,12 @@
         cta_url: '',
         cta_style: 'solid',
         cta_new_tab: true,
-        cta_tooltip: ''
+        cta_tooltip: '',
+        show_idle: false,
+        show_dnd: false,
+        show_offline: false,
+        show_voice: false,
+        show_boosts: false
     };
 
     var REFRESH_INTERVAL_MIN = 10;
@@ -184,6 +206,17 @@
             onlineValue = baseOnline;
         }
 
+        var idleValue = Math.max(0, Math.round(onlineValue * 0.2));
+        var dndValue = Math.max(0, Math.round(onlineValue * 0.1));
+        var pureOnline = Math.max(0, onlineValue - idleValue - dndValue);
+        var offlineValue = Math.max(0, baseTotal - onlineValue);
+        var voiceParticipants = Math.max(0, Math.round(onlineValue * 0.35));
+        if (!isFinite(voiceParticipants)) {
+            voiceParticipants = Math.max(0, Math.round(baseOnline * 0.35));
+        }
+        var voiceChannelsActive = voiceParticipants > 0 ? Math.max(1, Math.round(voiceParticipants / 4)) : 0;
+        var boostCount = 5;
+
         var demoServerName = __('Serveur Démo', 'discord-bot-jlg');
         var avatarUrl = STATIC_PREVIEW_AVATAR_BASE + '?size=' + mergedAttributes.avatar_size;
 
@@ -198,7 +231,24 @@
             last_updated: null,
             server_name: demoServerName,
             server_avatar_url: avatarUrl,
-            server_avatar_base_url: STATIC_PREVIEW_AVATAR_BASE
+            server_avatar_base_url: STATIC_PREVIEW_AVATAR_BASE,
+            approximate_presence_count: onlineValue,
+            status_counts: {
+                online: pureOnline,
+                idle: idleValue,
+                dnd: dndValue,
+                offline: offlineValue,
+                unknown: 0
+            },
+            voice_stats: {
+                participants: voiceParticipants,
+                channels: voiceChannelsActive
+            },
+            voice_participants: voiceParticipants,
+            voice_channels_active: voiceChannelsActive,
+            boost_count: boostCount,
+            offline_count: offlineValue,
+            offline_is_approximate: false
         };
 
         return {
@@ -303,11 +353,46 @@
         var hideIcons = !!previewAttributes.hide_icons;
         var showOnline = !!previewAttributes.show_online;
         var showTotal = !!previewAttributes.show_total;
+        var showIdle = !!previewAttributes.show_idle;
+        var showDnd = !!previewAttributes.show_dnd;
+        var showOffline = !!previewAttributes.show_offline;
+        var showVoice = !!previewAttributes.show_voice;
+        var showBoosts = !!previewAttributes.show_boosts;
         var showTitle = !!previewAttributes.show_title && previewAttributes.title;
         var showDiscordIcon = !!previewAttributes.show_discord_icon;
         var showServerName = !!previewAttributes.show_server_name;
         var showServerAvatar = !!previewAttributes.show_server_avatar;
         var hasTotal = !!stats.has_total;
+
+        var statusCounts = stats.status_counts && typeof stats.status_counts === 'object' ? stats.status_counts : {};
+        var idleValue = parseInt(statusCounts.idle, 10);
+        if (isNaN(idleValue) || idleValue < 0) { idleValue = 0; }
+        var dndValue = parseInt(statusCounts.dnd, 10);
+        if (isNaN(dndValue) || dndValue < 0) { dndValue = 0; }
+        var offlineValue = typeof stats.offline_count !== 'undefined' ? parseInt(stats.offline_count, 10) : parseInt(statusCounts.offline, 10);
+        if (isNaN(offlineValue) || offlineValue < 0) { offlineValue = 0; }
+        var offlineIsApprox = !!stats.offline_is_approximate;
+
+        var voiceStats = stats.voice_stats && typeof stats.voice_stats === 'object' ? stats.voice_stats : {};
+        var voiceParticipants = typeof stats.voice_participants !== 'undefined'
+            ? parseInt(stats.voice_participants, 10)
+            : parseInt(voiceStats.participants, 10);
+        if (isNaN(voiceParticipants) || voiceParticipants < 0) { voiceParticipants = 0; }
+        var voiceChannelsActive = typeof stats.voice_channels_active !== 'undefined'
+            ? parseInt(stats.voice_channels_active, 10)
+            : parseInt(voiceStats.channels, 10);
+        if (isNaN(voiceChannelsActive) || voiceChannelsActive < 0) { voiceChannelsActive = 0; }
+
+        var boostCount = typeof stats.boost_count !== 'undefined' ? parseInt(stats.boost_count, 10) : 0;
+        if (isNaN(boostCount) || boostCount < 0) { boostCount = 0; }
+
+        var voiceExtraSingular = __('%d salon actif', 'discord-bot-jlg');
+        var voiceExtraPlural = __('%d salons actifs', 'discord-bot-jlg');
+        var voiceExtraText = '';
+        if (voiceChannelsActive > 0) {
+            var voiceTemplate = translatePlural('%d salon actif', '%d salons actifs', voiceChannelsActive);
+            voiceExtraText = voiceTemplate.replace('%d', voiceChannelsActive);
+        }
 
         var layoutClass = (previewAttributes.layout || 'horizontal').toString().toLowerCase();
         var themeClass = (previewAttributes.theme || 'discord').toString().toLowerCase();
@@ -597,6 +682,164 @@
             statsWrapperChildren.push(createElementWithChildren('div', totalProps, totalChildren));
         }
 
+        if (showIdle) {
+            var idleLabelClasses = ['discord-label'];
+            if (hideLabels) {
+                idleLabelClasses.push('screen-reader-text');
+            }
+
+            var idleChildren = [];
+            if (!hideIcons) {
+                idleChildren.push(createElement('span', { className: 'discord-icon' }, previewAttributes.icon_idle));
+            }
+
+            idleChildren.push(createElement('span', {
+                className: 'discord-number',
+                role: 'status',
+                'aria-live': 'polite'
+            }, formatStaticNumber(idleValue)));
+
+            idleChildren.push(createElement('span', { className: idleLabelClasses.join(' ') },
+                createElement('span', { className: 'discord-label-text' }, previewAttributes.label_idle)
+            ));
+
+            statsWrapperChildren.push(createElementWithChildren('div', {
+                className: 'discord-stat discord-idle',
+                'data-value': idleValue,
+                'data-label-idle': previewAttributes.label_idle,
+                'data-hide-labels': hideLabels ? 'true' : 'false'
+            }, idleChildren));
+        }
+
+        if (showDnd) {
+            var dndLabelClasses = ['discord-label'];
+            if (hideLabels) {
+                dndLabelClasses.push('screen-reader-text');
+            }
+
+            var dndChildren = [];
+            if (!hideIcons) {
+                dndChildren.push(createElement('span', { className: 'discord-icon' }, previewAttributes.icon_dnd));
+            }
+
+            dndChildren.push(createElement('span', {
+                className: 'discord-number',
+                role: 'status',
+                'aria-live': 'polite'
+            }, formatStaticNumber(dndValue)));
+
+            dndChildren.push(createElement('span', { className: dndLabelClasses.join(' ') },
+                createElement('span', { className: 'discord-label-text' }, previewAttributes.label_dnd)
+            ));
+
+            statsWrapperChildren.push(createElementWithChildren('div', {
+                className: 'discord-stat discord-dnd',
+                'data-value': dndValue,
+                'data-label-dnd': previewAttributes.label_dnd,
+                'data-hide-labels': hideLabels ? 'true' : 'false'
+            }, dndChildren));
+        }
+
+        if (showOffline) {
+            var offlineLabelClasses = ['discord-label'];
+            if (hideLabels) {
+                offlineLabelClasses.push('screen-reader-text');
+            }
+
+            var offlineChildren = [];
+            if (!hideIcons) {
+                offlineChildren.push(createElement('span', { className: 'discord-icon' }, previewAttributes.icon_offline));
+            }
+
+            offlineChildren.push(createElement('span', {
+                className: 'discord-number',
+                role: 'status',
+                'aria-live': 'polite'
+            }, formatStaticNumber(offlineValue)));
+
+            offlineChildren.push(createElement('span', {
+                className: 'discord-approx-indicator',
+                'aria-hidden': 'true',
+                hidden: !offlineIsApprox
+            }, '≈'));
+
+            offlineChildren.push(createElementWithChildren('span', { className: offlineLabelClasses.join(' ') }, [
+                createElement('span', { className: 'discord-label-text' }, previewAttributes.label_offline),
+                createElement('span', { className: 'discord-label-extra screen-reader-text' }, offlineIsApprox ? __('approx.', 'discord-bot-jlg') : '')
+            ]));
+
+            statsWrapperChildren.push(createElementWithChildren('div', {
+                className: 'discord-stat discord-offline' + (offlineIsApprox ? ' discord-offline-approximate' : ''),
+                'data-value': offlineValue,
+                'data-label-offline': previewAttributes.label_offline,
+                'data-label-approx': __('approx.', 'discord-bot-jlg'),
+                'data-approximate': offlineIsApprox ? 'true' : 'false',
+                'data-hide-labels': hideLabels ? 'true' : 'false'
+            }, offlineChildren));
+        }
+
+        if (showVoice) {
+            var voiceLabelClasses = ['discord-label'];
+            if (hideLabels) {
+                voiceLabelClasses.push('screen-reader-text');
+            }
+
+            var voiceChildren = [];
+            if (!hideIcons) {
+                voiceChildren.push(createElement('span', { className: 'discord-icon' }, previewAttributes.icon_voice));
+            }
+
+            voiceChildren.push(createElement('span', {
+                className: 'discord-number',
+                role: 'status',
+                'aria-live': 'polite'
+            }, formatStaticNumber(voiceParticipants)));
+
+            voiceChildren.push(createElementWithChildren('span', { className: voiceLabelClasses.join(' ') }, [
+                createElement('span', { className: 'discord-label-text' }, previewAttributes.label_voice),
+                createElement('span', { className: 'discord-label-extra screen-reader-text', 'data-role': 'discord-voice-extra' }, voiceExtraText)
+            ]));
+
+            statsWrapperChildren.push(createElementWithChildren('div', {
+                className: 'discord-stat discord-voice',
+                'data-value': voiceParticipants,
+                'data-label-voice': previewAttributes.label_voice,
+                'data-voice-channels': voiceChannelsActive,
+                'data-label-voice-extra-singular': voiceExtraSingular,
+                'data-label-voice-extra-plural': voiceExtraPlural,
+                'data-hide-labels': hideLabels ? 'true' : 'false'
+            }, voiceChildren));
+        }
+
+        if (showBoosts) {
+            var boostLabelClasses = ['discord-label'];
+            if (hideLabels) {
+                boostLabelClasses.push('screen-reader-text');
+            }
+
+            var boostChildren = [];
+            if (!hideIcons) {
+                boostChildren.push(createElement('span', { className: 'discord-icon' }, previewAttributes.icon_boosts));
+            }
+
+            boostChildren.push(createElement('span', {
+                className: 'discord-number',
+                role: 'status',
+                'aria-live': 'polite'
+            }, formatStaticNumber(boostCount)));
+
+            boostChildren.push(createElement('span', { className: boostLabelClasses.join(' ') },
+                createElement('span', { className: 'discord-label-text' }, previewAttributes.label_boosts)
+            ));
+
+            statsWrapperChildren.push(createElementWithChildren('div', {
+                className: 'discord-stat discord-boosts',
+                'data-value': boostCount,
+                'data-label-boosts': previewAttributes.label_boosts,
+                'data-hide-labels': hideLabels ? 'true' : 'false'
+            }, boostChildren));
+        }
+
         statsMainChildren.push(createElementWithChildren('div', { className: 'discord-stats-wrapper' }, statsWrapperChildren));
 
         if (showDiscordIcon && logoPosition === 'right') {
@@ -875,6 +1118,43 @@
                                 label: __('Afficher le total des membres', 'discord-bot-jlg'),
                                 checked: !!attributes.show_total,
                                 onChange: updateAttribute(setAttributes, 'show_total')
+                            })
+                        ),
+                        createElement(
+                            PanelRow,
+                            null,
+                            createElement(ToggleControl, {
+                                label: __('Afficher les inactifs', 'discord-bot-jlg'),
+                                checked: !!attributes.show_idle,
+                                onChange: updateAttribute(setAttributes, 'show_idle')
+                            }),
+                            createElement(ToggleControl, {
+                                label: __('Afficher les statuts « Ne pas déranger »', 'discord-bot-jlg'),
+                                checked: !!attributes.show_dnd,
+                                onChange: updateAttribute(setAttributes, 'show_dnd')
+                            })
+                        ),
+                        createElement(
+                            PanelRow,
+                            null,
+                            createElement(ToggleControl, {
+                                label: __('Afficher les membres hors ligne', 'discord-bot-jlg'),
+                                checked: !!attributes.show_offline,
+                                onChange: updateAttribute(setAttributes, 'show_offline')
+                            }),
+                            createElement(ToggleControl, {
+                                label: __('Afficher les membres en vocal', 'discord-bot-jlg'),
+                                checked: !!attributes.show_voice,
+                                onChange: updateAttribute(setAttributes, 'show_voice')
+                            })
+                        ),
+                        createElement(
+                            PanelRow,
+                            null,
+                            createElement(ToggleControl, {
+                                label: __('Afficher les boosts', 'discord-bot-jlg'),
+                                checked: !!attributes.show_boosts,
+                                onChange: updateAttribute(setAttributes, 'show_boosts')
                             })
                         ),
                         createElement(
