@@ -42,10 +42,26 @@ if (!function_exists('discord_bot_jlg_get_cron_interval')) {
             $default_interval = 300;
         }
 
-        $interval = (int) apply_filters('discord_bot_jlg_cron_interval', $default_interval);
+        $options = get_option(DISCORD_BOT_JLG_OPTION_NAME, array());
+
+        if (!is_array($options)) {
+            $options = array();
+        }
+
+        $interval = isset($options['cache_duration']) ? (int) $options['cache_duration'] : $default_interval;
 
         if ($interval < 60) {
             $interval = 60;
+        } elseif ($interval > 3600) {
+            $interval = 3600;
+        }
+
+        $interval = (int) apply_filters('discord_bot_jlg_cron_interval', $interval);
+
+        if ($interval < 60) {
+            $interval = 60;
+        } elseif ($interval > 3600) {
+            $interval = 3600;
         }
 
         return $interval;
@@ -247,14 +263,48 @@ class DiscordServerStats {
         );
     }
 
+    /**
+     * Normalise la valeur de la durée de cache.
+     *
+     * @param mixed $duration Durée à normaliser.
+     *
+     * @return int
+     */
+    private function normalize_cache_duration($duration) {
+        $duration = (int) $duration;
+
+        if ($duration < 60) {
+            $duration = 60;
+        } elseif ($duration > 3600) {
+            $duration = 3600;
+        }
+
+        return $duration;
+    }
+
+    /**
+     * Replanifie le cron de rafraîchissement du cache.
+     *
+     * @param int|null $interval Intervalle à utiliser.
+     *
+     * @return void
+     */
+    private function reschedule_cron_event($interval = null) {
+        if (null === $interval) {
+            $interval = discord_bot_jlg_get_cron_interval();
+        } else {
+            $interval = $this->normalize_cache_duration($interval);
+        }
+
+        wp_clear_scheduled_hook(DISCORD_BOT_JLG_CRON_HOOK);
+
+        wp_schedule_event(time() + $interval, 'discord_bot_jlg_refresh', DISCORD_BOT_JLG_CRON_HOOK);
+    }
+
     public function activate() {
         add_option(DISCORD_BOT_JLG_OPTION_NAME, $this->default_options, '', false);
 
-        if (false === wp_next_scheduled(DISCORD_BOT_JLG_CRON_HOOK)) {
-            $timestamp = time() + discord_bot_jlg_get_cron_interval();
-
-            wp_schedule_event($timestamp, 'discord_bot_jlg_refresh', DISCORD_BOT_JLG_CRON_HOOK);
-        }
+        $this->reschedule_cron_event();
     }
 
     public function deactivate() {
@@ -306,10 +356,26 @@ class DiscordServerStats {
         $new_server_id = isset($value['server_id']) ? (string) $value['server_id'] : '';
         $old_bot_token = isset($old_value['bot_token']) ? (string) $old_value['bot_token'] : '';
         $new_bot_token = isset($value['bot_token']) ? (string) $value['bot_token'] : '';
+        $old_cache_duration = isset($old_value['cache_duration']) ? $old_value['cache_duration'] : DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION;
+        $new_cache_duration = isset($value['cache_duration']) ? $value['cache_duration'] : DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION;
+
+        $old_cache_duration = $this->normalize_cache_duration($old_cache_duration);
+        $new_cache_duration = $this->normalize_cache_duration($new_cache_duration);
+
+        $cache_duration_changed = ($old_cache_duration !== $new_cache_duration);
 
         if ($old_server_id !== $new_server_id || $old_bot_token !== $new_bot_token) {
             $this->api->clear_all_cached_data();
+
+            if ($cache_duration_changed) {
+                $this->reschedule_cron_event($new_cache_duration);
+            }
+
             return;
+        }
+
+        if ($cache_duration_changed) {
+            $this->reschedule_cron_event($new_cache_duration);
         }
 
         $this->api->clear_cache();
