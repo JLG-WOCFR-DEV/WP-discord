@@ -130,6 +130,26 @@
         "avatar_size": {
             "type": "number",
             "default": 128
+        },
+        "cta_enabled": {
+            "type": "boolean",
+            "default": false
+        },
+        "cta_label": {
+            "type": "string",
+            "default": "Rejoindre notre serveur Discord"
+        },
+        "cta_url": {
+            "type": "string",
+            "default": ""
+        },
+        "cta_style": {
+            "type": "string",
+            "default": "solid"
+        },
+        "cta_new_tab": {
+            "type": "boolean",
+            "default": true
         }
     }
 }

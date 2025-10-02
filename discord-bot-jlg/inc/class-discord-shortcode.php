@@ -69,6 +69,11 @@ class Discord_Bot_JLG_Shortcode {
                 'show_server_name'     => false,
                 'show_server_avatar'   => false,
                 'avatar_size'          => '128',
+                'cta_enabled'          => false,
+                'cta_label'            => __('Rejoindre notre serveur Discord', 'discord-bot-jlg'),
+                'cta_url'              => '',
+                'cta_style'            => 'solid',
+                'cta_new_tab'          => true,
             ),
             $atts,
             'discord_stats'
@@ -87,6 +92,21 @@ class Discord_Bot_JLG_Shortcode {
         $show_server_name   = filter_var($atts['show_server_name'], FILTER_VALIDATE_BOOLEAN);
         $show_server_avatar = filter_var($atts['show_server_avatar'], FILTER_VALIDATE_BOOLEAN);
         $avatar_size        = $this->sanitize_avatar_size($atts['avatar_size']);
+        $cta_enabled        = filter_var($atts['cta_enabled'], FILTER_VALIDATE_BOOLEAN);
+        $cta_new_tab        = filter_var($atts['cta_new_tab'], FILTER_VALIDATE_BOOLEAN);
+
+        $cta_label = sanitize_text_field($atts['cta_label']);
+        if ('' === $cta_label) {
+            $cta_label = __('Rejoindre notre serveur Discord', 'discord-bot-jlg');
+        }
+
+        $cta_url = esc_url_raw($atts['cta_url']);
+
+        $allowed_cta_styles = array('solid', 'outline');
+        $cta_style = sanitize_text_field($atts['cta_style']);
+        if (!in_array($cta_style, $allowed_cta_styles, true)) {
+            $cta_style = 'solid';
+        }
 
         if ($force_demo) {
             $stats = $this->api->get_demo_stats();
@@ -185,6 +205,10 @@ class Discord_Bot_JLG_Shortcode {
             if ('' !== $server_avatar_url) {
                 $container_classes[] = 'discord-has-server-avatar';
             }
+        }
+
+        if ($cta_enabled && '' !== $cta_url) {
+            $container_classes[] = 'discord-has-cta';
         }
 
         $style_declarations = array(
@@ -294,6 +318,20 @@ class Discord_Bot_JLG_Shortcode {
         }
 
         $discord_svg = '<svg class="discord-logo-svg" aria-hidden="true" focusable="false" viewBox="0 0 127.14 96.36" xmlns="http://www.w3.org/2000/svg"><path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.25,105.25,0,0,0,126.6,80.22h0C129.24,52.84,122.09,29.11,107.7,8.07ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.25,60,73.25,53s5-12.74,11.44-12.74S96.23,46,96.12,53,91.08,65.69,84.69,65.69Z"/></svg>';
+
+        $cta_should_render = ($cta_enabled && '' !== $cta_url);
+        $cta_button_classes = array('discord-cta-button');
+        if ($cta_should_render) {
+            $cta_button_classes[] = 'discord-cta-button--' . $cta_style;
+        }
+
+        $cta_rel = '';
+        $cta_target = '';
+
+        if ($cta_should_render && $cta_new_tab) {
+            $cta_target = ' target="_blank"';
+            $cta_rel    = ' rel="noopener"';
+        }
 
         ob_start();
         ?>
@@ -408,6 +446,14 @@ class Discord_Bot_JLG_Shortcode {
                     </div>
                     <?php endif; ?>
                 </div>
+
+                <?php if ($cta_should_render) : ?>
+                <div class="discord-cta-container">
+                    <a class="<?php echo esc_attr(implode(' ', $cta_button_classes)); ?>" href="<?php echo esc_url($cta_url); ?>"<?php echo $cta_target; ?><?php echo $cta_rel; ?>>
+                        <span class="discord-cta-label"><?php echo esc_html($cta_label); ?></span>
+                    </a>
+                </div>
+                <?php endif; ?>
 
                 <?php if ($show_discord_icon && $logo_position_class === 'right'): ?>
                 <div class="discord-logo-container">
