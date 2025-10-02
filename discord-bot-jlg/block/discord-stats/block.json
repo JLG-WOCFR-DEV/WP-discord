@@ -15,12 +15,12 @@
     "editorStyle": "discord-bot-jlg-block-editor-style",
     "style": "discord-bot-jlg-inline",
     "supports": {
-        "html": false,
-        "customClassName": true,
         "align": [
             "wide",
             "full"
-        ]
+        ],
+        "customClassName": true,
+        "html": false
     },
     "attributes": {
         "layout": {

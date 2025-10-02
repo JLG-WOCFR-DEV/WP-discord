@@ -290,12 +290,26 @@ class Discord_Bot_JLG_Shortcode {
 
         $custom_class_sources = array();
 
-        if (!empty($atts['className'])) {
-            $custom_class_sources[] = $atts['className'];
+        $class_name_attribute = '';
+        if (array_key_exists('className', $received_atts)) {
+            $class_name_attribute = is_string($atts['className']) ? trim($atts['className']) : '';
+        } elseif (!empty($atts['className'])) {
+            $class_name_attribute = is_string($atts['className']) ? trim($atts['className']) : '';
         }
 
-        if (!empty($atts['class'])) {
-            $custom_class_sources[] = $atts['class'];
+        if ('' !== $class_name_attribute) {
+            $custom_class_sources[] = $class_name_attribute;
+        }
+
+        $legacy_class_attribute = '';
+        if (array_key_exists('class', $received_atts)) {
+            $legacy_class_attribute = is_string($atts['class']) ? trim($atts['class']) : '';
+        } elseif (!empty($atts['class'])) {
+            $legacy_class_attribute = is_string($atts['class']) ? trim($atts['class']) : '';
+        }
+
+        if ('' === $class_name_attribute && '' !== $legacy_class_attribute) {
+            $custom_class_sources[] = $legacy_class_attribute;
         }
 
         if (!empty($custom_class_sources)) {
