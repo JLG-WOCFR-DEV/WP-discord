@@ -410,6 +410,7 @@
         --discord-gap: clamp(10px, 5vw, 16px);
         --discord-padding: clamp(10px, 4vw, 18px);
         --discord-avatar-size: clamp(46px, 20vw, 72px);
+        padding-bottom: calc(var(--discord-padding) * 2.5 + 48px);
     }
 
     .discord-stats-container .discord-stats-wrapper {
@@ -420,6 +421,28 @@
     .discord-stats-container .discord-stat {
         flex: 1 1 100%;
         width: 100%;
+    }
+
+    .discord-stats-container .discord-refresh-status {
+        top: auto;
+        bottom: 16px;
+        left: 18px;
+        right: 18px;
+        padding: 6px 10px;
+        justify-content: center;
+        text-align: center;
+        font-size: 12px;
+    }
+
+    .discord-stats-container .discord-demo-badge {
+        top: auto;
+        bottom: calc(16px + 42px);
+        left: 50%;
+        right: auto;
+        padding: 4px 10px;
+        transform: translateX(-50%) scale(var(--discord-badge-scale));
+        text-align: center;
+        white-space: nowrap;
     }
 }
 
@@ -434,6 +457,7 @@
         --discord-logo-height: clamp(20px, 12vw, 26px);
         --discord-badge-scale: 0.85;
         --discord-avatar-size: clamp(42px, 24vw, 64px);
+        padding-bottom: calc(var(--discord-padding) * 3 + 58px);
     }
 
     .discord-stats-container .discord-stats-main {
@@ -450,5 +474,19 @@
 
     .discord-stats-container .discord-label {
         font-size: var(--discord-label-size);
+    }
+
+    .discord-stats-container .discord-refresh-status {
+        left: 12px;
+        right: 12px;
+        bottom: 12px;
+        padding: 6px 8px;
+        line-height: 1.3;
+    }
+
+    .discord-stats-container .discord-demo-badge {
+        bottom: calc(12px + 38px);
+        padding: 3px 8px;
+        letter-spacing: 0.08em;
     }
 }
