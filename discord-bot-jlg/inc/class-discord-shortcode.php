@@ -462,9 +462,23 @@ class Discord_Bot_JLG_Shortcode {
             </div>
         </div>
 
-        <?php if ('' !== $invite_url) : ?>
+        <?php if ('' !== $invite_url) :
+            $invite_button_classes = array('discord-invite-button', 'wp-element-button');
+
+            if ($compact) {
+                $invite_button_classes[] = 'discord-invite-button--compact';
+            }
+
+            $invite_rel_value = implode(' ', array('noopener', 'noreferrer', 'nofollow'));
+            $invite_link_attributes = array(
+                sprintf('class="%s"', esc_attr(implode(' ', $invite_button_classes))),
+                sprintf('href="%s"', esc_url($invite_url)),
+                'target="_blank"',
+                sprintf('rel="%s"', esc_attr($invite_rel_value)),
+            );
+        ?>
         <div class="discord-invite">
-            <a class="discord-invite-button" href="<?php echo esc_url($invite_url); ?>" target="_blank" rel="noopener noreferrer nofollow">
+            <a <?php echo implode(' ', $invite_link_attributes); ?>>
                 <span class="discord-invite-button__label"><?php echo esc_html($invite_label); ?></span>
             </a>
         </div>
