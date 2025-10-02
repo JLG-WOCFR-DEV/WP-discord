@@ -43,6 +43,11 @@ class Test_Discord_Bot_JLG_Shortcode extends TestCase {
             'default_refresh_enabled' => true,
             'default_refresh_interval' => 45,
             'default_theme' => 'dark',
+            'stat_bg_color' => '#123456',
+            'stat_text_color' => '#f0f0f0',
+            'accent_color' => '#654321',
+            'accent_color_alt' => '#765432',
+            'accent_text_color' => '#111111',
         );
 
         $stats = array(
@@ -166,5 +171,26 @@ class Test_Discord_Bot_JLG_Shortcode extends TestCase {
         $this->assertStringContainsString('data-show-server-avatar="true"', $html);
         $this->assertStringContainsString('data-server-name="Test Guild"', $html);
         $this->assertStringContainsString('data-server-avatar-url="https://cdn.discordapp.com/icons/123456789/abcdef.png?size=128"', $html);
+        $this->assertStringContainsString('--discord-surface-background: #123456', $html);
+        $this->assertStringContainsString('--discord-accent: #654321', $html);
+        $this->assertStringContainsString('--discord-accent-secondary: #765432', $html);
+        $this->assertStringContainsString('--discord-accent-contrast: #111111', $html);
+    }
+
+    public function test_render_shortcode_includes_custom_colors() {
+        $shortcode = $this->get_shortcode_instance();
+
+        $html = $shortcode->render_shortcode(array(
+            'stat_bg_color'     => '#abcdef',
+            'stat_text_color'   => 'rgb(10, 20, 30)',
+            'accent_color'      => '#ff00aa',
+            'accent_text_color' => '#0f0f0f',
+        ));
+
+        $this->assertStringContainsString('--discord-surface-background: #abcdef', $html);
+        $this->assertStringContainsString('--discord-surface-text: rgb(10, 20, 30)', $html);
+        $this->assertStringContainsString('--discord-accent: #ff00aa', $html);
+        $this->assertStringContainsString('--discord-accent-secondary: #ff00aa', $html);
+        $this->assertStringContainsString('--discord-accent-contrast: #0f0f0f', $html);
     }
 }

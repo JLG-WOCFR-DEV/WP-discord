@@ -47,6 +47,14 @@ class Discord_Bot_JLG_Shortcode {
             $default_theme = $options['default_theme'];
         }
 
+        $default_colors = array(
+            'stat_bg_color'      => isset($options['stat_bg_color']) ? discord_bot_jlg_sanitize_color($options['stat_bg_color']) : '',
+            'stat_text_color'    => isset($options['stat_text_color']) ? discord_bot_jlg_sanitize_color($options['stat_text_color']) : '',
+            'accent_color'       => isset($options['accent_color']) ? discord_bot_jlg_sanitize_color($options['accent_color']) : '',
+            'accent_color_alt'   => isset($options['accent_color_alt']) ? discord_bot_jlg_sanitize_color($options['accent_color_alt']) : '',
+            'accent_text_color'  => isset($options['accent_text_color']) ? discord_bot_jlg_sanitize_color($options['accent_text_color']) : '',
+        );
+
         $default_invite_url = isset($options['invite_url']) ? esc_url_raw($options['invite_url']) : '';
         $default_invite_label = isset($options['invite_label'])
             ? sanitize_text_field($options['invite_label'])
@@ -103,6 +111,11 @@ class Discord_Bot_JLG_Shortcode {
                 'border_radius'        => '8',
                 'gap'                  => '20',
                 'padding'              => '15',
+                'stat_bg_color'        => $default_colors['stat_bg_color'],
+                'stat_text_color'      => $default_colors['stat_text_color'],
+                'accent_color'         => $default_colors['accent_color'],
+                'accent_color_alt'     => $default_colors['accent_color_alt'],
+                'accent_text_color'    => $default_colors['accent_text_color'],
                 'demo'                 => false,
                 'show_discord_icon'    => false,
                 'discord_icon_position'=> 'left',
@@ -299,6 +312,37 @@ class Discord_Bot_JLG_Shortcode {
             '--discord-padding: ' . intval($atts['padding']) . 'px',
             '--discord-radius: ' . intval($atts['border_radius']) . 'px',
         );
+
+        $stat_bg_color     = discord_bot_jlg_sanitize_color($atts['stat_bg_color']);
+        $stat_text_color   = discord_bot_jlg_sanitize_color($atts['stat_text_color']);
+        $accent_color      = discord_bot_jlg_sanitize_color($atts['accent_color']);
+        $accent_color_alt  = discord_bot_jlg_sanitize_color($atts['accent_color_alt']);
+        $accent_text_color = discord_bot_jlg_sanitize_color($atts['accent_text_color']);
+
+        if ('' !== $accent_color && '' === $accent_color_alt) {
+            $accent_color_alt = $accent_color;
+        }
+
+        if ('' !== $stat_bg_color) {
+            $style_declarations[] = '--discord-surface-background: ' . $stat_bg_color;
+        }
+
+        if ('' !== $stat_text_color) {
+            $style_declarations[] = '--discord-surface-text: ' . $stat_text_color;
+        }
+
+        if ('' !== $accent_color) {
+            $style_declarations[] = '--discord-accent: ' . $accent_color;
+            $style_declarations[] = '--discord-logo-color: ' . $accent_color;
+        }
+
+        if ('' !== $accent_color_alt) {
+            $style_declarations[] = '--discord-accent-secondary: ' . $accent_color_alt;
+        }
+
+        if ('' !== $accent_text_color) {
+            $style_declarations[] = '--discord-accent-contrast: ' . $accent_text_color;
+        }
 
         if (!empty($atts['width'])) {
             $validated_width = $this->validate_width_value($atts['width']);
