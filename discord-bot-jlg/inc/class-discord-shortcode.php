@@ -517,16 +517,63 @@ class Discord_Bot_JLG_Shortcode {
             }
         }
 
+        $title_text = is_string($atts['title']) ? trim($atts['title']) : '';
+        $title_id   = $unique_id . '-title';
+        $server_name_id = $unique_id . '-server-name';
+
+        $region_label_ids = array();
+
+        if ($show_title && '' !== $title_text) {
+            $region_label_ids[] = $title_id;
+        }
+
+        if ($show_server_name && '' !== $server_name) {
+            $region_label_ids[] = $server_name_id;
+        }
+
+        $region_label_base = __('Statistiques Discord', 'discord-bot-jlg');
+        /* translators: %s: Discord server name. */
+        $region_label_pattern = __('Statistiques Discord – %s', 'discord-bot-jlg');
+        $region_label_text    = '';
+
+        if (empty($region_label_ids)) {
+            if ('' !== $server_name) {
+                $region_label_text = sprintf($region_label_pattern, $server_name);
+            } else {
+                $region_label_text = $region_label_base;
+            }
+        }
+
         $attributes = array(
             sprintf('id="%s"', esc_attr($unique_id)),
             sprintf('class="%s"', esc_attr(implode(' ', $container_classes))),
+            'role="region"',
             sprintf('data-demo="%s"', esc_attr($is_forced_demo ? 'true' : 'false')),
             sprintf('data-fallback-demo="%s"', esc_attr($is_fallback_demo ? 'true' : 'false')),
             sprintf('data-stale="%s"', esc_attr($is_stale ? 'true' : 'false')),
             sprintf('data-hide-labels="%s"', esc_attr($hide_labels ? 'true' : 'false')),
             'aria-live="polite"',
             'aria-busy="false"',
+            sprintf('data-region-label-base="%s"', esc_attr($region_label_base)),
+            sprintf('data-region-label-pattern="%s"', esc_attr($region_label_pattern)),
+            sprintf('data-region-title-id="%s"', esc_attr($title_id)),
+            sprintf('data-region-server-id="%s"', esc_attr($server_name_id)),
         );
+
+        if (!empty($region_label_ids)) {
+            $labelledby_value = implode(' ', $region_label_ids);
+            $attributes[]     = sprintf('aria-labelledby="%s"', esc_attr($labelledby_value));
+            $attributes[]     = sprintf('data-region-label-ids="%s"', esc_attr($labelledby_value));
+            $attributes[]     = 'data-region-labelling="labelledby"';
+        } else {
+            $attributes[] = sprintf('aria-label="%s"', esc_attr($region_label_text));
+            $attributes[] = sprintf('data-region-label="%s"', esc_attr($region_label_text));
+            $attributes[] = 'data-region-labelling="label"';
+        }
+
+        if ('' !== $server_name) {
+            $attributes[] = sprintf('data-region-server-name="%s"', esc_attr($server_name));
+        }
 
         if ($is_stale && $last_updated > 0) {
             $attributes[] = sprintf('data-last-updated="%s"', esc_attr($last_updated));
@@ -627,7 +674,7 @@ class Discord_Bot_JLG_Shortcode {
             <?php endif; ?>
 
             <?php if ($show_title): ?>
-            <div class="discord-stats-title"><?php echo esc_html($atts['title']); ?></div>
+            <div class="discord-stats-title" id="<?php echo esc_attr($title_id); ?>"><?php echo esc_html($atts['title']); ?></div>
             <?php endif; ?>
 
             <div class="discord-stats-main">
@@ -664,7 +711,7 @@ class Discord_Bot_JLG_Shortcode {
                         <?php endif; ?>
                         <?php if ($show_server_name && '' !== $server_name) : ?>
                         <div class="discord-server-name" data-role="discord-server-name">
-                            <span class="discord-server-name__text"><?php echo esc_html($server_name); ?></span>
+                            <span class="discord-server-name__text" id="<?php echo esc_attr($server_name_id); ?>"><?php echo esc_html($server_name); ?></span>
                         </div>
                         <?php endif; ?>
                     </div>

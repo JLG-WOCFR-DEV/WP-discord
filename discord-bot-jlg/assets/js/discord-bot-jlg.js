@@ -121,6 +121,143 @@
         }
     }
 
+    function refreshRegionAccessibility(container) {
+        if (!container) {
+            return;
+        }
+
+        if (container.setAttribute && container.getAttribute('role') !== 'region') {
+            container.setAttribute('role', 'region');
+        }
+
+        var dataset = container.dataset || null;
+        var collected = {};
+        var labelIds = [];
+
+        function collectId(id) {
+            if (!id) {
+                return;
+            }
+
+            var trimmed = String(id).trim();
+            if (!trimmed || Object.prototype.hasOwnProperty.call(collected, trimmed)) {
+                return;
+            }
+
+            if (typeof document !== 'undefined') {
+                var target = document.getElementById(trimmed);
+                if (!target) {
+                    return;
+                }
+            }
+
+            collected[trimmed] = true;
+            labelIds.push(trimmed);
+        }
+
+        if (dataset && dataset.regionTitleId) {
+            collectId(dataset.regionTitleId);
+        } else if (container.getAttribute) {
+            collectId(container.getAttribute('data-region-title-id'));
+        }
+
+        if (dataset && dataset.regionServerId) {
+            collectId(dataset.regionServerId);
+        } else if (container.getAttribute) {
+            collectId(container.getAttribute('data-region-server-id'));
+        }
+
+        var existingLabelIds = dataset && dataset.regionLabelIds
+            ? dataset.regionLabelIds
+            : (container.getAttribute ? container.getAttribute('data-region-label-ids') : '');
+
+        if (existingLabelIds) {
+            existingLabelIds.split(/\s+/).forEach(function (candidate) {
+                collectId(candidate);
+            });
+        }
+
+        if (labelIds.length > 0) {
+            var joined = labelIds.join(' ');
+            container.setAttribute('aria-labelledby', joined);
+
+            if (container.removeAttribute) {
+                container.removeAttribute('aria-label');
+            }
+
+            if (dataset) {
+                dataset.regionLabelIds = joined;
+                dataset.regionLabelling = 'labelledby';
+                delete dataset.regionLabel;
+            } else {
+                container.setAttribute('data-region-label-ids', joined);
+                container.setAttribute('data-region-labelling', 'labelledby');
+                container.removeAttribute('data-region-label');
+            }
+
+            return;
+        }
+
+        var baseLabel = dataset && dataset.regionLabelBase
+            ? dataset.regionLabelBase
+            : (container.getAttribute ? container.getAttribute('data-region-label-base') : '') || '';
+        var pattern = dataset && dataset.regionLabelPattern
+            ? dataset.regionLabelPattern
+            : (container.getAttribute ? container.getAttribute('data-region-label-pattern') : '') || '';
+
+        var serverName = '';
+        if (dataset && dataset.regionServerName && dataset.regionServerName.trim()) {
+            serverName = dataset.regionServerName.trim();
+        } else if (dataset && dataset.serverName && dataset.serverName.trim()) {
+            serverName = dataset.serverName.trim();
+        } else if (container.getAttribute) {
+            var attrServerName = container.getAttribute('data-region-server-name')
+                || container.getAttribute('data-server-name');
+            if (attrServerName && attrServerName.trim()) {
+                serverName = attrServerName.trim();
+            }
+        }
+
+        var label = '';
+        if (serverName) {
+            if (/%(\d+\$)?s/.test(pattern)) {
+                label = pattern.replace(/%(\d+\$)?s/g, serverName);
+            } else if (pattern) {
+                label = pattern + ' ' + serverName;
+            } else if (baseLabel) {
+                label = baseLabel + ' – ' + serverName;
+            } else {
+                label = serverName;
+            }
+        } else if (pattern && /%(\d+\$)?s/.test(pattern)) {
+            if (baseLabel) {
+                label = baseLabel;
+            } else {
+                label = pattern.replace(/%(\d+\$)?s/g, '').trim();
+            }
+        }
+
+        if (!label) {
+            label = baseLabel || serverName || 'Discord';
+        }
+
+        container.setAttribute('aria-label', label);
+
+        if (container.removeAttribute) {
+            container.removeAttribute('aria-labelledby');
+        }
+
+        if (dataset) {
+            dataset.regionLabel = label;
+            dataset.regionLabelling = 'label';
+            delete dataset.regionLabelIds;
+        } else {
+            container.setAttribute('data-region-label', label);
+            container.setAttribute('data-region-labelling', 'label');
+            container.removeAttribute('data-region-label-ids');
+        }
+    }
+
     function formatStaleMessage(timestamp, locale) {
         if (!timestamp) {
             return getLocalizedString('staleNotice', 'Données mises en cache');
@@ -287,6 +424,7 @@
         }
 
         cleanupServerHeader(container);
+        refreshRegionAccessibility(container);
     }
 
     function ensureServerNameElement(container) {
@@ -315,6 +453,17 @@
             element.appendChild(textElement);
         }
 
+        var labelId = null;
+        if (container && container.dataset && container.dataset.regionServerId) {
+            labelId = container.dataset.regionServerId;
+        } else if (container && container.getAttribute) {
+            labelId = container.getAttribute('data-region-server-id');
+        }
+
+        if (labelId && textElement.getAttribute('id') !== labelId) {
+            textElement.setAttribute('id', labelId);
+        }
+
         return {
             element: element,
             textElement: textElement
@@ -322,15 +471,34 @@
     }
 
     function updateServerName(container, serverName) {
-        if (!container || !container.dataset || container.dataset.showServerName !== 'true') {
-            removeServerNameElement(container);
+        if (!container) {
             return;
         }
 
+        var dataset = container.dataset || null;
         var safeName = '';
 
         if (typeof serverName === 'string') {
             safeName = serverName.trim();
+        }
+
+        if (dataset) {
+            if (safeName) {
+                dataset.regionServerName = safeName;
+            } else {
+                delete dataset.regionServerName;
+            }
+        } else if (container.setAttribute) {
+            if (safeName) {
+                container.setAttribute('data-region-server-name', safeName);
+            } else {
+                container.removeAttribute('data-region-server-name');
+            }
+        }
+
+        if (!dataset || dataset.showServerName !== 'true') {
+            removeServerNameElement(container);
+            return;
         }
 
         if (!safeName) {
@@ -340,14 +508,27 @@
 
         var elements = ensureServerNameElement(container);
         if (!elements) {
+            refreshRegionAccessibility(container);
             return;
         }
 
-        elements.textElement.textContent = safeName;
-
-        if (container.dataset) {
-            container.dataset.serverName = safeName;
+        if (elements.textElement.textContent !== safeName) {
+            elements.textElement.textContent = safeName;
         }
+
+        var labelId = dataset && dataset.regionServerId
+            ? dataset.regionServerId
+            : (container.getAttribute ? container.getAttribute('data-region-server-id') : '');
+
+        if (labelId) {
+            elements.textElement.setAttribute('id', labelId);
+        }
+
+        if (dataset) {
+            dataset.serverName = safeName;
+        }
+
+        refreshRegionAccessibility(container);
     }
 
     function ensureServerAvatarElement(container) {
@@ -1670,6 +1851,7 @@
                 updatePresenceBreakdown(container, payloadData, formatter);
                 updateApproximateMembers(container, payloadData, formatter);
                 updatePremiumSubscriptions(container, payloadData, formatter);
+                refreshRegionAccessibility(container);
 
                 resultInfo.success = true;
 
@@ -1774,6 +1956,7 @@
 
         Array.prototype.forEach.call(containers, function (container) {
             syncRefreshOverlayClass(container);
+            refreshRegionAccessibility(container);
         });
     }
 
