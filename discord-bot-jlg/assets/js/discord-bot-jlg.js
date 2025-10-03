@@ -601,15 +601,91 @@
         return numericValue;
     }
 
+    function elementHasClass(element, className) {
+        if (!element || !className) {
+            return false;
+        }
+
+        if (element.classList && typeof element.classList.contains === 'function') {
+            return element.classList.contains(className);
+        }
+
+        if (typeof element.className === 'string' && element.className) {
+            return (' ' + element.className + ' ').indexOf(' ' + className + ' ') !== -1;
+        }
+
+        return false;
+    }
+
+    function ensureNumberValueElement(element) {
+        if (!element) {
+            return null;
+        }
+
+        var existing = element.querySelector('.discord-number-value');
+        if (existing) {
+            return existing;
+        }
+
+        var childNodes = [];
+        if (element.childNodes && element.childNodes.length) {
+            for (var i = 0; i < element.childNodes.length; i++) {
+                childNodes.push(element.childNodes[i]);
+            }
+        }
+
+        var doc = element.ownerDocument || (typeof document !== 'undefined' ? document : null);
+        if (!doc || typeof doc.createElement !== 'function') {
+            return null;
+        }
+
+        var valueElement = doc.createElement('span');
+        valueElement.className = 'discord-number-value';
+
+        var insertionPoint = null;
+        for (var j = 0; j < childNodes.length; j++) {
+            var child = childNodes[j];
+            if (child && child.nodeType === 1 && elementHasClass(child, 'screen-reader-text')) {
+                insertionPoint = child;
+                break;
+            }
+        }
+
+        if (insertionPoint && typeof element.insertBefore === 'function') {
+            element.insertBefore(valueElement, insertionPoint);
+        } else if (typeof element.appendChild === 'function') {
+            element.appendChild(valueElement);
+        }
+
+        for (var k = 0; k < childNodes.length; k++) {
+            var node = childNodes[k];
+            if (!node || node === valueElement) {
+                continue;
+            }
+
+            if (node.nodeType === 3) {
+                if (node.parentNode === element) {
+                    element.removeChild(node);
+                }
+            }
+        }
+
+        return valueElement;
+    }
+
     function setNumberElementText(element, text) {
         if (!element) {
             return;
         }
 
-        var target = element.querySelector('.discord-number-value');
+        var target = element;
+
+        if (!elementHasClass(element, 'discord-number-value')) {
+            target = ensureNumberValueElement(element);
+        }
 
         if (!target) {
-            target = element;
+            return;
         }
 
         if (typeof text === 'undefined' || text === null) {
@@ -1020,6 +1096,7 @@
             labelText = getLocalizedString('labelOnline', 'En ligne');
         }
 
+        var numberElement = onlineStat.querySelector('.discord-number');
         var labelElement = onlineStat.querySelector('.discord-label');
         if (!labelElement) {
             labelElement = document.createElement('span');
@@ -1062,6 +1139,54 @@
 
         if (labelTextElement.textContent !== labelText) {
             labelTextElement.textContent = labelText;
+        }
+
+        var labelId = labelTextElement.getAttribute('id');
+
+        if (!labelId) {
+            if (onlineStat.dataset && onlineStat.dataset.labelId) {
+                labelId = onlineStat.dataset.labelId;
+            }
+
+            if (!labelId && onlineStat.id) {
+                labelId = onlineStat.id + '-label';
+            }
+
+            if (!labelId && container && container.id) {
+                labelId = container.id + '-label-online';
+            }
+
+            if (!labelId) {
+                labelId = 'discord-label-online-' + Date.now().toString(36) + '-' + Math.random().toString(36).slice(2);
+            }
+
+            labelTextElement.setAttribute('id', labelId);
+
+            if (onlineStat.dataset) {
+                onlineStat.dataset.labelId = labelId;
+            }
+        }
+
+        if (numberElement && labelId) {
+            var labelledbyAttr = typeof numberElement.getAttribute === 'function'
+                ? numberElement.getAttribute('aria-labelledby')
+                : null;
+
+            var tokens = labelledbyAttr ? labelledbyAttr.split(/\s+/) : [];
+            var filtered = [];
+
+            for (var idx = 0; idx < tokens.length; idx++) {
+                var token = tokens[idx];
+                if (token) {
+                    filtered.push(token);
+                }
+            }
+
+            if (filtered.indexOf(labelId) === -1) {
+                filtered.push(labelId);
+            }
+
+            numberElement.setAttribute('aria-labelledby', filtered.join(' '));
         }
     }
 
