@@ -17,6 +17,9 @@
     var SERVER_AVATAR_CLASS = 'discord-server-avatar';
     var SERVER_AVATAR_IMAGE_CLASS = 'discord-server-avatar__image';
     var ALLOWED_AVATAR_SIZES = [16, 32, 64, 128, 256, 512, 1024, 2048, 4096];
+    var SYNTHETIC_LABEL_SELECTOR = '[data-region-synthetic-label="true"]';
+    var SYNTHETIC_LABEL_CLASS = 'discord-region-label';
+    var SCREEN_READER_TEXT_CLASS = 'screen-reader-text';
 
     if (typeof window !== 'undefined' && window.discordBotJlg) {
         globalConfig = window.discordBotJlg;
@@ -121,6 +124,98 @@
         }
     }
 
+    function generateSyntheticRegionLabelId(container) {
+        if (!container) {
+            return 'discord-region-label-' + Math.random().toString(36).slice(2);
+        }
+
+        if (container.getAttribute) {
+            var containerId = container.getAttribute('id');
+            if (containerId) {
+                return containerId + '-region-label';
+            }
+        }
+
+        return 'discord-region-label-' + Math.random().toString(36).slice(2);
+    }
+
+    function getSyntheticRegionLabelElement(container, syntheticId) {
+        if (!container || typeof document === 'undefined') {
+            return null;
+        }
+
+        if (syntheticId) {
+            var byId = document.getElementById(syntheticId);
+            if (byId && byId.getAttribute('data-region-synthetic-label') === 'true') {
+                return byId;
+            }
+        }
+
+        return container.querySelector(SYNTHETIC_LABEL_SELECTOR);
+    }
+
+    function ensureSyntheticRegionLabel(container, syntheticId, labelText) {
+        if (!container || typeof document === 'undefined') {
+            return null;
+        }
+
+        var element = getSyntheticRegionLabelElement(container, syntheticId);
+
+        if (!element) {
+            element = document.createElement('span');
+            element.className = SCREEN_READER_TEXT_CLASS + ' ' + SYNTHETIC_LABEL_CLASS;
+            element.setAttribute('data-region-synthetic-label', 'true');
+
+            if (container.firstChild) {
+                container.insertBefore(element, container.firstChild);
+            } else {
+                container.appendChild(element);
+            }
+        }
+
+        var finalId = syntheticId;
+
+        if (!finalId && element.getAttribute) {
+            var existingId = element.getAttribute('id');
+            if (existingId) {
+                finalId = existingId;
+            }
+        }
+
+        if (!finalId) {
+            finalId = generateSyntheticRegionLabelId(container);
+        }
+
+        if (finalId) {
+            element.setAttribute('id', finalId);
+        }
+
+        if (typeof labelText === 'string' && element.textContent !== labelText) {
+            element.textContent = labelText;
+        }
+
+        var dataset = container.dataset || null;
+        if (dataset) {
+            dataset.regionSyntheticId = finalId;
+        } else if (container.setAttribute && finalId) {
+            container.setAttribute('data-region-synthetic-id', finalId);
+        }
+
+        return element;
+    }
+
+    function removeSyntheticRegionLabel(container, syntheticId) {
+        if (!container || typeof document === 'undefined') {
+            return;
+        }
+
+        var element = getSyntheticRegionLabelElement(container, syntheticId);
+
+        if (element && element.parentNode) {
+            element.parentNode.removeChild(element);
+        }
+    }
+
     function refreshRegionAccessibility(container) {
         if (!container) {
             return;
@@ -131,71 +226,17 @@
         }
 
         var dataset = container.dataset || null;
-        var collected = {};
-        var labelIds = [];
 
-        function collectId(id) {
-            if (!id) {
-                return;
-            }
-
-            var trimmed = String(id).trim();
-            if (!trimmed || Object.prototype.hasOwnProperty.call(collected, trimmed)) {
-                return;
-            }
-
-            if (typeof document !== 'undefined') {
-                var target = document.getElementById(trimmed);
-                if (!target) {
-                    return;
-                }
-            }
-
-            collected[trimmed] = true;
-            labelIds.push(trimmed);
+        var syntheticId = '';
+        if (dataset && dataset.regionSyntheticId) {
+            syntheticId = String(dataset.regionSyntheticId).trim();
         }
 
-        if (dataset && dataset.regionTitleId) {
-            collectId(dataset.regionTitleId);
-        } else if (container.getAttribute) {
-            collectId(container.getAttribute('data-region-title-id'));
-        }
-
-        if (dataset && dataset.regionServerId) {
-            collectId(dataset.regionServerId);
-        } else if (container.getAttribute) {
-            collectId(container.getAttribute('data-region-server-id'));
-        }
-
-        var existingLabelIds = dataset && dataset.regionLabelIds
-            ? dataset.regionLabelIds
-            : (container.getAttribute ? container.getAttribute('data-region-label-ids') : '');
-
-        if (existingLabelIds) {
-            existingLabelIds.split(/\s+/).forEach(function (candidate) {
-                collectId(candidate);
-            });
-        }
-
-        if (labelIds.length > 0) {
-            var joined = labelIds.join(' ');
-            container.setAttribute('aria-labelledby', joined);
-
-            if (container.removeAttribute) {
-                container.removeAttribute('aria-label');
+        if (!syntheticId && container.getAttribute) {
+            var attrSyntheticId = container.getAttribute('data-region-synthetic-id');
+            if (attrSyntheticId && attrSyntheticId.trim()) {
+                syntheticId = attrSyntheticId.trim();
             }
-
-            if (dataset) {
-                dataset.regionLabelIds = joined;
-                dataset.regionLabelling = 'labelledby';
-                delete dataset.regionLabel;
-            } else {
-                container.setAttribute('data-region-label-ids', joined);
-                container.setAttribute('data-region-labelling', 'labelledby');
-                container.removeAttribute('data-region-label');
-            }
-
-            return;
         }
 
         var baseLabel = dataset && dataset.regionLabelBase
@@ -241,20 +282,140 @@
             label = baseLabel || serverName || 'Discord';
         }
 
-        container.setAttribute('aria-label', label);
+        var labelElements = [];
+        var seenElements = [];
 
-        if (container.removeAttribute) {
-            container.removeAttribute('aria-labelledby');
+        function addLabelElementById(id) {
+            if (!id || typeof document === 'undefined') {
+                return;
+            }
+
+            var trimmed = String(id).trim();
+            if (!trimmed) {
+                return;
+            }
+
+            var element = document.getElementById(trimmed);
+            if (!element) {
+                return;
+            }
+
+            if (seenElements.indexOf(element) !== -1) {
+                return;
+            }
+
+            seenElements.push(element);
+            labelElements.push({
+                element: element,
+                synthetic: element.getAttribute && element.getAttribute('data-region-synthetic-label') === 'true'
+            });
         }
 
-        if (dataset) {
-            dataset.regionLabel = label;
-            dataset.regionLabelling = 'label';
-            delete dataset.regionLabelIds;
+        if (dataset && dataset.regionTitleId) {
+            addLabelElementById(dataset.regionTitleId);
+        } else if (container.getAttribute) {
+            addLabelElementById(container.getAttribute('data-region-title-id'));
+        }
+
+        if (dataset && dataset.regionServerId) {
+            addLabelElementById(dataset.regionServerId);
+        } else if (container.getAttribute) {
+            addLabelElementById(container.getAttribute('data-region-server-id'));
+        }
+
+        var existingLabelIds = dataset && dataset.regionLabelIds
+            ? dataset.regionLabelIds
+            : (container.getAttribute ? container.getAttribute('data-region-label-ids') : '');
+
+        if (existingLabelIds) {
+            existingLabelIds.split(/\s+/).forEach(function (candidate) {
+                addLabelElementById(candidate);
+            });
+        }
+
+        var hasVisibleLabel = labelElements.some(function (detail) {
+            return detail && !detail.synthetic;
+        });
+
+        if (!hasVisibleLabel) {
+            var syntheticElement = ensureSyntheticRegionLabel(container, syntheticId, label);
+            if (syntheticElement) {
+                var alreadyTracked = labelElements.some(function (detail) {
+                    return detail.element === syntheticElement;
+                });
+
+                if (!alreadyTracked) {
+                    labelElements.push({
+                        element: syntheticElement,
+                        synthetic: true
+                    });
+                }
+            }
         } else {
-            container.setAttribute('data-region-label', label);
-            container.setAttribute('data-region-labelling', 'label');
-            container.removeAttribute('data-region-label-ids');
+            removeSyntheticRegionLabel(container, syntheticId);
+
+            labelElements = labelElements.filter(function (detail) {
+                return detail && !detail.synthetic;
+            });
+        }
+
+        var labelIds = [];
+        labelElements.forEach(function (detail) {
+            if (!detail || !detail.element || !detail.element.getAttribute) {
+                return;
+            }
+
+            var elementId = detail.element.getAttribute('id');
+            if (elementId && labelIds.indexOf(elementId) === -1) {
+                labelIds.push(elementId);
+            }
+        });
+
+        if (labelIds.length > 0) {
+            var joined = labelIds.join(' ');
+            container.setAttribute('aria-labelledby', joined);
+
+            if (dataset) {
+                dataset.regionLabelIds = joined;
+                dataset.regionLabelling = 'labelledby';
+            } else {
+                container.setAttribute('data-region-label-ids', joined);
+                container.setAttribute('data-region-labelling', 'labelledby');
+            }
+        } else if (container.removeAttribute) {
+            container.removeAttribute('aria-labelledby');
+
+            if (dataset) {
+                delete dataset.regionLabelIds;
+                dataset.regionLabelling = 'label';
+            } else {
+                container.removeAttribute('data-region-label-ids');
+                container.setAttribute('data-region-labelling', 'label');
+            }
+        }
+
+        var finalHasVisibleLabel = labelElements.some(function (detail) {
+            return detail && !detail.synthetic;
+        });
+
+        if (!finalHasVisibleLabel) {
+            container.setAttribute('aria-label', label);
+
+            if (dataset) {
+                dataset.regionLabel = label;
+            } else {
+                container.setAttribute('data-region-label', label);
+            }
+        } else {
+            if (container.removeAttribute) {
+                container.removeAttribute('aria-label');
+            }
+
+            if (dataset) {
+                delete dataset.regionLabel;
+            } else {
+                container.removeAttribute('data-region-label');
+            }
         }
     }
 
