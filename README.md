@@ -17,6 +17,7 @@ Accédez à la page **Discord Bot** dans l’administration pour :
 - Indiquer l’ID du serveur à surveiller ;
 - Définir la durée du cache des statistiques ;
 - Choisir les éléments affichés par défaut (nom/avatar du serveur, rafraîchissement automatique, thème) ;
+- Personnaliser les icônes et libellés proposés par défaut (cartes principales, répartition des présences, boosts) ;
 - Ajouter du CSS personnalisé.
 
 ### Définir le token via une constante
@@ -52,7 +53,7 @@ Pour activer l'auto-actualisation, utilisez par exemple :
 [discord_stats refresh="true" refresh_interval="60"]
 ```
 
-💡 Les cases à cocher et listes de la page **Configuration** servent de pré-sélection lors de l’insertion du shortcode, du bloc ou du widget. Cocher « Afficher le nom du serveur » ou « Afficher l’avatar » renseigne automatiquement `show_server_name="true"` et `show_server_avatar="true"`. Le sélecteur de thème alimente l’attribut `theme`, tandis que l’option « Rafraîchissement auto par défaut » coche `refresh="true"` et initialise `refresh_interval` avec l’intervalle numérique défini.
+💡 Les cases à cocher et listes de la page **Configuration** servent de pré-sélection lors de l’insertion du shortcode, du bloc ou du widget. Cocher « Afficher le nom du serveur » ou « Afficher l’avatar » renseigne automatiquement `show_server_name="true"` et `show_server_avatar="true"`. Le sélecteur de thème alimente l’attribut `theme`, tandis que l’option « Rafraîchissement auto par défaut » coche `refresh="true"` et initialise `refresh_interval` avec l’intervalle numérique défini. Les nouveaux panneaux « Icônes » et « Libellés par défaut » remplissent les attributs `icon_*` et `label_*` du bloc, du widget et du shortcode afin d’éviter de retaper vos émojis et textes favoris.
 
 L'attribut optionnel `width` accepte uniquement des longueurs CSS valides comme `320px`, `75%`, `42rem`, ainsi que les mots-clés `auto`, `fit-content`, `min-content` et `max-content`. Les expressions `calc(...)` sont prises en charge lorsqu'elles ne contiennent que des nombres, des unités usuelles et les opérateurs arithmétiques de base. Toute valeur non conforme est ignorée afin d'éviter l'injection de styles indésirables.
 

@@ -58,6 +58,22 @@
     ];
 
     var blockConfig = window.discordBotJlgBlockConfig || {};
+    var globalDefaults = blockConfig.defaults || {};
+
+    function pickDefault(key, fallback) {
+        if (!globalDefaults || typeof globalDefaults !== 'object') {
+            return fallback;
+        }
+
+        var value = globalDefaults[key];
+
+        if (typeof value === 'undefined' || value === null || value === '') {
+            return fallback;
+        }
+
+        return value;
+    }
+
     var profileChoices = Array.isArray(blockConfig.profiles) ? blockConfig.profiles : [];
     var profileOptions = profileChoices.map(function (choice) {
         if (!choice || typeof choice !== 'object') {
@@ -100,24 +116,24 @@
         compact: false,
         align: 'left',
         width: '',
-        icon_online: '🟢',
-        icon_total: '👥',
-        icon_presence: '📊',
-        icon_approximate: '📈',
-        icon_premium: '💎',
-        label_online: 'En ligne',
-        label_total: 'Membres',
-        label_presence: 'Présence par statut',
-        label_presence_online: 'En ligne',
-        label_presence_idle: 'Inactif',
-        label_presence_dnd: 'Ne pas déranger',
-        label_presence_offline: 'Hors ligne',
-        label_presence_streaming: 'En direct',
-        label_presence_other: 'Autres',
-        label_approximate: 'Membres (approx.)',
-        label_premium: 'Boosts serveur',
-        label_premium_singular: 'Boost serveur',
-        label_premium_plural: 'Boosts serveur',
+        icon_online: pickDefault('icon_online', '🟢'),
+        icon_total: pickDefault('icon_total', '👥'),
+        icon_presence: pickDefault('icon_presence', '📊'),
+        icon_approximate: pickDefault('icon_approximate', '📈'),
+        icon_premium: pickDefault('icon_premium', '💎'),
+        label_online: pickDefault('label_online', __('En ligne', 'discord-bot-jlg')),
+        label_total: pickDefault('label_total', __('Membres', 'discord-bot-jlg')),
+        label_presence: pickDefault('label_presence', __('Présence par statut', 'discord-bot-jlg')),
+        label_presence_online: pickDefault('label_presence_online', __('En ligne', 'discord-bot-jlg')),
+        label_presence_idle: pickDefault('label_presence_idle', __('Inactif', 'discord-bot-jlg')),
+        label_presence_dnd: pickDefault('label_presence_dnd', __('Ne pas déranger', 'discord-bot-jlg')),
+        label_presence_offline: pickDefault('label_presence_offline', __('Hors ligne', 'discord-bot-jlg')),
+        label_presence_streaming: pickDefault('label_presence_streaming', __('En direct', 'discord-bot-jlg')),
+        label_presence_other: pickDefault('label_presence_other', __('Autres', 'discord-bot-jlg')),
+        label_approximate: pickDefault('label_approximate', __('Membres (approx.)', 'discord-bot-jlg')),
+        label_premium: pickDefault('label_premium', __('Boosts serveur', 'discord-bot-jlg')),
+        label_premium_singular: pickDefault('label_premium_singular', __('Boost serveur', 'discord-bot-jlg')),
+        label_premium_plural: pickDefault('label_premium_plural', __('Boosts serveur', 'discord-bot-jlg')),
         hide_labels: false,
         hide_icons: false,
         border_radius: 8,

@@ -188,6 +188,22 @@ class Discord_Bot_JLG_Admin {
         );
 
         add_settings_field(
+            'default_stat_icons',
+            __('Icônes par défaut', 'discord-bot-jlg'),
+            array($this, 'default_stat_icons_render'),
+            'discord_stats_settings',
+            'discord_stats_display_section'
+        );
+
+        add_settings_field(
+            'default_stat_labels',
+            __('Libellés par défaut', 'discord-bot-jlg'),
+            array($this, 'default_stat_labels_render'),
+            'discord_stats_settings',
+            'discord_stats_display_section'
+        );
+
+        add_settings_field(
             'default_theme',
             __('Thème par défaut', 'discord-bot-jlg'),
             array($this, 'default_theme_render'),
@@ -334,6 +350,60 @@ class Discord_Bot_JLG_Admin {
             'accent_color'       => $existing_colors['accent_color'],
             'accent_color_alt'   => $existing_colors['accent_color_alt'],
             'accent_text_color'  => $existing_colors['accent_text_color'],
+            'default_icon_online'      => isset($current_options['default_icon_online'])
+                ? sanitize_text_field($current_options['default_icon_online'])
+                : '',
+            'default_icon_total'       => isset($current_options['default_icon_total'])
+                ? sanitize_text_field($current_options['default_icon_total'])
+                : '',
+            'default_icon_presence'    => isset($current_options['default_icon_presence'])
+                ? sanitize_text_field($current_options['default_icon_presence'])
+                : '',
+            'default_icon_approximate' => isset($current_options['default_icon_approximate'])
+                ? sanitize_text_field($current_options['default_icon_approximate'])
+                : '',
+            'default_icon_premium'     => isset($current_options['default_icon_premium'])
+                ? sanitize_text_field($current_options['default_icon_premium'])
+                : '',
+            'default_label_online'            => isset($current_options['default_label_online'])
+                ? sanitize_text_field($current_options['default_label_online'])
+                : '',
+            'default_label_total'             => isset($current_options['default_label_total'])
+                ? sanitize_text_field($current_options['default_label_total'])
+                : '',
+            'default_label_presence'          => isset($current_options['default_label_presence'])
+                ? sanitize_text_field($current_options['default_label_presence'])
+                : '',
+            'default_label_presence_online'   => isset($current_options['default_label_presence_online'])
+                ? sanitize_text_field($current_options['default_label_presence_online'])
+                : '',
+            'default_label_presence_idle'     => isset($current_options['default_label_presence_idle'])
+                ? sanitize_text_field($current_options['default_label_presence_idle'])
+                : '',
+            'default_label_presence_dnd'      => isset($current_options['default_label_presence_dnd'])
+                ? sanitize_text_field($current_options['default_label_presence_dnd'])
+                : '',
+            'default_label_presence_offline'  => isset($current_options['default_label_presence_offline'])
+                ? sanitize_text_field($current_options['default_label_presence_offline'])
+                : '',
+            'default_label_presence_streaming'=> isset($current_options['default_label_presence_streaming'])
+                ? sanitize_text_field($current_options['default_label_presence_streaming'])
+                : '',
+            'default_label_presence_other'    => isset($current_options['default_label_presence_other'])
+                ? sanitize_text_field($current_options['default_label_presence_other'])
+                : '',
+            'default_label_approximate'       => isset($current_options['default_label_approximate'])
+                ? sanitize_text_field($current_options['default_label_approximate'])
+                : '',
+            'default_label_premium'           => isset($current_options['default_label_premium'])
+                ? sanitize_text_field($current_options['default_label_premium'])
+                : '',
+            'default_label_premium_singular'  => isset($current_options['default_label_premium_singular'])
+                ? sanitize_text_field($current_options['default_label_premium_singular'])
+                : '',
+            'default_label_premium_plural'    => isset($current_options['default_label_premium_plural'])
+                ? sanitize_text_field($current_options['default_label_premium_plural'])
+                : '',
         );
 
         if (isset($input['server_id'])) {
@@ -496,6 +566,42 @@ class Discord_Bot_JLG_Admin {
             $sanitized_color = discord_bot_jlg_sanitize_color($raw_color);
 
             $sanitized[$color_field] = $sanitized_color;
+        }
+
+        $text_fields = array(
+            'default_icon_online',
+            'default_icon_total',
+            'default_icon_presence',
+            'default_icon_approximate',
+            'default_icon_premium',
+            'default_label_online',
+            'default_label_total',
+            'default_label_presence',
+            'default_label_presence_online',
+            'default_label_presence_idle',
+            'default_label_presence_dnd',
+            'default_label_presence_offline',
+            'default_label_presence_streaming',
+            'default_label_presence_other',
+            'default_label_approximate',
+            'default_label_premium',
+            'default_label_premium_singular',
+            'default_label_premium_plural',
+        );
+
+        foreach ($text_fields as $text_field) {
+            if (!array_key_exists($text_field, $input)) {
+                continue;
+            }
+
+            $raw_value = is_string($input[$text_field]) ? trim($input[$text_field]) : '';
+
+            if ('' === $raw_value) {
+                $sanitized[$text_field] = '';
+                continue;
+            }
+
+            $sanitized[$text_field] = sanitize_text_field($raw_value);
         }
 
         $existing_profiles = isset($current_options['server_profiles']) && is_array($current_options['server_profiles'])
@@ -1149,6 +1255,106 @@ class Discord_Bot_JLG_Admin {
         <?php
     }
 
+    public function default_stat_icons_render() {
+        $options = get_option($this->option_name);
+        if (!is_array($options)) {
+            $options = array();
+        }
+
+        $defaults = array(
+            'default_icon_online'      => array('label' => __('Membres en ligne', 'discord-bot-jlg'), 'placeholder' => '🟢'),
+            'default_icon_total'       => array('label' => __('Total des membres', 'discord-bot-jlg'), 'placeholder' => '👥'),
+            'default_icon_presence'    => array('label' => __('Répartition des présences', 'discord-bot-jlg'), 'placeholder' => '📊'),
+            'default_icon_approximate' => array('label' => __('Total approximatif', 'discord-bot-jlg'), 'placeholder' => '📈'),
+            'default_icon_premium'     => array('label' => __('Boosts Nitro', 'discord-bot-jlg'), 'placeholder' => '💎'),
+        );
+
+        ?>
+        <fieldset>
+            <legend class="screen-reader-text"><?php esc_html_e('Icônes par défaut', 'discord-bot-jlg'); ?></legend>
+            <p class="description"><?php esc_html_e('Définissez des icônes ou émojis proposés par défaut dans le shortcode, le bloc et le widget.', 'discord-bot-jlg'); ?></p>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; max-width: 720px;">
+                <?php foreach ($defaults as $option_key => $metadata) :
+                    $current_value = isset($options[$option_key]) ? $options[$option_key] : '';
+                    ?>
+                    <label style="display: flex; flex-direction: column; gap: 4px;">
+                        <span><?php echo esc_html($metadata['label']); ?></span>
+                        <input type="text"
+                               name="<?php echo esc_attr($this->option_name); ?>[<?php echo esc_attr($option_key); ?>]"
+                               value="<?php echo esc_attr($current_value); ?>"
+                               class="regular-text"
+                               style="max-width: 120px;"
+                               placeholder="<?php echo esc_attr($metadata['placeholder']); ?>" />
+                    </label>
+                <?php endforeach; ?>
+            </div>
+        </fieldset>
+        <?php
+    }
+
+    public function default_stat_labels_render() {
+        $options = get_option($this->option_name);
+        if (!is_array($options)) {
+            $options = array();
+        }
+
+        $main_labels = array(
+            'default_label_online'      => array('label' => __('Membres en ligne', 'discord-bot-jlg'), 'placeholder' => __('En ligne', 'discord-bot-jlg')),
+            'default_label_total'       => array('label' => __('Total des membres', 'discord-bot-jlg'), 'placeholder' => __('Membres', 'discord-bot-jlg')),
+            'default_label_presence'    => array('label' => __('Titre de la répartition', 'discord-bot-jlg'), 'placeholder' => __('Présence par statut', 'discord-bot-jlg')),
+            'default_label_approximate' => array('label' => __('Total approximatif', 'discord-bot-jlg'), 'placeholder' => __('Membres (approx.)', 'discord-bot-jlg')),
+            'default_label_premium'     => array('label' => __('Boosts (libellé global)', 'discord-bot-jlg'), 'placeholder' => __('Boosts serveur', 'discord-bot-jlg')),
+            'default_label_premium_singular' => array('label' => __('Boost (singulier)', 'discord-bot-jlg'), 'placeholder' => __('Boost serveur', 'discord-bot-jlg')),
+            'default_label_premium_plural'   => array('label' => __('Boosts (pluriel)', 'discord-bot-jlg'), 'placeholder' => __('Boosts serveur', 'discord-bot-jlg')),
+        );
+
+        $presence_labels = array(
+            'default_label_presence_online'    => array('label' => __('Présence : en ligne', 'discord-bot-jlg'), 'placeholder' => __('En ligne', 'discord-bot-jlg')),
+            'default_label_presence_idle'      => array('label' => __('Présence : inactif', 'discord-bot-jlg'), 'placeholder' => __('Inactif', 'discord-bot-jlg')),
+            'default_label_presence_dnd'       => array('label' => __('Présence : ne pas déranger', 'discord-bot-jlg'), 'placeholder' => __('Ne pas déranger', 'discord-bot-jlg')),
+            'default_label_presence_offline'   => array('label' => __('Présence : hors ligne', 'discord-bot-jlg'), 'placeholder' => __('Hors ligne', 'discord-bot-jlg')),
+            'default_label_presence_streaming' => array('label' => __('Présence : en direct', 'discord-bot-jlg'), 'placeholder' => __('En direct', 'discord-bot-jlg')),
+            'default_label_presence_other'     => array('label' => __('Présence : autres', 'discord-bot-jlg'), 'placeholder' => __('Autres', 'discord-bot-jlg')),
+        );
+
+        ?>
+        <fieldset>
+            <legend class="screen-reader-text"><?php esc_html_e('Libellés par défaut', 'discord-bot-jlg'); ?></legend>
+            <p class="description"><?php esc_html_e('Ces textes sont injectés automatiquement dans le bloc, le shortcode et le widget. Laissez vide pour conserver les libellés natifs.', 'discord-bot-jlg'); ?></p>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; max-width: 900px;">
+                <?php foreach ($main_labels as $option_key => $metadata) :
+                    $current_value = isset($options[$option_key]) ? $options[$option_key] : '';
+                    ?>
+                    <label style="display: flex; flex-direction: column; gap: 4px;">
+                        <span><?php echo esc_html($metadata['label']); ?></span>
+                        <input type="text"
+                               name="<?php echo esc_attr($this->option_name); ?>[<?php echo esc_attr($option_key); ?>]"
+                               value="<?php echo esc_attr($current_value); ?>"
+                               class="regular-text"
+                               placeholder="<?php echo esc_attr($metadata['placeholder']); ?>" />
+                    </label>
+                <?php endforeach; ?>
+            </div>
+
+            <h4 style="margin-top: 18px;"><?php esc_html_e('Détails de présence', 'discord-bot-jlg'); ?></h4>
+            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; max-width: 900px;">
+                <?php foreach ($presence_labels as $option_key => $metadata) :
+                    $current_value = isset($options[$option_key]) ? $options[$option_key] : '';
+                    ?>
+                    <label style="display: flex; flex-direction: column; gap: 4px;">
+                        <span><?php echo esc_html($metadata['label']); ?></span>
+                        <input type="text"
+                               name="<?php echo esc_attr($this->option_name); ?>[<?php echo esc_attr($option_key); ?>]"
+                               value="<?php echo esc_attr($current_value); ?>"
+                               class="regular-text"
+                               placeholder="<?php echo esc_attr($metadata['placeholder']); ?>" />
+                    </label>
+                <?php endforeach; ?>
+            </div>
+        </fieldset>
+        <?php
+    }
+
     /**
      * Rend le sélecteur de thème par défaut.
      */
@@ -1582,6 +1788,7 @@ class Discord_Bot_JLG_Admin {
                 <li><?php echo wp_kses_post(__('« Afficher le nom du serveur » pré-renseigne <code>show_server_name="true"</code>.', 'discord-bot-jlg')); ?></li>
                 <li><?php echo wp_kses_post(__('« Afficher l\'avatar » active <code>show_server_avatar="true"</code> et ajuste la taille depuis la barre latérale du bloc.', 'discord-bot-jlg')); ?></li>
                 <li><?php echo wp_kses_post(__('Le thème choisi devient la valeur par défaut de l\'attribut <code>theme</code>.', 'discord-bot-jlg')); ?></li>
+                <li><?php echo wp_kses_post(__('Les icônes et libellés saisis dans « Icônes/Libellés par défaut » sont proposés automatiquement partout (bloc, widget, shortcode).', 'discord-bot-jlg')); ?></li>
                 <li><?php echo wp_kses_post(__('En cochant « Rafraîchissement auto », le shortcode/ bloc utilise <code>refresh="true"</code> et l\'intervalle numérique saisi pour <code>refresh_interval</code>.', 'discord-bot-jlg')); ?></li>
             </ul>
 
