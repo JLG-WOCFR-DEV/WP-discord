@@ -6,6 +6,7 @@
     var registerBlockType = blocks.registerBlockType;
     var createElement = element.createElement;
     var Fragment = element.Fragment;
+    var useState = element.useState;
     var __ = i18n.__;
     var InspectorControls = blockEditor.InspectorControls;
     var useBlockProps = blockEditor.useBlockProps || function () { return {}; };
@@ -1038,10 +1039,26 @@
                 setAttributes({ className: attributes.class });
             }
 
-            var preview = ServerSideRender
+            var hasUseState = typeof useState === 'function';
+            var stateTuple = hasUseState ? useState(false) : [false, function () {}];
+            var isDynamicPreview = stateTuple[0];
+            var setIsDynamicPreview = stateTuple[1];
+            var canUseDynamicPreview = hasUseState && !!ServerSideRender;
+
+            var preview = (ServerSideRender && isDynamicPreview)
                 ? createElement(ServerSideRender, {
                     block: blockName,
-                    attributes: attributes
+                    attributes: attributes,
+                    ErrorResponsePlaceholder: function () {
+                        return createElement('div', { className: 'discord-bot-jlg-preview-error' },
+                            createElement('p', null, __('Impossible de charger l\'aperçu dynamique pour le moment. Vérifiez votre configuration ou réessayez plus tard.', 'discord-bot-jlg'))
+                        );
+                    },
+                    EmptyResponsePlaceholder: function () {
+                        return createElement('div', { className: 'discord-bot-jlg-preview-error' },
+                            createElement('p', null, __('Aucun aperçu dynamique disponible pour le moment.', 'discord-bot-jlg'))
+                        );
+                    }
                 })
                 : renderStaticPreview(attributes);
 
@@ -1126,6 +1143,15 @@
                     createElement(
                         PanelBody,
                         { title: __('Paramètres essentiels', 'discord-bot-jlg'), initialOpen: true },
+                        createElement(ToggleControl, {
+                            label: __('Activer l\'aperçu dynamique', 'discord-bot-jlg'),
+                            checked: !!isDynamicPreview,
+                            onChange: function (value) { setIsDynamicPreview(!!value); },
+                            disabled: !canUseDynamicPreview,
+                            help: canUseDynamicPreview
+                                ? __('Basculer entre l\'aperçu statique et dynamique généré par le serveur.', 'discord-bot-jlg')
+                                : __('L\'aperçu dynamique nécessite la prise en charge du rendu côté serveur.', 'discord-bot-jlg')
+                        }),
                         createElement(SelectControl, {
                             label: __('Disposition', 'discord-bot-jlg'),
                             value: attributes.layout,
