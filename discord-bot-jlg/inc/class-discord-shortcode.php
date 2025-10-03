@@ -553,6 +553,14 @@ class Discord_Bot_JLG_Shortcode {
             $render_synthetic_label   = true;
         }
 
+        if (!empty($region_label_ids)) {
+            $region_label_ids = array_values(array_unique(array_filter($region_label_ids, 'strlen')));
+        }
+
+        if ('' !== $region_label_text) {
+            $region_label_text = trim($region_label_text);
+        }
+
         $attributes = array(
             sprintf('id="%s"', esc_attr($unique_id)),
             sprintf('class="%s"', esc_attr(implode(' ', $container_classes))),
