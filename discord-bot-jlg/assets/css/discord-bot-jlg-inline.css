@@ -1,5 +1,7 @@
 
 .discord-stats-container {
+    margin: var(--wp--style--spacing--margin, 20px 0);
+    padding: var(--wp--style--spacing--padding, 0);
     position: relative;
     --discord-gap: clamp(14px, 3vw, 22px);
     --discord-padding: clamp(12px, 2.8vw, 20px);
