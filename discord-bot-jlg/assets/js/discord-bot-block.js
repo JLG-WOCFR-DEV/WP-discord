@@ -1083,18 +1083,41 @@
             }
 
             var hasUseState = typeof useState === 'function';
-            var stateTuple = hasUseState ? useState(false) : [false, function () {}];
-            var isDynamicPreview = stateTuple[0];
-            var setIsDynamicPreview = stateTuple[1];
+            var defaultPreviewRenderer = renderStaticPreview;
+            var stateTuple = hasUseState
+                ? useState(defaultPreviewRenderer)
+                : [defaultPreviewRenderer, function () {}];
+            var previewRenderer = stateTuple[0];
+            var setPreviewRenderer = stateTuple[1];
             var canUseDynamicPreview = hasUseState && !!ServerSideRender;
+            if (typeof previewRenderer !== 'function') {
+                previewRenderer = defaultPreviewRenderer;
+            }
+            var isDynamicPreview = canUseDynamicPreview && previewRenderer === ServerSideRender;
+
+            if (!isDynamicPreview && previewRenderer !== defaultPreviewRenderer) {
+                previewRenderer = defaultPreviewRenderer;
+            }
 
             var preview = (ServerSideRender && isDynamicPreview)
                 ? createElement(ServerSideRender, {
                     block: blockName,
                     attributes: attributes,
                     ErrorResponsePlaceholder: function () {
-                        return createElement('div', { className: 'discord-bot-jlg-preview-error' },
-                            createElement('p', null, __('Impossible de charger l\'aperçu dynamique pour le moment. Vérifiez votre configuration ou réessayez plus tard.', 'discord-bot-jlg'))
+                        return createElement(
+                            'div',
+                            { className: 'discord-bot-jlg-preview-error' },
+                            createElement('p', { className: 'discord-bot-jlg-preview-error__title' },
+                                __('Impossible de charger l\'aperçu dynamique pour le moment.', 'discord-bot-jlg')
+                            ),
+                            createElement('p', { className: 'discord-bot-jlg-preview-error__description' },
+                                __('L\'API ne répond pas ou a retourné une erreur inattendue. Un aperçu statique est affiché ci-dessous.', 'discord-bot-jlg')
+                            ),
+                            createElement(
+                                'div',
+                                { className: 'discord-bot-jlg-preview-error__fallback' },
+                                defaultPreviewRenderer(attributes)
+                            )
                         );
                     },
                     EmptyResponsePlaceholder: function () {
@@ -1103,7 +1126,7 @@
                         );
                     }
                 })
-                : renderStaticPreview(attributes);
+                : previewRenderer(attributes);
 
             var colorPanel = null;
 
@@ -1388,10 +1411,17 @@
                         createElement(ToggleControl, {
                             label: __('Activer l\'aperçu dynamique', 'discord-bot-jlg'),
                             checked: !!isDynamicPreview,
-                            onChange: function (value) { setIsDynamicPreview(!!value); },
+                            onChange: function (value) {
+                                if (!canUseDynamicPreview) {
+                                    setPreviewRenderer(defaultPreviewRenderer);
+                                    return;
+                                }
+
+                                setPreviewRenderer(value ? ServerSideRender : defaultPreviewRenderer);
+                            },
                             disabled: !canUseDynamicPreview,
                             help: canUseDynamicPreview
-                                ? __('Basculer entre l\'aperçu statique et dynamique généré par le serveur.', 'discord-bot-jlg')
+                                ? __('Basculer entre l\'aperçu statique et le rendu dynamique fourni par l\'API.', 'discord-bot-jlg')
                                 : __('L\'aperçu dynamique nécessite la prise en charge du rendu côté serveur.', 'discord-bot-jlg')
                         }),
                         createElement(SelectControl, {
