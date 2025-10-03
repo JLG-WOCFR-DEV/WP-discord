@@ -524,6 +524,8 @@ class Discord_Bot_JLG_Shortcode {
             sprintf('data-fallback-demo="%s"', esc_attr($is_fallback_demo ? 'true' : 'false')),
             sprintf('data-stale="%s"', esc_attr($is_stale ? 'true' : 'false')),
             sprintf('data-hide-labels="%s"', esc_attr($hide_labels ? 'true' : 'false')),
+            'aria-live="polite"',
+            'aria-busy="false"',
         );
 
         if ($is_stale && $last_updated > 0) {
