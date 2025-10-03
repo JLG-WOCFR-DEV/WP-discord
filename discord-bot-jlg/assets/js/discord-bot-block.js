@@ -10,7 +10,8 @@
     var InspectorControls = blockEditor.InspectorControls;
     var useBlockProps = blockEditor.useBlockProps || function () { return {}; };
     var PanelBody = components.PanelBody;
-    var PanelRow = components.PanelRow;
+    var ToolsPanel = components.__experimentalToolsPanel;
+    var ToolsPanelItem = components.__experimentalToolsPanelItem;
     var ToggleControl = components.ToggleControl;
     var TextControl = components.TextControl;
     var SelectControl = components.SelectControl;
@@ -162,6 +163,47 @@
         server_id: '',
         bot_token: ''
     };
+
+    var metricsToggleConfigs = [
+        {
+            attribute: 'show_online',
+            label: __('Afficher les membres en ligne', 'discord-bot-jlg'),
+            defaultValue: defaultAttributes.show_online
+        },
+        {
+            attribute: 'show_total',
+            label: __('Afficher le total des membres', 'discord-bot-jlg'),
+            defaultValue: defaultAttributes.show_total
+        },
+        {
+            attribute: 'show_presence_breakdown',
+            label: __('Afficher la répartition des présences', 'discord-bot-jlg'),
+            defaultValue: defaultAttributes.show_presence_breakdown
+        },
+        {
+            attribute: 'show_approximate_member_count',
+            label: __('Afficher le total approximatif', 'discord-bot-jlg'),
+            defaultValue: defaultAttributes.show_approximate_member_count
+        },
+        {
+            attribute: 'show_premium_subscriptions',
+            label: __('Afficher les boosts Nitro', 'discord-bot-jlg'),
+            defaultValue: defaultAttributes.show_premium_subscriptions
+        }
+    ];
+
+    var animationToggleConfigs = [
+        {
+            attribute: 'animated',
+            label: __('Activer les animations', 'discord-bot-jlg'),
+            defaultValue: defaultAttributes.animated
+        },
+        {
+            attribute: 'refresh',
+            label: __('Rafraîchissement automatique', 'discord-bot-jlg'),
+            defaultValue: defaultAttributes.refresh
+        }
+    ];
 
     var REFRESH_INTERVAL_MIN = 10;
     var REFRESH_INTERVAL_MAX = 3600;
@@ -1117,6 +1159,148 @@
                 }
             }
 
+            var hasToolsPanelSupport = !!(ToolsPanel && ToolsPanelItem);
+
+            function renderToggleControlFromConfig(config) {
+                if (!config || !config.attribute) {
+                    return null;
+                }
+
+                var toggleProps = {
+                    key: config.attribute,
+                    label: config.label,
+                    checked: !!attributes[config.attribute],
+                    onChange: updateAttribute(setAttributes, config.attribute)
+                };
+
+                if (config.help) {
+                    toggleProps.help = config.help;
+                }
+
+                return createElement(ToggleControl, toggleProps);
+            }
+
+            function resetGroupAttributes(configs) {
+                if (!Array.isArray(configs)) {
+                    return;
+                }
+
+                var update = {};
+                var hasUpdates = false;
+
+                for (var i = 0; i < configs.length; i++) {
+                    var item = configs[i];
+
+                    if (!item || !item.attribute) {
+                        continue;
+                    }
+
+                    var attributeName = item.attribute;
+                    var defaultValue = Object.prototype.hasOwnProperty.call(item, 'defaultValue')
+                        ? item.defaultValue
+                        : defaultAttributes[attributeName];
+
+                    update[attributeName] = defaultValue;
+                    hasUpdates = true;
+                }
+
+                if (hasUpdates) {
+                    setAttributes(update);
+                }
+            }
+
+            function renderToggleGroup(label, configs, groupKey) {
+                if (!Array.isArray(configs) || !configs.length) {
+                    return null;
+                }
+
+                if (hasToolsPanelSupport) {
+                    var items = configs.map(function (config) {
+                        if (!config || !config.attribute) {
+                            return null;
+                        }
+
+                        var attributeName = config.attribute;
+                        var defaultValue = Object.prototype.hasOwnProperty.call(config, 'defaultValue')
+                            ? config.defaultValue
+                            : defaultAttributes[attributeName];
+
+                        return createElement(
+                            ToolsPanelItem,
+                            {
+                                key: attributeName,
+                                hasValue: function () {
+                                    var normalizedDefault = !!defaultValue;
+                                    var hasAttribute = Object.prototype.hasOwnProperty.call(attributes, attributeName);
+                                    var rawValue = hasAttribute ? attributes[attributeName] : defaultValue;
+                                    var currentValue = !!rawValue;
+
+                                    return currentValue !== normalizedDefault;
+                                },
+                                label: config.itemLabel || config.label,
+                                isShownByDefault: true,
+                                onDeselect: function () {
+                                    var deselectUpdate = {};
+                                    deselectUpdate[attributeName] = defaultValue;
+                                    setAttributes(deselectUpdate);
+                                }
+                            },
+                            renderToggleControlFromConfig(config)
+                        );
+                    });
+
+                    var filteredItems = [];
+
+                    for (var itemIndex = 0; itemIndex < items.length; itemIndex++) {
+                        if (items[itemIndex]) {
+                            filteredItems.push(items[itemIndex]);
+                        }
+                    }
+
+                    if (!filteredItems.length) {
+                        return null;
+                    }
+
+                    return createElement(
+                        ToolsPanel,
+                        {
+                            key: groupKey,
+                            label: label,
+                            panelId: 'discord-bot-jlg-' + groupKey,
+                            resetAll: function () {
+                                resetGroupAttributes(configs);
+                            }
+                        },
+                        filteredItems
+                    );
+                }
+
+                var children = [
+                    createElement(
+                        'span',
+                        {
+                            key: String(groupKey) + '-label',
+                            className: 'discord-bot-jlg-toggle-group__label components-base-control__label'
+                        },
+                        label
+                    )
+                ];
+
+                for (var index = 0; index < configs.length; index++) {
+                    children.push(renderToggleControlFromConfig(configs[index]));
+                }
+
+                var groupProps = {
+                    key: groupKey,
+                    className: 'discord-bot-jlg-toggle-group'
+                };
+
+                return createElement.apply(
+                    null,
+                    ['div', groupProps].concat(children)
+                );
+            }
+
             return createElement(
                 Fragment,
                 null,
@@ -1150,75 +1334,28 @@
                             onChange: updateAttribute(setAttributes, 'width'),
                             help: __('Utilisez une valeur CSS valide, ex. 100% ou 320px.', 'discord-bot-jlg')
                         }),
-                        createElement(
-                            PanelRow,
-                            null,
-                            createElement(ToggleControl, {
-                                label: __('Afficher les membres en ligne', 'discord-bot-jlg'),
-                                checked: !!attributes.show_online,
-                                onChange: updateAttribute(setAttributes, 'show_online')
-                            }),
-                            createElement(ToggleControl, {
-                                label: __('Afficher le total des membres', 'discord-bot-jlg'),
-                                checked: !!attributes.show_total,
-                                onChange: updateAttribute(setAttributes, 'show_total')
-                            })
+                        renderToggleGroup(
+                            __('Affichage des métriques', 'discord-bot-jlg'),
+                            metricsToggleConfigs,
+                            'metrics'
                         ),
-                        createElement(
-                            PanelRow,
-                            null,
-                            createElement(ToggleControl, {
-                                label: __('Afficher la répartition des présences', 'discord-bot-jlg'),
-                                checked: !!attributes.show_presence_breakdown,
-                                onChange: updateAttribute(setAttributes, 'show_presence_breakdown')
-                            }),
-                            createElement(ToggleControl, {
-                                label: __('Afficher le total approximatif', 'discord-bot-jlg'),
-                                checked: !!attributes.show_approximate_member_count,
-                                onChange: updateAttribute(setAttributes, 'show_approximate_member_count')
-                            })
-                        ),
-                        createElement(
-                            PanelRow,
-                            null,
-                            createElement(ToggleControl, {
-                                label: __('Afficher les boosts Nitro', 'discord-bot-jlg'),
-                                checked: !!attributes.show_premium_subscriptions,
-                                onChange: updateAttribute(setAttributes, 'show_premium_subscriptions')
-                            })
-                        ),
-                        createElement(
-                            PanelRow,
-                            null,
-                            createElement(ToggleControl, {
-                                label: __('Afficher le titre', 'discord-bot-jlg'),
-                                checked: !!attributes.show_title,
-                                onChange: updateAttribute(setAttributes, 'show_title')
-                            }),
-                            createElement(ToggleControl, {
-                                label: __('Mode compact', 'discord-bot-jlg'),
-                                checked: !!attributes.compact,
-                                onChange: updateAttribute(setAttributes, 'compact')
-                            })
-                        ),
+                        renderToggleControlFromConfig({
+                            attribute: 'show_title',
+                            label: __('Afficher le titre', 'discord-bot-jlg')
+                        }),
+                        renderToggleControlFromConfig({
+                            attribute: 'compact',
+                            label: __('Mode compact', 'discord-bot-jlg')
+                        }),
                         !!attributes.show_title && createElement(TextControl, {
                             label: __('Titre personnalisé', 'discord-bot-jlg'),
                             value: attributes.title,
                             onChange: updateAttribute(setAttributes, 'title')
                         }),
-                        createElement(
-                            PanelRow,
-                            null,
-                            createElement(ToggleControl, {
-                                label: __('Activer les animations', 'discord-bot-jlg'),
-                                checked: !!attributes.animated,
-                                onChange: updateAttribute(setAttributes, 'animated')
-                            }),
-                            createElement(ToggleControl, {
-                                label: __('Rafraîchissement automatique', 'discord-bot-jlg'),
-                                checked: !!attributes.refresh,
-                                onChange: updateAttribute(setAttributes, 'refresh')
-                            })
+                        renderToggleGroup(
+                            __('Options d\'animation', 'discord-bot-jlg'),
+                            animationToggleConfigs,
+                            'animation'
                         ),
                         !!attributes.refresh && createElement(RefreshIntervalControl, {
                             label: __('Intervalle de rafraîchissement (secondes)', 'discord-bot-jlg'),
@@ -1259,15 +1396,10 @@
                     createElement(
                         PanelBody,
                         { title: __('Apparence avancée', 'discord-bot-jlg'), initialOpen: false },
-                        createElement(
-                            PanelRow,
-                            null,
-                            createElement(ToggleControl, {
-                                label: __('Afficher l\'icône Discord', 'discord-bot-jlg'),
-                                checked: !!attributes.show_discord_icon,
-                                onChange: updateAttribute(setAttributes, 'show_discord_icon')
-                            })
-                        ),
+                        renderToggleControlFromConfig({
+                            attribute: 'show_discord_icon',
+                            label: __('Afficher l\'icône Discord', 'discord-bot-jlg')
+                        }),
                         !!attributes.show_discord_icon && createElement(SelectControl, {
                             label: __('Position de l\'icône', 'discord-bot-jlg'),
                             value: attributes.discord_icon_position,
@@ -1322,38 +1454,26 @@
                             onChange: updateAttribute(setAttributes, 'label_total'),
                             placeholder: __('Membres', 'discord-bot-jlg')
                         }),
-                        createElement(
-                            PanelRow,
-                            null,
-                            createElement(ToggleControl, {
-                                label: __('Masquer les libellés', 'discord-bot-jlg'),
-                                checked: !!attributes.hide_labels,
-                                onChange: updateAttribute(setAttributes, 'hide_labels')
-                            }),
-                            createElement(ToggleControl, {
-                                label: __('Masquer les icônes', 'discord-bot-jlg'),
-                                checked: !!attributes.hide_icons,
-                                onChange: updateAttribute(setAttributes, 'hide_icons')
-                            })
-                        )
+                        renderToggleControlFromConfig({
+                            attribute: 'hide_labels',
+                            label: __('Masquer les libellés', 'discord-bot-jlg')
+                        }),
+                        renderToggleControlFromConfig({
+                            attribute: 'hide_icons',
+                            label: __('Masquer les icônes', 'discord-bot-jlg')
+                        })
                     ),
                     createElement(
                         PanelBody,
                         { title: __('Identité du serveur', 'discord-bot-jlg'), initialOpen: false },
-                        createElement(
-                            PanelRow,
-                            null,
-                            createElement(ToggleControl, {
-                                label: __('Afficher le nom du serveur', 'discord-bot-jlg'),
-                                checked: !!attributes.show_server_name,
-                                onChange: updateAttribute(setAttributes, 'show_server_name')
-                            }),
-                            createElement(ToggleControl, {
-                                label: __('Afficher l\'avatar du serveur', 'discord-bot-jlg'),
-                                checked: !!attributes.show_server_avatar,
-                                onChange: updateAttribute(setAttributes, 'show_server_avatar')
-                            })
-                        ),
+                        renderToggleControlFromConfig({
+                            attribute: 'show_server_name',
+                            label: __('Afficher le nom du serveur', 'discord-bot-jlg')
+                        }),
+                        renderToggleControlFromConfig({
+                            attribute: 'show_server_avatar',
+                            label: __('Afficher l\'avatar du serveur', 'discord-bot-jlg')
+                        }),
                         !!attributes.show_server_avatar && createElement(NumberControl, {
                             label: __('Taille de l\'avatar (px)', 'discord-bot-jlg'),
                             value: attributes.avatar_size,
@@ -1369,15 +1489,10 @@
                     createElement(
                         PanelBody,
                         { title: __('Bouton d\'action', 'discord-bot-jlg'), initialOpen: false },
-                        createElement(
-                            PanelRow,
-                            null,
-                            createElement(ToggleControl, {
-                                label: __('Afficher le bouton d\'action', 'discord-bot-jlg'),
-                                checked: !!attributes.cta_enabled,
-                                onChange: updateAttribute(setAttributes, 'cta_enabled')
-                            })
-                        ),
+                        renderToggleControlFromConfig({
+                            attribute: 'cta_enabled',
+                            label: __('Afficher le bouton d\'action', 'discord-bot-jlg')
+                        }),
                         !!attributes.cta_enabled && createElement(TextControl, {
                             label: __('Libellé du bouton', 'discord-bot-jlg'),
                             value: attributes.cta_label,
@@ -1398,16 +1513,11 @@
                             options: ctaStyleOptions,
                             onChange: updateAttribute(setAttributes, 'cta_style')
                         }),
-                        !!attributes.cta_enabled && createElement(
-                            PanelRow,
-                            null,
-                            createElement(ToggleControl, {
-                                label: __('Ouvrir dans un nouvel onglet', 'discord-bot-jlg'),
-                                checked: !!attributes.cta_new_tab,
-                                onChange: updateAttribute(setAttributes, 'cta_new_tab'),
-                                help: __('Ajoute les attributs target="_blank" et rel="noopener".', 'discord-bot-jlg')
-                            })
-                        ),
+                        !!attributes.cta_enabled && renderToggleControlFromConfig({
+                            attribute: 'cta_new_tab',
+                            label: __('Ouvrir dans un nouvel onglet', 'discord-bot-jlg'),
+                            help: __('Ajoute les attributs target="_blank" et rel="noopener".', 'discord-bot-jlg')
+                        }),
                         !!attributes.cta_enabled && createElement(TextControl, {
                             label: __('Info-bulle (optionnel)', 'discord-bot-jlg'),
                             value: attributes.cta_tooltip,
@@ -1435,15 +1545,10 @@
                     createElement(
                         PanelBody,
                         { title: __('Options développeur', 'discord-bot-jlg'), initialOpen: false },
-                        createElement(
-                            PanelRow,
-                            null,
-                            createElement(ToggleControl, {
-                                label: __('Forcer le mode démo', 'discord-bot-jlg'),
-                                checked: !!attributes.demo,
-                                onChange: updateAttribute(setAttributes, 'demo')
-                            })
-                        )
+                        renderToggleControlFromConfig({
+                            attribute: 'demo',
+                            label: __('Forcer le mode démo', 'discord-bot-jlg')
+                        })
                     )
                 ),
                 createElement(
