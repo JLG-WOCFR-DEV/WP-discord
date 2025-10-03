@@ -48,6 +48,24 @@ class Test_Discord_Bot_JLG_Shortcode extends TestCase {
             'accent_color' => '#654321',
             'accent_color_alt' => '#765432',
             'accent_text_color' => '#111111',
+            'default_icon_online' => '🔥',
+            'default_icon_total' => '🧑‍🤝‍🧑',
+            'default_icon_presence' => '🛰️',
+            'default_icon_approximate' => '📐',
+            'default_icon_premium' => '💠',
+            'default_label_online' => 'Actifs',
+            'default_label_total' => 'Membres inscrits',
+            'default_label_presence' => 'Répartition des membres',
+            'default_label_presence_online' => 'Connectés',
+            'default_label_presence_idle' => 'En pause',
+            'default_label_presence_dnd' => 'Occupés',
+            'default_label_presence_offline' => 'Déconnectés',
+            'default_label_presence_streaming' => 'En stream',
+            'default_label_presence_other' => 'Autres statuts',
+            'default_label_approximate' => 'Total approx.',
+            'default_label_premium' => 'Boosts actifs',
+            'default_label_premium_singular' => 'Boost actif',
+            'default_label_premium_plural' => 'Boosts actifs',
         );
 
         $stats = array(
@@ -175,6 +193,12 @@ class Test_Discord_Bot_JLG_Shortcode extends TestCase {
         $this->assertStringContainsString('--discord-accent: #654321', $html);
         $this->assertStringContainsString('--discord-accent-secondary: #765432', $html);
         $this->assertStringContainsString('--discord-accent-contrast: #111111', $html);
+        $this->assertStringContainsString('data-label-online="Actifs"', $html);
+        $this->assertStringContainsString('discord-icon">🔥<', $html);
+        $this->assertStringContainsString('data-label-total="Membres inscrits"', $html);
+        $this->assertStringContainsString('data-label-presence="Répartition des membres"', $html);
+        $this->assertStringContainsString('data-label-other="Autres statuts"', $html);
+        $this->assertStringContainsString('data-label-premium="Boosts actifs"', $html);
     }
 
     public function test_render_shortcode_includes_custom_colors() {

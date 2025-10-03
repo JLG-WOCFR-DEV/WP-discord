@@ -107,6 +107,41 @@ class Discord_Stats_Widget extends WP_Widget {
             $shortcode_atts['bot_token'] = $bot_token_override;
         }
 
+        $textual_attributes = array(
+            'icon_online',
+            'icon_total',
+            'icon_presence',
+            'icon_approximate',
+            'icon_premium',
+            'label_online',
+            'label_total',
+            'label_presence',
+            'label_presence_online',
+            'label_presence_idle',
+            'label_presence_dnd',
+            'label_presence_offline',
+            'label_presence_streaming',
+            'label_presence_other',
+            'label_approximate',
+            'label_premium',
+            'label_premium_singular',
+            'label_premium_plural',
+        );
+
+        foreach ($textual_attributes as $attribute_key) {
+            if (!array_key_exists($attribute_key, $instance)) {
+                continue;
+            }
+
+            $raw_value = $instance[$attribute_key];
+
+            if ('' === $raw_value || null === $raw_value) {
+                continue;
+            }
+
+            $shortcode_atts[$attribute_key] = sanitize_text_field($raw_value);
+        }
+
         $attr_parts = array();
         foreach ($shortcode_atts as $key => $value) {
             if ('' === $value) {
@@ -391,6 +426,27 @@ class Discord_Stats_Widget extends WP_Widget {
             $cache_duration = $min_refresh;
         }
 
+        $display_defaults = array(
+            'icon_online'          => isset($options['default_icon_online']) ? sanitize_text_field($options['default_icon_online']) : '',
+            'icon_total'           => isset($options['default_icon_total']) ? sanitize_text_field($options['default_icon_total']) : '',
+            'icon_presence'        => isset($options['default_icon_presence']) ? sanitize_text_field($options['default_icon_presence']) : '',
+            'icon_approximate'     => isset($options['default_icon_approximate']) ? sanitize_text_field($options['default_icon_approximate']) : '',
+            'icon_premium'         => isset($options['default_icon_premium']) ? sanitize_text_field($options['default_icon_premium']) : '',
+            'label_online'         => isset($options['default_label_online']) ? sanitize_text_field($options['default_label_online']) : '',
+            'label_total'          => isset($options['default_label_total']) ? sanitize_text_field($options['default_label_total']) : '',
+            'label_presence'       => isset($options['default_label_presence']) ? sanitize_text_field($options['default_label_presence']) : '',
+            'label_presence_online'=> isset($options['default_label_presence_online']) ? sanitize_text_field($options['default_label_presence_online']) : '',
+            'label_presence_idle'  => isset($options['default_label_presence_idle']) ? sanitize_text_field($options['default_label_presence_idle']) : '',
+            'label_presence_dnd'   => isset($options['default_label_presence_dnd']) ? sanitize_text_field($options['default_label_presence_dnd']) : '',
+            'label_presence_offline'=> isset($options['default_label_presence_offline']) ? sanitize_text_field($options['default_label_presence_offline']) : '',
+            'label_presence_streaming'=> isset($options['default_label_presence_streaming']) ? sanitize_text_field($options['default_label_presence_streaming']) : '',
+            'label_presence_other' => isset($options['default_label_presence_other']) ? sanitize_text_field($options['default_label_presence_other']) : '',
+            'label_approximate'    => isset($options['default_label_approximate']) ? sanitize_text_field($options['default_label_approximate']) : '',
+            'label_premium'        => isset($options['default_label_premium']) ? sanitize_text_field($options['default_label_premium']) : '',
+            'label_premium_singular' => isset($options['default_label_premium_singular']) ? sanitize_text_field($options['default_label_premium_singular']) : '',
+            'label_premium_plural' => isset($options['default_label_premium_plural']) ? sanitize_text_field($options['default_label_premium_plural']) : '',
+        );
+
         return array(
             'title'                => $default_title,
             'layout'               => 'horizontal',
@@ -412,6 +468,24 @@ class Discord_Stats_Widget extends WP_Widget {
             'profile_key'          => '',
             'server_id_override'   => '',
             'bot_token_override'   => '',
+            'icon_online'          => $display_defaults['icon_online'],
+            'icon_total'           => $display_defaults['icon_total'],
+            'icon_presence'        => $display_defaults['icon_presence'],
+            'icon_approximate'     => $display_defaults['icon_approximate'],
+            'icon_premium'         => $display_defaults['icon_premium'],
+            'label_online'         => $display_defaults['label_online'],
+            'label_total'          => $display_defaults['label_total'],
+            'label_presence'       => $display_defaults['label_presence'],
+            'label_presence_online'=> $display_defaults['label_presence_online'],
+            'label_presence_idle'  => $display_defaults['label_presence_idle'],
+            'label_presence_dnd'   => $display_defaults['label_presence_dnd'],
+            'label_presence_offline'=> $display_defaults['label_presence_offline'],
+            'label_presence_streaming'=> $display_defaults['label_presence_streaming'],
+            'label_presence_other' => $display_defaults['label_presence_other'],
+            'label_approximate'    => $display_defaults['label_approximate'],
+            'label_premium'        => $display_defaults['label_premium'],
+            'label_premium_singular' => $display_defaults['label_premium_singular'],
+            'label_premium_plural' => $display_defaults['label_premium_plural'],
         );
     }
 }

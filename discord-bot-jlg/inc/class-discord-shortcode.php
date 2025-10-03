@@ -55,6 +55,40 @@ class Discord_Bot_JLG_Shortcode {
             'accent_text_color'  => isset($options['accent_text_color']) ? discord_bot_jlg_sanitize_color($options['accent_text_color']) : '',
         );
 
+        $default_text_sources = array(
+            'icon_online'          => array('option' => 'default_icon_online', 'fallback' => '🟢'),
+            'icon_total'           => array('option' => 'default_icon_total', 'fallback' => '👥'),
+            'icon_presence'        => array('option' => 'default_icon_presence', 'fallback' => '📊'),
+            'icon_approximate'     => array('option' => 'default_icon_approximate', 'fallback' => '📈'),
+            'icon_premium'         => array('option' => 'default_icon_premium', 'fallback' => '💎'),
+            'label_online'         => array('option' => 'default_label_online', 'fallback' => __('En ligne', 'discord-bot-jlg')),
+            'label_total'          => array('option' => 'default_label_total', 'fallback' => __('Membres', 'discord-bot-jlg')),
+            'label_presence'       => array('option' => 'default_label_presence', 'fallback' => __('Présence par statut', 'discord-bot-jlg')),
+            'label_presence_online'=> array('option' => 'default_label_presence_online', 'fallback' => __('En ligne', 'discord-bot-jlg')),
+            'label_presence_idle'  => array('option' => 'default_label_presence_idle', 'fallback' => __('Inactif', 'discord-bot-jlg')),
+            'label_presence_dnd'   => array('option' => 'default_label_presence_dnd', 'fallback' => __('Ne pas déranger', 'discord-bot-jlg')),
+            'label_presence_offline'=> array('option' => 'default_label_presence_offline', 'fallback' => __('Hors ligne', 'discord-bot-jlg')),
+            'label_presence_streaming'=> array('option' => 'default_label_presence_streaming', 'fallback' => __('En direct', 'discord-bot-jlg')),
+            'label_presence_other' => array('option' => 'default_label_presence_other', 'fallback' => __('Autres', 'discord-bot-jlg')),
+            'label_approximate'    => array('option' => 'default_label_approximate', 'fallback' => __('Membres (approx.)', 'discord-bot-jlg')),
+            'label_premium'        => array('option' => 'default_label_premium', 'fallback' => __('Boosts serveur', 'discord-bot-jlg')),
+            'label_premium_singular' => array('option' => 'default_label_premium_singular', 'fallback' => __('Boost serveur', 'discord-bot-jlg')),
+            'label_premium_plural' => array('option' => 'default_label_premium_plural', 'fallback' => __('Boosts serveur', 'discord-bot-jlg')),
+        );
+
+        $default_texts = array();
+
+        foreach ($default_text_sources as $attribute_key => $config) {
+            $option_key = $config['option'];
+            $raw_value  = isset($options[$option_key]) ? sanitize_text_field($options[$option_key]) : '';
+
+            if ('' === $raw_value) {
+                $raw_value = $config['fallback'];
+            }
+
+            $default_texts[$attribute_key] = $raw_value;
+        }
+
         $default_invite_url = isset($options['invite_url']) ? esc_url_raw($options['invite_url']) : '';
         $default_invite_label = isset($options['invite_label'])
             ? sanitize_text_field($options['invite_label'])
@@ -106,24 +140,24 @@ class Discord_Bot_JLG_Shortcode {
                 'width'                => '',
                 'class'                => '',
                 'className'            => '',
-                'icon_online'          => '🟢',
-                'icon_total'           => '👥',
-                'icon_presence'        => '📊',
-                'icon_approximate'     => '📈',
-                'icon_premium'         => '💎',
-                'label_online'         => __('En ligne', 'discord-bot-jlg'),
-                'label_total'          => __('Membres', 'discord-bot-jlg'),
-                'label_presence'       => __('Présence par statut', 'discord-bot-jlg'),
-                'label_presence_online'=> __('En ligne', 'discord-bot-jlg'),
-                'label_presence_idle'  => __('Inactif', 'discord-bot-jlg'),
-                'label_presence_dnd'   => __('Ne pas déranger', 'discord-bot-jlg'),
-                'label_presence_offline'=> __('Hors ligne', 'discord-bot-jlg'),
-                'label_presence_streaming'=> __('En direct', 'discord-bot-jlg'),
-                'label_presence_other' => __('Autres', 'discord-bot-jlg'),
-                'label_approximate'    => __('Membres (approx.)', 'discord-bot-jlg'),
-                'label_premium'        => __('Boosts serveur', 'discord-bot-jlg'),
-                'label_premium_singular' => __('Boost serveur', 'discord-bot-jlg'),
-                'label_premium_plural' => __('Boosts serveur', 'discord-bot-jlg'),
+                'icon_online'          => $default_texts['icon_online'],
+                'icon_total'           => $default_texts['icon_total'],
+                'icon_presence'        => $default_texts['icon_presence'],
+                'icon_approximate'     => $default_texts['icon_approximate'],
+                'icon_premium'         => $default_texts['icon_premium'],
+                'label_online'         => $default_texts['label_online'],
+                'label_total'          => $default_texts['label_total'],
+                'label_presence'       => $default_texts['label_presence'],
+                'label_presence_online'=> $default_texts['label_presence_online'],
+                'label_presence_idle'  => $default_texts['label_presence_idle'],
+                'label_presence_dnd'   => $default_texts['label_presence_dnd'],
+                'label_presence_offline'=> $default_texts['label_presence_offline'],
+                'label_presence_streaming'=> $default_texts['label_presence_streaming'],
+                'label_presence_other' => $default_texts['label_presence_other'],
+                'label_approximate'    => $default_texts['label_approximate'],
+                'label_premium'        => $default_texts['label_premium'],
+                'label_premium_singular' => $default_texts['label_premium_singular'],
+                'label_premium_plural' => $default_texts['label_premium_plural'],
                 'hide_labels'          => false,
                 'hide_icons'           => false,
                 'border_radius'        => '8',
