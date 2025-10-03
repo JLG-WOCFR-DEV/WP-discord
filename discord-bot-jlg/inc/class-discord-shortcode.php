@@ -258,7 +258,7 @@ class Discord_Bot_JLG_Shortcode {
 
         if (!is_array($stats)) {
             return sprintf(
-                '<div class="discord-stats-error">%s</div>',
+                '<div class="discord-stats-error" role="alert" aria-live="assertive">%s</div>',
                 esc_html__('Impossible de récupérer les stats Discord', 'discord-bot-jlg')
             );
         }
