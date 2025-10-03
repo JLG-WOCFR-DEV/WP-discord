@@ -521,7 +521,10 @@ class Discord_Bot_JLG_Shortcode {
         $title_id   = $unique_id . '-title';
         $server_name_id = $unique_id . '-server-name';
 
-        $region_label_ids = array();
+        $region_label_ids            = array();
+        $region_synthetic_label_id   = $unique_id . '-region-label';
+        $render_synthetic_label      = false;
+        $region_label_text           = '';
 
         if ($show_title && '' !== $title_text) {
             $region_label_ids[] = $title_id;
@@ -534,7 +537,6 @@ class Discord_Bot_JLG_Shortcode {
         $region_label_base = __('Statistiques Discord', 'discord-bot-jlg');
         /* translators: %s: Discord server name. */
         $region_label_pattern = __('Statistiques Discord – %s', 'discord-bot-jlg');
-        $region_label_text    = '';
 
         if (empty($region_label_ids)) {
             if ('' !== $server_name) {
@@ -542,6 +544,13 @@ class Discord_Bot_JLG_Shortcode {
             } else {
                 $region_label_text = $region_label_base;
             }
+
+            if ('' === $region_label_text) {
+                $region_label_text = __('Statistiques Discord', 'discord-bot-jlg');
+            }
+
+            $region_label_ids[]       = $region_synthetic_label_id;
+            $render_synthetic_label   = true;
         }
 
         $attributes = array(
@@ -558,6 +567,7 @@ class Discord_Bot_JLG_Shortcode {
             sprintf('data-region-label-pattern="%s"', esc_attr($region_label_pattern)),
             sprintf('data-region-title-id="%s"', esc_attr($title_id)),
             sprintf('data-region-server-id="%s"', esc_attr($server_name_id)),
+            sprintf('data-region-synthetic-id="%s"', esc_attr($region_synthetic_label_id)),
         );
 
         if (!empty($region_label_ids)) {
@@ -565,10 +575,11 @@ class Discord_Bot_JLG_Shortcode {
             $attributes[]     = sprintf('aria-labelledby="%s"', esc_attr($labelledby_value));
             $attributes[]     = sprintf('data-region-label-ids="%s"', esc_attr($labelledby_value));
             $attributes[]     = 'data-region-labelling="labelledby"';
-        } else {
+        }
+
+        if ($render_synthetic_label) {
             $attributes[] = sprintf('aria-label="%s"', esc_attr($region_label_text));
             $attributes[] = sprintf('data-region-label="%s"', esc_attr($region_label_text));
-            $attributes[] = 'data-region-labelling="label"';
         }
 
         if ('' !== $server_name) {
@@ -664,6 +675,12 @@ class Discord_Bot_JLG_Shortcode {
         ob_start();
         ?>
         <div <?php echo implode(' ', $attributes); ?>>
+
+            <?php if ($render_synthetic_label): ?>
+            <span class="screen-reader-text discord-region-label"
+                data-region-synthetic-label="true"
+                id="<?php echo esc_attr($region_synthetic_label_id); ?>"><?php echo esc_html($region_label_text); ?></span>
+            <?php endif; ?>
 
             <?php if (!empty($stats['is_demo'])): ?>
             <div class="discord-demo-badge"><?php echo esc_html__('Mode Démo', 'discord-bot-jlg'); ?></div>
