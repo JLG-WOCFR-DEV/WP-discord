@@ -104,6 +104,104 @@
     margin-left: 5px;
 }
 
+.discord-stats-container .discord-stat.discord-approximate-members,
+.discord-stats-container .discord-stat.discord-premium-subscriptions {
+    flex: 1 1 clamp(200px, 32vw, 260px);
+}
+
+.discord-stats-container .discord-stat.discord-presence-breakdown {
+    align-items: flex-start;
+    gap: calc(var(--discord-gap) * 0.6);
+    flex: 1 1 clamp(260px, 50vw, 420px);
+}
+
+.discord-stats-container .discord-presence-breakdown .discord-icon {
+    align-self: flex-start;
+}
+
+.discord-stats-container .discord-presence-content {
+    display: flex;
+    flex-direction: column;
+    gap: calc(var(--discord-gap) * 0.45);
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.discord-stats-container .discord-presence-summary {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: baseline;
+    gap: calc(var(--discord-gap) * 0.35);
+}
+
+.discord-stats-container .discord-presence-summary .discord-label {
+    margin-left: 0;
+}
+
+.discord-stats-container .discord-presence-list {
+    list-style: none;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+    gap: calc(var(--discord-gap) * 0.35);
+    margin: calc(var(--discord-gap) * 0.4) 0 0;
+    padding: 0;
+    width: 100%;
+}
+
+.discord-stats-container .discord-presence-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: calc(var(--discord-gap) * 0.35);
+    padding: 0.15em 0;
+    min-width: 0;
+    font-size: calc(var(--discord-label-size) * 0.95);
+}
+
+.discord-stats-container .discord-presence-dot {
+    width: 0.65em;
+    height: 0.65em;
+    border-radius: 50%;
+    flex: 0 0 auto;
+    background: currentColor;
+    opacity: 0.9;
+}
+
+.discord-stats-container .discord-presence-item-label {
+    flex: 1 1 auto;
+    min-width: 0;
+}
+
+.discord-stats-container .discord-presence-item-value {
+    flex: 0 0 auto;
+    font-weight: 600;
+    font-variant-numeric: tabular-nums;
+}
+
+.discord-stats-container .discord-presence-online .discord-presence-dot {
+    color: #57f287;
+}
+
+.discord-stats-container .discord-presence-idle .discord-presence-dot {
+    color: #fee75c;
+}
+
+.discord-stats-container .discord-presence-dnd .discord-presence-dot {
+    color: #ed4245;
+}
+
+.discord-stats-container .discord-presence-offline .discord-presence-dot {
+    color: #99aab5;
+}
+
+.discord-stats-container .discord-presence-streaming .discord-presence-dot {
+    color: #593695;
+}
+
+.discord-stats-container .discord-presence-other .discord-presence-dot {
+    color: #00aff4;
+}
+
 .discord-stats-container .discord-stat:hover,
 .discord-stats-container .discord-stat:focus-visible {
     transform: translateY(-2px);
@@ -273,6 +371,10 @@
     .discord-stats-container .discord-cta-button {
         width: 100%;
         max-width: 100%;
+    }
+
+    .discord-stats-container .discord-presence-list {
+        grid-template-columns: repeat(1, minmax(0, 1fr));
     }
 }
 

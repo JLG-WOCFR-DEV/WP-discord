@@ -166,6 +166,10 @@ class Test_Discord_Bot_JLG_API extends TestCase {
         $this->assertIsArray($stats);
         $this->assertTrue($stats['is_demo']);
         $this->assertTrue($stats['fallback_demo']);
+        $this->assertArrayHasKey('presence_count_by_status', $stats);
+        $this->assertIsArray($stats['presence_count_by_status']);
+        $this->assertArrayHasKey('approximate_member_count', $stats);
+        $this->assertArrayHasKey('premium_subscription_count', $stats);
         $this->assertArrayHasKey('stale', $stats);
         $this->assertTrue($stats['stale']);
         $this->assertArrayHasKey('last_updated', $stats);
@@ -344,8 +348,15 @@ class Test_Discord_Bot_JLG_API extends TestCase {
             'presence_count' => 9,
             'name'           => 'Widget Guild',
             'members'        => array(
-                array('id' => 1),
-                array('id' => 2),
+                array('id' => 1, 'status' => 'online'),
+                array('id' => 2, 'status' => 'online'),
+                array('id' => 3, 'status' => 'online'),
+                array('id' => 4, 'status' => 'online'),
+                array('id' => 5, 'status' => 'idle'),
+                array('id' => 6, 'status' => 'idle'),
+                array('id' => 7, 'status' => 'dnd'),
+                array('id' => 8, 'status' => 'dnd'),
+                array('id' => 9, 'status' => 'streaming'),
             ),
         );
 
@@ -353,6 +364,7 @@ class Test_Discord_Bot_JLG_API extends TestCase {
             'approximate_presence_count' => 42,
             'approximate_member_count'   => 120,
             'name'                       => 'Bot Guild',
+            'premium_subscription_count' => 14,
         );
 
         $http_client = new Successful_Mock_Discord_Bot_JLG_Http_Client($widget_payload, $bot_payload);
@@ -366,6 +378,19 @@ class Test_Discord_Bot_JLG_API extends TestCase {
         $this->assertSame('Widget Guild', $stats['server_name']);
         $this->assertTrue($stats['has_total']);
         $this->assertTrue($stats['total_is_approximate']);
+        $this->assertSame(120, $stats['approximate_member_count']);
+        $this->assertSame(9, $stats['approximate_presence_count']);
+        $this->assertSame(14, $stats['premium_subscription_count']);
+        $this->assertArrayHasKey('presence_count_by_status', $stats);
+        $this->assertSame(
+            array(
+                'online'    => 4,
+                'idle'      => 2,
+                'dnd'       => 2,
+                'streaming' => 1,
+            ),
+            $stats['presence_count_by_status']
+        );
         $this->assertSame('', $api->get_last_error_message());
 
         $cached_stats = get_transient($cache_key);
@@ -403,7 +428,10 @@ class Test_Discord_Bot_JLG_API extends TestCase {
             'presence_count' => 4,
             'name'           => 'Override Guild',
             'members'        => array(
-                array('id' => 1),
+                array('id' => 1, 'status' => 'online'),
+                array('id' => 2, 'status' => 'online'),
+                array('id' => 3, 'status' => 'idle'),
+                array('id' => 4, 'status' => 'dnd'),
             ),
         );
 
@@ -411,6 +439,7 @@ class Test_Discord_Bot_JLG_API extends TestCase {
             'approximate_presence_count' => 8,
             'approximate_member_count'   => 24,
             'name'                       => 'Override Guild',
+            'premium_subscription_count' => 3,
         );
 
         $http_client = new Successful_Mock_Discord_Bot_JLG_Http_Client($widget_payload, $bot_payload);
@@ -427,6 +456,17 @@ class Test_Discord_Bot_JLG_API extends TestCase {
 
         $this->assertIsArray($stats);
         $this->assertSame(2, count($http_client->requests));
+        $this->assertSame(24, $stats['approximate_member_count']);
+        $this->assertSame(4, $stats['approximate_presence_count']);
+        $this->assertSame(3, $stats['premium_subscription_count']);
+        $this->assertSame(
+            array(
+                'online' => 2,
+                'idle'   => 1,
+                'dnd'    => 1,
+            ),
+            $stats['presence_count_by_status']
+        );
 
         $signature          = 'server:' . $override_id;
         $override_cache_key = $cache_key . '_' . md5($signature);

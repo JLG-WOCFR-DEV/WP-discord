@@ -308,6 +308,48 @@ class Discord_Bot_JLG_API {
                         } elseif (!empty($bot_stats['server_avatar_base_url'])) {
                             $stats['server_avatar_base_url'] = $bot_stats['server_avatar_base_url'];
                         }
+
+                        $presence_breakdown = array();
+
+                        foreach (array($widget_stats, $bot_stats) as $source_stats) {
+                            if (!is_array($source_stats) || empty($source_stats['presence_count_by_status']) || !is_array($source_stats['presence_count_by_status'])) {
+                                continue;
+                            }
+
+                            foreach ($source_stats['presence_count_by_status'] as $status_key => $count_value) {
+                                if (!isset($presence_breakdown[$status_key])) {
+                                    $presence_breakdown[$status_key] = 0;
+                                }
+
+                                $presence_breakdown[$status_key] += (int) $count_value;
+                            }
+                        }
+
+                        if (!empty($presence_breakdown)) {
+                            $stats['presence_count_by_status'] = $presence_breakdown;
+                        } elseif (isset($widget_stats['presence_count_by_status'])) {
+                            $stats['presence_count_by_status'] = $widget_stats['presence_count_by_status'];
+                        } elseif (isset($bot_stats['presence_count_by_status'])) {
+                            $stats['presence_count_by_status'] = $bot_stats['presence_count_by_status'];
+                        }
+
+                        if (isset($widget_stats['approximate_presence_count']) && null !== $widget_stats['approximate_presence_count']) {
+                            $stats['approximate_presence_count'] = (int) $widget_stats['approximate_presence_count'];
+                        } elseif (isset($bot_stats['approximate_presence_count'])) {
+                            $stats['approximate_presence_count'] = (int) $bot_stats['approximate_presence_count'];
+                        }
+
+                        if (isset($bot_stats['approximate_member_count']) && null !== $bot_stats['approximate_member_count']) {
+                            $stats['approximate_member_count'] = (int) $bot_stats['approximate_member_count'];
+                        } elseif (isset($widget_stats['approximate_member_count']) && null !== $widget_stats['approximate_member_count']) {
+                            $stats['approximate_member_count'] = (int) $widget_stats['approximate_member_count'];
+                        }
+
+                        if (isset($bot_stats['premium_subscription_count'])) {
+                            $stats['premium_subscription_count'] = (int) $bot_stats['premium_subscription_count'];
+                        } elseif (isset($widget_stats['premium_subscription_count'])) {
+                            $stats['premium_subscription_count'] = (int) $widget_stats['premium_subscription_count'];
+                        }
                     } elseif (false === $stats) {
                         $stats = $bot_stats;
                     }
@@ -1278,16 +1320,33 @@ class Discord_Bot_JLG_API {
         $demo_avatar_base = 'https://cdn.discordapp.com/embed/avatars/0.png';
         $demo_avatar_url  = add_query_arg('size', 256, $demo_avatar_base);
 
+        $online_value = (int) round($base_online + $variation);
+        if ($online_value < 0) {
+            $online_value = 0;
+        }
+
+        $presence_breakdown = array(
+            'online' => (int) round($online_value * 0.68),
+            'idle'   => (int) round($online_value * 0.22),
+        );
+
+        $allocated = (int) $presence_breakdown['online'] + (int) $presence_breakdown['idle'];
+        $presence_breakdown['dnd'] = max(0, $online_value - $allocated);
+
         return array(
-            'online'               => (int) round($base_online + $variation),
-            'total'                => (int) $base_total,
-            'server_name'          => __('Serveur Démo', 'discord-bot-jlg'),
-            'is_demo'              => true,
-            'fallback_demo'        => (bool) $is_fallback,
-            'has_total'            => true,
-            'total_is_approximate' => false,
-            'server_avatar_url'    => $demo_avatar_url,
-            'server_avatar_base_url' => $demo_avatar_base,
+            'online'                     => $online_value,
+            'total'                      => (int) $base_total,
+            'server_name'                => __('Serveur Démo', 'discord-bot-jlg'),
+            'is_demo'                    => true,
+            'fallback_demo'              => (bool) $is_fallback,
+            'has_total'                  => true,
+            'total_is_approximate'       => false,
+            'server_avatar_url'          => $demo_avatar_url,
+            'server_avatar_base_url'     => $demo_avatar_base,
+            'approximate_presence_count' => $online_value,
+            'approximate_member_count'   => (int) $base_total,
+            'presence_count_by_status'   => $presence_breakdown,
+            'premium_subscription_count' => 6,
         );
     }
 
@@ -1600,6 +1659,29 @@ class Discord_Bot_JLG_API {
         $has_presence_count = isset($data['presence_count']);
         $has_members_list   = isset($data['members']) && is_array($data['members']);
 
+        $presence_breakdown = array();
+
+        if ($has_members_list) {
+            foreach ($data['members'] as $member) {
+                if (!is_array($member)) {
+                    continue;
+                }
+
+                $raw_status = isset($member['status']) ? $member['status'] : '';
+                $status_key = $this->normalize_presence_status_slug($raw_status);
+
+                if ('' === $status_key) {
+                    continue;
+                }
+
+                if (!array_key_exists($status_key, $presence_breakdown)) {
+                    $presence_breakdown[$status_key] = 0;
+                }
+
+                $presence_breakdown[$status_key]++;
+            }
+        }
+
         if (false === $has_presence_count && false === $has_members_list) {
             $this->last_error = __('Données incomplètes reçues depuis le widget Discord.', 'discord-bot-jlg');
             $missing_parts = array();
@@ -1627,11 +1709,15 @@ class Discord_Bot_JLG_API {
         $server_name = isset($data['name']) ? $data['name'] : '';
 
         $stats = array(
-            'online'               => $online,
-            'total'                => null,
-            'server_name'          => $server_name,
-            'has_total'            => false,
-            'total_is_approximate' => false,
+            'online'                     => $online,
+            'total'                      => null,
+            'server_name'                => $server_name,
+            'has_total'                  => false,
+            'total_is_approximate'       => false,
+            'approximate_presence_count' => $has_presence_count ? (int) $data['presence_count'] : null,
+            'approximate_member_count'   => isset($data['member_count']) ? (int) $data['member_count'] : null,
+            'presence_count_by_status'   => $presence_breakdown,
+            'premium_subscription_count' => 0,
         );
 
         if (isset($data['member_count'])) {
@@ -1787,14 +1873,20 @@ class Discord_Bot_JLG_API {
         }
 
         return array(
-            'online'               => (int) $data['approximate_presence_count'],
-            'total'                => (int) $data['approximate_member_count'],
-            'server_name'          => isset($data['name']) ? $data['name'] : '',
-            'has_total'            => true,
+            'online'                     => (int) $data['approximate_presence_count'],
+            'total'                      => (int) $data['approximate_member_count'],
+            'server_name'                => isset($data['name']) ? $data['name'] : '',
+            'has_total'                  => true,
             // Discord renvoie uniquement un total approximatif via approximate_member_count.
-            'total_is_approximate' => true,
-            'server_avatar_url'    => $server_avatar_url,
-            'server_avatar_base_url' => $server_avatar_base_url,
+            'total_is_approximate'       => true,
+            'server_avatar_url'          => $server_avatar_url,
+            'server_avatar_base_url'     => $server_avatar_base_url,
+            'approximate_presence_count' => (int) $data['approximate_presence_count'],
+            'approximate_member_count'   => (int) $data['approximate_member_count'],
+            'presence_count_by_status'   => array(),
+            'premium_subscription_count' => isset($data['premium_subscription_count'])
+                ? (int) $data['premium_subscription_count']
+                : 0,
         );
     }
 
@@ -1875,6 +1967,64 @@ class Discord_Bot_JLG_API {
         }
 
         return trim(wp_strip_all_tags($message));
+    }
+
+    private function normalize_presence_status_slug($status) {
+        if (is_numeric($status)) {
+            $status = (string) $status;
+        }
+
+        if (!is_string($status)) {
+            return '';
+        }
+
+        $normalized = strtolower(trim($status));
+
+        if ('' === $normalized) {
+            return '';
+        }
+
+        if ('do_not_disturb' === $normalized || 'dnd' === $normalized) {
+            return 'dnd';
+        }
+
+        if ('invisible' === $normalized) {
+            return 'offline';
+        }
+
+        switch ($normalized) {
+            case 'online':
+            case 'idle':
+            case 'offline':
+            case 'streaming':
+                return $normalized;
+        }
+
+        return 'other';
+    }
+
+    private function sort_presence_breakdown($breakdown) {
+        if (!is_array($breakdown) || empty($breakdown)) {
+            return array();
+        }
+
+        $ordered = array();
+        $preferred_order = array('online', 'idle', 'dnd', 'offline', 'streaming', 'other');
+
+        foreach ($preferred_order as $status_key) {
+            if (array_key_exists($status_key, $breakdown)) {
+                $ordered[$status_key] = (int) $breakdown[$status_key];
+                unset($breakdown[$status_key]);
+            }
+        }
+
+        if (!empty($breakdown)) {
+            foreach ($breakdown as $status_key => $value) {
+                $ordered[$status_key] = (int) $value;
+            }
+        }
+
+        return $ordered;
     }
 
     /**
@@ -2166,6 +2316,54 @@ class Discord_Bot_JLG_API {
 
         if (!isset($stats['server_avatar_base_url'])) {
             $stats['server_avatar_base_url'] = '';
+        }
+
+        if (array_key_exists('approximate_member_count', $stats)) {
+            $stats['approximate_member_count'] = is_numeric($stats['approximate_member_count'])
+                ? (int) $stats['approximate_member_count']
+                : null;
+        } else {
+            $stats['approximate_member_count'] = isset($stats['total']) && null !== $stats['total']
+                ? (int) $stats['total']
+                : null;
+        }
+
+        if (array_key_exists('approximate_presence_count', $stats)) {
+            $stats['approximate_presence_count'] = is_numeric($stats['approximate_presence_count'])
+                ? (int) $stats['approximate_presence_count']
+                : null;
+        } else {
+            $stats['approximate_presence_count'] = isset($stats['online'])
+                ? (int) $stats['online']
+                : null;
+        }
+
+        if (!isset($stats['presence_count_by_status']) || !is_array($stats['presence_count_by_status'])) {
+            $stats['presence_count_by_status'] = array();
+        } else {
+            $normalized_breakdown = array();
+
+            foreach ($stats['presence_count_by_status'] as $status => $value) {
+                $status_key = $this->normalize_presence_status_slug($status);
+
+                if ('' === $status_key) {
+                    continue;
+                }
+
+                if (!array_key_exists($status_key, $normalized_breakdown)) {
+                    $normalized_breakdown[$status_key] = 0;
+                }
+
+                $normalized_breakdown[$status_key] += max(0, (int) $value);
+            }
+
+            $stats['presence_count_by_status'] = $this->sort_presence_breakdown($normalized_breakdown);
+        }
+
+        if (array_key_exists('premium_subscription_count', $stats)) {
+            $stats['premium_subscription_count'] = max(0, (int) $stats['premium_subscription_count']);
+        } else {
+            $stats['premium_subscription_count'] = 0;
         }
 
         return $stats;

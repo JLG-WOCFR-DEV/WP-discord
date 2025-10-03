@@ -58,6 +58,9 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
             'demo_mode'      => 1,
             'show_online'    => 1,
             'show_total'     => 1,
+            'show_presence_breakdown' => 1,
+            'show_approximate_member_count' => 1,
+            'show_premium_subscriptions' => 0,
             'widget_title'   => 'Existing title',
             'cache_duration' => 450,
             'custom_css'     => '.existing { color: blue; }',
@@ -174,6 +177,18 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
                     'show_server_name'       => 1,
                     'show_server_avatar'     => 1,
                     'default_refresh_enabled'=> 1,
+                ),
+            ),
+            'metric-checkboxes' => array(
+                array(
+                    'show_presence_breakdown'       => 'on',
+                    'show_approximate_member_count' => 'yes',
+                    'show_premium_subscriptions'    => '1',
+                ),
+                array(
+                    'show_presence_breakdown'       => 1,
+                    'show_approximate_member_count' => 1,
+                    'show_premium_subscriptions'    => 1,
                 ),
             ),
             'default-theme-valid' => array(
@@ -514,6 +529,9 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
             'demo_mode'      => 0,
             'show_online'    => 0,
             'show_total'     => 0,
+            'show_presence_breakdown' => 0,
+            'show_approximate_member_count' => 0,
+            'show_premium_subscriptions' => 0,
             'show_server_name'   => 0,
             'show_server_avatar' => 0,
             'default_refresh_enabled' => 0,
