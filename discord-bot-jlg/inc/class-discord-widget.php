@@ -67,6 +67,9 @@ class Discord_Stats_Widget extends WP_Widget {
             'layout'               => $layout,
             'show_online'          => !empty($instance['show_online']) ? 'true' : 'false',
             'show_total'           => !empty($instance['show_total']) ? 'true' : 'false',
+            'show_presence_breakdown' => !empty($instance['show_presence_breakdown']) ? 'true' : 'false',
+            'show_approximate_member_count' => !empty($instance['show_approximate_member_count']) ? 'true' : 'false',
+            'show_premium_subscriptions' => !empty($instance['show_premium_subscriptions']) ? 'true' : 'false',
             'compact'              => !empty($instance['compact']) ? 'true' : 'false',
             'hide_labels'          => !empty($instance['hide_labels']) ? 'true' : 'false',
             'hide_icons'           => !empty($instance['hide_icons']) ? 'true' : 'false',
@@ -134,6 +137,9 @@ class Discord_Stats_Widget extends WP_Widget {
 
         $instance['show_online'] = !empty($new_instance['show_online']) ? 1 : 0;
         $instance['show_total']  = !empty($new_instance['show_total']) ? 1 : 0;
+        $instance['show_presence_breakdown'] = !empty($new_instance['show_presence_breakdown']) ? 1 : 0;
+        $instance['show_approximate_member_count'] = !empty($new_instance['show_approximate_member_count']) ? 1 : 0;
+        $instance['show_premium_subscriptions'] = !empty($new_instance['show_premium_subscriptions']) ? 1 : 0;
         $instance['compact']     = !empty($new_instance['compact']) ? 1 : 0;
         $instance['hide_labels'] = !empty($new_instance['hide_labels']) ? 1 : 0;
         $instance['hide_icons']  = !empty($new_instance['hide_icons']) ? 1 : 0;
@@ -208,6 +214,24 @@ class Discord_Stats_Widget extends WP_Widget {
             <input type="checkbox" id="<?php echo esc_attr($this->get_field_id('show_total')); ?>"
                    name="<?php echo esc_attr($this->get_field_name('show_total')); ?>" value="1" <?php checked($instance['show_total'], 1); ?> />
             <label for="<?php echo esc_attr($this->get_field_id('show_total')); ?>"><?php esc_html_e('Afficher le total des membres', 'discord-bot-jlg'); ?></label>
+        </p>
+
+        <p>
+            <input type="checkbox" id="<?php echo esc_attr($this->get_field_id('show_presence_breakdown')); ?>"
+                   name="<?php echo esc_attr($this->get_field_name('show_presence_breakdown')); ?>" value="1" <?php checked($instance['show_presence_breakdown'], 1); ?> />
+            <label for="<?php echo esc_attr($this->get_field_id('show_presence_breakdown')); ?>"><?php esc_html_e('Afficher le détail par statut de présence', 'discord-bot-jlg'); ?></label>
+        </p>
+
+        <p>
+            <input type="checkbox" id="<?php echo esc_attr($this->get_field_id('show_approximate_member_count')); ?>"
+                   name="<?php echo esc_attr($this->get_field_name('show_approximate_member_count')); ?>" value="1" <?php checked($instance['show_approximate_member_count'], 1); ?> />
+            <label for="<?php echo esc_attr($this->get_field_id('show_approximate_member_count')); ?>"><?php esc_html_e('Afficher le total approximatif des membres', 'discord-bot-jlg'); ?></label>
+        </p>
+
+        <p>
+            <input type="checkbox" id="<?php echo esc_attr($this->get_field_id('show_premium_subscriptions')); ?>"
+                   name="<?php echo esc_attr($this->get_field_name('show_premium_subscriptions')); ?>" value="1" <?php checked($instance['show_premium_subscriptions'], 1); ?> />
+            <label for="<?php echo esc_attr($this->get_field_id('show_premium_subscriptions')); ?>"><?php esc_html_e('Afficher le nombre de boosts Nitro', 'discord-bot-jlg'); ?></label>
         </p>
 
         <p>
@@ -372,6 +396,9 @@ class Discord_Stats_Widget extends WP_Widget {
             'layout'               => 'horizontal',
             'show_online'          => !empty($options['show_online']) ? 1 : 0,
             'show_total'           => !empty($options['show_total']) ? 1 : 0,
+            'show_presence_breakdown' => !empty($options['show_presence_breakdown']) ? 1 : 0,
+            'show_approximate_member_count' => !empty($options['show_approximate_member_count']) ? 1 : 0,
+            'show_premium_subscriptions' => !empty($options['show_premium_subscriptions']) ? 1 : 0,
             'compact'              => 0,
             'hide_labels'          => 0,
             'hide_icons'           => 0,

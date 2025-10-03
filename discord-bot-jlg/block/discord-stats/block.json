@@ -35,6 +35,18 @@
             "type": "boolean",
             "default": true
         },
+        "show_presence_breakdown": {
+            "type": "boolean",
+            "default": false
+        },
+        "show_approximate_member_count": {
+            "type": "boolean",
+            "default": false
+        },
+        "show_premium_subscriptions": {
+            "type": "boolean",
+            "default": false
+        },
         "show_title": {
             "type": "boolean",
             "default": false
@@ -83,6 +95,18 @@
             "type": "string",
             "default": "\ud83d\udc65"
         },
+        "icon_presence": {
+            "type": "string",
+            "default": "\ud83d\udcca"
+        },
+        "icon_approximate": {
+            "type": "string",
+            "default": "\ud83d\udcc8"
+        },
+        "icon_premium": {
+            "type": "string",
+            "default": "\ud83d\udc8e"
+        },
         "label_online": {
             "type": "string",
             "default": "En ligne"
@@ -90,6 +114,50 @@
         "label_total": {
             "type": "string",
             "default": "Membres"
+        },
+        "label_presence": {
+            "type": "string",
+            "default": "Présence par statut"
+        },
+        "label_presence_online": {
+            "type": "string",
+            "default": "En ligne"
+        },
+        "label_presence_idle": {
+            "type": "string",
+            "default": "Inactif"
+        },
+        "label_presence_dnd": {
+            "type": "string",
+            "default": "Ne pas déranger"
+        },
+        "label_presence_offline": {
+            "type": "string",
+            "default": "Hors ligne"
+        },
+        "label_presence_streaming": {
+            "type": "string",
+            "default": "En direct"
+        },
+        "label_presence_other": {
+            "type": "string",
+            "default": "Autres"
+        },
+        "label_approximate": {
+            "type": "string",
+            "default": "Membres (approx.)"
+        },
+        "label_premium": {
+            "type": "string",
+            "default": "Boosts serveur"
+        },
+        "label_premium_singular": {
+            "type": "string",
+            "default": "Boost serveur"
+        },
+        "label_premium_plural": {
+            "type": "string",
+            "default": "Boosts serveur"
         },
         "hide_labels": {
             "type": "boolean",

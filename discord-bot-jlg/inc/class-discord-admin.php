@@ -148,6 +148,30 @@ class Discord_Bot_JLG_Admin {
         );
 
         add_settings_field(
+            'show_presence_breakdown',
+            __('Afficher la répartition des présences', 'discord-bot-jlg'),
+            array($this, 'show_presence_breakdown_render'),
+            'discord_stats_settings',
+            'discord_stats_display_section'
+        );
+
+        add_settings_field(
+            'show_approximate_member_count',
+            __('Afficher le total approximatif', 'discord-bot-jlg'),
+            array($this, 'show_approximate_member_count_render'),
+            'discord_stats_settings',
+            'discord_stats_display_section'
+        );
+
+        add_settings_field(
+            'show_premium_subscriptions',
+            __('Afficher les boosts Nitro', 'discord-bot-jlg'),
+            array($this, 'show_premium_subscriptions_render'),
+            'discord_stats_settings',
+            'discord_stats_display_section'
+        );
+
+        add_settings_field(
             'show_server_name',
             __('Afficher le nom du serveur', 'discord-bot-jlg'),
             array($this, 'show_server_name_render'),
@@ -371,6 +395,9 @@ class Discord_Bot_JLG_Admin {
         $sanitized['demo_mode']              = !empty($input['demo_mode']) ? 1 : 0;
         $sanitized['show_online']            = !empty($input['show_online']) ? 1 : 0;
         $sanitized['show_total']             = !empty($input['show_total']) ? 1 : 0;
+        $sanitized['show_presence_breakdown'] = !empty($input['show_presence_breakdown']) ? 1 : 0;
+        $sanitized['show_approximate_member_count'] = !empty($input['show_approximate_member_count']) ? 1 : 0;
+        $sanitized['show_premium_subscriptions'] = !empty($input['show_premium_subscriptions']) ? 1 : 0;
         $sanitized['show_server_name']       = !empty($input['show_server_name']) ? 1 : 0;
         $sanitized['show_server_avatar']     = !empty($input['show_server_avatar']) ? 1 : 0;
         $sanitized['default_refresh_enabled'] = !empty($input['default_refresh_enabled']) ? 1 : 0;
@@ -1059,6 +1086,38 @@ class Discord_Bot_JLG_Admin {
         <input type="checkbox" name="<?php echo esc_attr($this->option_name); ?>[show_total]"
                value="1" <?php checked($value, 1); ?> />
         <label><?php esc_html_e('Afficher le nombre total de membres', 'discord-bot-jlg'); ?></label>
+        <?php
+    }
+
+    public function show_presence_breakdown_render() {
+        $options = get_option($this->option_name);
+        $value   = isset($options['show_presence_breakdown']) ? (int) $options['show_presence_breakdown'] : 0;
+        ?>
+        <input type="checkbox" name="<?php echo esc_attr($this->option_name); ?>[show_presence_breakdown]"
+               value="1" <?php checked($value, 1); ?> />
+        <label><?php esc_html_e('Afficher la répartition des statuts (en ligne, inactif, DnD, etc.)', 'discord-bot-jlg'); ?></label>
+        <p class="description"><?php esc_html_e('Active une carte dédiée lorsque les données du widget ou de l’API bot sont disponibles.', 'discord-bot-jlg'); ?></p>
+        <?php
+    }
+
+    public function show_approximate_member_count_render() {
+        $options = get_option($this->option_name);
+        $value   = isset($options['show_approximate_member_count']) ? (int) $options['show_approximate_member_count'] : 0;
+        ?>
+        <input type="checkbox" name="<?php echo esc_attr($this->option_name); ?>[show_approximate_member_count]"
+               value="1" <?php checked($value, 1); ?> />
+        <label><?php esc_html_e('Afficher le total approximatif fourni par l’API', 'discord-bot-jlg'); ?></label>
+        <p class="description"><?php esc_html_e('Affiche une seconde carte dédiée au compteur approximate_member_count lorsque le total exact est indisponible.', 'discord-bot-jlg'); ?></p>
+        <?php
+    }
+
+    public function show_premium_subscriptions_render() {
+        $options = get_option($this->option_name);
+        $value   = isset($options['show_premium_subscriptions']) ? (int) $options['show_premium_subscriptions'] : 0;
+        ?>
+        <input type="checkbox" name="<?php echo esc_attr($this->option_name); ?>[show_premium_subscriptions]"
+               value="1" <?php checked($value, 1); ?> />
+        <label><?php esc_html_e('Afficher le nombre de boosts Nitro (premium_subscription_count)', 'discord-bot-jlg'); ?></label>
         <?php
     }
 

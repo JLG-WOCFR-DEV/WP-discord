@@ -92,6 +92,9 @@ class Discord_Bot_JLG_Shortcode {
                 'layout'               => 'horizontal',
                 'show_online'          => !empty($options['show_online']),
                 'show_total'           => !empty($options['show_total']),
+                'show_presence_breakdown' => !empty($options['show_presence_breakdown']),
+                'show_approximate_member_count' => !empty($options['show_approximate_member_count']),
+                'show_premium_subscriptions' => !empty($options['show_premium_subscriptions']),
                 'show_title'           => false,
                 'title'                => isset($options['widget_title']) ? $options['widget_title'] : '',
                 'theme'                => $default_theme,
@@ -105,8 +108,22 @@ class Discord_Bot_JLG_Shortcode {
                 'className'            => '',
                 'icon_online'          => '🟢',
                 'icon_total'           => '👥',
+                'icon_presence'        => '📊',
+                'icon_approximate'     => '📈',
+                'icon_premium'         => '💎',
                 'label_online'         => __('En ligne', 'discord-bot-jlg'),
                 'label_total'          => __('Membres', 'discord-bot-jlg'),
+                'label_presence'       => __('Présence par statut', 'discord-bot-jlg'),
+                'label_presence_online'=> __('En ligne', 'discord-bot-jlg'),
+                'label_presence_idle'  => __('Inactif', 'discord-bot-jlg'),
+                'label_presence_dnd'   => __('Ne pas déranger', 'discord-bot-jlg'),
+                'label_presence_offline'=> __('Hors ligne', 'discord-bot-jlg'),
+                'label_presence_streaming'=> __('En direct', 'discord-bot-jlg'),
+                'label_presence_other' => __('Autres', 'discord-bot-jlg'),
+                'label_approximate'    => __('Membres (approx.)', 'discord-bot-jlg'),
+                'label_premium'        => __('Boosts serveur', 'discord-bot-jlg'),
+                'label_premium_singular' => __('Boost serveur', 'discord-bot-jlg'),
+                'label_premium_plural' => __('Boosts serveur', 'discord-bot-jlg'),
                 'hide_labels'          => false,
                 'hide_icons'           => false,
                 'border_radius'        => '8',
@@ -141,6 +158,9 @@ class Discord_Bot_JLG_Shortcode {
 
         $show_online        = filter_var($atts['show_online'], FILTER_VALIDATE_BOOLEAN);
         $show_total         = filter_var($atts['show_total'], FILTER_VALIDATE_BOOLEAN);
+        $show_presence_breakdown = filter_var($atts['show_presence_breakdown'], FILTER_VALIDATE_BOOLEAN);
+        $show_approximate_members = filter_var($atts['show_approximate_member_count'], FILTER_VALIDATE_BOOLEAN);
+        $show_premium_subscriptions = filter_var($atts['show_premium_subscriptions'], FILTER_VALIDATE_BOOLEAN);
         $show_title         = filter_var($atts['show_title'], FILTER_VALIDATE_BOOLEAN);
         $animated           = filter_var($atts['animated'], FILTER_VALIDATE_BOOLEAN);
         $refresh            = filter_var($atts['refresh'], FILTER_VALIDATE_BOOLEAN);
@@ -228,6 +248,43 @@ class Discord_Bot_JLG_Shortcode {
         $server_avatar_raw    = isset($stats['server_avatar_url']) ? esc_url_raw($stats['server_avatar_url']) : '';
         $server_avatar_url    = '';
 
+        $presence_counts = array();
+        if (!empty($stats['presence_count_by_status']) && is_array($stats['presence_count_by_status'])) {
+            foreach ($stats['presence_count_by_status'] as $status_key => $count_value) {
+                if (!is_scalar($count_value)) {
+                    continue;
+                }
+
+                $status_slug = sanitize_key($status_key);
+
+                if ('' === $status_slug) {
+                    continue;
+                }
+
+                $presence_counts[$status_slug] = max(0, (int) $count_value);
+            }
+        }
+
+        $approximate_presence = null;
+        if (isset($stats['approximate_presence_count']) && null !== $stats['approximate_presence_count']) {
+            $approximate_presence = (int) $stats['approximate_presence_count'];
+        } elseif (!empty($presence_counts)) {
+            $approximate_presence = array_sum($presence_counts);
+        }
+
+        if (null !== $approximate_presence && $approximate_presence < 0) {
+            $approximate_presence = 0;
+        }
+
+        $approximate_member_count = null;
+        if (isset($stats['approximate_member_count']) && null !== $stats['approximate_member_count']) {
+            $approximate_member_count = (int) $stats['approximate_member_count'];
+        }
+
+        $premium_subscription_count = isset($stats['premium_subscription_count'])
+            ? max(0, (int) $stats['premium_subscription_count'])
+            : 0;
+
         if ($show_server_avatar) {
             $server_avatar_url = $this->prepare_avatar_url($server_avatar_base, $server_avatar_raw, $avatar_size);
         }
@@ -268,6 +325,18 @@ class Discord_Bot_JLG_Shortcode {
         if ($cta_enabled) {
             $container_classes[] = 'discord-has-cta';
             $container_classes[] = 'discord-cta-style-' . $cta_style;
+        }
+
+        if ($show_presence_breakdown && (null !== $approximate_presence || !empty($presence_counts))) {
+            $container_classes[] = 'discord-has-presence-breakdown';
+        }
+
+        if ($show_approximate_members && null !== $approximate_member_count) {
+            $container_classes[] = 'discord-has-approximate-total';
+        }
+
+        if ($show_premium_subscriptions) {
+            $container_classes[] = 'discord-has-premium';
         }
 
         $cta_button_attributes = array();
@@ -618,6 +687,146 @@ class Discord_Bot_JLG_Shortcode {
                         <span class="<?php echo esc_attr(implode(' ', $label_classes)); ?>">
                             <span class="discord-label-text"><?php echo esc_html($has_total ? $atts['label_total'] : $label_unavailable); ?></span>
                             <span class="discord-label-extra screen-reader-text"><?php echo $total_is_approximate ? esc_html__('approx.', 'discord-bot-jlg') : ''; ?></span>
+                        </span>
+                    </div>
+                    <?php endif; ?>
+
+                    <?php if ($show_presence_breakdown && (null !== $approximate_presence || !empty($presence_counts))) : ?>
+                    <?php
+                    $presence_label_classes = array('discord-label');
+                    if ($hide_labels) {
+                        $presence_label_classes[] = 'screen-reader-text';
+                    }
+
+                    $presence_label_map = array(
+                        'online'    => isset($atts['label_presence_online']) ? $atts['label_presence_online'] : '',
+                        'idle'      => isset($atts['label_presence_idle']) ? $atts['label_presence_idle'] : '',
+                        'dnd'       => isset($atts['label_presence_dnd']) ? $atts['label_presence_dnd'] : '',
+                        'offline'   => isset($atts['label_presence_offline']) ? $atts['label_presence_offline'] : '',
+                        'streaming' => isset($atts['label_presence_streaming']) ? $atts['label_presence_streaming'] : '',
+                        'other'     => isset($atts['label_presence_other']) ? $atts['label_presence_other'] : '',
+                    );
+
+                    $presence_counts_ordered = array();
+                    if (!empty($presence_counts)) {
+                        $preferred_presence_order = array('online', 'idle', 'dnd', 'offline', 'streaming', 'other');
+                        foreach ($preferred_presence_order as $preferred_status) {
+                            if (array_key_exists($preferred_status, $presence_counts)) {
+                                $presence_counts_ordered[$preferred_status] = $presence_counts[$preferred_status];
+                            }
+                        }
+
+                        foreach ($presence_counts as $presence_status => $presence_value) {
+                            if (array_key_exists($presence_status, $presence_counts_ordered)) {
+                                continue;
+                            }
+
+                            $presence_counts_ordered[$presence_status] = $presence_value;
+                        }
+                    }
+
+                    $presence_display_value = (null !== $approximate_presence)
+                        ? $approximate_presence
+                        : array_sum($presence_counts_ordered);
+
+                    if ($presence_display_value < 0) {
+                        $presence_display_value = 0;
+                    }
+                    ?>
+                    <div class="discord-stat discord-presence-breakdown"
+                        data-role="discord-presence-breakdown"
+                        data-label-presence="<?php echo esc_attr($atts['label_presence']); ?>"
+                        data-label-online="<?php echo esc_attr($presence_label_map['online']); ?>"
+                        data-label-idle="<?php echo esc_attr($presence_label_map['idle']); ?>"
+                        data-label-dnd="<?php echo esc_attr($presence_label_map['dnd']); ?>"
+                        data-label-offline="<?php echo esc_attr($presence_label_map['offline']); ?>"
+                        data-label-streaming="<?php echo esc_attr($presence_label_map['streaming']); ?>"
+                        data-label-other="<?php echo esc_attr($presence_label_map['other']); ?>"
+                        data-hide-labels="<?php echo esc_attr($hide_labels ? 'true' : 'false'); ?>"
+                        <?php if (null !== $presence_display_value) : ?>
+                        data-value="<?php echo esc_attr($presence_display_value); ?>"
+                        <?php endif; ?>>
+                        <?php if (!$hide_icons): ?>
+                        <span class="discord-icon"><?php echo esc_html($atts['icon_presence']); ?></span>
+                        <?php endif; ?>
+                        <div class="discord-presence-content">
+                            <div class="discord-presence-summary">
+                                <span class="discord-number" role="status" aria-live="polite"><?php echo esc_html(number_format_i18n($presence_display_value)); ?></span>
+                                <span class="<?php echo esc_attr(implode(' ', $presence_label_classes)); ?>">
+                                    <span class="discord-label-text"><?php echo esc_html($atts['label_presence']); ?></span>
+                                </span>
+                            </div>
+                            <?php if (!empty($presence_counts_ordered)) : ?>
+                            <ul class="discord-presence-list">
+                                <?php foreach ($presence_counts_ordered as $presence_status => $presence_value) :
+                                    $status_label = isset($presence_label_map[$presence_status])
+                                        ? $presence_label_map[$presence_status]
+                                        : ucfirst($presence_status);
+                                ?>
+                                <li class="discord-presence-item discord-presence-<?php echo esc_attr($presence_status); ?>"
+                                    data-status="<?php echo esc_attr($presence_status); ?>"
+                                    data-label="<?php echo esc_attr($status_label); ?>">
+                                    <span class="discord-presence-dot" aria-hidden="true"></span>
+                                    <span class="discord-presence-item-label"><?php echo esc_html($status_label); ?></span>
+                                    <span class="discord-presence-item-value"><?php echo esc_html(number_format_i18n(max(0, (int) $presence_value))); ?></span>
+                                </li>
+                                <?php endforeach; ?>
+                            </ul>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <?php endif; ?>
+
+                    <?php if ($show_approximate_members && null !== $approximate_member_count) : ?>
+                    <?php
+                    $approx_label_classes = array('discord-label');
+                    if ($hide_labels) {
+                        $approx_label_classes[] = 'screen-reader-text';
+                    }
+                    ?>
+                    <div class="discord-stat discord-approximate-members"
+                        data-role="discord-approximate-members"
+                        data-label-approximate="<?php echo esc_attr($atts['label_approximate']); ?>"
+                        data-placeholder="<?php echo esc_attr('—'); ?>"
+                        data-value="<?php echo esc_attr($approximate_member_count); ?>">
+                        <?php if (!$hide_icons): ?>
+                        <span class="discord-icon"><?php echo esc_html($atts['icon_approximate']); ?></span>
+                        <?php endif; ?>
+                        <span class="discord-number" role="status" aria-live="polite"><?php echo esc_html(number_format_i18n($approximate_member_count)); ?></span>
+                        <span class="discord-approx-indicator" aria-hidden="true">≈</span>
+                        <span class="<?php echo esc_attr(implode(' ', $approx_label_classes)); ?>">
+                            <span class="discord-label-text"><?php echo esc_html($atts['label_approximate']); ?></span>
+                        </span>
+                    </div>
+                    <?php endif; ?>
+
+                    <?php if ($show_premium_subscriptions) : ?>
+                    <?php
+                    $premium_label_classes = array('discord-label');
+                    if ($hide_labels) {
+                        $premium_label_classes[] = 'screen-reader-text';
+                    }
+                    $premium_label_text = $premium_subscription_count === 1
+                        ? $atts['label_premium_singular']
+                        : $atts['label_premium_plural'];
+
+                    if ('' === $premium_label_text) {
+                        $premium_label_text = $atts['label_premium'];
+                    }
+                    ?>
+                    <div class="discord-stat discord-premium-subscriptions"
+                        data-role="discord-premium-subscriptions"
+                        data-label-premium="<?php echo esc_attr($atts['label_premium']); ?>"
+                        data-label-premium-singular="<?php echo esc_attr($atts['label_premium_singular']); ?>"
+                        data-label-premium-plural="<?php echo esc_attr($atts['label_premium_plural']); ?>"
+                        data-placeholder="<?php echo esc_attr('0'); ?>"
+                        data-value="<?php echo esc_attr($premium_subscription_count); ?>">
+                        <?php if (!$hide_icons): ?>
+                        <span class="discord-icon"><?php echo esc_html($atts['icon_premium']); ?></span>
+                        <?php endif; ?>
+                        <span class="discord-number" role="status" aria-live="polite"><?php echo esc_html(number_format_i18n($premium_subscription_count)); ?></span>
+                        <span class="<?php echo esc_attr(implode(' ', $premium_label_classes)); ?>">
+                            <span class="discord-label-text"><?php echo esc_html($premium_label_text); ?></span>
                         </span>
                     </div>
                     <?php endif; ?>

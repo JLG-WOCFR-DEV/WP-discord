@@ -694,6 +694,288 @@
         }, 300);
     }
 
+    function updatePresenceBreakdown(container, payload, formatter) {
+        if (!container) {
+            return;
+        }
+
+        var card = container.querySelector('[data-role="discord-presence-breakdown"]');
+
+        if (!card) {
+            if (container.classList && typeof container.classList.remove === 'function') {
+                container.classList.remove('discord-has-presence-breakdown');
+            }
+            return;
+        }
+
+        var breakdownSource = payload && typeof payload.presence_count_by_status === 'object'
+            ? payload.presence_count_by_status
+            : null;
+
+        var normalizedBreakdown = {};
+
+        if (breakdownSource) {
+            for (var key in breakdownSource) {
+                if (!Object.prototype.hasOwnProperty.call(breakdownSource, key)) {
+                    continue;
+                }
+
+                var rawValue = breakdownSource[key];
+                var value = typeof rawValue === 'number' ? rawValue : parseInt(rawValue, 10);
+
+                if (isNaN(value) || value < 0) {
+                    value = 0;
+                }
+
+                var normalizedKey = '';
+
+                if (typeof key === 'string' || typeof key === 'number') {
+                    normalizedKey = String(key).toLowerCase().trim();
+                }
+
+                if (!normalizedKey) {
+                    continue;
+                }
+
+                if (normalizedKey === 'do_not_disturb') {
+                    normalizedKey = 'dnd';
+                }
+
+                if (normalizedKey === 'invisible') {
+                    normalizedKey = 'offline';
+                }
+
+                if (['online', 'idle', 'dnd', 'offline', 'streaming', 'other'].indexOf(normalizedKey) === -1) {
+                    normalizedKey = 'other';
+                }
+
+                if (!Object.prototype.hasOwnProperty.call(normalizedBreakdown, normalizedKey)) {
+                    normalizedBreakdown[normalizedKey] = 0;
+                }
+
+                normalizedBreakdown[normalizedKey] += value;
+            }
+        }
+
+        var presenceValue = null;
+
+        if (payload && typeof payload.approximate_presence_count === 'number') {
+            presenceValue = payload.approximate_presence_count;
+        } else if (breakdownSource) {
+            presenceValue = 0;
+            for (var breakdownKey in normalizedBreakdown) {
+                if (!Object.prototype.hasOwnProperty.call(normalizedBreakdown, breakdownKey)) {
+                    continue;
+                }
+
+                presenceValue += normalizedBreakdown[breakdownKey];
+            }
+        }
+
+        if (presenceValue !== null && presenceValue < 0) {
+            presenceValue = 0;
+        }
+
+        if (presenceValue !== null) {
+            updateStatElement(card, '.discord-number', presenceValue, formatter);
+
+            if (card.dataset) {
+                card.dataset.value = presenceValue;
+            }
+        }
+
+        var list = card.querySelector('.discord-presence-list');
+
+        if (list) {
+            while (list.firstChild) {
+                list.removeChild(list.firstChild);
+            }
+
+            var preferredOrder = ['online', 'idle', 'dnd', 'offline', 'streaming', 'other'];
+            var orderedKeys = [];
+
+            for (var i = 0; i < preferredOrder.length; i++) {
+                var preferredKey = preferredOrder[i];
+                if (Object.prototype.hasOwnProperty.call(normalizedBreakdown, preferredKey)) {
+                    orderedKeys.push(preferredKey);
+                }
+            }
+
+            var remainingKeys = Object.keys(normalizedBreakdown).sort();
+
+            for (var j = 0; j < remainingKeys.length; j++) {
+                if (orderedKeys.indexOf(remainingKeys[j]) === -1) {
+                    orderedKeys.push(remainingKeys[j]);
+                }
+            }
+
+            var labelMap = {
+                online: card.dataset && card.dataset.labelOnline ? card.dataset.labelOnline : '',
+                idle: card.dataset && card.dataset.labelIdle ? card.dataset.labelIdle : '',
+                dnd: card.dataset && card.dataset.labelDnd ? card.dataset.labelDnd : '',
+                offline: card.dataset && card.dataset.labelOffline ? card.dataset.labelOffline : '',
+                streaming: card.dataset && card.dataset.labelStreaming ? card.dataset.labelStreaming : '',
+                other: card.dataset && card.dataset.labelOther ? card.dataset.labelOther : ''
+            };
+
+            var formatterToUse = formatter && typeof formatter.format === 'function'
+                ? formatter
+                : DEFAULT_NUMBER_FORMATTER;
+
+            var fragment = document.createDocumentFragment();
+
+            for (var k = 0; k < orderedKeys.length; k++) {
+                var statusKey = orderedKeys[k];
+                var countValue = normalizedBreakdown[statusKey];
+
+                if (typeof countValue !== 'number') {
+                    countValue = parseInt(countValue, 10);
+                }
+
+                if (isNaN(countValue) || countValue < 0) {
+                    countValue = 0;
+                }
+
+                var label = labelMap[statusKey] || statusKey.charAt(0).toUpperCase() + statusKey.slice(1);
+
+                var item = document.createElement('li');
+                item.className = 'discord-presence-item discord-presence-' + statusKey;
+                item.setAttribute('data-status', statusKey);
+                item.setAttribute('data-label', label);
+
+                var dot = document.createElement('span');
+                dot.className = 'discord-presence-dot';
+                dot.setAttribute('aria-hidden', 'true');
+                item.appendChild(dot);
+
+                var labelElement = document.createElement('span');
+                labelElement.className = 'discord-presence-item-label';
+                labelElement.textContent = label;
+                item.appendChild(labelElement);
+
+                var valueElement = document.createElement('span');
+                valueElement.className = 'discord-presence-item-value';
+                valueElement.textContent = formatterToUse.format(countValue);
+                item.appendChild(valueElement);
+
+                fragment.appendChild(item);
+            }
+
+            list.appendChild(fragment);
+        }
+
+        if (container.classList && typeof container.classList.toggle === 'function') {
+            var hasPresenceData = !!(presenceValue !== null || (breakdownSource && Object.keys(breakdownSource).length));
+            container.classList.toggle('discord-has-presence-breakdown', hasPresenceData);
+        }
+    }
+
+    function updateApproximateMembers(container, payload, formatter) {
+        if (!container) {
+            return;
+        }
+
+        var card = container.querySelector('[data-role="discord-approximate-members"]');
+
+        if (!card) {
+            if (container.classList && typeof container.classList.remove === 'function') {
+                container.classList.remove('discord-has-approximate-total');
+            }
+            return;
+        }
+
+        var placeholder = card.dataset && card.dataset.placeholder ? card.dataset.placeholder : '—';
+        var value = null;
+
+        if (payload && typeof payload.approximate_member_count === 'number') {
+            value = payload.approximate_member_count;
+        }
+
+        if (value === null) {
+            var numberElement = card.querySelector('.discord-number');
+            if (numberElement) {
+                numberElement.textContent = placeholder;
+            }
+
+            if (card.dataset && Object.prototype.hasOwnProperty.call(card.dataset, 'value')) {
+                delete card.dataset.value;
+            }
+
+            if (container.classList && typeof container.classList.remove === 'function') {
+                container.classList.remove('discord-has-approximate-total');
+            }
+
+            return;
+        }
+
+        updateStatElement(card, '.discord-number', value, formatter);
+
+        if (card.dataset) {
+            card.dataset.value = value;
+        }
+
+        if (container.classList && typeof container.classList.add === 'function') {
+            container.classList.add('discord-has-approximate-total');
+        }
+    }
+
+    function updatePremiumSubscriptions(container, payload, formatter) {
+        if (!container) {
+            return;
+        }
+
+        var card = container.querySelector('[data-role="discord-premium-subscriptions"]');
+
+        if (!card) {
+            if (container.classList && typeof container.classList.remove === 'function') {
+                container.classList.remove('discord-has-premium');
+            }
+            return;
+        }
+
+        var value = 0;
+
+        if (payload && typeof payload.premium_subscription_count === 'number') {
+            value = payload.premium_subscription_count;
+        }
+
+        if (value < 0 || !isFinite(value)) {
+            value = 0;
+        }
+
+        updateStatElement(card, '.discord-number', value, formatter);
+
+        if (card.dataset) {
+            card.dataset.value = value;
+        }
+
+        var labelElement = card.querySelector('.discord-label-text');
+        if (labelElement) {
+            var singular = card.dataset && card.dataset.labelPremiumSingular ? card.dataset.labelPremiumSingular : '';
+            var plural = card.dataset && card.dataset.labelPremiumPlural ? card.dataset.labelPremiumPlural : '';
+            var baseLabel = card.dataset && card.dataset.labelPremium ? card.dataset.labelPremium : '';
+            var text = baseLabel;
+
+            if (value === 1 && singular) {
+                text = singular;
+            } else if (value !== 1 && plural) {
+                text = plural;
+            } else if (!text) {
+                text = value === 1 ? singular : plural;
+            }
+
+            if (!text) {
+                text = baseLabel;
+            }
+
+            labelElement.textContent = text;
+        }
+
+        if (container.classList && typeof container.classList.add === 'function') {
+            container.classList.add('discord-has-premium');
+        }
+    }
+
     function ensureOnlineLabelElement(container) {
         if (!container) {
             return;
@@ -1228,6 +1510,11 @@
                         }
                     }
                 }
+
+                var payloadData = data.data || {};
+                updatePresenceBreakdown(container, payloadData, formatter);
+                updateApproximateMembers(container, payloadData, formatter);
+                updatePremiumSubscriptions(container, payloadData, formatter);
 
                 resultInfo.success = true;
 
