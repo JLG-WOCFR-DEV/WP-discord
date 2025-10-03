@@ -680,7 +680,8 @@ class Discord_Bot_JLG_Shortcode {
                     <div class="discord-stat discord-online"
                         data-value="<?php echo esc_attr((int) $stats['online']); ?>"
                         data-label-online="<?php echo esc_attr($atts['label_online']); ?>"
-                        data-hide-labels="<?php echo esc_attr($hide_labels ? 'true' : 'false'); ?>">
+                        data-hide-labels="<?php echo esc_attr($hide_labels ? 'true' : 'false'); ?>"
+                        data-label-id="<?php echo esc_attr($online_label_id); ?>">
                         <?php if (!$hide_icons): ?>
                         <span class="discord-icon"><?php echo esc_html($atts['icon_online']); ?></span>
                         <?php endif; ?>
