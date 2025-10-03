@@ -282,6 +282,10 @@
             label = baseLabel || serverName || 'Discord';
         }
 
+        if (typeof label === 'string') {
+            label = label.trim();
+        }
+
         var labelElements = [];
         var seenElements = [];
 
