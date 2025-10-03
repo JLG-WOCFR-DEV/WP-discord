@@ -13,6 +13,7 @@
     var PanelBody = components.PanelBody;
     var ToolsPanel = components.__experimentalToolsPanel;
     var ToolsPanelItem = components.__experimentalToolsPanelItem;
+    var VStack = components.__experimentalVStack || components.VStack;
     var ToggleControl = components.ToggleControl;
     var TextControl = components.TextControl;
     var SelectControl = components.SelectControl;
@@ -1292,29 +1293,86 @@
                     );
                 }
 
-                var children = [
+                var stackChildren = [];
+
+                for (var index = 0; index < configs.length; index++) {
+                    var toggle = renderToggleControlFromConfig(configs[index]);
+
+                    if (!toggle) {
+                        continue;
+                    }
+
+                    stackChildren.push(createElement(
+                        'div',
+                        {
+                            key: (configs[index] && configs[index].attribute) || 'toggle-' + index,
+                            className: 'discord-bot-jlg-toggle-group__item'
+                        },
+                        toggle
+                    ));
+                }
+
+                if (!stackChildren.length) {
+                    return null;
+                }
+
+                var stackWrapperProps = {
+                    className: 'discord-bot-jlg-toggle-group__controls'
+                };
+
+                var stackWrapper;
+
+                if (VStack) {
+                    var vStackProps = {};
+
+                    for (var key in stackWrapperProps) {
+                        if (Object.prototype.hasOwnProperty.call(stackWrapperProps, key)) {
+                            vStackProps[key] = stackWrapperProps[key];
+                        }
+                    }
+
+                    vStackProps.spacing = 2;
+
+                    stackWrapper = createElement(
+                        VStack,
+                        vStackProps,
+                        stackChildren
+                    );
+                } else {
+                    var fallbackProps = {};
+
+                    for (var propKey in stackWrapperProps) {
+                        if (Object.prototype.hasOwnProperty.call(stackWrapperProps, propKey)) {
+                            fallbackProps[propKey] = stackWrapperProps[propKey];
+                        }
+                    }
+
+                    fallbackProps.style = {
+                        display: 'grid',
+                        rowGap: '12px'
+                    };
+
+                    stackWrapper = createElement(
+                        'div',
+                        fallbackProps,
+                        stackChildren
+                    );
+                }
+
+                return createElement(
+                    'div',
+                    {
+                        key: groupKey,
+                        className: 'discord-bot-jlg-toggle-group'
+                    },
                     createElement(
                         'span',
                         {
-                            key: String(groupKey) + '-label',
                             className: 'discord-bot-jlg-toggle-group__label components-base-control__label'
                         },
                         label
-                    )
-                ];
-
-                for (var index = 0; index < configs.length; index++) {
-                    children.push(renderToggleControlFromConfig(configs[index]));
-                }
-
-                var groupProps = {
-                    key: groupKey,
-                    className: 'discord-bot-jlg-toggle-group'
-                };
-
-                return createElement.apply(
-                    null,
-                    ['div', groupProps].concat(children)
+                    ),
+                    stackWrapper
                 );
             }
 
@@ -1360,11 +1418,6 @@
                             onChange: updateAttribute(setAttributes, 'width'),
                             help: __('Utilisez une valeur CSS valide, ex. 100% ou 320px.', 'discord-bot-jlg')
                         }),
-                        renderToggleGroup(
-                            __('Affichage des métriques', 'discord-bot-jlg'),
-                            metricsToggleConfigs,
-                            'metrics'
-                        ),
                         renderToggleControlFromConfig({
                             attribute: 'show_title',
                             label: __('Afficher le titre', 'discord-bot-jlg')
@@ -1378,6 +1431,15 @@
                             value: attributes.title,
                             onChange: updateAttribute(setAttributes, 'title')
                         }),
+                    ),
+                    createElement(
+                        PanelBody,
+                        { title: __('Affichage & animation', 'discord-bot-jlg'), initialOpen: false },
+                        renderToggleGroup(
+                            __('Affichage des métriques', 'discord-bot-jlg'),
+                            metricsToggleConfigs,
+                            'metrics'
+                        ),
                         renderToggleGroup(
                             __('Options d\'animation', 'discord-bot-jlg'),
                             animationToggleConfigs,
