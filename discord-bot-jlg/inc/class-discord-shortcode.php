@@ -676,6 +676,7 @@ class Discord_Bot_JLG_Shortcode {
                         $online_label_classes[] = 'screen-reader-text';
                     }
                     ?>
+                    <?php $online_label_id = $unique_id . '-label-online'; ?>
                     <div class="discord-stat discord-online"
                         data-value="<?php echo esc_attr((int) $stats['online']); ?>"
                         data-label-online="<?php echo esc_attr($atts['label_online']); ?>"
@@ -683,9 +684,11 @@ class Discord_Bot_JLG_Shortcode {
                         <?php if (!$hide_icons): ?>
                         <span class="discord-icon"><?php echo esc_html($atts['icon_online']); ?></span>
                         <?php endif; ?>
-                        <span class="discord-number" role="status" aria-live="polite"><?php echo esc_html(number_format_i18n((int) $stats['online'])); ?></span>
+                        <span class="discord-number" role="status" aria-live="polite" aria-labelledby="<?php echo esc_attr($online_label_id); ?>">
+                            <span class="discord-number-value"><?php echo esc_html(number_format_i18n((int) $stats['online'])); ?></span>
+                        </span>
                         <span class="<?php echo esc_attr(implode(' ', $online_label_classes)); ?>">
-                            <span class="discord-label-text"><?php echo esc_html($atts['label_online']); ?></span>
+                            <span class="discord-label-text" id="<?php echo esc_attr($online_label_id); ?>"><?php echo esc_html($atts['label_online']); ?></span>
                         </span>
                     </div>
                     <?php endif; ?>
@@ -707,6 +710,11 @@ class Discord_Bot_JLG_Shortcode {
                         $label_classes[] = 'screen-reader-text';
                     }
                     ?>
+                    <?php
+                    $total_label_id        = $unique_id . '-label-total';
+                    $total_label_extra_id  = $unique_id . '-label-total-extra';
+                    $total_aria_labelledby = trim($total_label_id . ' ' . $total_label_extra_id);
+                    ?>
                     <div class="<?php echo esc_attr(implode(' ', $total_classes)); ?>"
                         <?php if ($has_total): ?>
                         data-value="<?php echo esc_attr((int) $stats['total']); ?>"
@@ -718,11 +726,13 @@ class Discord_Bot_JLG_Shortcode {
                         <?php if (!$hide_icons): ?>
                         <span class="discord-icon"><?php echo esc_html($atts['icon_total']); ?></span>
                         <?php endif; ?>
-                        <span class="discord-number" role="status" aria-live="polite"><?php echo $has_total ? esc_html(number_format_i18n((int) $stats['total'])) : '&mdash;'; ?></span>
+                        <span class="discord-number" role="status" aria-live="polite" aria-labelledby="<?php echo esc_attr($total_aria_labelledby); ?>">
+                            <span class="discord-number-value"><?php echo $has_total ? esc_html(number_format_i18n((int) $stats['total'])) : '&mdash;'; ?></span>
+                        </span>
                         <span class="discord-approx-indicator" aria-hidden="true"<?php echo $total_is_approximate ? '' : ' hidden'; ?>>≈</span>
                         <span class="<?php echo esc_attr(implode(' ', $label_classes)); ?>">
-                            <span class="discord-label-text"><?php echo esc_html($has_total ? $atts['label_total'] : $label_unavailable); ?></span>
-                            <span class="discord-label-extra screen-reader-text"><?php echo $total_is_approximate ? esc_html__('approx.', 'discord-bot-jlg') : ''; ?></span>
+                            <span class="discord-label-text" id="<?php echo esc_attr($total_label_id); ?>"><?php echo esc_html($has_total ? $atts['label_total'] : $label_unavailable); ?></span>
+                            <span class="discord-label-extra screen-reader-text" id="<?php echo esc_attr($total_label_extra_id); ?>"><?php echo $total_is_approximate ? esc_html__('approx.', 'discord-bot-jlg') : ''; ?></span>
                         </span>
                     </div>
                     <?php endif; ?>
@@ -769,6 +779,7 @@ class Discord_Bot_JLG_Shortcode {
                         $presence_display_value = 0;
                     }
                     ?>
+                    <?php $presence_label_id = $unique_id . '-label-presence'; ?>
                     <div class="discord-stat discord-presence-breakdown"
                         data-role="discord-presence-breakdown"
                         data-label-presence="<?php echo esc_attr($atts['label_presence']); ?>"
@@ -787,9 +798,11 @@ class Discord_Bot_JLG_Shortcode {
                         <?php endif; ?>
                         <div class="discord-presence-content">
                             <div class="discord-presence-summary">
-                                <span class="discord-number" role="status" aria-live="polite"><?php echo esc_html(number_format_i18n($presence_display_value)); ?></span>
+                                <span class="discord-number" role="status" aria-live="polite" aria-labelledby="<?php echo esc_attr($presence_label_id); ?>">
+                                    <span class="discord-number-value"><?php echo esc_html(number_format_i18n($presence_display_value)); ?></span>
+                                </span>
                                 <span class="<?php echo esc_attr(implode(' ', $presence_label_classes)); ?>">
-                                    <span class="discord-label-text"><?php echo esc_html($atts['label_presence']); ?></span>
+                                    <span class="discord-label-text" id="<?php echo esc_attr($presence_label_id); ?>"><?php echo esc_html($atts['label_presence']); ?></span>
                                 </span>
                             </div>
                             <?php if (!empty($presence_counts_ordered)) : ?>
@@ -820,6 +833,7 @@ class Discord_Bot_JLG_Shortcode {
                         $approx_label_classes[] = 'screen-reader-text';
                     }
                     ?>
+                    <?php $approximate_label_id = $unique_id . '-label-approximate'; ?>
                     <div class="discord-stat discord-approximate-members"
                         data-role="discord-approximate-members"
                         data-label-approximate="<?php echo esc_attr($atts['label_approximate']); ?>"
@@ -828,10 +842,12 @@ class Discord_Bot_JLG_Shortcode {
                         <?php if (!$hide_icons): ?>
                         <span class="discord-icon"><?php echo esc_html($atts['icon_approximate']); ?></span>
                         <?php endif; ?>
-                        <span class="discord-number" role="status" aria-live="polite"><?php echo esc_html(number_format_i18n($approximate_member_count)); ?></span>
+                        <span class="discord-number" role="status" aria-live="polite" aria-labelledby="<?php echo esc_attr($approximate_label_id); ?>">
+                            <span class="discord-number-value"><?php echo esc_html(number_format_i18n($approximate_member_count)); ?></span>
+                        </span>
                         <span class="discord-approx-indicator" aria-hidden="true">≈</span>
                         <span class="<?php echo esc_attr(implode(' ', $approx_label_classes)); ?>">
-                            <span class="discord-label-text"><?php echo esc_html($atts['label_approximate']); ?></span>
+                            <span class="discord-label-text" id="<?php echo esc_attr($approximate_label_id); ?>"><?php echo esc_html($atts['label_approximate']); ?></span>
                         </span>
                     </div>
                     <?php endif; ?>
@@ -850,6 +866,7 @@ class Discord_Bot_JLG_Shortcode {
                         $premium_label_text = $atts['label_premium'];
                     }
                     ?>
+                    <?php $premium_label_id = $unique_id . '-label-premium'; ?>
                     <div class="discord-stat discord-premium-subscriptions"
                         data-role="discord-premium-subscriptions"
                         data-label-premium="<?php echo esc_attr($atts['label_premium']); ?>"
@@ -860,9 +877,11 @@ class Discord_Bot_JLG_Shortcode {
                         <?php if (!$hide_icons): ?>
                         <span class="discord-icon"><?php echo esc_html($atts['icon_premium']); ?></span>
                         <?php endif; ?>
-                        <span class="discord-number" role="status" aria-live="polite"><?php echo esc_html(number_format_i18n($premium_subscription_count)); ?></span>
+                        <span class="discord-number" role="status" aria-live="polite" aria-labelledby="<?php echo esc_attr($premium_label_id); ?>">
+                            <span class="discord-number-value"><?php echo esc_html(number_format_i18n($premium_subscription_count)); ?></span>
+                        </span>
                         <span class="<?php echo esc_attr(implode(' ', $premium_label_classes)); ?>">
-                            <span class="discord-label-text"><?php echo esc_html($premium_label_text); ?></span>
+                            <span class="discord-label-text" id="<?php echo esc_attr($premium_label_id); ?>"><?php echo esc_html($premium_label_text); ?></span>
                         </span>
                     </div>
                     <?php endif; ?>
