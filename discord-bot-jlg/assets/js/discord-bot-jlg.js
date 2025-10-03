@@ -601,6 +601,24 @@
         return numericValue;
     }
 
+    function setNumberElementText(element, text) {
+        if (!element) {
+            return;
+        }
+
+        var target = element.querySelector('.discord-number-value');
+
+        if (!target) {
+            target = element;
+        }
+
+        if (typeof text === 'undefined' || text === null) {
+            text = '';
+        }
+
+        target.textContent = text;
+    }
+
     function updateStatElement(container, selector, value, formatter) {
         if (value === null) {
             return;
@@ -615,7 +633,7 @@
             ? formatter
             : DEFAULT_NUMBER_FORMATTER;
 
-        element.textContent = safeFormatter.format(value);
+        setNumberElementText(element, safeFormatter.format(value));
 
         function isAnimationEnabled(target) {
             if (!target) {
@@ -894,7 +912,7 @@
         if (value === null) {
             var numberElement = card.querySelector('.discord-number');
             if (numberElement) {
-                numberElement.textContent = placeholder;
+                setNumberElementText(numberElement, placeholder);
             }
 
             if (card.dataset && Object.prototype.hasOwnProperty.call(card.dataset, 'value')) {
@@ -1480,7 +1498,7 @@
                         totalElement.classList.remove('discord-total-approximate');
 
                         if (numberElement) {
-                            numberElement.textContent = placeholder;
+                            setNumberElementText(numberElement, placeholder);
                             numberElement.style.transform = 'scale(1)';
                         }
 
