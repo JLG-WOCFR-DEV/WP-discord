@@ -84,6 +84,8 @@ Les rafraîchissements publics (visiteurs non connectés) n'exigent plus de nonc
 
 Le plugin embarque sa propre définition `.screen-reader-text`, incluse à la fois dans les feuilles de style principales et inline chargées par le shortcode. Ce fallback reprend le pattern WordPress (position absolue, dimensions réduites à 1px, `clip-path: inset(50%)`, etc.) afin que les libellés masqués restent interprétables par les lecteurs d'écran même si le thème actif ne fournit pas cette classe utilitaire.
 
+La zone des compteurs expose également `aria-live="polite"` et bascule `aria-busy` durant les rafraîchissements. Ainsi, les lecteurs d'écran (NVDA 2024.1 et VoiceOver sous macOS Sonoma, testés avec Firefox/Chrome et Safari) annoncent l'arrivée de nouvelles valeurs sans interrompre la navigation en cours.
+
 ### Ré-initialisation manuelle du widget
 
 Si vous chargez dynamiquement du HTML contenant de nouveaux conteneurs `.discord-stats-container`, vous pouvez relancer l'initialisation automatique en appelant l'API publique exposée par le script côté client :

@@ -1124,6 +1124,14 @@
             return;
         }
 
+        if (container.setAttribute) {
+            container.setAttribute('aria-busy', 'true');
+
+            if (!container.hasAttribute('aria-live')) {
+                container.setAttribute('aria-live', 'polite');
+            }
+        }
+
         if (container.dataset) {
             container.dataset.refreshing = 'true';
         }
@@ -1148,6 +1156,10 @@
     function hideRefreshIndicator(container) {
         if (!container) {
             return;
+        }
+
+        if (container.setAttribute) {
+            container.setAttribute('aria-busy', 'false');
         }
 
         if (container.dataset) {
