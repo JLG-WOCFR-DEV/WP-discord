@@ -100,13 +100,6 @@ class Discord_Stats_Widget extends WP_Widget {
             $shortcode_atts['server_id'] = $server_id_override;
         }
 
-        $bot_token_override = isset($instance['bot_token_override'])
-            ? sanitize_text_field($instance['bot_token_override'])
-            : '';
-        if ('' !== $bot_token_override) {
-            $shortcode_atts['bot_token'] = $bot_token_override;
-        }
-
         $textual_attributes = array(
             'icon_online',
             'icon_total',
