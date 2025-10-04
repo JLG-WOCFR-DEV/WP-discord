@@ -497,32 +497,32 @@ class Discord_Bot_JLG_API {
      *
      * @return void
      */
-    public function ajax_refresh_stats() {
-        $current_action     = current_action();
-        $is_public_request  = ('wp_ajax_nopriv_refresh_discord_stats' === $current_action);
-        $nonce              = isset($_POST['_ajax_nonce']) ? sanitize_text_field(wp_unslash($_POST['_ajax_nonce'])) : '';
-
-        if (false === $is_public_request) {
-            if (empty($nonce) || !wp_verify_nonce($nonce, 'refresh_discord_stats')) {
-                wp_send_json_error(
-                    array(
-                        'nonce_expired' => true,
-                        'message'       => __('Nonce invalide', 'discord-bot-jlg'),
-                    ),
-                    403
-                );
-            }
+    private function build_refresh_response($success, $data, $status_code) {
+        if (!is_array($data)) {
+            $data = array();
         }
 
-        $profile_key_override = '';
-        if (isset($_POST['profile_key'])) {
-            $profile_key_override = sanitize_key(wp_unslash($_POST['profile_key']));
-        }
+        return array(
+            'success' => (bool) $success,
+            'data'    => $data,
+            'status'  => (int) $status_code,
+        );
+    }
 
-        $server_id_override = '';
-        if (isset($_POST['server_id'])) {
-            $server_id_override = $this->sanitize_server_id(wp_unslash($_POST['server_id']));
-        }
+    public function process_refresh_request($request_args = array()) {
+        $defaults = array(
+            'is_public_request' => true,
+            'profile_key'       => '',
+            'server_id'         => '',
+            'force_refresh'     => false,
+        );
+
+        $args = wp_parse_args($request_args, $defaults);
+
+        $is_public_request = !empty($args['is_public_request']);
+        $profile_key_override = isset($args['profile_key']) ? sanitize_key($args['profile_key']) : '';
+        $server_id_override   = isset($args['server_id']) ? $this->sanitize_server_id($args['server_id']) : '';
+        $force_refresh        = discord_bot_jlg_validate_bool(isset($args['force_refresh']) ? $args['force_refresh'] : false);
 
         $connection_args = array(
             'profile_key' => $profile_key_override,
@@ -542,22 +542,17 @@ class Discord_Bot_JLG_API {
                 $error_message = __('Profil de serveur introuvable.', 'discord-bot-jlg');
             }
 
-            wp_send_json_error(
-                array(
-                    'message' => $error_message,
-                ),
-                400
-            );
+            return $this->build_refresh_response(false, array(
+                'message' => $error_message,
+            ), 400);
         }
 
         $options = $context['options'];
 
         if (!empty($options['demo_mode'])) {
-            wp_send_json_error(
-                array(
-                    'message' => __('Mode démo actif', 'discord-bot-jlg'),
-                )
-            );
+            return $this->build_refresh_response(false, array(
+                'message' => __('Mode démo actif', 'discord-bot-jlg'),
+            ), 200);
         }
 
         $original_cache_key = $this->cache_key;
@@ -605,14 +600,11 @@ class Discord_Bot_JLG_API {
                             $client_retry_after
                         );
 
-                        wp_send_json_error(
-                            array(
-                                'rate_limited' => true,
-                                'message'      => $message,
-                                'retry_after'  => $client_retry_after,
-                            ),
-                            429
-                        );
+                        return $this->build_refresh_response(false, array(
+                            'rate_limited' => true,
+                            'message'      => $message,
+                            'retry_after'  => $client_retry_after,
+                        ), 429);
                     }
                 }
 
@@ -627,14 +619,11 @@ class Discord_Bot_JLG_API {
                             $retry_after
                         );
 
-                        wp_send_json_error(
-                            array(
-                                'rate_limited' => true,
-                                'message'      => $message,
-                                'retry_after'  => $retry_after,
-                            ),
-                            429
-                        );
+                        return $this->build_refresh_response(false, array(
+                            'rate_limited' => true,
+                            'message'      => $message,
+                            'retry_after'  => $retry_after,
+                        ), 429);
                     }
                 }
 
@@ -650,13 +639,13 @@ class Discord_Bot_JLG_API {
                             $response_payload['retry_after'] = max(0, (int) $next_retry - time());
                         }
 
-                        wp_send_json_success($response_payload);
+                        return $this->build_refresh_response(true, $response_payload, 200);
                     }
 
                     $refresh_requires_remote_call = true;
                     $bypass_cache = true;
                 } elseif (is_array($cached_stats) && empty($cached_stats['is_demo'])) {
-                    wp_send_json_success($cached_stats);
+                    return $this->build_refresh_response(true, $cached_stats, 200);
                 } else {
                     $refresh_requires_remote_call = true;
                 }
@@ -667,17 +656,13 @@ class Discord_Bot_JLG_API {
                 $bypass_cache = true;
             }
 
-            if (isset($_POST['force_refresh'])) {
-                $force_refresh = discord_bot_jlg_validate_bool(wp_unslash($_POST['force_refresh']));
-
-                if (
-                    true === $force_refresh
-                    && false === $is_public_request
-                    && current_user_can('manage_options')
-                ) {
-                    $bypass_cache = true;
-                    $refresh_requires_remote_call = true;
-                }
+            if (
+                true === $force_refresh
+                && false === $is_public_request
+                && current_user_can('manage_options')
+            ) {
+                $bypass_cache = true;
+                $refresh_requires_remote_call = true;
             }
 
             $stats = $this->get_stats(
@@ -717,7 +702,7 @@ class Discord_Bot_JLG_API {
                     $stats['retry_after'] = max(0, (int) $next_retry - time());
                 }
 
-                wp_send_json_success($stats);
+                return $this->build_refresh_response(true, $stats, 200);
             }
 
             if (is_array($stats) && empty($stats['is_demo'])) {
@@ -732,13 +717,13 @@ class Discord_Bot_JLG_API {
                     }
                 }
 
-                wp_send_json_success($stats);
+                return $this->build_refresh_response(true, $stats, 200);
             }
 
             if (true === $is_public_request) {
                 $cached_stats = get_transient($this->cache_key);
                 if (is_array($cached_stats) && empty($cached_stats['is_demo'])) {
-                    wp_send_json_success($cached_stats);
+                    return $this->build_refresh_response(true, $cached_stats, 200);
                 }
 
                 delete_transient($rate_limit_key);
@@ -766,7 +751,7 @@ class Discord_Bot_JLG_API {
                     }
                 }
 
-                wp_send_json_error($error_payload, 503);
+                return $this->build_refresh_response(false, $error_payload, 503);
             }
 
             $error_payload = array(
@@ -782,10 +767,69 @@ class Discord_Bot_JLG_API {
                 $error_payload['diagnostic'] = $last_error_message;
             }
 
-            wp_send_json_error($error_payload, 503);
+            return $this->build_refresh_response(false, $error_payload, 503);
         } finally {
             $this->cache_key = $original_cache_key;
         }
+    }
+
+    public function ajax_refresh_stats() {
+        $current_action     = current_action();
+        $is_public_request  = ('wp_ajax_nopriv_refresh_discord_stats' === $current_action);
+        $nonce              = isset($_POST['_ajax_nonce']) ? sanitize_text_field(wp_unslash($_POST['_ajax_nonce'])) : '';
+
+        if (false === $is_public_request) {
+            if (empty($nonce) || !wp_verify_nonce($nonce, 'refresh_discord_stats')) {
+                wp_send_json_error(
+                    array(
+                        'nonce_expired' => true,
+                        'message'       => __('Nonce invalide', 'discord-bot-jlg'),
+                    ),
+                    403
+                );
+            }
+        }
+
+        $profile_key_override = '';
+        if (isset($_POST['profile_key'])) {
+            $profile_key_override = sanitize_key(wp_unslash($_POST['profile_key']));
+        }
+
+        $server_id_override = '';
+        if (isset($_POST['server_id'])) {
+            $server_id_override = $this->sanitize_server_id(wp_unslash($_POST['server_id']));
+        }
+
+        $force_refresh = false;
+
+        if (isset($_POST['force_refresh'])) {
+            $requested_force_refresh = discord_bot_jlg_validate_bool(wp_unslash($_POST['force_refresh']));
+
+            if (
+                true === $requested_force_refresh
+                && false === $is_public_request
+                && current_user_can('manage_options')
+            ) {
+                $force_refresh = true;
+            }
+        }
+
+        $result = $this->process_refresh_request(
+            array(
+                'is_public_request' => $is_public_request,
+                'profile_key'       => $profile_key_override,
+                'server_id'         => $server_id_override,
+                'force_refresh'     => $force_refresh,
+            )
+        );
+
+        $status = isset($result['status']) ? (int) $result['status'] : 200;
+
+        if (!empty($result['success'])) {
+            wp_send_json_success($result['data'], $status);
+        }
+
+        wp_send_json_error($result['data'], $status);
     }
 
     /**

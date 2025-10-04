@@ -4,6 +4,8 @@ $GLOBALS['wp_test_transients'] = array();
 $GLOBALS['wp_test_current_action'] = 'wp_ajax_nopriv_refresh_discord_stats';
 $GLOBALS['wp_test_filters'] = array();
 $GLOBALS['wp_test_last_remote_request'] = null;
+$GLOBALS['wp_test_nonce_validations'] = array();
+$GLOBALS['wp_test_is_user_logged_in'] = false;
 
 if (!defined('ABSPATH')) {
     define('ABSPATH', __DIR__);
@@ -19,6 +21,7 @@ require_once __DIR__ . '/../../inc/class-discord-api.php';
 require_once __DIR__ . '/../../inc/class-discord-widget.php';
 require_once __DIR__ . '/../../inc/class-discord-shortcode.php';
 require_once __DIR__ . '/../../inc/class-discord-site-health.php';
+require_once __DIR__ . '/../../inc/class-discord-rest.php';
 
 if (!defined('DISCORD_BOT_JLG_OPTION_NAME')) {
     define('DISCORD_BOT_JLG_OPTION_NAME', 'discord_server_stats_options');
@@ -365,11 +368,17 @@ function wp_print_styles($handle = '') {
 }
 
 function is_user_logged_in() {
-    return false;
+    return !empty($GLOBALS['wp_test_is_user_logged_in']);
 }
 
 function admin_url($path = '', $scheme = 'admin') {
     $base = 'https://example.com/wp-admin/';
+
+    return $base . ltrim((string) $path, '/');
+}
+
+function rest_url($path = '', $scheme = 'rest') {
+    $base = 'https://example.com/wp-json/';
 
     return $base . ltrim((string) $path, '/');
 }
@@ -387,6 +396,12 @@ function current_action() {
 }
 
 function wp_verify_nonce($nonce, $action) {
+    if (isset($GLOBALS['wp_test_nonce_validations']) && is_array($GLOBALS['wp_test_nonce_validations'])) {
+        if (array_key_exists($action, $GLOBALS['wp_test_nonce_validations'])) {
+            return (bool) $GLOBALS['wp_test_nonce_validations'][$action];
+        }
+    }
+
     return true;
 }
 
@@ -508,6 +523,120 @@ function wp_safe_remote_get($url, $args = array()) {
 }
 
 function current_user_can($capability) {
+    return true;
+}
+
+if (!function_exists('__return_true')) {
+    function __return_true() {
+        return true;
+    }
+}
+
+if (!function_exists('__return_false')) {
+    function __return_false() {
+        return false;
+    }
+}
+
+if (!class_exists('WP_REST_Server')) {
+    class WP_REST_Server {
+        const READABLE = 'GET';
+        const CREATABLE = 'POST';
+        const EDITABLE = 'PUT';
+        const DELETABLE = 'DELETE';
+    }
+}
+
+if (!class_exists('WP_REST_Request')) {
+    class WP_REST_Request {
+        private $params = array();
+        private $headers = array();
+
+        public function __construct($method = 'GET', $route = '') {
+            $this->params  = array();
+            $this->headers = array();
+        }
+
+        public function set_param($key, $value) {
+            $this->params[$key] = $value;
+        }
+
+        public function get_param($key) {
+            return isset($this->params[$key]) ? $this->params[$key] : null;
+        }
+
+        public function get_params() {
+            return $this->params;
+        }
+
+        public function set_header($key, $value) {
+            if (!is_string($key)) {
+                return;
+            }
+
+            $this->headers[strtolower($key)] = $value;
+        }
+
+        public function get_header($key) {
+            if (!is_string($key)) {
+                return '';
+            }
+
+            $normalized = strtolower($key);
+
+            return isset($this->headers[$normalized]) ? $this->headers[$normalized] : '';
+        }
+    }
+}
+
+if (!class_exists('WP_REST_Response')) {
+    class WP_REST_Response {
+        protected $data;
+        protected $status;
+
+        public function __construct($data = null, $status = 200) {
+            $this->data   = $data;
+            $this->status = (int) $status;
+        }
+
+        public function get_data() {
+            return $this->data;
+        }
+
+        public function set_data($data) {
+            $this->data = $data;
+        }
+
+        public function get_status() {
+            return (int) $this->status;
+        }
+
+        public function set_status($status) {
+            $this->status = (int) $status;
+        }
+    }
+}
+
+function rest_ensure_response($response) {
+    if ($response instanceof WP_REST_Response) {
+        return $response;
+    }
+
+    return new WP_REST_Response($response);
+}
+
+function register_rest_route($namespace, $route, $args = array(), $override = false) {
+    if (!isset($GLOBALS['wp_test_rest_routes'])) {
+        $GLOBALS['wp_test_rest_routes'] = array();
+    }
+
+    $GLOBALS['wp_test_rest_routes'][] = array(
+        'namespace' => $namespace,
+        'route'     => $route,
+        'args'      => $args,
+        'override'  => $override,
+    );
+
     return true;
 }
 

@@ -80,6 +80,103 @@
         return overrides;
     }
 
+    function buildRestRequestUrl(baseUrl, overrides) {
+        if (typeof baseUrl !== 'string' || !baseUrl) {
+            return '';
+        }
+
+        var profileKey = overrides && overrides.profileKey ? overrides.profileKey : '';
+        var serverId = overrides && overrides.serverId ? overrides.serverId : '';
+
+        var urlObject = null;
+        if (typeof URL === 'function') {
+            try {
+                var origin = (typeof window !== 'undefined' && window.location && window.location.origin)
+                    ? window.location.origin
+                    : undefined;
+                urlObject = new URL(baseUrl, origin);
+            } catch (error) {
+                urlObject = null;
+            }
+        }
+
+        if (urlObject && urlObject.searchParams) {
+            if (profileKey) {
+                urlObject.searchParams.set('profile_key', profileKey);
+            }
+
+            if (serverId) {
+                urlObject.searchParams.set('server_id', serverId);
+            }
+
+            return urlObject.toString();
+        }
+
+        var queryParts = [];
+        if (profileKey) {
+            queryParts.push('profile_key=' + encodeURIComponent(profileKey));
+        }
+
+        if (serverId) {
+            queryParts.push('server_id=' + encodeURIComponent(serverId));
+        }
+
+        if (!queryParts.length) {
+            return baseUrl;
+        }
+
+        var separator = baseUrl.indexOf('?') === -1 ? '?' : '&';
+
+        return baseUrl + separator + queryParts.join('&');
+    }
+
+    function requestStatsViaAjax(config, overrides) {
+        if (!config || typeof config.ajaxUrl !== 'string' || !config.ajaxUrl) {
+            return Promise.reject(new Error('Missing AJAX endpoint URL'));
+        }
+
+        var formData = new FormData();
+        formData.append('action', config.action || 'refresh_discord_stats');
+
+        if (config.requiresNonce && config.nonce) {
+            formData.append('_ajax_nonce', config.nonce);
+        }
+
+        if (overrides && overrides.profileKey) {
+            formData.append('profile_key', overrides.profileKey);
+        }
+
+        if (overrides && overrides.serverId) {
+            formData.append('server_id', overrides.serverId);
+        }
+
+        return fetch(config.ajaxUrl, {
+            method: 'POST',
+            body: formData,
+            credentials: 'same-origin'
+        });
+    }
+
+    function requestStatsViaRest(config, overrides) {
+        if (!config || typeof config.restUrl !== 'string' || !config.restUrl) {
+            return Promise.reject(new Error('Missing REST endpoint URL'));
+        }
+
+        var endpointUrl = buildRestRequestUrl(config.restUrl, overrides);
+        var options = {
+            method: 'GET',
+            credentials: 'same-origin'
+        };
+
+        if (config.restNonce) {
+            options.headers = {
+                'X-WP-Nonce': config.restNonce
+            };
+        }
+
+        return fetch(endpointUrl, options);
+    }
+
     function getOrCreateErrorMessageElement(container) {
         if (!container) {
             return null;
@@ -1701,29 +1798,32 @@
             retryAfter: null
         };
 
-        var formData = new FormData();
-        formData.append('action', config.action || 'refresh_discord_stats');
-
-        if (config.requiresNonce && config.nonce) {
-            formData.append('_ajax_nonce', config.nonce);
-        }
-
         var overrides = collectConnectionOverrides(container, config);
 
-        if (overrides.profileKey) {
-            formData.append('profile_key', overrides.profileKey);
+        var useRestEndpoint = !!(config && typeof config.restUrl === 'string' && config.restUrl);
+        var fetchPromise;
+
+        if (useRestEndpoint) {
+            fetchPromise = requestStatsViaRest(config, overrides)
+                .then(function (response) {
+                    if (response && response.status === 404 && config && config.ajaxUrl) {
+                        return requestStatsViaAjax(config, overrides);
+                    }
+
+                    return response;
+                })
+                .catch(function (error) {
+                    if (config && config.ajaxUrl) {
+                        return requestStatsViaAjax(config, overrides);
+                    }
+
+                    throw error;
+                });
+        } else {
+            fetchPromise = requestStatsViaAjax(config, overrides);
         }
 
-        if (overrides.serverId) {
-            formData.append('server_id', overrides.serverId);
-        }
-
-
-        var requestPromise = fetch(config.ajaxUrl, {
-            method: 'POST',
-            body: formData,
-            credentials: 'same-origin'
-        })
+        var requestPromise = fetchPromise
             .then(function (response) {
                 if (!response || typeof response !== 'object') {
                     var invalidResponseError = new Error('Invalid network response');

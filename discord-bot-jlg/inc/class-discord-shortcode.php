@@ -1216,6 +1216,8 @@ class Discord_Bot_JLG_Shortcode {
                 'action'  => 'refresh_discord_stats',
                 'nonce'   => $requires_nonce ? wp_create_nonce('refresh_discord_stats') : '',
                 'requiresNonce' => $requires_nonce,
+                'restUrl' => rest_url('discord-bot-jlg/v1/stats'),
+                'restNonce' => $requires_nonce ? wp_create_nonce('wp_rest') : '',
                 'locale'  => $locale,
                 'minRefreshInterval' => defined('Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL')
                     ? Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL
