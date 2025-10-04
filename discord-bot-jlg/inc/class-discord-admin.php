@@ -299,6 +299,13 @@ class Discord_Bot_JLG_Admin {
             : 10;
         $max_refresh_interval = 3600;
 
+        $min_cache_duration = max(
+            60,
+            defined('Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL')
+                ? (int) Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL
+                : 60
+        );
+
         $current_refresh_interval = isset($current_options['default_refresh_interval'])
             ? absint($current_options['default_refresh_interval'])
             : 60;
@@ -341,7 +348,10 @@ class Discord_Bot_JLG_Admin {
                 ? sanitize_text_field($current_options['invite_label'])
                 : '',
             'cache_duration' => isset($current_options['cache_duration'])
-                ? (int) $current_options['cache_duration']
+                ? max(
+                    $min_cache_duration,
+                    min(3600, (int) $current_options['cache_duration'])
+                )
                 : 300,
             'custom_css'     => '',
             'default_refresh_interval' => $current_refresh_interval,
@@ -533,13 +543,13 @@ class Discord_Bot_JLG_Admin {
                     ? (int) $current_options['cache_duration']
                     : 300;
                 $sanitized['cache_duration'] = max(
-                    Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL,
+                    $min_cache_duration,
                     min(3600, $fallback_duration)
                 );
             } else {
                 $cache_duration              = absint($raw_cache_duration);
                 $sanitized['cache_duration'] = max(
-                    Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL,
+                    $min_cache_duration,
                     min(3600, $cache_duration)
                 );
             }
@@ -1495,16 +1505,22 @@ class Discord_Bot_JLG_Admin {
      */
     public function cache_duration_render() {
         $options = get_option($this->option_name);
+        $min_cache_duration = max(
+            60,
+            defined('Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL')
+                ? (int) Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL
+                : 60
+        );
         ?>
         <input type="number" name="<?php echo esc_attr($this->option_name); ?>[cache_duration]"
                value="<?php echo esc_attr(isset($options['cache_duration']) ? $options['cache_duration'] : ''); ?>"
-               min="<?php echo esc_attr(Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL); ?>" max="3600" class="small-text" />
+               min="<?php echo esc_attr($min_cache_duration); ?>" max="3600" class="small-text" />
         <p class="description">
             <?php
             printf(
                 /* translators: 1: minimum cache duration in seconds, 2: maximum cache duration in seconds. */
                 esc_html__('Minimum %1$s secondes, maximum %2$s secondes (1 heure)', 'discord-bot-jlg'),
-                esc_html(Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL),
+                esc_html(number_format_i18n($min_cache_duration)),
                 esc_html(number_format_i18n(3600))
             );
             ?>
