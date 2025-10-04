@@ -140,7 +140,7 @@ function discord_bot_jlg_uninstall() {
             DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION
         );
 
-        $api->clear_cache(true);
+        $api->purge_full_cache();
     }
 }
 
