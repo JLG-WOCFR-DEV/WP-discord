@@ -179,6 +179,21 @@ class Test_Discord_Bot_JLG_Shortcode extends TestCase {
         $this->assertStringNotContainsString('</', $injected_css);
     }
 
+    public function test_register_assets_does_not_force_legacy_polyfill_dependencies() {
+        $shortcode = $this->get_shortcode_instance();
+
+        $shortcode->render_shortcode(array());
+
+        $this->assertArrayHasKey('discord-bot-jlg-frontend', $GLOBALS['wp_test_registered_scripts']);
+
+        $script = $GLOBALS['wp_test_registered_scripts']['discord-bot-jlg-frontend'];
+
+        $this->assertIsArray($script['deps']);
+        $this->assertNotContains('wp-polyfill', $script['deps']);
+        $this->assertNotContains('wp-api-fetch', $script['deps']);
+        $this->assertSame(array(), $script['deps']);
+    }
+
     public function test_render_shortcode_inherits_defaults_from_options() {
         $shortcode = $this->get_shortcode_instance();
 
