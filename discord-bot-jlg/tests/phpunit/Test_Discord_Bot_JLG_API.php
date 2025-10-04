@@ -252,6 +252,63 @@ class Test_Discord_Bot_JLG_API extends TestCase {
         $this->assertFalse(get_option(Discord_Bot_JLG_API::LAST_FALLBACK_OPTION));
     }
 
+    public function test_clear_all_cached_data_purges_registered_variants() {
+        $option_name = 'discord_server_stats_options';
+        $cache_key   = 'discord_server_stats_cache';
+
+        $GLOBALS['wp_test_options'][$option_name] = array(
+            'server_id'       => '111222333',
+            'cache_duration'  => 120,
+            'server_profiles' => array(
+                'alt' => array(
+                    'key'       => 'alt',
+                    'label'     => 'Alt Profile',
+                    'server_id' => '999888777',
+                ),
+            ),
+        );
+
+        $api = new Discord_Bot_JLG_API($option_name, $cache_key, 60, new Mock_Discord_Bot_JLG_Http_Client());
+
+        $api->get_stats(
+            array(
+                'bypass_cache' => true,
+                'profile_key'  => 'alt',
+            )
+        );
+
+        $derived_cache_key = $cache_key . '_' . md5('profile:alt');
+
+        $this->assertIsArray(get_transient($derived_cache_key));
+
+        set_transient($derived_cache_key . Discord_Bot_JLG_API::REFRESH_LOCK_SUFFIX, time(), 60);
+        set_transient($derived_cache_key . Discord_Bot_JLG_API::LAST_GOOD_SUFFIX, array('stats' => array('online' => 5)), 0);
+        set_transient($derived_cache_key . Discord_Bot_JLG_API::FALLBACK_RETRY_SUFFIX, time() + 60, 60);
+        set_transient($derived_cache_key . Discord_Bot_JLG_API::FALLBACK_RETRY_API_DELAY_SUFFIX, 30, 30);
+
+        $client_key  = $derived_cache_key . Discord_Bot_JLG_API::CLIENT_REFRESH_LOCK_PREFIX . 'abc';
+        $index_key   = $derived_cache_key . Discord_Bot_JLG_API::CLIENT_REFRESH_LOCK_INDEX_SUFFIX;
+        set_transient($client_key, time(), 60);
+        set_transient($index_key, array($client_key => time()), 86400);
+
+        $registry_option = Discord_Bot_JLG_API::CACHE_REGISTRY_PREFIX . md5($cache_key);
+        $registry        = get_option($registry_option);
+
+        $this->assertIsArray($registry);
+        $this->assertContains($derived_cache_key, $registry);
+
+        $api->purge_full_cache();
+
+        $this->assertFalse(get_transient($derived_cache_key));
+        $this->assertFalse(get_transient($derived_cache_key . Discord_Bot_JLG_API::REFRESH_LOCK_SUFFIX));
+        $this->assertFalse(get_transient($derived_cache_key . Discord_Bot_JLG_API::LAST_GOOD_SUFFIX));
+        $this->assertFalse(get_transient($derived_cache_key . Discord_Bot_JLG_API::FALLBACK_RETRY_SUFFIX));
+        $this->assertFalse(get_transient($derived_cache_key . Discord_Bot_JLG_API::FALLBACK_RETRY_API_DELAY_SUFFIX));
+        $this->assertFalse(get_transient($client_key));
+        $this->assertFalse(get_transient($index_key));
+        $this->assertFalse(get_option($registry_option));
+    }
+
     public function test_ajax_refresh_stats_returns_retry_after_with_uncached_fallback() {
         $option_name = 'discord_server_stats_options';
         $cache_key   = 'discord_server_stats_cache';

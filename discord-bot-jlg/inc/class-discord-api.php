@@ -22,6 +22,7 @@ class Discord_Bot_JLG_API {
     const FALLBACK_RETRY_SUFFIX = '_fallback_retry_after';
     const FALLBACK_RETRY_API_DELAY_SUFFIX = '_fallback_retry_after_delay';
     const LAST_FALLBACK_OPTION = 'discord_bot_jlg_last_fallback';
+    const CACHE_REGISTRY_PREFIX = 'discord_bot_jlg_cache_registry_';
 
     private $option_name;
     private $cache_key;
@@ -60,6 +61,63 @@ class Discord_Bot_JLG_API {
             : new Discord_Bot_JLG_Http_Client();
         $this->options_cache = null;
         $this->runtime_fallback_retry_timestamp = 0;
+    }
+
+    private function register_current_cache_key() {
+        $this->remember_cache_key_for_registry($this->cache_key);
+    }
+
+    private function remember_cache_key_for_registry($cache_key) {
+        $cache_key = (string) $cache_key;
+
+        if ('' === $cache_key) {
+            return;
+        }
+
+        $registry = $this->get_registered_cache_keys();
+
+        if (in_array($cache_key, $registry, true)) {
+            return;
+        }
+
+        $registry[] = $cache_key;
+        $this->save_cache_key_registry($registry);
+    }
+
+    private function get_cache_registry_option_name() {
+        return self::CACHE_REGISTRY_PREFIX . md5($this->base_cache_key);
+    }
+
+    private function get_registered_cache_keys() {
+        $registry = get_option($this->get_cache_registry_option_name());
+
+        if (!is_array($registry)) {
+            return array();
+        }
+
+        $registry = array_filter(array_map('strval', $registry));
+
+        return array_values(array_unique($registry));
+    }
+
+    private function save_cache_key_registry($registry) {
+        if (!is_array($registry)) {
+            $registry = array();
+        }
+
+        $registry = array_filter(array_map('strval', $registry));
+        $registry = array_values(array_unique($registry));
+
+        if (empty($registry)) {
+            delete_option($this->get_cache_registry_option_name());
+            return;
+        }
+
+        update_option($this->get_cache_registry_option_name(), $registry, false);
+    }
+
+    private function reset_cache_key_registry() {
+        delete_option($this->get_cache_registry_option_name());
     }
 
     /**
@@ -370,6 +428,7 @@ class Discord_Bot_JLG_API {
             $this->last_error = '';
             $this->set_last_retry_after(0);
             $this->clear_api_retry_after_delay();
+            $this->register_current_cache_key();
             set_transient($this->cache_key, $stats, $this->get_cache_duration($options));
             $this->store_last_good_stats($stats);
             $this->clear_last_fallback_details();
@@ -666,6 +725,7 @@ class Discord_Bot_JLG_API {
                     true === $is_public_request
                     && true === $refresh_requires_remote_call
                 ) {
+                    $this->register_current_cache_key();
                     set_transient($rate_limit_key, time(), $rate_limit_window);
                     if (!empty($client_rate_limit_key)) {
                         $this->set_client_rate_limit($client_rate_limit_key, $rate_limit_window);
@@ -823,17 +883,33 @@ class Discord_Bot_JLG_API {
      */
     public function clear_all_cached_data() {
         $original_cache_key = $this->cache_key;
-        $this->cache_key     = $this->base_cache_key;
 
-        delete_transient($this->cache_key);
-        delete_transient($this->cache_key . self::REFRESH_LOCK_SUFFIX);
+        $registry_keys = $this->get_registered_cache_keys();
+        $all_cache_keys = array_merge(array($this->base_cache_key), $registry_keys);
+        $all_cache_keys = array_values(array_unique(array_filter(array_map('strval', $all_cache_keys))));
+
+        foreach ($all_cache_keys as $cache_key) {
+            if ('' === $cache_key) {
+                continue;
+            }
+
+            $this->cache_key = $cache_key;
+
+            delete_transient($this->cache_key);
+            delete_transient($this->cache_key . self::REFRESH_LOCK_SUFFIX);
+            delete_transient($this->get_last_good_cache_key());
+            delete_transient($this->get_fallback_retry_key());
+            delete_transient($this->get_api_retry_after_key());
+            $this->clear_client_rate_limits();
+        }
+
+        $this->cache_key = $this->base_cache_key;
         $this->clear_fallback_retry_schedule();
         $this->clear_api_retry_after_delay();
-        delete_transient($this->get_last_good_cache_key());
-        $this->clear_client_rate_limits();
         $this->reset_runtime_cache();
         $this->flush_options_cache();
         $this->clear_last_fallback_details();
+        $this->reset_cache_key_registry();
 
         $this->cache_key = $original_cache_key;
     }
@@ -1140,6 +1216,7 @@ class Discord_Bot_JLG_API {
             return;
         }
 
+        $this->register_current_cache_key();
         set_transient($client_key, time(), $rate_limit_window);
         $this->remember_client_rate_limit_key($client_key);
     }
@@ -1169,6 +1246,7 @@ class Discord_Bot_JLG_API {
             unset($client_keys[$client_key]);
 
             if (!empty($client_keys)) {
+                $this->register_current_cache_key();
                 set_transient($index_key, $client_keys, DAY_IN_SECONDS);
             } else {
                 delete_transient($index_key);
@@ -1212,6 +1290,7 @@ class Discord_Bot_JLG_API {
 
         $updated_keys[$client_key] = $now;
 
+        $this->register_current_cache_key();
         set_transient($index_key, $updated_keys, DAY_IN_SECONDS);
     }
 
@@ -1365,6 +1444,7 @@ class Discord_Bot_JLG_API {
 
         $ttl = $this->get_fallback_cache_ttl($options);
 
+        $this->register_current_cache_key();
         set_transient($this->cache_key, $stats, $ttl);
         $this->store_last_fallback_details($reason);
 
@@ -1462,6 +1542,7 @@ class Discord_Bot_JLG_API {
 
         $next_retry = time() + $retry_window;
 
+        $this->register_current_cache_key();
         set_transient($this->get_fallback_retry_key(), $next_retry, max(1, $retry_window));
         $this->set_runtime_fallback_retry_timestamp($next_retry);
 
@@ -1498,6 +1579,7 @@ class Discord_Bot_JLG_API {
         $key         = $this->get_api_retry_after_key();
 
         if ($retry_after > 0) {
+            $this->register_current_cache_key();
             set_transient($key, $retry_after, max(1, $retry_after));
             return;
         }
@@ -1577,6 +1659,7 @@ class Discord_Bot_JLG_API {
             'timestamp' => time(),
         );
 
+        $this->register_current_cache_key();
         set_transient($this->get_last_good_cache_key(), $payload, 0);
     }
 
