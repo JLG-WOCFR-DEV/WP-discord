@@ -248,11 +248,11 @@ describe('discord-bot-jlg integration', () => {
         expect(setTimeoutCalls[setTimeoutCalls.length - 1][1]).toBe(15000);
     });
 
-    test('refresh request omits bot token overrides from dataset or config', async () => {
+    test('refresh request sends token reference instead of raw token', async () => {
         const container = createContainer();
         container.dataset.profileKey = 'profile-one';
         container.dataset.serverIdOverride = '777';
-        container.dataset.botTokenOverride = 'should-be-ignored';
+        container.dataset.tokenKey = 'dataset-token-ref';
 
         window.discordBotJlg = {
             ajaxUrl: 'https://example.com/wp-admin/admin-ajax.php',
@@ -262,6 +262,7 @@ describe('discord-bot-jlg integration', () => {
             minRefreshInterval: '5',
             profileKey: 'config-profile',
             serverId: 'config-server',
+            tokenKey: 'config-token-ref',
             botToken: 'config-token'
         };
 
@@ -299,6 +300,55 @@ describe('discord-bot-jlg integration', () => {
         const sentKeys = body.entries.map((entry) => entry[0]);
         expect(sentKeys).toContain('profile_key');
         expect(sentKeys).toContain('server_id');
+        expect(sentKeys).toContain('token_key');
+        expect(sentKeys).not.toContain('bot_token');
+
+        const tokenKeyEntry = body.entries.find((entry) => entry[0] === 'token_key');
+        expect(tokenKeyEntry).toBeDefined();
+        expect(tokenKeyEntry[1]).toBe('dataset-token-ref');
+    });
+
+    test('refresh request uses global token reference when dataset is empty', async () => {
+        const container = createContainer();
+
+        window.discordBotJlg = {
+            ajaxUrl: 'https://example.com/wp-admin/admin-ajax.php',
+            nonce: 'nonce',
+            requiresNonce: true,
+            locale: 'en-US',
+            minRefreshInterval: '5',
+            tokenKey: 'config-token-ref'
+        };
+
+        global.fetch.mockResolvedValue({
+            ok: true,
+            json: () => Promise.resolve({
+                success: true,
+                data: {
+                    online: 1,
+                    total: 2,
+                    has_total: true,
+                    total_is_approximate: false,
+                    stale: false,
+                    is_demo: false,
+                    fallback_demo: false,
+                    last_updated: 1700000000
+                }
+            })
+        });
+
+        loadScript();
+
+        runTimerByDelay(15000);
+        await flushPromises();
+
+        const request = global.fetch.mock.calls[0];
+        const body = request[1].body;
+        const sentKeys = body.entries.map((entry) => entry[0]);
+
+        expect(sentKeys).toContain('token_key');
+        const tokenKeyEntry = body.entries.find((entry) => entry[0] === 'token_key');
+        expect(tokenKeyEntry[1]).toBe('config-token-ref');
         expect(sentKeys).not.toContain('bot_token');
     });
 

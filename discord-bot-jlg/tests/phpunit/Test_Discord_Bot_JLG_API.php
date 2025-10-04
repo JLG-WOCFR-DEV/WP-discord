@@ -666,6 +666,97 @@ class Test_Discord_Bot_JLG_API extends TestCase {
         }
     }
 
+    public function test_store_override_token_sanitizes_value_and_sets_transient() {
+        $option_name = 'discord_server_stats_options';
+        $cache_key   = 'discord_server_stats_cache';
+
+        $api = new Discord_Bot_JLG_API($option_name, $cache_key, 60);
+
+        $token_key = $api->store_override_token("  temp-token\n");
+
+        $this->assertNotSame('', $token_key);
+
+        $transient_key = Discord_Bot_JLG_API::TOKEN_OVERRIDE_TRANSIENT_PREFIX . md5($token_key);
+        $entry         = wp_test_get_transient_entry($transient_key);
+
+        $this->assertNotNull($entry);
+        $this->assertSame('temp-token', $entry['value']);
+        $this->assertSame(Discord_Bot_JLG_API::TOKEN_OVERRIDE_TTL, $entry['ttl']);
+    }
+
+    public function test_resolve_connection_context_uses_token_reference() {
+        $option_name = 'discord_server_stats_options';
+        $cache_key   = 'discord_server_stats_cache';
+
+        $api = new Discord_Bot_JLG_API($option_name, $cache_key, 60);
+
+        $token_key = $api->store_override_token('token-override-123');
+
+        $method = new ReflectionMethod(Discord_Bot_JLG_API::class, 'resolve_connection_context');
+        $method->setAccessible(true);
+
+        $context = $method->invoke($api, array('token_key' => $token_key), array());
+
+        $this->assertIsArray($context);
+        $this->assertArrayHasKey('options', $context);
+        $this->assertArrayHasKey('bot_token', $context['options']);
+        $this->assertSame('token-override-123', $context['options']['bot_token']);
+        $this->assertTrue($context['options']['__bot_token_override']);
+        $this->assertArrayHasKey('signature', $context);
+        $this->assertStringContainsString('token_key:' . $token_key, $context['signature']);
+        $this->assertArrayNotHasKey('error', $context);
+
+        $transient_key = Discord_Bot_JLG_API::TOKEN_OVERRIDE_TRANSIENT_PREFIX . md5($token_key);
+        $entry         = wp_test_get_transient_entry($transient_key);
+
+        $this->assertNotNull($entry);
+        $this->assertSame('token-override-123', $entry['value']);
+    }
+
+    public function test_resolve_connection_context_returns_error_when_token_missing() {
+        $option_name = 'discord_server_stats_options';
+        $cache_key   = 'discord_server_stats_cache';
+
+        $api = new Discord_Bot_JLG_API($option_name, $cache_key, 60);
+
+        $method = new ReflectionMethod(Discord_Bot_JLG_API::class, 'resolve_connection_context');
+        $method->setAccessible(true);
+
+        $context = $method->invoke($api, array('token_key' => 'missing-token'), array());
+
+        $this->assertIsArray($context);
+        $this->assertArrayHasKey('error', $context);
+        $this->assertInstanceOf(WP_Error::class, $context['error']);
+        $this->assertSame(
+            'La référence du token a expiré, veuillez recharger la page.',
+            $context['error']->get_error_message()
+        );
+    }
+
+    public function test_ajax_refresh_stats_returns_error_when_token_reference_expired() {
+        $option_name = 'discord_server_stats_options';
+        $cache_key   = 'discord_server_stats_cache';
+
+        $api = new Stubbed_Discord_Bot_JLG_API($option_name, $cache_key, 60);
+        $api->set_mock_stats(array());
+
+        $_POST = array(
+            'token_key' => 'expired-reference',
+        );
+
+        try {
+            $api->ajax_refresh_stats();
+            $this->fail('Expected ajax_refresh_stats to return an error when the token reference is missing.');
+        } catch (WP_Send_JSON_Error $error) {
+            $this->assertSame(400, $error->status_code);
+            $this->assertArrayHasKey('message', $error->data);
+            $this->assertSame(
+                'La référence du token a expiré, veuillez recharger la page.',
+                $error->data['message']
+            );
+        }
+    }
+
     public function test_ajax_refresh_stats_hides_diagnostic_for_public_errors() {
         $option_name = 'discord_server_stats_options';
         $cache_key   = 'discord_server_stats_cache';

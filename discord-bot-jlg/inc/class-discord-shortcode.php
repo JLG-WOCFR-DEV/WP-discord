@@ -184,6 +184,7 @@ class Discord_Bot_JLG_Shortcode {
                 'cta_tooltip'          => '',
                 'profile'              => '',
                 'server_id'            => '',
+                'bot_token'            => '',
             ),
             $atts,
             'discord_stats'
@@ -238,6 +239,16 @@ class Discord_Bot_JLG_Shortcode {
 
         $profile_key        = $this->sanitize_profile_key($atts['profile']);
         $override_server_id = $this->sanitize_server_id_attribute($atts['server_id']);
+        $bot_token_override = '';
+        $override_token_key = '';
+
+        if (array_key_exists('bot_token', $received_atts)) {
+            $bot_token_override = $this->sanitize_bot_token_attribute($atts['bot_token']);
+        }
+
+        if ('' !== $bot_token_override) {
+            $override_token_key = $this->api->store_override_token($bot_token_override);
+        }
 
         if ($force_demo) {
             $stats = $this->api->get_demo_stats();
@@ -247,6 +258,7 @@ class Discord_Bot_JLG_Shortcode {
                     array(
                         'profile_key' => $profile_key,
                         'server_id'   => $override_server_id,
+                        'token_key'   => $override_token_key,
                     ),
                     'strlen'
                 )
@@ -626,6 +638,10 @@ class Discord_Bot_JLG_Shortcode {
 
         if ('' !== $override_server_id) {
             $attributes[] = sprintf('data-server-id-override="%s"', esc_attr($override_server_id));
+        }
+
+        if ('' !== $override_token_key) {
+            $attributes[] = sprintf('data-token-key="%s"', esc_attr($override_token_key));
         }
 
 
@@ -1046,6 +1062,23 @@ class Discord_Bot_JLG_Shortcode {
         }
 
         return sanitize_key($value);
+    }
+
+    private function sanitize_bot_token_attribute($value) {
+        if (is_array($value) || is_object($value)) {
+            return '';
+        }
+
+        $value = (string) $value;
+        $value = trim($value);
+
+        if ('' === $value) {
+            return '';
+        }
+
+        $value = preg_replace('/[\x00-\x1F\x7F]+/', '', $value);
+
+        return sanitize_text_field($value);
     }
 
     private function sanitize_server_id_attribute($value) {

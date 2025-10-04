@@ -31,7 +31,7 @@ class Test_Discord_Bot_JLG_Shortcode extends TestCase {
     private function get_shortcode_instance($custom_css = '') {
         $api = $this->getMockBuilder(Discord_Bot_JLG_API::class)
             ->disableOriginalConstructor()
-            ->onlyMethods(array('get_plugin_options', 'get_stats', 'get_demo_stats'))
+            ->onlyMethods(array('get_plugin_options', 'get_stats', 'get_demo_stats', 'store_override_token'))
             ->getMock();
 
         $options = array(
@@ -85,6 +85,7 @@ class Test_Discord_Bot_JLG_Shortcode extends TestCase {
         $api->method('get_plugin_options')->willReturn($options);
         $api->method('get_stats')->willReturn($stats);
         $api->method('get_demo_stats')->willReturn($stats);
+        $api->method('store_override_token')->willReturn('');
 
         return new Discord_Bot_JLG_Shortcode(DISCORD_BOT_JLG_OPTION_NAME, $api);
     }
@@ -99,6 +100,82 @@ class Test_Discord_Bot_JLG_Shortcode extends TestCase {
         $this->assertStringNotContainsString('position:fixed', $html);
         $this->assertStringNotContainsString('width: 100%;position:fixed', $html);
         $this->assertStringNotContainsString('width:100%;position:fixed', $html);
+    }
+
+    public function test_render_shortcode_registers_token_override_reference() {
+        $options = array(
+            'show_online'   => true,
+            'show_total'    => true,
+            'widget_title'  => 'Mon serveur',
+            'custom_css'    => '',
+            'show_server_name' => true,
+            'show_server_avatar' => true,
+            'default_refresh_enabled' => true,
+            'default_refresh_interval' => 45,
+            'default_theme' => 'dark',
+            'stat_bg_color' => '#123456',
+            'stat_text_color' => '#f0f0f0',
+            'accent_color' => '#654321',
+            'accent_color_alt' => '#765432',
+            'accent_text_color' => '#111111',
+            'default_icon_online' => '🔥',
+            'default_icon_total' => '🧑‍🤝‍🧑',
+            'default_icon_presence' => '🛰️',
+            'default_icon_approximate' => '📐',
+            'default_icon_premium' => '💠',
+            'default_label_online' => 'Actifs',
+            'default_label_total' => 'Membres inscrits',
+            'default_label_presence' => 'Répartition des membres',
+            'default_label_presence_online' => 'Connectés',
+            'default_label_presence_idle' => 'En pause',
+            'default_label_presence_dnd' => 'Occupés',
+            'default_label_presence_offline' => 'Déconnectés',
+            'default_label_presence_streaming' => 'En stream',
+            'default_label_presence_other' => 'Autres statuts',
+            'default_label_approximate' => 'Total approx.',
+            'default_label_premium' => 'Boosts actifs',
+            'default_label_premium_singular' => 'Boost actif',
+            'default_label_premium_plural' => 'Boosts actifs',
+        );
+
+        $stats = array(
+            'online'               => 12,
+            'total'                => 42,
+            'has_total'            => true,
+            'total_is_approximate' => false,
+            'stale'                => false,
+            'fallback_demo'        => false,
+            'is_demo'              => false,
+        );
+
+        $api = $this->getMockBuilder(Discord_Bot_JLG_API::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(array('get_plugin_options', 'get_stats', 'get_demo_stats', 'store_override_token'))
+            ->getMock();
+
+        $api->method('get_plugin_options')->willReturn($options);
+        $api->method('get_demo_stats')->willReturn($stats);
+
+        $api->expects($this->once())
+            ->method('store_override_token')
+            ->with('secure-token')
+            ->willReturn('token-ref-123');
+
+        $api->expects($this->once())
+            ->method('get_stats')
+            ->with($this->callback(function ($args) {
+                return isset($args['token_key']) && 'token-ref-123' === $args['token_key'];
+            }))
+            ->willReturn($stats);
+
+        $shortcode = new Discord_Bot_JLG_Shortcode(DISCORD_BOT_JLG_OPTION_NAME, $api);
+
+        $html = $shortcode->render_shortcode(array(
+            'bot_token' => ' secure-token ',
+        ));
+
+        $this->assertStringContainsString('data-token-key="token-ref-123"', $html);
+        $this->assertStringNotContainsString('secure-token', $html);
     }
 
     public function test_render_shortcode_accepts_min_function_width() {

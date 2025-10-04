@@ -59,6 +59,8 @@ L'attribut optionnel `width` accepte uniquement des longueurs CSS valides comme 
 
 Le paramètre `refresh_interval` est exprimé en secondes et doit être d'au moins 10 secondes (10 000 ms). Toute valeur plus basse est automatiquement portée à 10 secondes pour éviter les erreurs 429 de Discord. L’interface du bloc Gutenberg impose également cette limite via un champ numérique (incréments de 5, valeur minimale : 10).
 
+Les éventuels tokens de bot fournis via un bloc, un widget ou un shortcode ne sont jamais exposés au navigateur. Lors du rendu PHP, le plugin stocke temporairement la valeur dans un transient et n’injecte dans le HTML qu’une clé de référence (`data-token-key`). Pendant les rafraîchissements AJAX, seul cet identifiant non sensible est renvoyé au serveur, qui résout le token avant d’appeler l’API Discord. La durée de vie par défaut (3 heures) peut être ajustée via le filtre `discord_bot_jlg_token_override_ttl`. Si la référence expire, le visiteur est invité à recharger la page pour générer une nouvelle clé.
+
 #### Couleurs personnalisées
 
 Les attributs suivants alimentent les variables CSS du composant et acceptent des couleurs hexadécimales (`#112233`) ou des notations `rgb()/rgba()` :

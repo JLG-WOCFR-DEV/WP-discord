@@ -1138,6 +1138,9 @@ class Discord_Bot_JLG_Admin {
             }
             ?>
         </p>
+        <p class="description">
+            <?php esc_html_e('Lorsqu’un bloc, un widget ou un shortcode fournit un token d’override, la valeur est stockée temporairement côté serveur et remplacée par une référence sécurisée pour les rafraîchissements AJAX.', 'discord-bot-jlg'); ?>
+        </p>
         <?php if (!$constant_overridden && $has_saved_token) : ?>
             <p>
                 <label for="<?php echo esc_attr($delete_input_id); ?>">
