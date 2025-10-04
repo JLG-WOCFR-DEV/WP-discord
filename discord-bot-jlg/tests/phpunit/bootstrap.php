@@ -288,6 +288,7 @@ $GLOBALS['wp_test_inline_styles']     = array();
 $GLOBALS['wp_test_registered_scripts'] = array();
 $GLOBALS['wp_test_enqueued_scripts']   = array();
 $GLOBALS['wp_test_localized_scripts']  = array();
+$GLOBALS['wp_test_inline_scripts']     = array();
 
 function wp_register_style($handle, $src = '', $deps = array(), $ver = false) {
     $GLOBALS['wp_test_registered_styles'][$handle] = array(
@@ -326,6 +327,19 @@ function wp_register_script($handle, $src = '', $deps = array(), $ver = false, $
 
 function wp_enqueue_script($handle) {
     $GLOBALS['wp_test_enqueued_scripts'][$handle] = true;
+    return true;
+}
+
+function wp_add_inline_script($handle, $data, $position = 'after') {
+    if (!isset($GLOBALS['wp_test_inline_scripts'][$handle])) {
+        $GLOBALS['wp_test_inline_scripts'][$handle] = array();
+    }
+
+    $GLOBALS['wp_test_inline_scripts'][$handle][] = array(
+        'data'     => (string) $data,
+        'position' => $position,
+    );
+
     return true;
 }
 

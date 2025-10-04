@@ -1178,13 +1178,35 @@ class Discord_Bot_JLG_Shortcode {
             DISCORD_BOT_JLG_VERSION
         );
 
+        $script_dependencies = array();
+
         wp_register_script(
             'discord-bot-jlg-frontend',
             DISCORD_BOT_JLG_PLUGIN_URL . 'assets/js/discord-bot-jlg.js',
-            array('wp-polyfill', 'wp-api-fetch'),
+            $script_dependencies,
             DISCORD_BOT_JLG_VERSION,
             true
         );
+
+        if (function_exists('wp_get_script_polyfill')) {
+            if (function_exists('wp_scripts')) {
+                wp_scripts();
+            }
+
+            if (isset($GLOBALS['wp_scripts'])) {
+                $polyfill_loader = wp_get_script_polyfill(
+                    $GLOBALS['wp_scripts'],
+                    array(
+                        'fetch'   => array('wp-polyfill-fetch'),
+                        'Promise' => array('wp-polyfill-promise'),
+                    )
+                );
+
+                if (!empty($polyfill_loader) && function_exists('wp_add_inline_script')) {
+                    wp_add_inline_script('discord-bot-jlg-frontend', $polyfill_loader, 'before');
+                }
+            }
+        }
 
         $locale = str_replace('_', '-', get_locale());
 

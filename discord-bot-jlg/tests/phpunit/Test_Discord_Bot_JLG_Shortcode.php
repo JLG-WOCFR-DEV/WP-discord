@@ -14,6 +14,7 @@ class Test_Discord_Bot_JLG_Shortcode extends TestCase {
         $GLOBALS['wp_test_registered_scripts'] = array();
         $GLOBALS['wp_test_enqueued_scripts']   = array();
         $GLOBALS['wp_test_localized_scripts']  = array();
+        $GLOBALS['wp_test_inline_scripts']     = array();
 
         $this->reset_shortcode_static_state();
     }
@@ -216,5 +217,18 @@ class Test_Discord_Bot_JLG_Shortcode extends TestCase {
         $this->assertStringContainsString('--discord-accent: #ff00aa', $html);
         $this->assertStringContainsString('--discord-accent-secondary: #ff00aa', $html);
         $this->assertStringContainsString('--discord-accent-contrast: #0f0f0f', $html);
+    }
+
+    public function test_frontend_script_has_no_forced_polyfill_dependencies() {
+        $shortcode = $this->get_shortcode_instance();
+
+        $shortcode->render_shortcode(array());
+
+        $this->assertArrayHasKey('discord-bot-jlg-frontend', $GLOBALS['wp_test_registered_scripts']);
+
+        $registered_script = $GLOBALS['wp_test_registered_scripts']['discord-bot-jlg-frontend'];
+
+        $this->assertIsArray($registered_script['deps']);
+        $this->assertSame(array(), $registered_script['deps']);
     }
 }
