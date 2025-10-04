@@ -169,7 +169,6 @@ class Discord_Bot_JLG_API {
                 'bypass_cache' => false,
                 'profile_key'  => '',
                 'server_id'    => '',
-                'bot_token'    => '',
             )
         );
 
@@ -177,7 +176,6 @@ class Discord_Bot_JLG_API {
         $args['bypass_cache'] = discord_bot_jlg_validate_bool($args['bypass_cache']);
         $args['profile_key']  = isset($args['profile_key']) ? sanitize_key($args['profile_key']) : '';
         $args['server_id']    = isset($args['server_id']) ? $this->sanitize_server_id($args['server_id']) : '';
-        $args['bot_token']    = isset($args['bot_token']) ? $this->sanitize_token_override($args['bot_token']) : '';
 
         if (true === $args['force_demo']) {
             $demo_stats = $this->get_demo_stats(false);
@@ -467,15 +465,9 @@ class Discord_Bot_JLG_API {
             $server_id_override = $this->sanitize_server_id(wp_unslash($_POST['server_id']));
         }
 
-        $bot_token_override = '';
-        if (isset($_POST['bot_token'])) {
-            $bot_token_override = $this->sanitize_token_override(wp_unslash($_POST['bot_token']));
-        }
-
         $connection_args = array(
             'profile_key' => $profile_key_override,
             'server_id'   => $server_id_override,
-            'bot_token'   => $bot_token_override,
         );
 
         $options = $this->get_plugin_options();
@@ -634,7 +626,6 @@ class Discord_Bot_JLG_API {
                     'bypass_cache' => $bypass_cache,
                     'profile_key'  => $profile_key_override,
                     'server_id'    => $server_id_override,
-                    'bot_token'    => $bot_token_override,
                 )
             );
 
@@ -2143,7 +2134,6 @@ class Discord_Bot_JLG_API {
 
         $profile_key = isset($args['profile_key']) ? sanitize_key($args['profile_key']) : '';
         $server_id_override = isset($args['server_id']) ? $this->sanitize_server_id($args['server_id']) : '';
-        $bot_token_override = isset($args['bot_token']) ? $this->sanitize_token_override($args['bot_token']) : '';
 
         if ('' !== $profile_key) {
             $profile = $this->find_server_profile($profile_key, $options);
@@ -2183,12 +2173,6 @@ class Discord_Bot_JLG_API {
             $signature_parts[] = 'server:' . $server_id_override;
         }
 
-        if ('' !== $bot_token_override) {
-            $effective_options['bot_token'] = $bot_token_override;
-            $effective_options['__bot_token_override'] = true;
-            $signature_parts[] = 'token:' . sha1($bot_token_override);
-        }
-
         if (!isset($effective_options['server_id'])) {
             $effective_options['server_id'] = '';
         } else {
@@ -2224,20 +2208,6 @@ class Discord_Bot_JLG_API {
         $value = preg_replace('/[^0-9]/', '', (string) $value);
 
         return (string) $value;
-    }
-
-    private function sanitize_token_override($token) {
-        if (!is_string($token) && !is_numeric($token)) {
-            return '';
-        }
-
-        $token = trim((string) $token);
-
-        if ('' === $token) {
-            return '';
-        }
-
-        return sanitize_text_field($token);
     }
 
     private function find_server_profile($profile_key, $options) {

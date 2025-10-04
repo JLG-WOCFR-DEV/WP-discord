@@ -41,8 +41,7 @@
     function collectConnectionOverrides(container, config) {
         var overrides = {
             profileKey: '',
-            serverId: '',
-            botToken: ''
+            serverId: ''
         };
 
         if (config && typeof config === 'object') {
@@ -52,10 +51,6 @@
 
             if (typeof config.serverId === 'string' && config.serverId) {
                 overrides.serverId = config.serverId;
-            }
-
-            if (typeof config.botToken === 'string' && config.botToken) {
-                overrides.botToken = config.botToken;
             }
         }
 
@@ -69,15 +64,10 @@
             if (typeof dataset.serverIdOverride === 'string' && dataset.serverIdOverride) {
                 overrides.serverId = dataset.serverIdOverride;
             }
-
-            if (typeof dataset.botTokenOverride === 'string' && dataset.botTokenOverride) {
-                overrides.botToken = dataset.botTokenOverride;
-            }
         }
 
         overrides.profileKey = overrides.profileKey ? String(overrides.profileKey).trim() : '';
         overrides.serverId = overrides.serverId ? String(overrides.serverId).trim() : '';
-        overrides.botToken = overrides.botToken ? String(overrides.botToken).trim() : '';
 
         return overrides;
     }
@@ -1720,9 +1710,6 @@
             formData.append('server_id', overrides.serverId);
         }
 
-        if (overrides.botToken) {
-            formData.append('bot_token', overrides.botToken);
-        }
 
         var requestPromise = fetch(config.ajaxUrl, {
             method: 'POST',

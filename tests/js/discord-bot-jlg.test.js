@@ -248,6 +248,60 @@ describe('discord-bot-jlg integration', () => {
         expect(setTimeoutCalls[setTimeoutCalls.length - 1][1]).toBe(15000);
     });
 
+    test('refresh request omits bot token overrides from dataset or config', async () => {
+        const container = createContainer();
+        container.dataset.profileKey = 'profile-one';
+        container.dataset.serverIdOverride = '777';
+        container.dataset.botTokenOverride = 'should-be-ignored';
+
+        window.discordBotJlg = {
+            ajaxUrl: 'https://example.com/wp-admin/admin-ajax.php',
+            nonce: 'nonce',
+            requiresNonce: true,
+            locale: 'en-US',
+            minRefreshInterval: '5',
+            profileKey: 'config-profile',
+            serverId: 'config-server',
+            botToken: 'config-token'
+        };
+
+        global.fetch.mockResolvedValue({
+            ok: true,
+            json: () => Promise.resolve({
+                success: true,
+                data: {
+                    online: 3,
+                    total: 9,
+                    has_total: true,
+                    total_is_approximate: false,
+                    stale: false,
+                    is_demo: false,
+                    fallback_demo: false,
+                    server_name: 'Ignored Token Server',
+                    last_updated: 1700000000
+                }
+            })
+        });
+
+        loadScript();
+
+        runTimerByDelay(15000);
+        await flushPromises();
+
+        expect(global.fetch).toHaveBeenCalledTimes(1);
+        const request = global.fetch.mock.calls[0];
+        expect(request).toBeDefined();
+        expect(request[1]).toBeDefined();
+
+        const body = request[1].body;
+        expect(body).toBeInstanceOf(MockFormData);
+
+        const sentKeys = body.entries.map((entry) => entry[0]);
+        expect(sentKeys).toContain('profile_key');
+        expect(sentKeys).toContain('server_id');
+        expect(sentKeys).not.toContain('bot_token');
+    });
+
     test('refresh indicator toggles while stats request is in flight', async () => {
         const container = createContainer();
 
