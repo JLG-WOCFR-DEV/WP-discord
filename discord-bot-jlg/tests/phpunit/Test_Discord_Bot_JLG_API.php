@@ -136,6 +136,25 @@ class Stubbed_Discord_Bot_JLG_API extends Discord_Bot_JLG_API {
     }
 }
 
+class Recording_Discord_Bot_JLG_API extends Discord_Bot_JLG_API {
+    public $recorded_args = array();
+    private $mocked_responses = array();
+
+    public function set_mocked_responses(array $responses) {
+        $this->mocked_responses = array_values($responses);
+    }
+
+    public function get_stats($args = array()) {
+        $this->recorded_args[] = $args;
+
+        if (!empty($this->mocked_responses)) {
+            return array_shift($this->mocked_responses);
+        }
+
+        return array('online' => 1);
+    }
+}
+
 class Test_Discord_Bot_JLG_API extends TestCase {
     protected function setUp(): void {
         parent::setUp();
@@ -469,6 +488,58 @@ class Test_Discord_Bot_JLG_API extends TestCase {
         $this->assertSame($stats, $last_good_entry['value']['stats']);
         $this->assertIsInt($last_good_entry['value']['timestamp']);
         $this->assertGreaterThan(0, $last_good_entry['value']['timestamp']);
+    }
+
+    public function test_refresh_cache_via_cron_refreshes_all_profiles() {
+        $option_name = 'discord_server_stats_options';
+        $cache_key   = 'discord_server_stats_cache';
+
+        $GLOBALS['wp_test_options'][$option_name] = array(
+            'server_id'       => '123456789',
+            'bot_token'       => 'token-default',
+            'server_profiles' => array(
+                'alt' => array(
+                    'key'       => 'alt',
+                    'label'     => 'Alt Profile',
+                    'server_id' => '987654321',
+                    'bot_token' => 'token-alt',
+                ),
+                'beta' => array(
+                    'key'       => 'beta',
+                    'label'     => 'Beta Profile',
+                    'server_id' => '192837465',
+                    'bot_token' => 'token-beta',
+                ),
+            ),
+        );
+
+        $api = new Recording_Discord_Bot_JLG_API($option_name, $cache_key, 60);
+
+        $api->refresh_cache_via_cron();
+
+        $this->assertCount(3, $api->recorded_args);
+        $this->assertSame(
+            array(
+                'bypass_cache' => true,
+            ),
+            $api->recorded_args[0]
+        );
+
+        $this->assertSame(
+            array(
+                'profile_key'  => 'alt',
+                'bypass_cache' => true,
+            ),
+            $api->recorded_args[1]
+        );
+
+        $this->assertSame(
+            array(
+                'profile_key'  => 'beta',
+                'bypass_cache' => true,
+            ),
+            $api->recorded_args[2]
+        );
     }
 
     public function test_get_stats_uses_distinct_cache_key_for_server_override() {

@@ -828,10 +828,7 @@ class Discord_Bot_JLG_API {
             }
 
             $this->log_debug('Cron refresh failed: ' . $last_error);
-            return;
-        }
-
-        if (!empty($stats['is_demo']) && !empty($stats['fallback_demo'])) {
+        } elseif (!empty($stats['is_demo']) && !empty($stats['fallback_demo'])) {
             $last_error = $this->get_last_error_message();
 
             if ('' === $last_error) {
@@ -839,6 +836,70 @@ class Discord_Bot_JLG_API {
             }
 
             $this->log_debug('Cron refresh produced fallback stats: ' . $last_error);
+        }
+
+        $profiles = $this->get_server_profiles(true);
+
+        if (!is_array($profiles) || empty($profiles)) {
+            return;
+        }
+
+        foreach ($profiles as $profile_key => $profile) {
+            if (!is_array($profile)) {
+                continue;
+            }
+
+            $effective_profile_key = isset($profile['key']) ? sanitize_key($profile['key']) : sanitize_key($profile_key);
+
+            if ('' === $effective_profile_key) {
+                continue;
+            }
+
+            $profile_server_id = isset($profile['server_id']) ? $this->sanitize_server_id($profile['server_id']) : '';
+
+            if ('' === $profile_server_id) {
+                $this->log_debug(sprintf('Cron refresh skipped for profile "%s": missing server ID.', $effective_profile_key));
+                continue;
+            }
+
+            $profile_token = '';
+
+            if (isset($profile['bot_token'])) {
+                $profile_token = trim((string) $profile['bot_token']);
+            }
+
+            if ('' === $profile_token) {
+                $this->log_debug(sprintf('Cron refresh skipped for profile "%s": missing bot token.', $effective_profile_key));
+                continue;
+            }
+
+            $profile_stats = $this->get_stats(
+                array(
+                    'profile_key'  => $effective_profile_key,
+                    'bypass_cache' => true,
+                )
+            );
+
+            if (!is_array($profile_stats)) {
+                $last_error = $this->get_last_error_message();
+
+                if ('' === $last_error) {
+                    $last_error = 'Unknown error.';
+                }
+
+                $this->log_debug(sprintf('Cron refresh failed for profile "%s": %s', $effective_profile_key, $last_error));
+                continue;
+            }
+
+            if (!empty($profile_stats['is_demo']) && !empty($profile_stats['fallback_demo'])) {
+                $last_error = $this->get_last_error_message();
+
+                if ('' === $last_error) {
+                    $last_error = 'Fallback statistics returned.';
+                }
+
+                $this->log_debug(sprintf('Cron refresh produced fallback stats for profile "%s": %s', $effective_profile_key, $last_error));
+            }
         }
     }
 
