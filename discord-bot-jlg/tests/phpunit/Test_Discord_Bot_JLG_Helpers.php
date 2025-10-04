@@ -222,6 +222,39 @@ class Test_Discord_Bot_JLG_Helpers extends TestCase {
         remove_all_filters('discord_bot_jlg_secret_migrated');
     }
 
+    /**
+     * @runInSeparateProcess
+     * @preserveGlobalState disabled
+     */
+    public function test_decrypt_secret_migrates_secret_without_iv_using_current_prefix() {
+        $this->define_auth_constants();
+
+        $plaintext = 'token-without-iv';
+
+        $key_material = hash('sha256', self::AUTH_KEY, true);
+        $iv_material  = hash('sha256', self::AUTH_SALT . self::AUTH_KEY, true);
+        $iv           = substr($iv_material, 0, 16);
+        $ciphertext   = openssl_encrypt($plaintext, 'aes-256-cbc', $key_material, OPENSSL_RAW_DATA, $iv);
+        $mac          = hash_hmac('sha256', $ciphertext, self::AUTH_SALT, true);
+        $legacy       = DISCORD_BOT_JLG_SECRET_PREFIX . base64_encode($ciphertext . $mac);
+
+        $captured = null;
+        add_action('discord_bot_jlg_secret_migrated', function ($migrated, $original) use (&$captured) {
+            $captured = array($migrated, $original);
+        }, 10, 2);
+
+        $decrypted = discord_bot_jlg_decrypt_secret($legacy);
+
+        $this->assertFalse(is_wp_error($decrypted));
+        $this->assertSame($plaintext, $decrypted);
+        $this->assertIsArray($captured);
+        $this->assertSame($legacy, $captured[1]);
+        $this->assertTrue(discord_bot_jlg_is_encrypted_secret($captured[0]));
+        $this->assertStringStartsWith(DISCORD_BOT_JLG_SECRET_PREFIX, $captured[0]);
+
+        remove_all_filters('discord_bot_jlg_secret_migrated');
+    }
+
     private function define_auth_constants(): void {
         if (!defined('AUTH_KEY')) {
             define('AUTH_KEY', self::AUTH_KEY);

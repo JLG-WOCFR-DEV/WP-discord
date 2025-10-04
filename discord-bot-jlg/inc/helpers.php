@@ -415,26 +415,44 @@ if (!function_exists('discord_bot_jlg_decrypt_secret')) {
             return $plaintext;
         }
 
-        if (strlen($decoded) <= 48) {
+        $decoded_length = strlen($decoded);
+        $iv_length      = 16;
+        $mac_length     = 32;
+
+        if ($decoded_length >= ($iv_length + $mac_length + 1)) {
+            $iv                 = substr($decoded, 0, $iv_length);
+            $ciphertext_and_mac = substr($decoded, $iv_length);
+
+            if (strlen($ciphertext_and_mac) > $mac_length) {
+                $ciphertext = substr($ciphertext_and_mac, 0, -$mac_length);
+                $mac        = substr($ciphertext_and_mac, -$mac_length);
+                $expected   = hash_hmac('sha256', $iv . $ciphertext, AUTH_SALT, true);
+
+                if (hash_equals($expected, $mac)) {
+                    $plaintext = openssl_decrypt($ciphertext, 'aes-256-cbc', $key_material, OPENSSL_RAW_DATA, $iv);
+
+                    if (false === $plaintext) {
+                        return new WP_Error(
+                            'discord_bot_jlg_decrypt_secret_failed',
+                            __('Le déchiffrement du token Discord a échoué.', 'discord-bot-jlg')
+                        );
+                    }
+
+                    return $plaintext;
+                }
+            }
+        }
+
+        if ($decoded_length <= $mac_length) {
             return new WP_Error(
                 'discord_bot_jlg_decrypt_secret_invalid_payload',
                 __('Le token chiffré est corrompu ou incomplet.', 'discord-bot-jlg')
             );
         }
 
-        $iv                = substr($decoded, 0, 16);
-        $ciphertext_and_mac = substr($decoded, 16);
-
-        if (strlen($ciphertext_and_mac) <= 32) {
-            return new WP_Error(
-                'discord_bot_jlg_decrypt_secret_invalid_payload',
-                __('Le token chiffré est corrompu ou incomplet.', 'discord-bot-jlg')
-            );
-        }
-
-        $ciphertext = substr($ciphertext_and_mac, 0, -32);
-        $mac        = substr($ciphertext_and_mac, -32);
-        $expected   = hash_hmac('sha256', $iv . $ciphertext, AUTH_SALT, true);
+        $ciphertext = substr($decoded, 0, -$mac_length);
+        $mac        = substr($decoded, -$mac_length);
+        $expected   = hash_hmac('sha256', $ciphertext, AUTH_SALT, true);
 
         if (!hash_equals($expected, $mac)) {
             return new WP_Error(
@@ -443,6 +461,9 @@ if (!function_exists('discord_bot_jlg_decrypt_secret')) {
             );
         }
 
+        $iv_material = hash('sha256', AUTH_SALT . AUTH_KEY, true);
+        $iv          = substr($iv_material, 0, $iv_length);
+
         $plaintext = openssl_decrypt($ciphertext, 'aes-256-cbc', $key_material, OPENSSL_RAW_DATA, $iv);
 
         if (false === $plaintext) {
@@ -450,6 +471,14 @@ if (!function_exists('discord_bot_jlg_decrypt_secret')) {
                 'discord_bot_jlg_decrypt_secret_failed',
                 __('Le déchiffrement du token Discord a échoué.', 'discord-bot-jlg')
             );
+        }
+
+        if (function_exists('discord_bot_jlg_encrypt_secret')) {
+            $migrated = discord_bot_jlg_encrypt_secret($plaintext);
+
+            if (!is_wp_error($migrated) && function_exists('do_action')) {
+                do_action('discord_bot_jlg_secret_migrated', $migrated, $secret);
+            }
         }
 
         return $plaintext;
