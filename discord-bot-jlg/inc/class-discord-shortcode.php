@@ -184,7 +184,6 @@ class Discord_Bot_JLG_Shortcode {
                 'cta_tooltip'          => '',
                 'profile'              => '',
                 'server_id'            => '',
-                'bot_token'            => '',
             ),
             $atts,
             'discord_stats'
@@ -239,7 +238,16 @@ class Discord_Bot_JLG_Shortcode {
 
         $profile_key        = $this->sanitize_profile_key($atts['profile']);
         $override_server_id = $this->sanitize_server_id_attribute($atts['server_id']);
-        $override_bot_token = $this->sanitize_bot_token_attribute($atts['bot_token']);
+
+        $override_bot_token = '';
+        if (isset($received_atts['bot_token'])) {
+            $override_bot_token = $this->sanitize_bot_token_attribute($received_atts['bot_token']);
+        }
+
+        $token_reference_key = '';
+        if ('' !== $override_bot_token) {
+            $token_reference_key = $this->api->register_temporary_token_override($override_bot_token);
+        }
 
         if ($force_demo) {
             $stats = $this->api->get_demo_stats();
@@ -631,8 +639,8 @@ class Discord_Bot_JLG_Shortcode {
             $attributes[] = sprintf('data-server-id-override="%s"', esc_attr($override_server_id));
         }
 
-        if ('' !== $override_bot_token) {
-            $attributes[] = sprintf('data-bot-token-override="%s"', esc_attr($override_bot_token));
+        if ('' !== $token_reference_key) {
+            $attributes[] = sprintf('data-token-key="%s"', esc_attr($token_reference_key));
         }
 
         $refresh_interval = 0;

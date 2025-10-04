@@ -81,6 +81,12 @@ Pendant une requête d'actualisation, le conteneur affiche désormais un indicat
 
 Les rafraîchissements publics (visiteurs non connectés) n'exigent plus de nonce WordPress ; seuls les administrateurs connectés utilisent un jeton de sécurité pour l'action AJAX `refresh_discord_stats`.
 
+### Sécurisation des tokens temporaires
+
+Les surcharges de tokens transmises via le shortcode, le bloc ou le widget ne sont plus renvoyées telles quelles dans le HTML. Lors du rendu, le plugin stocke le secret côté serveur (transient de 15 minutes par défaut) et associe uniquement une référence opaque (`data-token-key`) au conteneur public. Le script `discord-bot-jlg.js` envoie ensuite ce `token_key` lors des rafraîchissements AJAX ; la méthode PHP `resolve_connection_context()` résout le token réel et le réinjecte dans l'appel HTTP sans jamais l'exposer au navigateur.
+
+Le délai d'expiration des références peut être ajusté via le filtre `discord_bot_jlg_token_reference_ttl`. Si la référence n'est plus valide (purge de cache, expiration…), un simple rechargement de la page régénère automatiquement un identifiant et réactive l'auto-actualisation.
+
 ### Accessibilité
 
 Le plugin embarque sa propre définition `.screen-reader-text`, incluse à la fois dans les feuilles de style principales et inline chargées par le shortcode. Ce fallback reprend le pattern WordPress (position absolue, dimensions réduites à 1px, `clip-path: inset(50%)`, etc.) afin que les libellés masqués restent interprétables par les lecteurs d'écran même si le thème actif ne fournit pas cette classe utilitaire.

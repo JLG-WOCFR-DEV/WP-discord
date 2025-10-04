@@ -976,6 +976,7 @@ class Discord_Bot_JLG_Admin {
             <li><?php esc_html_e('Ouvrez cette URL dans votre navigateur', 'discord-bot-jlg'); ?></li>
             <li><?php echo wp_kses_post(__('Sélectionnez votre serveur et cliquez sur <strong>"Autoriser"</strong>', 'discord-bot-jlg')); ?></li>
         </ol>
+        <p><?php echo wp_kses_post(__('🔒 Le token que vous collez dans WordPress reste côté serveur : le front reçoit uniquement une référence éphémère utilisée par les rafraîchissements AJAX. En cas d’expiration, un simple rechargement de la page régénère la référence.', 'discord-bot-jlg')); ?></p>
 
         <h4><?php esc_html_e('Étape 3 : Obtenir l\'ID de votre serveur', 'discord-bot-jlg'); ?></h4>
         <ol>

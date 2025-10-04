@@ -27,10 +27,10 @@ class Test_Discord_Bot_JLG_Shortcode extends TestCase {
         }
     }
 
-    private function get_shortcode_instance($custom_css = '') {
+    private function get_shortcode_instance($custom_css = '', callable $configure = null) {
         $api = $this->getMockBuilder(Discord_Bot_JLG_API::class)
             ->disableOriginalConstructor()
-            ->onlyMethods(array('get_plugin_options', 'get_stats', 'get_demo_stats'))
+            ->onlyMethods(array('get_plugin_options', 'get_stats', 'get_demo_stats', 'register_temporary_token_override'))
             ->getMock();
 
         $options = array(
@@ -84,6 +84,11 @@ class Test_Discord_Bot_JLG_Shortcode extends TestCase {
         $api->method('get_plugin_options')->willReturn($options);
         $api->method('get_stats')->willReturn($stats);
         $api->method('get_demo_stats')->willReturn($stats);
+        $api->method('register_temporary_token_override')->willReturn('');
+
+        if (null !== $configure) {
+            $configure($api);
+        }
 
         return new Discord_Bot_JLG_Shortcode(DISCORD_BOT_JLG_OPTION_NAME, $api);
     }
@@ -216,5 +221,24 @@ class Test_Discord_Bot_JLG_Shortcode extends TestCase {
         $this->assertStringContainsString('--discord-accent: #ff00aa', $html);
         $this->assertStringContainsString('--discord-accent-secondary: #ff00aa', $html);
         $this->assertStringContainsString('--discord-accent-contrast: #0f0f0f', $html);
+    }
+
+    public function test_render_shortcode_exposes_token_reference_instead_of_value() {
+        $expected_key = 'securetokenref';
+
+        $shortcode = $this->get_shortcode_instance('', function ($api) use ($expected_key) {
+            $api->expects($this->once())
+                ->method('register_temporary_token_override')
+                ->with('override-token')
+                ->willReturn($expected_key);
+        });
+
+        $html = $shortcode->render_shortcode(array(
+            'bot_token' => ' override-token ',
+        ));
+
+        $this->assertStringContainsString('data-token-key="' . $expected_key . '"', $html);
+        $this->assertStringNotContainsString('data-bot-token-override', $html);
+        $this->assertStringNotContainsString('override-token', $html);
     }
 }

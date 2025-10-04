@@ -22,6 +22,8 @@ class Discord_Bot_JLG_API {
     const FALLBACK_RETRY_SUFFIX = '_fallback_retry_after';
     const FALLBACK_RETRY_API_DELAY_SUFFIX = '_fallback_retry_after_delay';
     const LAST_FALLBACK_OPTION = 'discord_bot_jlg_last_fallback';
+    const TOKEN_REFERENCE_PREFIX = 'discord_bot_jlg_token_ref_';
+    const TOKEN_REFERENCE_TTL = 900;
 
     private $option_name;
     private $cache_key;
@@ -90,6 +92,32 @@ class Discord_Bot_JLG_API {
         }
 
         return $this->options_cache;
+    }
+
+    public function register_temporary_token_override($token) {
+        $token = $this->sanitize_token_override($token);
+
+        if ('' === $token) {
+            return '';
+        }
+
+        $attempts = 0;
+        $token_key = '';
+
+        do {
+            $token_key = $this->generate_token_reference_key();
+            $transient_key = $this->get_token_reference_transient_key($token_key);
+            $attempts++;
+        } while ('' !== $token_key && false !== get_transient($transient_key) && $attempts < 5);
+
+        if ('' === $token_key) {
+            return '';
+        }
+
+        $transient_key = $this->get_token_reference_transient_key($token_key);
+        set_transient($transient_key, array('token' => $token), $this->get_token_reference_ttl());
+
+        return $token_key;
     }
 
     public function get_server_profiles($include_sensitive = false) {
@@ -170,6 +198,7 @@ class Discord_Bot_JLG_API {
                 'profile_key'  => '',
                 'server_id'    => '',
                 'bot_token'    => '',
+                'token_key'    => '',
             )
         );
 
@@ -178,6 +207,7 @@ class Discord_Bot_JLG_API {
         $args['profile_key']  = isset($args['profile_key']) ? sanitize_key($args['profile_key']) : '';
         $args['server_id']    = isset($args['server_id']) ? $this->sanitize_server_id($args['server_id']) : '';
         $args['bot_token']    = isset($args['bot_token']) ? $this->sanitize_token_override($args['bot_token']) : '';
+        $args['token_key']    = isset($args['token_key']) ? $this->sanitize_token_reference_key($args['token_key']) : '';
 
         if (true === $args['force_demo']) {
             $demo_stats = $this->get_demo_stats(false);
@@ -472,10 +502,16 @@ class Discord_Bot_JLG_API {
             $bot_token_override = $this->sanitize_token_override(wp_unslash($_POST['bot_token']));
         }
 
+        $token_reference_key = '';
+        if (isset($_POST['token_key'])) {
+            $token_reference_key = $this->sanitize_token_reference_key(wp_unslash($_POST['token_key']));
+        }
+
         $connection_args = array(
             'profile_key' => $profile_key_override,
             'server_id'   => $server_id_override,
             'bot_token'   => $bot_token_override,
+            'token_key'   => $token_reference_key,
         );
 
         $options = $this->get_plugin_options();
@@ -2136,6 +2172,102 @@ class Discord_Bot_JLG_API {
         return $decrypted;
     }
 
+    private function get_token_reference_ttl() {
+        $ttl = self::TOKEN_REFERENCE_TTL;
+
+        if (function_exists('apply_filters')) {
+            $filtered = apply_filters('discord_bot_jlg_token_reference_ttl', $ttl);
+            if (is_numeric($filtered)) {
+                $ttl = (int) $filtered;
+            }
+        }
+
+        if ($ttl <= 0) {
+            $ttl = self::TOKEN_REFERENCE_TTL;
+        }
+
+        return max(60, $ttl);
+    }
+
+    private function get_token_reference_transient_key($token_key) {
+        return self::TOKEN_REFERENCE_PREFIX . $token_key;
+    }
+
+    private function generate_token_reference_key() {
+        if (function_exists('wp_generate_uuid4')) {
+            $uuid = wp_generate_uuid4();
+            $key = preg_replace('/[^a-f0-9]/', '', strtolower((string) $uuid));
+
+            if ('' !== $key) {
+                return $key;
+            }
+        }
+
+        try {
+            $bytes = random_bytes(16);
+            if (false !== $bytes) {
+                return bin2hex($bytes);
+            }
+        } catch (Exception $exception) {
+            // Fallback handled below.
+        }
+
+        return preg_replace('/[^a-f0-9]/', '', strtolower((string) uniqid('', true)));
+    }
+
+    private function resolve_token_reference($token_key) {
+        $token_key = $this->sanitize_token_reference_key($token_key);
+
+        if ('' === $token_key) {
+            return '';
+        }
+
+        $transient_key = $this->get_token_reference_transient_key($token_key);
+        $stored_value  = get_transient($transient_key);
+
+        if (false === $stored_value) {
+            return new WP_Error(
+                'discord_bot_jlg_token_reference_missing',
+                __('Le jeton temporaire a expiré, merci de recharger la page.', 'discord-bot-jlg')
+            );
+        }
+
+        $token = '';
+
+        if (is_array($stored_value) && isset($stored_value['token'])) {
+            $token = $this->sanitize_token_override($stored_value['token']);
+        } elseif (is_string($stored_value) || is_numeric($stored_value)) {
+            $token = $this->sanitize_token_override($stored_value);
+        }
+
+        if ('' === $token) {
+            delete_transient($transient_key);
+
+            return new WP_Error(
+                'discord_bot_jlg_token_reference_missing',
+                __('Le jeton temporaire a expiré, merci de recharger la page.', 'discord-bot-jlg')
+            );
+        }
+
+        set_transient($transient_key, array('token' => $token), $this->get_token_reference_ttl());
+
+        return $token;
+    }
+
+    private function sanitize_token_reference_key($token_key) {
+        if (!is_string($token_key) && !is_numeric($token_key)) {
+            return '';
+        }
+
+        $sanitized = preg_replace('/[^a-zA-Z0-9_-]/', '', (string) $token_key);
+
+        if ('' === $sanitized) {
+            return '';
+        }
+
+        return strtolower($sanitized);
+    }
+
     private function resolve_connection_context($args, $options) {
         $options = is_array($options) ? $options : array();
         $effective_options = $options;
@@ -2144,6 +2276,7 @@ class Discord_Bot_JLG_API {
         $profile_key = isset($args['profile_key']) ? sanitize_key($args['profile_key']) : '';
         $server_id_override = isset($args['server_id']) ? $this->sanitize_server_id($args['server_id']) : '';
         $bot_token_override = isset($args['bot_token']) ? $this->sanitize_token_override($args['bot_token']) : '';
+        $token_reference_key = isset($args['token_key']) ? $this->sanitize_token_reference_key($args['token_key']) : '';
 
         if ('' !== $profile_key) {
             $profile = $this->find_server_profile($profile_key, $options);
@@ -2187,6 +2320,25 @@ class Discord_Bot_JLG_API {
             $effective_options['bot_token'] = $bot_token_override;
             $effective_options['__bot_token_override'] = true;
             $signature_parts[] = 'token:' . sha1($bot_token_override);
+        }
+
+        if ('' !== $token_reference_key) {
+            $resolved_token = $this->resolve_token_reference($token_reference_key);
+
+            if (is_wp_error($resolved_token)) {
+                return array(
+                    'options'   => $effective_options,
+                    'cache_key' => $this->build_cache_key_from_signature('default'),
+                    'signature' => 'token-ref:' . $token_reference_key,
+                    'error'     => $resolved_token,
+                );
+            }
+
+            if ('' !== $resolved_token) {
+                $effective_options['bot_token'] = $resolved_token;
+                $effective_options['__bot_token_override'] = true;
+                $signature_parts[] = 'token-ref:' . $token_reference_key;
+            }
         }
 
         if (!isset($effective_options['server_id'])) {

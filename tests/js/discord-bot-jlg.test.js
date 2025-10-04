@@ -184,6 +184,7 @@ describe('discord-bot-jlg integration', () => {
 
     test('successful refresh updates DOM elements and clears errors', async () => {
         const container = createContainer();
+        container.dataset.tokenKey = 'abc123';
 
         window.discordBotJlg = {
             ajaxUrl: 'https://example.com/wp-admin/admin-ajax.php',
@@ -243,6 +244,17 @@ describe('discord-bot-jlg integration', () => {
         expect(demoBadge).toBeNull();
         expect(container.dataset.refreshing).toBe('false');
         expect(container.querySelector('.discord-refresh-status')).toBeNull();
+
+        const requestOptions = global.fetch.mock.calls[0][1];
+        expect(requestOptions.body).toBeInstanceOf(MockFormData);
+        expect(requestOptions.body.entries).toEqual(
+            expect.arrayContaining([
+                ['action', 'refresh_discord_stats'],
+                ['token_key', 'abc123']
+            ])
+        );
+        const tokenEntries = requestOptions.body.entries.filter((entry) => entry[0] === 'bot_token');
+        expect(tokenEntries.length).toBe(0);
 
         const setTimeoutCalls = setTimeoutSpy.mock.calls;
         expect(setTimeoutCalls[setTimeoutCalls.length - 1][1]).toBe(15000);

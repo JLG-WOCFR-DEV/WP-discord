@@ -486,6 +486,64 @@ class Test_Discord_Bot_JLG_API extends TestCase {
         $this->assertSame($stats, $cached_stats);
     }
 
+    public function test_get_stats_uses_token_reference_override() {
+        $option_name = 'discord_server_stats_options';
+        $cache_key   = 'discord_server_stats_cache';
+
+        $GLOBALS['wp_test_options'][$option_name] = array(
+            'server_id'      => '97531',
+            'cache_duration' => 120,
+        );
+
+        $widget_payload = array(
+            'presence_count' => 2,
+            'name'           => 'Reference Guild',
+            'members'        => array(
+                array('id' => 1, 'status' => 'online'),
+                array('id' => 2, 'status' => 'idle'),
+            ),
+        );
+
+        $bot_payload = array(
+            'approximate_presence_count' => 2,
+            'approximate_member_count'   => 80,
+            'name'                       => 'Reference Guild',
+        );
+
+        $http_client = new Successful_Mock_Discord_Bot_JLG_Http_Client($widget_payload, $bot_payload);
+        $api         = new Discord_Bot_JLG_API($option_name, $cache_key, 60, $http_client);
+
+        $reference = $api->register_temporary_token_override('override-secret');
+
+        $this->assertNotSame('', $reference);
+
+        $transient_key = Discord_Bot_JLG_API::TOKEN_REFERENCE_PREFIX . $reference;
+        $this->assertArrayHasKey($transient_key, $GLOBALS['wp_test_transients']);
+
+        $stats = $api->get_stats(
+            array(
+                'bypass_cache' => true,
+                'token_key'    => $reference,
+            )
+        );
+
+        $this->assertIsArray($stats);
+        $this->assertSame('Reference Guild', $stats['server_name']);
+
+        $bot_request = null;
+        foreach ($http_client->requests as $request) {
+            if ('bot' === $request['context']) {
+                $bot_request = $request;
+                break;
+            }
+        }
+
+        $this->assertNotNull($bot_request, 'Bot request should be issued when token reference is provided.');
+        $this->assertArrayHasKey('headers', $bot_request['args']);
+        $this->assertArrayHasKey('Authorization', $bot_request['args']['headers']);
+        $this->assertSame('Bot override-secret', $bot_request['args']['headers']['Authorization']);
+    }
+
     public function test_get_stats_treats_string_force_demo_as_true() {
         $option_name = 'discord_server_stats_options';
         $cache_key   = 'discord_server_stats_cache';
@@ -524,6 +582,42 @@ class Test_Discord_Bot_JLG_API extends TestCase {
 
         $this->assertSame($cached_stats, $stats);
         $this->assertSame(0, $http_client->call_count, 'Cached payload should prevent HTTP requests');
+    }
+
+    public function test_ajax_refresh_stats_returns_error_when_token_reference_expired() {
+        $option_name = 'discord_server_stats_options';
+        $cache_key   = 'discord_server_stats_cache';
+
+        $GLOBALS['wp_test_options'][$option_name] = array(
+            'server_id'      => '123456789',
+            'cache_duration' => 60,
+        );
+
+        $http_client = new Mock_Discord_Bot_JLG_Http_Client();
+        $api         = new Discord_Bot_JLG_API($option_name, $cache_key, 60, $http_client);
+
+        $reference = $api->register_temporary_token_override('temp-token');
+        $this->assertNotSame('', $reference);
+
+        $transient_key = Discord_Bot_JLG_API::TOKEN_REFERENCE_PREFIX . $reference;
+        delete_transient($transient_key);
+
+        $_POST = array(
+            'token_key' => $reference,
+        );
+
+        try {
+            $api->ajax_refresh_stats();
+            $this->fail('Expected ajax_refresh_stats to throw WP_Send_JSON_Error');
+        } catch (WP_Send_JSON_Error $error) {
+            $this->assertIsArray($error->data);
+            $this->assertArrayHasKey('message', $error->data);
+            $this->assertSame(
+                'Le jeton temporaire a expiré, merci de recharger la page.',
+                $error->data['message']
+            );
+            $this->assertSame(400, $error->status_code);
+        }
     }
 
     public function test_ajax_refresh_stats_reuses_cached_fallback_until_retry_window() {
