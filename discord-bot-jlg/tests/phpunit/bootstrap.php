@@ -431,6 +431,26 @@ function remove_all_filters($hook) {
     }
 }
 
+function do_action($hook, ...$args) {
+    if (!isset($GLOBALS['wp_test_filters'][$hook])) {
+        return;
+    }
+
+    ksort($GLOBALS['wp_test_filters'][$hook]);
+
+    foreach ($GLOBALS['wp_test_filters'][$hook] as $priority => $callbacks) {
+        foreach ($callbacks as $callback) {
+            $params = array();
+
+            if ($callback['accepted_args'] > 0) {
+                $params = array_slice($args, 0, $callback['accepted_args']);
+            }
+
+            call_user_func_array($callback['callback'], $params);
+        }
+    }
+}
+
 function apply_filters($hook, $value, ...$args) {
     if (!isset($GLOBALS['wp_test_filters'][$hook])) {
         return $value;

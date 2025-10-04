@@ -3,8 +3,12 @@
  * Shared helper functions for Discord Bot JLG plugin.
  */
 
+if (!defined('DISCORD_BOT_JLG_SECRET_PREFIX_LEGACY')) {
+    define('DISCORD_BOT_JLG_SECRET_PREFIX_LEGACY', 'dbjlg_enc_v1:');
+}
+
 if (!defined('DISCORD_BOT_JLG_SECRET_PREFIX')) {
-    define('DISCORD_BOT_JLG_SECRET_PREFIX', 'dbjlg_enc_v1:');
+    define('DISCORD_BOT_JLG_SECRET_PREFIX', 'dbjlg_enc_v2:');
 }
 
 if (!function_exists('discord_bot_jlg_get_available_themes')) {
@@ -193,11 +197,25 @@ if (!function_exists('discord_bot_jlg_is_encrypted_secret')) {
      * @return bool
      */
     function discord_bot_jlg_is_encrypted_secret($value) {
-        return (
-            is_string($value)
-            && '' !== $value
-            && 0 === strpos($value, DISCORD_BOT_JLG_SECRET_PREFIX)
-        );
+        if (!is_string($value) || '' === $value) {
+            return false;
+        }
+
+        $prefixes = array(DISCORD_BOT_JLG_SECRET_PREFIX);
+
+        if (defined('DISCORD_BOT_JLG_SECRET_PREFIX_LEGACY')) {
+            $prefixes[] = DISCORD_BOT_JLG_SECRET_PREFIX_LEGACY;
+        }
+
+        $prefixes = array_values(array_unique(array_filter($prefixes, 'strlen')));
+
+        foreach ($prefixes as $prefix) {
+            if (0 === strpos($value, $prefix)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 }
 
@@ -237,9 +255,24 @@ if (!function_exists('discord_bot_jlg_encrypt_secret')) {
             );
         }
 
+        try {
+            $iv = random_bytes(16);
+        } catch (Exception $exception) {
+            if (function_exists('openssl_random_pseudo_bytes')) {
+                $iv = openssl_random_pseudo_bytes(16);
+            } else {
+                $iv = false;
+            }
+        }
+
+        if (false === $iv || 16 !== strlen($iv)) {
+            return new WP_Error(
+                'discord_bot_jlg_encrypt_secret_iv_generation_failed',
+                __('La génération de l’IV aléatoire a échoué pour le chiffrement du token Discord.', 'discord-bot-jlg')
+            );
+        }
+
         $key_material = hash('sha256', AUTH_KEY, true);
-        $iv_material  = hash('sha256', AUTH_SALT . AUTH_KEY, true);
-        $iv           = substr($iv_material, 0, 16);
 
         $ciphertext = openssl_encrypt($secret, 'aes-256-cbc', $key_material, OPENSSL_RAW_DATA, $iv);
 
@@ -250,9 +283,9 @@ if (!function_exists('discord_bot_jlg_encrypt_secret')) {
             );
         }
 
-        $mac = hash_hmac('sha256', $ciphertext, AUTH_SALT, true);
+        $mac = hash_hmac('sha256', $iv . $ciphertext, AUTH_SALT, true);
 
-        return DISCORD_BOT_JLG_SECRET_PREFIX . base64_encode($ciphertext . $mac);
+        return DISCORD_BOT_JLG_SECRET_PREFIX . base64_encode($iv . $ciphertext . $mac);
     }
 }
 
@@ -302,19 +335,106 @@ if (!function_exists('discord_bot_jlg_decrypt_secret')) {
             );
         }
 
-        $payload = substr($secret, strlen(DISCORD_BOT_JLG_SECRET_PREFIX));
+        $prefixes = array(
+            'current' => DISCORD_BOT_JLG_SECRET_PREFIX,
+        );
+
+        if (defined('DISCORD_BOT_JLG_SECRET_PREFIX_LEGACY')) {
+            $prefixes['legacy'] = DISCORD_BOT_JLG_SECRET_PREFIX_LEGACY;
+        }
+
+        $matched_prefix_key = null;
+        $matched_prefix     = null;
+
+        foreach ($prefixes as $key => $prefix) {
+            if (0 === strpos($secret, $prefix)) {
+                $matched_prefix_key = $key;
+                $matched_prefix     = $prefix;
+                break;
+            }
+        }
+
+        if (null === $matched_prefix) {
+            return new WP_Error(
+                'discord_bot_jlg_decrypt_secret_unrecognized_prefix',
+                __('Le format du token enregistré n’est pas reconnu comme un secret chiffré.', 'discord-bot-jlg')
+            );
+        }
+
+        $payload = substr($secret, strlen($matched_prefix));
         $decoded = base64_decode($payload, true);
 
-        if (false === $decoded || strlen($decoded) <= 32) {
+        if (false === $decoded) {
             return new WP_Error(
                 'discord_bot_jlg_decrypt_secret_invalid_payload',
                 __('Le token chiffré est corrompu ou incomplet.', 'discord-bot-jlg')
             );
         }
 
-        $ciphertext = substr($decoded, 0, -32);
-        $mac        = substr($decoded, -32);
-        $expected   = hash_hmac('sha256', $ciphertext, AUTH_SALT, true);
+        $key_material = hash('sha256', AUTH_KEY, true);
+
+        if ('legacy' === $matched_prefix_key) {
+            if (strlen($decoded) <= 32) {
+                return new WP_Error(
+                    'discord_bot_jlg_decrypt_secret_invalid_payload',
+                    __('Le token chiffré est corrompu ou incomplet.', 'discord-bot-jlg')
+                );
+            }
+
+            $ciphertext = substr($decoded, 0, -32);
+            $mac        = substr($decoded, -32);
+            $expected   = hash_hmac('sha256', $ciphertext, AUTH_SALT, true);
+
+            if (!hash_equals($expected, $mac)) {
+                return new WP_Error(
+                    'discord_bot_jlg_decrypt_secret_mac_mismatch',
+                    __('Le token chiffré n’a pas pu être vérifié.', 'discord-bot-jlg')
+                );
+            }
+
+            $iv_material = hash('sha256', AUTH_SALT . AUTH_KEY, true);
+            $iv          = substr($iv_material, 0, 16);
+
+            $plaintext = openssl_decrypt($ciphertext, 'aes-256-cbc', $key_material, OPENSSL_RAW_DATA, $iv);
+
+            if (false === $plaintext) {
+                return new WP_Error(
+                    'discord_bot_jlg_decrypt_secret_failed',
+                    __('Le déchiffrement du token Discord a échoué.', 'discord-bot-jlg')
+                );
+            }
+
+            if (function_exists('discord_bot_jlg_encrypt_secret')) {
+                $migrated = discord_bot_jlg_encrypt_secret($plaintext);
+
+                if (!is_wp_error($migrated) && function_exists('do_action')) {
+                    do_action('discord_bot_jlg_secret_migrated', $migrated, $secret);
+                }
+            }
+
+            return $plaintext;
+        }
+
+        if (strlen($decoded) <= 48) {
+            return new WP_Error(
+                'discord_bot_jlg_decrypt_secret_invalid_payload',
+                __('Le token chiffré est corrompu ou incomplet.', 'discord-bot-jlg')
+            );
+        }
+
+        $iv                = substr($decoded, 0, 16);
+        $ciphertext_and_mac = substr($decoded, 16);
+
+        if (strlen($ciphertext_and_mac) <= 32) {
+            return new WP_Error(
+                'discord_bot_jlg_decrypt_secret_invalid_payload',
+                __('Le token chiffré est corrompu ou incomplet.', 'discord-bot-jlg')
+            );
+        }
+
+        $ciphertext = substr($ciphertext_and_mac, 0, -32);
+        $mac        = substr($ciphertext_and_mac, -32);
+        $expected   = hash_hmac('sha256', $iv . $ciphertext, AUTH_SALT, true);
 
         if (!hash_equals($expected, $mac)) {
             return new WP_Error(
@@ -322,10 +442,6 @@ if (!function_exists('discord_bot_jlg_decrypt_secret')) {
                 __('Le token chiffré n’a pas pu être vérifié.', 'discord-bot-jlg')
             );
         }
-
-        $key_material = hash('sha256', AUTH_KEY, true);
-        $iv_material  = hash('sha256', AUTH_SALT . AUTH_KEY, true);
-        $iv           = substr($iv_material, 0, 16);
 
         $plaintext = openssl_decrypt($ciphertext, 'aes-256-cbc', $key_material, OPENSSL_RAW_DATA, $iv);
 
