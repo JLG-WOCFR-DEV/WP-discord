@@ -2276,6 +2276,22 @@ class Discord_Bot_JLG_API {
         $effective_options = $options;
         $signature_parts = array();
 
+        $args = is_array($args) ? $args : array();
+
+        $token_override_keys = array(
+            'bot_token',
+            'bot_token_override',
+            '__bot_token_override',
+            'botToken',
+            'botTokenOverride',
+        );
+
+        foreach ($token_override_keys as $token_key) {
+            if (array_key_exists($token_key, $args)) {
+                unset($args[$token_key]);
+            }
+        }
+
         $profile_key = isset($args['profile_key']) ? sanitize_key($args['profile_key']) : '';
         $server_id_override = isset($args['server_id']) ? $this->sanitize_server_id($args['server_id']) : '';
 

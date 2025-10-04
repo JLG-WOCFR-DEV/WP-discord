@@ -56,6 +56,14 @@
 
         var dataset = container && container.dataset ? container.dataset : null;
 
+        if (dataset && Object.prototype.hasOwnProperty.call(dataset, 'botTokenOverride')) {
+            try {
+                delete dataset.botTokenOverride;
+            } catch (error) {
+                dataset.botTokenOverride = '';
+            }
+        }
+
         if (dataset) {
             if (typeof dataset.profileKey === 'string' && dataset.profileKey) {
                 overrides.profileKey = dataset.profileKey;

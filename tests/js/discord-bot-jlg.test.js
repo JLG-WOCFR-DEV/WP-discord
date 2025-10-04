@@ -300,6 +300,8 @@ describe('discord-bot-jlg integration', () => {
         expect(sentKeys).toContain('profile_key');
         expect(sentKeys).toContain('server_id');
         expect(sentKeys).not.toContain('bot_token');
+        expect(container.hasAttribute('data-bot-token-override')).toBe(false);
+        expect('botTokenOverride' in container.dataset).toBe(false);
     });
 
     test('refresh indicator toggles while stats request is in flight', async () => {
