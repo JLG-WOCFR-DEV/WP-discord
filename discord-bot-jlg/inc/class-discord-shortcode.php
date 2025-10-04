@@ -39,6 +39,24 @@ class Discord_Bot_JLG_Shortcode {
     public function render_shortcode($atts) {
         $options = $this->api->get_plugin_options();
 
+        $normalized_atts = is_array($atts) ? $atts : array();
+        $received_atts   = $normalized_atts;
+
+        $sensitive_attribute_keys = array(
+            'bot_token',
+            'bot_token_override',
+            '__bot_token_override',
+            'botToken',
+            'botTokenOverride',
+        );
+
+        foreach ($sensitive_attribute_keys as $sensitive_key) {
+            if (array_key_exists($sensitive_key, $normalized_atts)) {
+                unset($normalized_atts[$sensitive_key]);
+                unset($received_atts[$sensitive_key]);
+            }
+        }
+
         $default_theme = 'discord';
         if (
             isset($options['default_theme'])
@@ -119,8 +137,6 @@ class Discord_Bot_JLG_Shortcode {
             min($max_refresh_option, $default_refresh_interval)
         );
 
-        $received_atts = is_array($atts) ? $atts : array();
-
         $atts = shortcode_atts(
             array(
                 'layout'               => 'horizontal',
@@ -185,7 +201,7 @@ class Discord_Bot_JLG_Shortcode {
                 'profile'              => '',
                 'server_id'            => '',
             ),
-            $atts,
+            $normalized_atts,
             'discord_stats'
         );
 

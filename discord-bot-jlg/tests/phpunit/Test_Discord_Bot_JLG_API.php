@@ -543,6 +543,108 @@ class Test_Discord_Bot_JLG_API extends TestCase {
         $this->assertSame($stats, $cached_stats);
     }
 
+    public function test_get_stats_ignores_bot_token_override_from_args() {
+        $option_name = 'discord_server_stats_options';
+        $cache_key   = 'discord_server_stats_cache';
+
+        $GLOBALS['wp_test_options'][$option_name] = array(
+            'server_id'      => '1357911',
+            'cache_duration' => 60,
+            'bot_token'      => 'stored-token',
+        );
+
+        $widget_payload = array(
+            'presence_count' => 6,
+            'name'           => 'Token Guarded Guild',
+        );
+
+        $bot_payload = array(
+            'approximate_presence_count' => 12,
+            'approximate_member_count'   => 48,
+            'name'                       => 'Token Guarded Guild',
+            'premium_subscription_count' => 2,
+        );
+
+        $http_client = new Successful_Mock_Discord_Bot_JLG_Http_Client($widget_payload, $bot_payload);
+        $api         = new Discord_Bot_JLG_API($option_name, $cache_key, 60, $http_client);
+
+        $api->get_stats(
+            array(
+                'bypass_cache' => true,
+                'bot_token'    => 'injected-token',
+            )
+        );
+
+        $this->assertSame(2, count($http_client->requests));
+
+        $bot_request = null;
+        foreach ($http_client->requests as $request) {
+            if ('bot' === $request['context']) {
+                $bot_request = $request;
+                break;
+            }
+        }
+
+        $this->assertNotNull($bot_request, 'Expected a bot request to be issued');
+        $this->assertArrayHasKey('headers', $bot_request['args']);
+        $this->assertArrayHasKey('Authorization', $bot_request['args']['headers']);
+        $this->assertSame('Bot stored-token', $bot_request['args']['headers']['Authorization']);
+    }
+
+    /**
+     * @runInSeparateProcess
+     * @preserveGlobalState disabled
+     */
+    public function test_get_stats_prefers_constant_token_over_arg_override() {
+        define('DISCORD_BOT_JLG_TOKEN', 'constant-token');
+
+        $option_name = 'discord_server_stats_options';
+        $cache_key   = 'discord_server_stats_cache';
+
+        $GLOBALS['wp_test_options'][$option_name] = array(
+            'server_id'      => '2468024',
+            'cache_duration' => 60,
+            'bot_token'      => 'stored-token',
+        );
+
+        $widget_payload = array(
+            'presence_count' => 4,
+            'name'           => 'Constant Token Guild',
+        );
+
+        $bot_payload = array(
+            'approximate_presence_count' => 8,
+            'approximate_member_count'   => 32,
+            'name'                       => 'Constant Token Guild',
+            'premium_subscription_count' => 5,
+        );
+
+        $http_client = new Successful_Mock_Discord_Bot_JLG_Http_Client($widget_payload, $bot_payload);
+        $api         = new Discord_Bot_JLG_API($option_name, $cache_key, 60, $http_client);
+
+        $api->get_stats(
+            array(
+                'bypass_cache' => true,
+                'bot_token'    => 'ignored-token',
+            )
+        );
+
+        $this->assertSame(2, count($http_client->requests));
+
+        $bot_request = null;
+        foreach ($http_client->requests as $request) {
+            if ('bot' === $request['context']) {
+                $bot_request = $request;
+                break;
+            }
+        }
+
+        $this->assertNotNull($bot_request, 'Expected a bot request to be issued');
+        $this->assertArrayHasKey('headers', $bot_request['args']);
+        $this->assertArrayHasKey('Authorization', $bot_request['args']['headers']);
+        $this->assertSame('Bot constant-token', $bot_request['args']['headers']['Authorization']);
+    }
+
     public function test_get_stats_treats_string_force_demo_as_true() {
         $option_name = 'discord_server_stats_options';
         $cache_key   = 'discord_server_stats_cache';
