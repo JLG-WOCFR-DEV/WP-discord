@@ -15,7 +15,7 @@ Plugin WordPress permettant d'afficher les statistiques d'un serveur Discord.
 Accédez à la page **Discord Bot** dans l’administration pour :
 - Saisir le token de votre bot Discord ;
 - Indiquer l’ID du serveur à surveiller ;
-- Définir la durée du cache des statistiques ;
+- Définir la durée du cache des statistiques (minimum 60 secondes, alignées sur le cron de rafraîchissement) ;
 - Choisir les éléments affichés par défaut (nom/avatar du serveur, rafraîchissement automatique, thème) ;
 - Personnaliser les icônes et libellés proposés par défaut (cartes principales, répartition des présences, boosts) ;
 - Ajouter du CSS personnalisé.

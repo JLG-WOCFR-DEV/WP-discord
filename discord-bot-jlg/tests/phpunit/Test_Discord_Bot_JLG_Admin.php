@@ -115,7 +115,7 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
                     'show_online'  => 1,
                     'show_total'   => 0,
                     'widget_title' => sanitize_text_field(' <strong>Stats</strong> '),
-                    'cache_duration' => 45,
+                    'cache_duration' => self::get_min_cache_duration(),
                     'custom_css'   => $sanitized_css,
                 ),
             ),
@@ -129,7 +129,7 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
                 ),
                 array(
                     'server_id'      => '123456789012345678',
-                    'cache_duration' => Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL,
+                    'cache_duration' => self::get_min_cache_duration(),
                     'demo_mode'      => 0,
                     'show_online'    => 1,
                     'show_total'     => 1,
@@ -522,6 +522,10 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
         delete_option(Discord_Bot_JLG_API::LAST_FALLBACK_OPTION);
     }
 
+    private static function get_min_cache_duration(): int {
+        return max(60, (int) Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL);
+    }
+
     private function get_expected_defaults(): array {
         return array(
             'server_id'      => '',
@@ -538,7 +542,7 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
             'default_theme'   => 'dark',
             'widget_title'   => '',
             'cache_duration' => max(
-                Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL,
+                self::get_min_cache_duration(),
                 min(3600, (int) $this->saved_options['cache_duration'])
             ),
             'custom_css'     => '',
