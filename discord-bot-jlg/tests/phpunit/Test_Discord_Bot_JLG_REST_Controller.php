@@ -52,8 +52,37 @@ class Test_Discord_Bot_JLG_REST_Controller extends TestCase {
     protected function tearDown(): void {
         $GLOBALS['wp_test_nonce_validations'] = array();
         $GLOBALS['wp_test_is_user_logged_in'] = false;
+        $GLOBALS['wp_test_current_user_can']  = null;
 
         parent::tearDown();
+    }
+
+    public function test_permission_callback_allows_admins() {
+        $GLOBALS['wp_test_current_user_can'] = array('manage_options' => true);
+
+        $api        = new Stubbed_Discord_Bot_JLG_API_For_REST();
+        $controller = new Discord_Bot_JLG_REST_Controller($api, null);
+        $request    = new WP_REST_Request();
+
+        $this->assertTrue($controller->check_rest_permissions($request));
+    }
+
+    public function test_permission_callback_rejects_when_user_lacks_capability() {
+        $GLOBALS['wp_test_current_user_can'] = array('manage_options' => false);
+
+        $api        = new Stubbed_Discord_Bot_JLG_API_For_REST();
+        $controller = new Discord_Bot_JLG_REST_Controller($api, null);
+        $request    = new WP_REST_Request();
+
+        $result = $controller->check_rest_permissions($request);
+
+        $this->assertInstanceOf(WP_Error::class, $result);
+        $this->assertSame('discord_bot_jlg_forbidden', $result->get_error_code());
+
+        $error_data = $result->get_error_data();
+        if (is_array($error_data) && array_key_exists('status', $error_data)) {
+            $this->assertSame(403, $error_data['status']);
+        }
     }
 
     public function test_public_request_returns_successful_payload() {
