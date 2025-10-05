@@ -35,7 +35,7 @@ class Discord_Bot_JLG_REST_Controller {
                 array(
                     'methods'             => WP_REST_Server::READABLE,
                     'callback'            => array($this, 'handle_get_stats'),
-                    'permission_callback' => '__return_true',
+                    'permission_callback' => array($this, 'check_manage_options_permission'),
                     'args'                => array(
                         'profile_key' => array(
                             'description'       => __('Profil de serveur à utiliser.', 'discord-bot-jlg'),
@@ -64,7 +64,7 @@ class Discord_Bot_JLG_REST_Controller {
                 array(
                     'methods'             => WP_REST_Server::READABLE,
                     'callback'            => array($this, 'handle_get_analytics'),
-                    'permission_callback' => '__return_true',
+                    'permission_callback' => array($this, 'check_manage_options_permission'),
                     'args'                => array(
                         'profile_key' => array(
                             'description'       => __('Profil de serveur à analyser.', 'discord-bot-jlg'),
@@ -196,5 +196,51 @@ class Discord_Bot_JLG_REST_Controller {
         );
 
         return rest_ensure_response(new WP_REST_Response($response, 200));
+    }
+
+    public function check_manage_options_permission(WP_REST_Request $request) {
+        if (current_user_can('manage_options')) {
+            return true;
+        }
+
+        $configured_keys = apply_filters('discord_bot_jlg_rest_api_keys', array());
+        if (!is_array($configured_keys)) {
+            $configured_keys = array($configured_keys);
+        }
+
+        $configured_keys = array_filter(array_map('strval', $configured_keys));
+
+        if (!empty($configured_keys)) {
+            $provided_key = $request->get_header('X-Discord-Bot-JLG-Key');
+            if (!is_string($provided_key) || '' === $provided_key) {
+                $provided_key = $request->get_param('api_key');
+            }
+
+            if (is_string($provided_key) && '' !== $provided_key) {
+                $provided_key = trim($provided_key);
+
+                foreach ($configured_keys as $expected_key) {
+                    $expected_key = trim($expected_key);
+
+                    if ('' === $expected_key) {
+                        continue;
+                    }
+
+                    if (function_exists('hash_equals') && hash_equals($expected_key, $provided_key)) {
+                        return true;
+                    }
+
+                    if ($expected_key === $provided_key) {
+                        return true;
+                    }
+                }
+            }
+        }
+
+        return new WP_Error(
+            'rest_forbidden',
+            __('Vous n\'avez pas les droits nécessaires pour accéder à cette ressource.', 'discord-bot-jlg'),
+            array('status' => 403)
+        );
     }
 }

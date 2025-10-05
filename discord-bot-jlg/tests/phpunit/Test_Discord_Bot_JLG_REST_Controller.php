@@ -52,6 +52,7 @@ class Test_Discord_Bot_JLG_REST_Controller extends TestCase {
     protected function tearDown(): void {
         $GLOBALS['wp_test_nonce_validations'] = array();
         $GLOBALS['wp_test_is_user_logged_in'] = false;
+        unset($GLOBALS['wp_test_current_user_caps']);
 
         parent::tearDown();
     }
@@ -168,5 +169,37 @@ class Test_Discord_Bot_JLG_REST_Controller extends TestCase {
         $payload = $response->get_data();
         $this->assertFalse($payload['success']);
         $this->assertArrayHasKey('message', $payload['data']);
+    }
+
+    public function test_permission_callback_allows_manage_options_users() {
+        $GLOBALS['wp_test_current_user_caps'] = array(
+            'manage_options' => true,
+        );
+
+        $api        = new Stubbed_Discord_Bot_JLG_API_For_REST();
+        $controller = new Discord_Bot_JLG_REST_Controller($api, null);
+        $request    = new WP_REST_Request();
+
+        $permission = $controller->check_manage_options_permission($request);
+
+        $this->assertTrue($permission);
+    }
+
+    public function test_permission_callback_rejects_users_without_capabilities() {
+        $GLOBALS['wp_test_current_user_caps'] = array(
+            'edit_posts'     => true,
+            'manage_options' => false,
+        );
+
+        $api        = new Stubbed_Discord_Bot_JLG_API_For_REST();
+        $controller = new Discord_Bot_JLG_REST_Controller($api, null);
+        $request    = new WP_REST_Request();
+
+        $permission = $controller->check_manage_options_permission($request);
+
+        $this->assertInstanceOf(WP_Error::class, $permission);
+        $error_data = $permission->get_error_data();
+        $this->assertTrue(is_array($error_data));
+        $this->assertSame(403, $error_data['status']);
     }
 }

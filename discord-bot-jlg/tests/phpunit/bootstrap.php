@@ -524,7 +524,29 @@ function wp_safe_remote_get($url, $args = array()) {
 }
 
 function current_user_can($capability) {
-    return true;
+    if (!isset($GLOBALS['wp_test_current_user_caps'])) {
+        return true;
+    }
+
+    $caps = $GLOBALS['wp_test_current_user_caps'];
+
+    if (true === $caps) {
+        return true;
+    }
+
+    if (!is_array($caps)) {
+        return false;
+    }
+
+    if (array_key_exists($capability, $caps)) {
+        return (bool) $caps[$capability];
+    }
+
+    if (array_key_exists('*', $caps)) {
+        return (bool) $caps['*'];
+    }
+
+    return false;
 }
 
 if (!function_exists('__return_true')) {
@@ -683,13 +705,19 @@ function wp_validate_boolean($value) {
 
 class WP_Error {
     private $message;
+    private $data;
 
-    public function __construct($code = '', $message = '') {
+    public function __construct($code = '', $message = '', $data = null) {
         $this->message = $message;
+        $this->data    = $data;
     }
 
     public function get_error_message() {
         return $this->message;
+    }
+
+    public function get_error_data($code = '') {
+        return $this->data;
     }
 }
 

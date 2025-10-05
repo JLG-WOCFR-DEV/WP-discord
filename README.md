@@ -81,6 +81,10 @@ Pendant une requête d'actualisation, le conteneur affiche désormais un indicat
 
 Les rafraîchissements publics (visiteurs non connectés) n'exigent plus de nonce WordPress ; seuls les administrateurs connectés utilisent un jeton de sécurité pour l'action AJAX `refresh_discord_stats`.
 
+### Analytics (REST)
+
+Les graphiques d'analytics et la page d'administration exploitent l'endpoint REST `discord-bot-jlg/v1/analytics`. Pour des raisons de confidentialité, sa consultation nécessite d'être connecté avec la capacité `manage_options`. Si vous devez ouvrir l'accès à un outil externe, vous pouvez fournir une clé API partagée en filtrant `discord_bot_jlg_rest_api_keys` et en l'envoyant via l'en-tête `X-Discord-Bot-JLG-Key` (ou le paramètre `api_key`).
+
 ### Accessibilité
 
 Le plugin embarque sa propre définition `.screen-reader-text`, incluse à la fois dans les feuilles de style principales et inline chargées par le shortcode. Ce fallback reprend le pattern WordPress (position absolue, dimensions réduites à 1px, `clip-path: inset(50%)`, etc.) afin que les libellés masqués restent interprétables par les lecteurs d'écran même si le thème actif ne fournit pas cette classe utilitaire.
