@@ -1772,7 +1772,7 @@ class Discord_Bot_JLG_Admin {
      */
     private function render_demo_intro_notice() {
         ?>
-        <div style="background: #fff3cd; padding: 10px 20px; border-radius: 8px; margin: 20px 0;">
+        <div style="background: #fff3cd; padding: 10px 20px; border-radius: 8px; margin: 20px auto; width: 100%; max-width: 500px;">
             <p><?php echo wp_kses_post(__('<strong>💡 Astuce :</strong> Tous les exemples ci-dessous utilisent le mode démo. Vous pouvez les copier-coller directement !', 'discord-bot-jlg')); ?></p>
         </div>
         <?php
