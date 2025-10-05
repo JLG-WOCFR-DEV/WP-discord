@@ -103,6 +103,27 @@ class Successful_Mock_Discord_Bot_JLG_Http_Client extends Discord_Bot_JLG_Http_C
     }
 }
 
+class Recording_Server_Id_Discord_Bot_JLG_Http_Client extends Discord_Bot_JLG_Http_Client {
+    public $requests = array();
+    private $error_code;
+    private $error_message;
+
+    public function __construct($error_code = 'stubbed_error', $error_message = 'Stubbed HTTP failure') {
+        $this->error_code    = $error_code;
+        $this->error_message = $error_message;
+    }
+
+    public function get($url, array $args = array(), $context = '') {
+        $this->requests[] = array(
+            'url'     => $url,
+            'args'    => $args,
+            'context' => $context,
+        );
+
+        return new WP_Error($this->error_code, $this->error_message);
+    }
+}
+
 class Recording_Discord_Bot_JLG_Analytics extends Discord_Bot_JLG_Analytics {
     public $snapshots = array();
     public $purge_calls = array();
@@ -246,6 +267,64 @@ class Test_Discord_Bot_JLG_API extends TestCase {
         $this->assertSame('fourth_profile', $profiles['fourth_profile']['key']);
         $this->assertSame('fourth_profile', $profiles['fourth_profile']['label']);
         $this->assertSame('000999', $profiles['fourth_profile']['server_id']);
+    }
+
+    public function test_get_stats_with_unknown_profile_returns_demo_and_error() {
+        $option_name = DISCORD_BOT_JLG_OPTION_NAME;
+        $cache_key   = DISCORD_BOT_JLG_CACHE_KEY;
+
+        $GLOBALS['wp_test_options'][$option_name] = array(
+            'server_id'       => '111222',
+            'server_profiles' => array(
+                'known' => array(
+                    'key'       => 'known',
+                    'label'     => 'Profil connu',
+                    'server_id' => '111222',
+                    'bot_token' => 'encrypted-token',
+                ),
+            ),
+        );
+
+        $http_client = new Recording_Server_Id_Discord_Bot_JLG_Http_Client();
+        $api         = new Discord_Bot_JLG_API($option_name, $cache_key, 60, $http_client);
+
+        $stats = $api->get_stats(array(
+            'profile_key' => 'missing',
+            'bypass_cache' => true,
+        ));
+
+        $this->assertSame(array(), $http_client->requests, 'HTTP client should not be invoked when profile is unknown');
+        $this->assertArrayHasKey('is_demo', $stats);
+        $this->assertTrue($stats['is_demo']);
+        $this->assertArrayHasKey('fallback_demo', $stats);
+        $this->assertTrue($stats['fallback_demo']);
+        $this->assertStringContainsString('introuvable', strtolower($api->get_last_error_message()));
+    }
+
+    public function test_get_stats_with_server_override_sanitizes_requested_id() {
+        $option_name = DISCORD_BOT_JLG_OPTION_NAME;
+        $cache_key   = DISCORD_BOT_JLG_CACHE_KEY;
+
+        $GLOBALS['wp_test_options'][$option_name] = array(
+            'server_id' => '555999',
+        );
+
+        $http_client = new Recording_Server_Id_Discord_Bot_JLG_Http_Client('forced_error', 'Simulated network failure');
+        $api         = new Discord_Bot_JLG_API($option_name, $cache_key, 60, $http_client);
+
+        $stats = $api->get_stats(array(
+            'server_id'    => 'abc123def',
+            'bypass_cache' => true,
+        ));
+
+        $this->assertNotEmpty($http_client->requests, 'Widget request should be attempted before falling back');
+        $first_request = $http_client->requests[0];
+        $this->assertStringContainsString('/123/widget.json', $first_request['url']);
+        $this->assertSame('widget', $first_request['context']);
+        $this->assertArrayHasKey('is_demo', $stats);
+        $this->assertTrue($stats['is_demo']);
+        $this->assertTrue($stats['fallback_demo']);
+        $this->assertStringContainsString('Simulated network failure', $api->get_last_error_message());
     }
 
     public function test_get_stats_caches_fallback_payload() {
@@ -1096,7 +1175,7 @@ class Test_Discord_Bot_JLG_API extends TestCase {
             $api->ajax_refresh_stats();
             $this->fail('Expected error response for authenticated request');
         } catch (WP_Send_JSON_Error $response) {
-            $this->assertNull($response->status_code);
+            $this->assertSame(503, $response->status_code);
             $this->assertArrayHasKey('retry_after', $response->data);
             $this->assertArrayHasKey(
                 'diagnostic',
