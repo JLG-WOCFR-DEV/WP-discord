@@ -193,6 +193,61 @@ class Test_Discord_Bot_JLG_API extends TestCase {
         );
     }
 
+    public function test_get_server_profiles_normalizes_entries() {
+        $option_name = DISCORD_BOT_JLG_OPTION_NAME;
+
+        $GLOBALS['wp_test_options'][$option_name] = array(
+            'server_profiles' => array(
+                'First Profile' => array(
+                    'key'       => 'Custom Key!!',
+                    'label'     => '  My Label  ',
+                    'server_id' => ' 123-456 ',
+                    'bot_token' => 'secret-token',
+                ),
+                'Second Profile' => array(
+                    'label'     => 'Second Label ',
+                    'server_id' => 'abc789',
+                    'bot_token' => '',
+                ),
+                'Fourth Profile' => array(
+                    'key'       => '!!!',
+                    'label'     => '',
+                    'server_id' => '000-999',
+                ),
+                '   ' => array(
+                    'key'       => '   ',
+                    'label'     => 'Should not be kept',
+                    'server_id' => '111',
+                ),
+                'invalid' => 'not-an-array',
+            ),
+        );
+
+        $api = new Discord_Bot_JLG_API($option_name, DISCORD_BOT_JLG_CACHE_KEY);
+
+        $profiles = $api->get_server_profiles(false);
+
+        $this->assertCount(3, $profiles);
+
+        $this->assertArrayHasKey('custom_key', $profiles);
+        $this->assertSame('custom_key', $profiles['custom_key']['key']);
+        $this->assertSame('My Label', $profiles['custom_key']['label']);
+        $this->assertSame('123456', $profiles['custom_key']['server_id']);
+        $this->assertTrue($profiles['custom_key']['has_token']);
+        $this->assertArrayNotHasKey('bot_token', $profiles['custom_key']);
+
+        $this->assertArrayHasKey('second_profile', $profiles);
+        $this->assertSame('second_profile', $profiles['second_profile']['key']);
+        $this->assertSame('Second Label', $profiles['second_profile']['label']);
+        $this->assertSame('789', $profiles['second_profile']['server_id']);
+        $this->assertFalse($profiles['second_profile']['has_token']);
+
+        $this->assertArrayHasKey('fourth_profile', $profiles);
+        $this->assertSame('fourth_profile', $profiles['fourth_profile']['key']);
+        $this->assertSame('fourth_profile', $profiles['fourth_profile']['label']);
+        $this->assertSame('000999', $profiles['fourth_profile']['server_id']);
+    }
+
     public function test_get_stats_caches_fallback_payload() {
         $option_name = 'discord_server_stats_options';
         $cache_key   = 'discord_server_stats_cache';

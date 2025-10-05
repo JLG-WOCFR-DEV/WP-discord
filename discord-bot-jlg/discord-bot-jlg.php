@@ -250,6 +250,76 @@ class DiscordServerStats {
         add_action(DISCORD_BOT_JLG_CRON_HOOK, array($this->api, 'refresh_cache_via_cron'));
     }
 
+    private function get_block_editor_config() {
+        $profiles = $this->api->get_server_profiles(false);
+
+        if (!is_array($profiles)) {
+            $profiles = array();
+        }
+
+        $profiles = array_values(array_filter(array_map(function ($profile) {
+            if (!is_array($profile)) {
+                return null;
+            }
+
+            $profile_key = isset($profile['key']) ? sanitize_key($profile['key']) : '';
+
+            if ('' === $profile_key) {
+                return null;
+            }
+
+            $label = isset($profile['label']) ? sanitize_text_field($profile['label']) : $profile_key;
+            $server_id = isset($profile['server_id']) ? preg_replace('/[^0-9]/', '', (string) $profile['server_id']) : '';
+            $has_token = !empty($profile['has_token']);
+
+            return array(
+                'key'       => $profile_key,
+                'label'     => $label,
+                'server_id' => $server_id,
+                'has_token' => $has_token,
+            );
+        }, array_values($profiles))));
+
+        $options_for_defaults = $this->api->get_plugin_options();
+        if (!is_array($options_for_defaults)) {
+            $options_for_defaults = array();
+        }
+
+        $default_mappings = array(
+            'icon_online'              => 'default_icon_online',
+            'icon_total'               => 'default_icon_total',
+            'icon_presence'            => 'default_icon_presence',
+            'icon_approximate'         => 'default_icon_approximate',
+            'icon_premium'             => 'default_icon_premium',
+            'label_online'             => 'default_label_online',
+            'label_total'              => 'default_label_total',
+            'label_presence'           => 'default_label_presence',
+            'label_presence_online'    => 'default_label_presence_online',
+            'label_presence_idle'      => 'default_label_presence_idle',
+            'label_presence_dnd'       => 'default_label_presence_dnd',
+            'label_presence_offline'   => 'default_label_presence_offline',
+            'label_presence_streaming' => 'default_label_presence_streaming',
+            'label_presence_other'     => 'default_label_presence_other',
+            'label_approximate'        => 'default_label_approximate',
+            'label_premium'            => 'default_label_premium',
+            'label_premium_singular'   => 'default_label_premium_singular',
+            'label_premium_plural'     => 'default_label_premium_plural',
+        );
+
+        $block_display_defaults = array();
+
+        foreach ($default_mappings as $output_key => $option_key) {
+            $block_display_defaults[$output_key] = isset($options_for_defaults[$option_key])
+                ? sanitize_text_field($options_for_defaults[$option_key])
+                : '';
+        }
+
+        return array(
+            'profiles' => $profiles,
+            'defaults' => $block_display_defaults,
+        );
+    }
+
     public function register_block() {
         if (!function_exists('register_block_type')) {
             return;
@@ -267,63 +337,12 @@ class DiscordServerStats {
             true
         );
 
-        $profiles_for_block = array();
-        $stored_profiles    = $this->api->get_server_profiles(false);
-
-        if (is_array($stored_profiles)) {
-            foreach ($stored_profiles as $profile) {
-                if (!is_array($profile)) {
-                    continue;
-                }
-
-                $key = isset($profile['key']) ? sanitize_key($profile['key']) : '';
-
-                if ('' === $key) {
-                    continue;
-                }
-
-                $profiles_for_block[] = array(
-                    'key'        => $key,
-                    'label'      => isset($profile['label']) ? sanitize_text_field($profile['label']) : $key,
-                    'server_id'  => isset($profile['server_id']) ? preg_replace('/[^0-9]/', '', (string) $profile['server_id']) : '',
-                    'has_token'  => !empty($profile['has_token']),
-                );
-            }
-        }
-
-        $options_for_defaults = $this->api->get_plugin_options();
-        if (!is_array($options_for_defaults)) {
-            $options_for_defaults = array();
-        }
-
-        $block_display_defaults = array(
-            'icon_online'          => isset($options_for_defaults['default_icon_online']) ? sanitize_text_field($options_for_defaults['default_icon_online']) : '',
-            'icon_total'           => isset($options_for_defaults['default_icon_total']) ? sanitize_text_field($options_for_defaults['default_icon_total']) : '',
-            'icon_presence'        => isset($options_for_defaults['default_icon_presence']) ? sanitize_text_field($options_for_defaults['default_icon_presence']) : '',
-            'icon_approximate'     => isset($options_for_defaults['default_icon_approximate']) ? sanitize_text_field($options_for_defaults['default_icon_approximate']) : '',
-            'icon_premium'         => isset($options_for_defaults['default_icon_premium']) ? sanitize_text_field($options_for_defaults['default_icon_premium']) : '',
-            'label_online'         => isset($options_for_defaults['default_label_online']) ? sanitize_text_field($options_for_defaults['default_label_online']) : '',
-            'label_total'          => isset($options_for_defaults['default_label_total']) ? sanitize_text_field($options_for_defaults['default_label_total']) : '',
-            'label_presence'       => isset($options_for_defaults['default_label_presence']) ? sanitize_text_field($options_for_defaults['default_label_presence']) : '',
-            'label_presence_online'=> isset($options_for_defaults['default_label_presence_online']) ? sanitize_text_field($options_for_defaults['default_label_presence_online']) : '',
-            'label_presence_idle'  => isset($options_for_defaults['default_label_presence_idle']) ? sanitize_text_field($options_for_defaults['default_label_presence_idle']) : '',
-            'label_presence_dnd'   => isset($options_for_defaults['default_label_presence_dnd']) ? sanitize_text_field($options_for_defaults['default_label_presence_dnd']) : '',
-            'label_presence_offline'=> isset($options_for_defaults['default_label_presence_offline']) ? sanitize_text_field($options_for_defaults['default_label_presence_offline']) : '',
-            'label_presence_streaming'=> isset($options_for_defaults['default_label_presence_streaming']) ? sanitize_text_field($options_for_defaults['default_label_presence_streaming']) : '',
-            'label_presence_other' => isset($options_for_defaults['default_label_presence_other']) ? sanitize_text_field($options_for_defaults['default_label_presence_other']) : '',
-            'label_approximate'    => isset($options_for_defaults['default_label_approximate']) ? sanitize_text_field($options_for_defaults['default_label_approximate']) : '',
-            'label_premium'        => isset($options_for_defaults['default_label_premium']) ? sanitize_text_field($options_for_defaults['default_label_premium']) : '',
-            'label_premium_singular' => isset($options_for_defaults['default_label_premium_singular']) ? sanitize_text_field($options_for_defaults['default_label_premium_singular']) : '',
-            'label_premium_plural' => isset($options_for_defaults['default_label_premium_plural']) ? sanitize_text_field($options_for_defaults['default_label_premium_plural']) : '',
-        );
+        $block_editor_config = $this->get_block_editor_config();
 
         wp_localize_script(
             $script_handle,
             'discordBotJlgBlockConfig',
-            array(
-                'profiles' => $profiles_for_block,
-                'defaults' => $block_display_defaults,
-            )
+            $block_editor_config
         );
 
         wp_register_style(
