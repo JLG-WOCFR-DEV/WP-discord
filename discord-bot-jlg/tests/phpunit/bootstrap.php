@@ -15,6 +15,24 @@ if (!defined('DAY_IN_SECONDS')) {
     define('DAY_IN_SECONDS', 86400);
 }
 
+if (!class_exists('WP_Widget')) {
+    class WP_Widget {
+        public $id_base;
+
+        public function __construct($id_base = '', $name = '', $widget_options = array()) {
+            $this->id_base = $id_base;
+        }
+
+        public function get_field_id($field_name) {
+            return $this->id_base . '-' . $field_name;
+        }
+
+        public function get_field_name($field_name) {
+            return $this->id_base . '[' . $field_name . ']';
+        }
+    }
+}
+
 require_once __DIR__ . '/../../inc/helpers.php';
 require_once __DIR__ . '/../../inc/class-discord-analytics.php';
 require_once __DIR__ . '/../../inc/class-discord-http.php';
@@ -42,24 +60,6 @@ if (!defined('DISCORD_BOT_JLG_PLUGIN_URL')) {
 
 if (!defined('DISCORD_BOT_JLG_VERSION')) {
     define('DISCORD_BOT_JLG_VERSION', 'test');
-}
-
-if (!class_exists('WP_Widget')) {
-    class WP_Widget {
-        public $id_base;
-
-        public function __construct($id_base = '', $name = '', $widget_options = array()) {
-            $this->id_base = $id_base;
-        }
-
-        public function get_field_id($field_name) {
-            return $this->id_base . '-' . $field_name;
-        }
-
-        public function get_field_name($field_name) {
-            return $this->id_base . '[' . $field_name . ']';
-        }
-    }
 }
 
 if (!function_exists('esc_html__')) {
@@ -90,6 +90,64 @@ if (!function_exists('do_shortcode')) {
     function do_shortcode($shortcode) {
         $GLOBALS['discord_bot_jlg_last_shortcode'] = $shortcode;
         return $shortcode;
+    }
+}
+
+if (!function_exists('add_query_arg')) {
+    function add_query_arg($key, $value = null, $url = '') {
+        if (is_array($key)) {
+            $params = $key;
+            $url    = (string) $value;
+        } else {
+            $params = array($key => $value);
+            $url    = (string) $url;
+        }
+
+        $parts = parse_url($url);
+
+        if (false === $parts) {
+            $parts = array('path' => $url);
+        }
+
+        $query = array();
+
+        if (isset($parts['query'])) {
+            parse_str($parts['query'], $query);
+        }
+
+        foreach ($params as $param_key => $param_value) {
+            $query[$param_key] = $param_value;
+        }
+
+        $parts['query'] = http_build_query($query, '', '&', PHP_QUERY_RFC3986);
+
+        $result = '';
+
+        if (!empty($parts['scheme'])) {
+            $result .= $parts['scheme'] . '://';
+        }
+
+        if (!empty($parts['host'])) {
+            $result .= $parts['host'];
+        }
+
+        if (!empty($parts['port'])) {
+            $result .= ':' . $parts['port'];
+        }
+
+        if (!empty($parts['path'])) {
+            $result .= $parts['path'];
+        }
+
+        if ('' !== $parts['query']) {
+            $result .= '?' . $parts['query'];
+        }
+
+        if (!empty($parts['fragment'])) {
+            $result .= '#' . $parts['fragment'];
+        }
+
+        return $result;
     }
 }
 
@@ -248,7 +306,11 @@ function sanitize_text_field($value) {
 
 function sanitize_key($key) {
     $key = strtolower((string) $key);
-    return preg_replace('/[^a-z0-9_]/', '', $key);
+    $key = preg_replace('/\s+/', '_', $key);
+    $key = preg_replace('/[^a-z0-9_\-]/', '', $key);
+    $key = trim($key, '_-');
+
+    return $key;
 }
 
 function shortcode_atts($pairs, $atts, $shortcode = '') {
