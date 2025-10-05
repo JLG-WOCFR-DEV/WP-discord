@@ -24,6 +24,7 @@
     var PanelColorSettings = blockEditor.PanelColorSettings || blockEditor.__experimentalPanelColorSettings;
     var ColorPalette = (blockEditor && blockEditor.ColorPalette) || components.ColorPalette;
     var RefreshIntervalControl = NumberControl || RangeControl || TextControl;
+    var SparklineDaysControl = NumberControl || RangeControl || TextControl;
     var ServerSideRender = serverSideRender;
 
     if (!registerBlockType || !InspectorControls) {
@@ -164,7 +165,10 @@
         cta_tooltip: '',
         profile: '',
         server_id: '',
-        bot_token: ''
+        bot_token: '',
+        show_sparkline: false,
+        sparkline_metric: 'online',
+        sparkline_days: 7
     };
 
     var metricsToggleConfigs = [
@@ -192,6 +196,12 @@
             attribute: 'show_premium_subscriptions',
             label: __('Afficher les boosts Nitro', 'discord-bot-jlg'),
             defaultValue: defaultAttributes.show_premium_subscriptions
+        },
+        {
+            attribute: 'show_sparkline',
+            label: __('Afficher la mini-sparkline', 'discord-bot-jlg'),
+            defaultValue: defaultAttributes.show_sparkline,
+            help: __('Nécessite l’historique généré par le cron pour afficher une tendance.', 'discord-bot-jlg')
         }
     ];
 
@@ -206,6 +216,12 @@
             label: __('Rafraîchissement automatique', 'discord-bot-jlg'),
             defaultValue: defaultAttributes.refresh
         }
+    ];
+
+    var sparklineMetricOptions = [
+        { label: __('Membres en ligne', 'discord-bot-jlg'), value: 'online' },
+        { label: __('Présence approximative', 'discord-bot-jlg'), value: 'presence' },
+        { label: __('Boosts Nitro', 'discord-bot-jlg'), value: 'premium' }
     ];
 
     var REFRESH_INTERVAL_MIN = 10;
@@ -1623,6 +1639,28 @@
                             metricsToggleConfigs,
                             'metrics'
                         ),
+                        !!attributes.show_sparkline && createElement(SelectControl, {
+                            label: __('Métrique pour la sparkline', 'discord-bot-jlg'),
+                            value: attributes.sparkline_metric || defaultAttributes.sparkline_metric,
+                            options: sparklineMetricOptions,
+                            onChange: updateAttribute(setAttributes, 'sparkline_metric')
+                        }),
+                        !!attributes.show_sparkline && createElement(SparklineDaysControl, {
+                            label: __('Fenêtre de calcul (jours)', 'discord-bot-jlg'),
+                            value: Math.max(3, Math.min(30, parseInt(attributes.sparkline_days, 10) || defaultAttributes.sparkline_days)),
+                            min: 3,
+                            max: 30,
+                            step: 1,
+                            onChange: function (value) {
+                                var parsed = parseInt(value, 10);
+                                if (isNaN(parsed)) {
+                                    parsed = defaultAttributes.sparkline_days;
+                                }
+
+                                parsed = Math.max(3, Math.min(30, parsed));
+                                setAttributes({ sparkline_days: parsed });
+                            }
+                        }),
                         renderToggleGroup(
                             __('Options d\'animation', 'discord-bot-jlg'),
                             animationToggleConfigs,

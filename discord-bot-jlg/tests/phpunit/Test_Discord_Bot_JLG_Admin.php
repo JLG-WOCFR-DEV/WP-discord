@@ -81,7 +81,7 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
             DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION
         );
 
-        $this->admin = new Discord_Bot_JLG_Admin(DISCORD_BOT_JLG_OPTION_NAME, $this->api);
+        $this->admin = new Discord_Bot_JLG_Admin(DISCORD_BOT_JLG_OPTION_NAME, $this->api, null);
     }
 
     protected function tearDown(): void {
@@ -431,7 +431,7 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
             DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION,
             $http_client
         );
-        $this->admin = new Discord_Bot_JLG_Admin(DISCORD_BOT_JLG_OPTION_NAME, $this->api);
+        $this->admin = new Discord_Bot_JLG_Admin(DISCORD_BOT_JLG_OPTION_NAME, $this->api, null);
 
         $fallback_reason = 'Connexion à Discord interrompue';
         update_option(

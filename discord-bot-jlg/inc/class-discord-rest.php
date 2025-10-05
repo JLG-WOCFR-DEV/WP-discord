@@ -6,14 +6,23 @@ if (false === defined('ABSPATH')) {
 class Discord_Bot_JLG_REST_Controller {
     const ROUTE_NAMESPACE = 'discord-bot-jlg/v1';
     const ROUTE_STATS = '/stats';
+    const ROUTE_ANALYTICS = '/analytics';
 
     /**
      * @var Discord_Bot_JLG_API
      */
     private $api;
 
-    public function __construct(Discord_Bot_JLG_API $api) {
+    /**
+     * @var Discord_Bot_JLG_Analytics|null
+     */
+    private $analytics;
+
+    public function __construct(Discord_Bot_JLG_API $api, $analytics = null) {
         $this->api = $api;
+        $this->analytics = ($analytics instanceof Discord_Bot_JLG_Analytics)
+            ? $analytics
+            : $api->get_analytics_service();
 
         add_action('rest_api_init', array($this, 'register_routes'));
     }
@@ -41,6 +50,36 @@ class Discord_Bot_JLG_REST_Controller {
                         'force_refresh' => array(
                             'description'       => __('Force le rafraîchissement du cache (administrateurs uniquement).', 'discord-bot-jlg'),
                             'type'              => 'boolean',
+                        ),
+                    ),
+                ),
+            ),
+            true
+        );
+
+        register_rest_route(
+            self::ROUTE_NAMESPACE,
+            self::ROUTE_ANALYTICS,
+            array(
+                array(
+                    'methods'             => WP_REST_Server::READABLE,
+                    'callback'            => array($this, 'handle_get_analytics'),
+                    'permission_callback' => '__return_true',
+                    'args'                => array(
+                        'profile_key' => array(
+                            'description'       => __('Profil de serveur à analyser.', 'discord-bot-jlg'),
+                            'type'              => 'string',
+                            'sanitize_callback' => 'sanitize_key',
+                        ),
+                        'server_id' => array(
+                            'description'       => __('Identifiant du serveur Discord.', 'discord-bot-jlg'),
+                            'type'              => 'string',
+                            'sanitize_callback' => 'sanitize_text_field',
+                        ),
+                        'days' => array(
+                            'description'       => __('Nombre de jours à agréger.', 'discord-bot-jlg'),
+                            'type'              => 'integer',
+                            'sanitize_callback' => 'absint',
                         ),
                     ),
                 ),
@@ -102,5 +141,60 @@ class Discord_Bot_JLG_REST_Controller {
         );
 
         return rest_ensure_response(new WP_REST_Response($response, $status));
+    }
+
+    public function handle_get_analytics(WP_REST_Request $request) {
+        $analytics = $this->analytics instanceof Discord_Bot_JLG_Analytics
+            ? $this->analytics
+            : $this->api->get_analytics_service();
+
+        if (!($analytics instanceof Discord_Bot_JLG_Analytics)) {
+            $response = array(
+                'success' => false,
+                'data'    => array(
+                    'message' => __('Service d\'analyse indisponible.', 'discord-bot-jlg'),
+                ),
+            );
+
+            return rest_ensure_response(new WP_REST_Response($response, 501));
+        }
+
+        $profile_key = $request->get_param('profile_key');
+        if (!is_string($profile_key)) {
+            $profile_key = '';
+        }
+        $profile_key = sanitize_key($profile_key);
+
+        if ('' === $profile_key) {
+            $profile_key = 'default';
+        }
+
+        $server_id = $request->get_param('server_id');
+        if (!is_string($server_id)) {
+            $server_id = '';
+        }
+        $server_id = preg_replace('/[^0-9]/', '', $server_id);
+
+        $days = (int) $request->get_param('days');
+        if ($days <= 0) {
+            $days = 7;
+        } elseif ($days > 30) {
+            $days = 30;
+        }
+
+        $aggregates = $analytics->get_aggregates(
+            array(
+                'profile_key' => $profile_key,
+                'server_id'   => $server_id,
+                'days'        => $days,
+            )
+        );
+
+        $response = array(
+            'success' => true,
+            'data'    => $aggregates,
+        );
+
+        return rest_ensure_response(new WP_REST_Response($response, 200));
     }
 }

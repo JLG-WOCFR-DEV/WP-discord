@@ -16,6 +16,7 @@ if (!defined('DAY_IN_SECONDS')) {
 }
 
 require_once __DIR__ . '/../../inc/helpers.php';
+require_once __DIR__ . '/../../inc/class-discord-analytics.php';
 require_once __DIR__ . '/../../inc/class-discord-http.php';
 require_once __DIR__ . '/../../inc/class-discord-api.php';
 require_once __DIR__ . '/../../inc/class-discord-widget.php';

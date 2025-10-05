@@ -34,6 +34,20 @@ class Stubbed_Discord_Bot_JLG_API_For_REST extends Discord_Bot_JLG_API {
     }
 }
 
+class Stubbed_Discord_Bot_JLG_Analytics {
+    public $last_args = array();
+    private $payload;
+
+    public function __construct($payload = array()) {
+        $this->payload = $payload;
+    }
+
+    public function get_aggregates($args = array()) {
+        $this->last_args = $args;
+        return $this->payload;
+    }
+}
+
 class Test_Discord_Bot_JLG_REST_Controller extends TestCase {
     protected function tearDown(): void {
         $GLOBALS['wp_test_nonce_validations'] = array();
@@ -52,7 +66,7 @@ class Test_Discord_Bot_JLG_REST_Controller extends TestCase {
             )
         );
 
-        $controller = new Discord_Bot_JLG_REST_Controller($api);
+        $controller = new Discord_Bot_JLG_REST_Controller($api, null);
         $request    = new WP_REST_Request();
         $request->set_param('profile_key', 'custom_profile');
         $request->set_param('server_id', ' 123456 ');
@@ -77,7 +91,7 @@ class Test_Discord_Bot_JLG_REST_Controller extends TestCase {
         $GLOBALS['wp_test_nonce_validations']['wp_rest'] = false;
 
         $api = new Stubbed_Discord_Bot_JLG_API_For_REST();
-        $controller = new Discord_Bot_JLG_REST_Controller($api);
+        $controller = new Discord_Bot_JLG_REST_Controller($api, null);
         $request    = new WP_REST_Request();
         $request->set_header('X-WP-Nonce', 'invalid');
 
@@ -106,7 +120,7 @@ class Test_Discord_Bot_JLG_REST_Controller extends TestCase {
             )
         );
 
-        $controller = new Discord_Bot_JLG_REST_Controller($api);
+        $controller = new Discord_Bot_JLG_REST_Controller($api, null);
         $request    = new WP_REST_Request();
 
         $response = $controller->handle_get_stats($request);
@@ -118,5 +132,41 @@ class Test_Discord_Bot_JLG_REST_Controller extends TestCase {
         $this->assertTrue($payload['data']['rate_limited']);
         $this->assertArrayHasKey('is_public_request', $api->last_args);
         $this->assertTrue($api->last_args['is_public_request']);
+    }
+
+    public function test_analytics_route_returns_aggregates() {
+        $api = new Stubbed_Discord_Bot_JLG_API_For_REST();
+        $analytics_payload = array('timeseries' => array(array('timestamp' => 1000, 'online' => 12)));
+        $analytics = new Stubbed_Discord_Bot_JLG_Analytics($analytics_payload);
+
+        $controller = new Discord_Bot_JLG_REST_Controller($api, $analytics);
+        $request    = new WP_REST_Request();
+        $request->set_param('profile_key', 'guild');
+        $request->set_param('days', 5);
+
+        $response = $controller->handle_get_analytics($request);
+
+        $this->assertInstanceOf(WP_REST_Response::class, $response);
+        $this->assertSame(200, $response->get_status());
+
+        $payload = $response->get_data();
+        $this->assertTrue($payload['success']);
+        $this->assertSame($analytics_payload, $payload['data']);
+        $this->assertArrayHasKey('profile_key', $analytics->last_args);
+        $this->assertSame('guild', $analytics->last_args['profile_key']);
+        $this->assertSame(5, $analytics->last_args['days']);
+    }
+
+    public function test_analytics_route_handles_missing_service() {
+        $api = new Stubbed_Discord_Bot_JLG_API_For_REST();
+        $controller = new Discord_Bot_JLG_REST_Controller($api, null);
+        $request    = new WP_REST_Request();
+
+        $response = $controller->handle_get_analytics($request);
+
+        $this->assertSame(501, $response->get_status());
+        $payload = $response->get_data();
+        $this->assertFalse($payload['success']);
+        $this->assertArrayHasKey('message', $payload['data']);
     }
 }

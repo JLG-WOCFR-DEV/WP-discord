@@ -200,6 +200,9 @@ class Discord_Bot_JLG_Shortcode {
                 'cta_tooltip'          => '',
                 'profile'              => '',
                 'server_id'            => '',
+                'show_sparkline'       => false,
+                'sparkline_metric'     => 'online',
+                'sparkline_days'       => '7',
             ),
             $normalized_atts,
             'discord_stats'
@@ -230,6 +233,21 @@ class Discord_Bot_JLG_Shortcode {
         $cta_new_tab        = filter_var($atts['cta_new_tab'], FILTER_VALIDATE_BOOLEAN);
         $cta_tooltip_raw    = array_key_exists('cta_tooltip', $received_atts) ? $received_atts['cta_tooltip'] : null;
         $cta_tooltip        = isset($atts['cta_tooltip']) ? sanitize_text_field($atts['cta_tooltip']) : '';
+        $show_sparkline     = filter_var($atts['show_sparkline'], FILTER_VALIDATE_BOOLEAN);
+        $sparkline_metric   = isset($atts['sparkline_metric']) ? sanitize_key($atts['sparkline_metric']) : 'online';
+        $allowed_sparkline_metrics = array('online', 'presence', 'premium');
+
+        if (!in_array($sparkline_metric, $allowed_sparkline_metrics, true)) {
+            $sparkline_metric = 'online';
+        }
+
+        $sparkline_days = isset($atts['sparkline_days']) ? (int) $atts['sparkline_days'] : 7;
+
+        if ($sparkline_days < 3) {
+            $sparkline_days = 3;
+        } elseif ($sparkline_days > 30) {
+            $sparkline_days = 30;
+        }
 
         $allowed_cta_styles = array('solid', 'outline');
         if (!in_array($cta_style, $allowed_cta_styles, true)) {
@@ -254,6 +272,15 @@ class Discord_Bot_JLG_Shortcode {
 
         $profile_key        = $this->sanitize_profile_key($atts['profile']);
         $override_server_id = $this->sanitize_server_id_attribute($atts['server_id']);
+
+        $sparkline_metric_label_map = array(
+            'online'   => isset($atts['label_online']) ? $atts['label_online'] : __('En ligne', 'discord-bot-jlg'),
+            'presence' => isset($atts['label_presence']) ? $atts['label_presence'] : __('Présence', 'discord-bot-jlg'),
+            'premium'  => isset($atts['label_premium']) ? $atts['label_premium'] : __('Boosts serveur', 'discord-bot-jlg'),
+        );
+        $sparkline_label = isset($sparkline_metric_label_map[$sparkline_metric])
+            ? $sparkline_metric_label_map[$sparkline_metric]
+            : __('Tendance', 'discord-bot-jlg');
 
         if ($force_demo) {
             $stats = $this->api->get_demo_stats();
@@ -644,6 +671,12 @@ class Discord_Bot_JLG_Shortcode {
             $attributes[] = sprintf('data-server-id-override="%s"', esc_attr($override_server_id));
         }
 
+        if ($show_sparkline) {
+            $attributes[] = 'data-show-sparkline="true"';
+            $attributes[] = sprintf('data-sparkline-metric="%s"', esc_attr($sparkline_metric));
+            $attributes[] = sprintf('data-sparkline-days="%d"', (int) $sparkline_days);
+        }
+
 
         $refresh_interval = 0;
         $min_refresh_interval = $min_refresh_option;
@@ -968,6 +1001,20 @@ class Discord_Bot_JLG_Shortcode {
                         </span>
                     </div>
                     <?php endif; ?>
+
+                    <?php if ($show_sparkline) : ?>
+                    <div class="discord-analytics-embed"
+                        data-role="discord-analytics-embed"
+                        data-metric="<?php echo esc_attr($sparkline_metric); ?>"
+                        data-days="<?php echo esc_attr($sparkline_days); ?>">
+                        <div class="discord-analytics-embed__header">
+                            <span class="discord-analytics-embed__title"><?php echo esc_html($sparkline_label); ?></span>
+                            <span class="discord-analytics-embed__range"><?php printf(esc_html__('Derniers %d jours', 'discord-bot-jlg'), $sparkline_days); ?></span>
+                        </div>
+                        <div class="discord-analytics-embed__sparkline" data-role="discord-sparkline"></div>
+                        <div class="discord-analytics-embed__note" data-role="discord-sparkline-note"></div>
+                    </div>
+                    <?php endif; ?>
                 </div>
 
                 <?php if ($show_discord_icon && $logo_position_class === 'right'): ?>
@@ -1218,6 +1265,8 @@ class Discord_Bot_JLG_Shortcode {
                 'requiresNonce' => $requires_nonce,
                 'restUrl' => rest_url('discord-bot-jlg/v1/stats'),
                 'restNonce' => $requires_nonce ? wp_create_nonce('wp_rest') : '',
+                'analyticsRestUrl' => rest_url('discord-bot-jlg/v1/analytics'),
+                'analyticsRestNonce' => $requires_nonce ? wp_create_nonce('wp_rest') : '',
                 'locale'  => $locale,
                 'minRefreshInterval' => defined('Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL')
                     ? Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL
@@ -1230,6 +1279,8 @@ class Discord_Bot_JLG_Shortcode {
                 'rateLimited'          => __('Actualisation trop fréquente, veuillez patienter avant de réessayer.', 'discord-bot-jlg'),
                 'serverAvatarAltTemplate' => __('Avatar du serveur Discord %s', 'discord-bot-jlg'),
                 'serverAvatarAltFallback' => __('Avatar du serveur Discord', 'discord-bot-jlg'),
+                'sparklineNoData'      => __('Tendance indisponible pour le moment.', 'discord-bot-jlg'),
+                'sparklineError'       => __('Impossible de charger la tendance.', 'discord-bot-jlg'),
             )
         );
 
