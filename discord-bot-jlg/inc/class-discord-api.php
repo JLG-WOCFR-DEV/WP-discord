@@ -281,23 +281,16 @@ class Discord_Bot_JLG_API {
             );
         }
 
-        $options = $this->get_plugin_options();
+        $fetch_context = $this->prepare_fetch_context($args);
+        $context       = $fetch_context['context'];
+        $options       = $fetch_context['options'];
+        $runtime_key   = $fetch_context['runtime_key'];
 
-        $context = $this->resolve_connection_context($args, $options);
-        $options = $context['options'];
+        if (true === $fetch_context['runtime_hit']) {
+            $this->last_error       = $fetch_context['runtime_error'];
+            $this->last_retry_after = $fetch_context['runtime_retry_after'];
 
-        $runtime_args = array(
-            'force_demo'   => $args['force_demo'],
-            'bypass_cache' => $args['bypass_cache'],
-            'signature'    => $context['signature'],
-        );
-
-        $runtime_key = $this->get_runtime_cache_key($runtime_args);
-
-        if (array_key_exists($runtime_key, $this->runtime_cache)) {
-            $this->last_error      = isset($this->runtime_errors[$runtime_key]) ? $this->runtime_errors[$runtime_key] : '';
-            $this->last_retry_after = isset($this->runtime_retry_after[$runtime_key]) ? (int) $this->runtime_retry_after[$runtime_key] : 0;
-            return $this->runtime_cache[$runtime_key];
+            return $fetch_context['runtime_value'];
         }
 
         if (!empty($context['error'])) {
@@ -338,14 +331,8 @@ class Discord_Bot_JLG_API {
                 return $this->remember_runtime_result($runtime_key, $demo_stats);
             }
 
-            $stats = false;
-            $widget_stats = $this->get_stats_from_widget($options);
-
-            if (is_array($widget_stats)) {
-                $widget_stats = $this->normalize_stats($widget_stats);
-                $stats        = $widget_stats;
-            }
-
+            $stats        = false;
+            $widget_stats = $this->fetch_widget_stats($options);
             $widget_incomplete = $this->stats_need_completion($widget_stats);
 
             $bot_stats  = false;
@@ -353,96 +340,10 @@ class Discord_Bot_JLG_API {
             $should_call_bot = (!empty($bot_token) && ($widget_incomplete || empty($widget_stats)));
 
             if ($should_call_bot) {
-                $bot_stats = $this->get_stats_from_bot($options);
-
-                if (is_array($bot_stats)) {
-                    $bot_stats = $this->normalize_stats($bot_stats);
-
-                    if (true === $widget_incomplete && is_array($widget_stats)) {
-                        $total             = null;
-                        $has_total         = false;
-                        $total_approximate = false;
-
-                        if (!empty($widget_stats['has_total'])) {
-                            $total             = $widget_stats['total'];
-                            $has_total         = true;
-                            $total_approximate = !empty($widget_stats['total_is_approximate']);
-                        } elseif (!empty($bot_stats['has_total'])) {
-                            $total             = $bot_stats['total'];
-                            $has_total         = true;
-                            $total_approximate = !empty($bot_stats['total_is_approximate']);
-                        }
-
-                        $stats = array(
-                            'online'               => isset($widget_stats['online']) ? (int) $widget_stats['online'] : (isset($bot_stats['online']) ? (int) $bot_stats['online'] : 0),
-                            'total'                => $has_total ? $total : null,
-                            'server_name'          => !empty($widget_stats['server_name'])
-                                ? $widget_stats['server_name']
-                                : (isset($bot_stats['server_name']) ? $bot_stats['server_name'] : ''),
-                            'has_total'            => $has_total,
-                            'total_is_approximate' => $total_approximate,
-                            'server_avatar_url'    => '',
-                            'server_avatar_base_url' => '',
-                        );
-
-                        if (!empty($widget_stats['server_avatar_url'])) {
-                            $stats['server_avatar_url'] = $widget_stats['server_avatar_url'];
-                        } elseif (!empty($bot_stats['server_avatar_url'])) {
-                            $stats['server_avatar_url'] = $bot_stats['server_avatar_url'];
-                        }
-
-                        if (!empty($widget_stats['server_avatar_base_url'])) {
-                            $stats['server_avatar_base_url'] = $widget_stats['server_avatar_base_url'];
-                        } elseif (!empty($bot_stats['server_avatar_base_url'])) {
-                            $stats['server_avatar_base_url'] = $bot_stats['server_avatar_base_url'];
-                        }
-
-                        $presence_breakdown = array();
-
-                        foreach (array($widget_stats, $bot_stats) as $source_stats) {
-                            if (!is_array($source_stats) || empty($source_stats['presence_count_by_status']) || !is_array($source_stats['presence_count_by_status'])) {
-                                continue;
-                            }
-
-                            foreach ($source_stats['presence_count_by_status'] as $status_key => $count_value) {
-                                if (!isset($presence_breakdown[$status_key])) {
-                                    $presence_breakdown[$status_key] = 0;
-                                }
-
-                                $presence_breakdown[$status_key] += (int) $count_value;
-                            }
-                        }
-
-                        if (!empty($presence_breakdown)) {
-                            $stats['presence_count_by_status'] = $presence_breakdown;
-                        } elseif (isset($widget_stats['presence_count_by_status'])) {
-                            $stats['presence_count_by_status'] = $widget_stats['presence_count_by_status'];
-                        } elseif (isset($bot_stats['presence_count_by_status'])) {
-                            $stats['presence_count_by_status'] = $bot_stats['presence_count_by_status'];
-                        }
-
-                        if (isset($widget_stats['approximate_presence_count']) && null !== $widget_stats['approximate_presence_count']) {
-                            $stats['approximate_presence_count'] = (int) $widget_stats['approximate_presence_count'];
-                        } elseif (isset($bot_stats['approximate_presence_count'])) {
-                            $stats['approximate_presence_count'] = (int) $bot_stats['approximate_presence_count'];
-                        }
-
-                        if (isset($bot_stats['approximate_member_count']) && null !== $bot_stats['approximate_member_count']) {
-                            $stats['approximate_member_count'] = (int) $bot_stats['approximate_member_count'];
-                        } elseif (isset($widget_stats['approximate_member_count']) && null !== $widget_stats['approximate_member_count']) {
-                            $stats['approximate_member_count'] = (int) $widget_stats['approximate_member_count'];
-                        }
-
-                        if (isset($bot_stats['premium_subscription_count'])) {
-                            $stats['premium_subscription_count'] = (int) $bot_stats['premium_subscription_count'];
-                        } elseif (isset($widget_stats['premium_subscription_count'])) {
-                            $stats['premium_subscription_count'] = (int) $widget_stats['premium_subscription_count'];
-                        }
-                    } elseif (false === $stats) {
-                        $stats = $bot_stats;
-                    }
-                }
+                $bot_stats = $this->fetch_bot_stats($options);
             }
+
+            $stats = $this->merge_stats($widget_stats, $bot_stats, $widget_incomplete);
 
             if (is_array($stats)) {
                 $stats = $this->normalize_stats($stats);
@@ -457,13 +358,7 @@ class Discord_Bot_JLG_API {
                 return $this->remember_runtime_result($runtime_key, $demo_stats);
             }
 
-            $this->last_error = '';
-            $this->set_last_retry_after(0);
-            $this->clear_api_retry_after_delay();
-            $this->register_current_cache_key();
-            set_transient($this->cache_key, $stats, $this->get_cache_duration($options));
-            $this->store_last_good_stats($stats);
-            $this->clear_last_fallback_details();
+            $this->persist_successful_stats($stats, $options, $context, $args);
 
             return $this->remember_runtime_result($runtime_key, $stats);
         } finally {
@@ -478,6 +373,212 @@ class Discord_Bot_JLG_API {
      */
     public function get_last_error_message() {
         return (string) $this->last_error;
+    }
+
+    private function prepare_fetch_context($args) {
+        $options = $this->get_plugin_options();
+
+        $context = $this->resolve_connection_context($args, $options);
+
+        if (isset($context['options']) && is_array($context['options'])) {
+            $options = $context['options'];
+        } else {
+            $options = array();
+            $context['options'] = array();
+        }
+
+        $runtime_args = array(
+            'force_demo'   => !empty($args['force_demo']),
+            'bypass_cache' => !empty($args['bypass_cache']),
+            'signature'    => isset($context['signature']) ? (string) $context['signature'] : '',
+        );
+
+        $runtime_key = $this->get_runtime_cache_key($runtime_args);
+        $runtime_hit = array_key_exists($runtime_key, $this->runtime_cache);
+
+        $runtime_error = '';
+        $runtime_retry_after = 0;
+        $runtime_value = null;
+
+        if (true === $runtime_hit) {
+            $runtime_value = $this->runtime_cache[$runtime_key];
+            if (isset($this->runtime_errors[$runtime_key])) {
+                $runtime_error = $this->runtime_errors[$runtime_key];
+            }
+            if (isset($this->runtime_retry_after[$runtime_key])) {
+                $runtime_retry_after = (int) $this->runtime_retry_after[$runtime_key];
+            }
+        }
+
+        return array(
+            'options'             => $options,
+            'context'             => $context,
+            'runtime_key'         => $runtime_key,
+            'runtime_hit'         => $runtime_hit,
+            'runtime_value'       => $runtime_value,
+            'runtime_error'       => $runtime_error,
+            'runtime_retry_after' => $runtime_retry_after,
+        );
+    }
+
+    private function fetch_widget_stats($options) {
+        $widget_stats = $this->get_stats_from_widget($options);
+
+        if (!is_array($widget_stats)) {
+            return null;
+        }
+
+        return $this->normalize_stats($widget_stats);
+    }
+
+    private function fetch_bot_stats($options) {
+        $bot_stats = $this->get_stats_from_bot($options);
+
+        if (!is_array($bot_stats)) {
+            return null;
+        }
+
+        return $this->normalize_stats($bot_stats);
+    }
+
+    private function merge_stats($widget_stats, $bot_stats, $widget_incomplete = null) {
+        if (null === $widget_incomplete) {
+            $widget_incomplete = $this->stats_need_completion($widget_stats);
+        }
+
+        if (
+            true === $widget_incomplete
+            && is_array($widget_stats)
+            && is_array($bot_stats)
+        ) {
+            $total             = null;
+            $has_total         = false;
+            $total_approximate = false;
+
+            if (!empty($widget_stats['has_total'])) {
+                $total             = $widget_stats['total'];
+                $has_total         = true;
+                $total_approximate = !empty($widget_stats['total_is_approximate']);
+            } elseif (!empty($bot_stats['has_total'])) {
+                $total             = $bot_stats['total'];
+                $has_total         = true;
+                $total_approximate = !empty($bot_stats['total_is_approximate']);
+            }
+
+            $stats = array(
+                'online'               => isset($widget_stats['online']) ? (int) $widget_stats['online'] : (isset($bot_stats['online']) ? (int) $bot_stats['online'] : 0),
+                'total'                => $has_total ? $total : null,
+                'server_name'          => !empty($widget_stats['server_name'])
+                    ? $widget_stats['server_name']
+                    : (isset($bot_stats['server_name']) ? $bot_stats['server_name'] : ''),
+                'has_total'            => $has_total,
+                'total_is_approximate' => $total_approximate,
+                'server_avatar_url'    => '',
+                'server_avatar_base_url' => '',
+            );
+
+            if (!empty($widget_stats['server_avatar_url'])) {
+                $stats['server_avatar_url'] = $widget_stats['server_avatar_url'];
+            } elseif (!empty($bot_stats['server_avatar_url'])) {
+                $stats['server_avatar_url'] = $bot_stats['server_avatar_url'];
+            }
+
+            if (!empty($widget_stats['server_avatar_base_url'])) {
+                $stats['server_avatar_base_url'] = $widget_stats['server_avatar_base_url'];
+            } elseif (!empty($bot_stats['server_avatar_base_url'])) {
+                $stats['server_avatar_base_url'] = $bot_stats['server_avatar_base_url'];
+            }
+
+            $presence_breakdown = array();
+
+            foreach (array($widget_stats, $bot_stats) as $source_stats) {
+                if (
+                    !is_array($source_stats)
+                    || empty($source_stats['presence_count_by_status'])
+                    || !is_array($source_stats['presence_count_by_status'])
+                ) {
+                    continue;
+                }
+
+                foreach ($source_stats['presence_count_by_status'] as $status_key => $count_value) {
+                    if (!isset($presence_breakdown[$status_key])) {
+                        $presence_breakdown[$status_key] = 0;
+                    }
+
+                    $presence_breakdown[$status_key] += (int) $count_value;
+                }
+            }
+
+            if (!empty($presence_breakdown)) {
+                $stats['presence_count_by_status'] = $presence_breakdown;
+            } elseif (isset($widget_stats['presence_count_by_status'])) {
+                $stats['presence_count_by_status'] = $widget_stats['presence_count_by_status'];
+            } elseif (isset($bot_stats['presence_count_by_status'])) {
+                $stats['presence_count_by_status'] = $bot_stats['presence_count_by_status'];
+            }
+
+            if (isset($widget_stats['approximate_presence_count']) && null !== $widget_stats['approximate_presence_count']) {
+                $stats['approximate_presence_count'] = (int) $widget_stats['approximate_presence_count'];
+            } elseif (isset($bot_stats['approximate_presence_count'])) {
+                $stats['approximate_presence_count'] = (int) $bot_stats['approximate_presence_count'];
+            }
+
+            if (isset($bot_stats['approximate_member_count']) && null !== $bot_stats['approximate_member_count']) {
+                $stats['approximate_member_count'] = (int) $bot_stats['approximate_member_count'];
+            } elseif (isset($widget_stats['approximate_member_count']) && null !== $widget_stats['approximate_member_count']) {
+                $stats['approximate_member_count'] = (int) $widget_stats['approximate_member_count'];
+            }
+
+            if (isset($bot_stats['premium_subscription_count'])) {
+                $stats['premium_subscription_count'] = (int) $bot_stats['premium_subscription_count'];
+            } elseif (isset($widget_stats['premium_subscription_count'])) {
+                $stats['premium_subscription_count'] = (int) $widget_stats['premium_subscription_count'];
+            }
+
+            return $stats;
+        }
+
+        if (is_array($widget_stats)) {
+            return $widget_stats;
+        }
+
+        if (is_array($bot_stats)) {
+            return $bot_stats;
+        }
+
+        return null;
+    }
+
+    private function persist_successful_stats($stats, $options, $context, $args) {
+        if (!is_array($stats)) {
+            return;
+        }
+
+        $this->last_error = '';
+        $this->set_last_retry_after(0);
+        $this->clear_api_retry_after_delay();
+        $this->register_current_cache_key();
+        set_transient($this->cache_key, $stats, $this->get_cache_duration($options));
+        $this->store_last_good_stats($stats);
+        $this->clear_last_fallback_details();
+
+        if (!$this->should_log_stats($stats)) {
+            return;
+        }
+
+        $profile_key = 'default';
+        if (!empty($args['profile_key'])) {
+            $profile_key = $args['profile_key'];
+        }
+
+        $server_id = '';
+        if (isset($context['options']['server_id'])) {
+            $server_id = (string) $context['options']['server_id'];
+        } elseif (isset($options['server_id'])) {
+            $server_id = (string) $options['server_id'];
+        }
+
+        $this->log_snapshot($profile_key, $server_id, $stats);
     }
 
     public function get_last_fallback_details() {
@@ -914,10 +1015,6 @@ class Discord_Bot_JLG_API {
             $this->log_debug('Cron refresh produced fallback stats: ' . $last_error);
         }
 
-        if ($this->should_log_stats($stats)) {
-            $this->log_snapshot('default', $server_id, $stats);
-        }
-
         $profiles = $this->get_server_profiles(true);
 
         if (!is_array($profiles) || empty($profiles)) {
@@ -980,8 +1077,6 @@ class Discord_Bot_JLG_API {
                 }
 
                 $this->log_debug(sprintf('Cron refresh produced fallback stats for profile "%s": %s', $effective_profile_key, $last_error));
-            } else {
-                $this->log_snapshot($effective_profile_key, $profile_server_id, $profile_stats);
             }
         }
 
@@ -2129,6 +2224,24 @@ class Discord_Bot_JLG_API {
             );
         }
 
+        $presence_breakdown = array();
+
+        if (!empty($data['presence_count_by_status']) && is_array($data['presence_count_by_status'])) {
+            foreach ($data['presence_count_by_status'] as $status => $value) {
+                $status_key = $this->normalize_presence_status_slug($status);
+
+                if ('' === $status_key) {
+                    continue;
+                }
+
+                if (!isset($presence_breakdown[$status_key])) {
+                    $presence_breakdown[$status_key] = 0;
+                }
+
+                $presence_breakdown[$status_key] += max(0, (int) $value);
+            }
+        }
+
         return array(
             'online'                     => (int) $data['approximate_presence_count'],
             'total'                      => (int) $data['approximate_member_count'],
@@ -2140,7 +2253,7 @@ class Discord_Bot_JLG_API {
             'server_avatar_base_url'     => $server_avatar_base_url,
             'approximate_presence_count' => (int) $data['approximate_presence_count'],
             'approximate_member_count'   => (int) $data['approximate_member_count'],
-            'presence_count_by_status'   => array(),
+            'presence_count_by_status'   => $presence_breakdown,
             'premium_subscription_count' => isset($data['premium_subscription_count'])
                 ? (int) $data['premium_subscription_count']
                 : 0,
