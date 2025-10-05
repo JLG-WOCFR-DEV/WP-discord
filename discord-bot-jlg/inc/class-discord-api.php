@@ -36,6 +36,7 @@ class Discord_Bot_JLG_API {
     private $http_client;
     private $options_cache;
     private $runtime_fallback_retry_timestamp;
+    private $analytics;
 
     /**
      * Prépare le service d'accès aux statistiques avec les clés et durées nécessaires.
@@ -46,7 +47,7 @@ class Discord_Bot_JLG_API {
      *
      * @return void
      */
-    public function __construct($option_name, $cache_key, $default_cache_duration = 300, $http_client = null) {
+    public function __construct($option_name, $cache_key, $default_cache_duration = 300, $http_client = null, $analytics = null) {
         $this->option_name = $option_name;
         $this->base_cache_key = $cache_key;
         $this->cache_key = $cache_key;
@@ -61,6 +62,17 @@ class Discord_Bot_JLG_API {
             : new Discord_Bot_JLG_Http_Client();
         $this->options_cache = null;
         $this->runtime_fallback_retry_timestamp = 0;
+        $this->analytics = ($analytics instanceof Discord_Bot_JLG_Analytics) ? $analytics : null;
+    }
+
+    public function set_analytics_service($analytics) {
+        if ($analytics instanceof Discord_Bot_JLG_Analytics) {
+            $this->analytics = $analytics;
+        }
+    }
+
+    public function get_analytics_service() {
+        return $this->analytics;
     }
 
     private function register_current_cache_key() {
@@ -148,6 +160,26 @@ class Discord_Bot_JLG_API {
         }
 
         return $this->options_cache;
+    }
+
+    public function get_analytics_retention_days($options = null) {
+        if (!is_array($options)) {
+            $options = $this->get_plugin_options();
+        }
+
+        $default_retention = defined('DISCORD_BOT_JLG_ANALYTICS_RETENTION_DEFAULT')
+            ? (int) DISCORD_BOT_JLG_ANALYTICS_RETENTION_DEFAULT
+            : Discord_Bot_JLG_Analytics::DEFAULT_RETENTION_DAYS;
+
+        $retention = isset($options['analytics_retention_days'])
+            ? (int) $options['analytics_retention_days']
+            : $default_retention;
+
+        if ($retention < 0) {
+            $retention = 0;
+        }
+
+        return $retention;
     }
 
     public function get_server_profiles($include_sensitive = false) {
@@ -882,9 +914,14 @@ class Discord_Bot_JLG_API {
             $this->log_debug('Cron refresh produced fallback stats: ' . $last_error);
         }
 
+        if ($this->should_log_stats($stats)) {
+            $this->log_snapshot('default', $server_id, $stats);
+        }
+
         $profiles = $this->get_server_profiles(true);
 
         if (!is_array($profiles) || empty($profiles)) {
+            $this->purge_analytics_if_needed($options);
             return;
         }
 
@@ -943,8 +980,49 @@ class Discord_Bot_JLG_API {
                 }
 
                 $this->log_debug(sprintf('Cron refresh produced fallback stats for profile "%s": %s', $effective_profile_key, $last_error));
+            } else {
+                $this->log_snapshot($effective_profile_key, $profile_server_id, $profile_stats);
             }
         }
+
+        $this->purge_analytics_if_needed($options);
+    }
+
+    private function purge_analytics_if_needed($options) {
+        if (!($this->analytics instanceof Discord_Bot_JLG_Analytics)) {
+            return;
+        }
+
+        $retention = $this->get_analytics_retention_days($options);
+        if ($retention <= 0) {
+            return;
+        }
+
+        $this->analytics->purge_old_entries($retention);
+    }
+
+    private function should_log_stats($stats) {
+        if (!is_array($stats)) {
+            return false;
+        }
+
+        if (!empty($stats['is_demo']) || !empty($stats['fallback_demo'])) {
+            return false;
+        }
+
+        return true;
+    }
+
+    private function log_snapshot($profile_key, $server_id, $stats) {
+        if (!($this->analytics instanceof Discord_Bot_JLG_Analytics)) {
+            return;
+        }
+
+        if (!$this->should_log_stats($stats)) {
+            return;
+        }
+
+        $this->analytics->log_snapshot($profile_key, $server_id, $stats);
     }
 
     /**

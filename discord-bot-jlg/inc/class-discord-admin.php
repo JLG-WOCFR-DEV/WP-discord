@@ -555,6 +555,24 @@ class Discord_Bot_JLG_Admin {
             }
         }
 
+        if (array_key_exists('analytics_retention_days', $input)) {
+            $raw_retention = is_string($input['analytics_retention_days'])
+                ? trim($input['analytics_retention_days'])
+                : $input['analytics_retention_days'];
+
+            if ('' === $raw_retention) {
+                $sanitized['analytics_retention_days'] = $sanitized['analytics_retention_days'];
+            } else {
+                $retention = absint($raw_retention);
+
+                if ($retention > 365) {
+                    $retention = 365;
+                }
+
+                $sanitized['analytics_retention_days'] = $retention;
+            }
+        }
+
         if (isset($input['custom_css'])) {
             $sanitized['custom_css'] = discord_bot_jlg_sanitize_custom_css($input['custom_css']);
         }
@@ -1041,6 +1059,16 @@ class Discord_Bot_JLG_Admin {
      */
     public function display_section_callback() {
         printf('<p>%s</p>', esc_html__('Personnalisez l\'affichage des statistiques Discord.', 'discord-bot-jlg'));
+    }
+
+    public function analytics_section_callback() {
+        printf(
+            '<p>%s</p>',
+            esc_html__(
+                'Conservez un historique des snapshots pour alimenter les graphiques et tendances.',
+                'discord-bot-jlg'
+            )
+        );
     }
 
     /**
@@ -1541,6 +1569,25 @@ class Discord_Bot_JLG_Admin {
         <?php
     }
 
+    public function analytics_retention_render() {
+        $options = get_option($this->option_name);
+        $default_retention = defined('DISCORD_BOT_JLG_ANALYTICS_RETENTION_DEFAULT')
+            ? (int) DISCORD_BOT_JLG_ANALYTICS_RETENTION_DEFAULT
+            : Discord_Bot_JLG_Analytics::DEFAULT_RETENTION_DAYS;
+        $value = isset($options['analytics_retention_days'])
+            ? max(0, (int) $options['analytics_retention_days'])
+            : $default_retention;
+        ?>
+        <input type="number"
+               name="<?php echo esc_attr($this->option_name); ?>[analytics_retention_days]"
+               value="<?php echo esc_attr($value); ?>"
+               min="0"
+               max="365"
+               class="small-text" />
+        <p class="description"><?php esc_html_e('Nombre de jours conservés (0 désactive la purge automatique).', 'discord-bot-jlg'); ?></p>
+        <?php
+    }
+
     /**
      * Affiche la page principale de configuration du plugin.
      *
@@ -1700,6 +1747,8 @@ class Discord_Bot_JLG_Admin {
             <h1><?php esc_html_e('📖 Guide & Démonstration', 'discord-bot-jlg'); ?></h1>
             <?php $this->render_demo_intro_notice(); ?>
 
+            <?php $this->render_demo_analytics_overview(); ?>
+
             <hr style="margin: 30px 0;">
 
             <?php $this->render_demo_previews(); ?>
@@ -1725,6 +1774,55 @@ class Discord_Bot_JLG_Admin {
         ?>
         <div style="background: #fff3cd; padding: 10px 20px; border-radius: 8px; margin: 20px 0;">
             <p><?php echo wp_kses_post(__('<strong>💡 Astuce :</strong> Tous les exemples ci-dessous utilisent le mode démo. Vous pouvez les copier-coller directement !', 'discord-bot-jlg')); ?></p>
+        </div>
+        <?php
+    }
+
+    private function render_demo_analytics_overview() {
+        $options    = $this->api->get_plugin_options();
+        $retention  = $this->api->get_analytics_retention_days($options);
+        $retention  = (int) $retention;
+        $retention_text = ($retention > 0)
+            ? sprintf(
+                /* translators: %d: number of days retained. */
+                esc_html__('Rétention actuelle : %d jours de snapshots.', 'discord-bot-jlg'),
+                $retention
+            )
+            : esc_html__('Rétention désactivée : activez-la dans l’onglet Configuration pour alimenter ce graphique.', 'discord-bot-jlg');
+        ?>
+        <div class="discord-analytics-panel" id="discord-analytics-panel" data-retention="<?php echo esc_attr($retention); ?>">
+            <div class="discord-analytics-panel__header">
+                <h2>📈 <?php esc_html_e('Tendances des statistiques', 'discord-bot-jlg'); ?></h2>
+                <p class="description"><?php echo esc_html($retention_text); ?></p>
+            </div>
+            <div class="discord-analytics-panel__body">
+                <div class="discord-analytics-panel__canvas">
+                    <canvas id="discord-analytics-chart" height="240" role="img" aria-label="<?php esc_attr_e('Évolution des présences et boosts Discord', 'discord-bot-jlg'); ?>"></canvas>
+                </div>
+                <div class="discord-analytics-panel__summary">
+                    <div class="discord-analytics-summary__item">
+                        <span class="discord-analytics-summary__label"><?php esc_html_e('Moyenne en ligne', 'discord-bot-jlg'); ?></span>
+                        <span class="discord-analytics-summary__value" data-role="analytics-average-online">—</span>
+                    </div>
+                    <div class="discord-analytics-summary__item">
+                        <span class="discord-analytics-summary__label"><?php esc_html_e('Présence moyenne', 'discord-bot-jlg'); ?></span>
+                        <span class="discord-analytics-summary__value" data-role="analytics-average-presence">—</span>
+                    </div>
+                    <div class="discord-analytics-summary__item">
+                        <span class="discord-analytics-summary__label"><?php esc_html_e('Moyenne totale', 'discord-bot-jlg'); ?></span>
+                        <span class="discord-analytics-summary__value" data-role="analytics-average-total">—</span>
+                    </div>
+                    <div class="discord-analytics-summary__item">
+                        <span class="discord-analytics-summary__label"><?php esc_html_e('Pic de présence', 'discord-bot-jlg'); ?></span>
+                        <span class="discord-analytics-summary__value" data-role="analytics-peak-presence">—</span>
+                    </div>
+                    <div class="discord-analytics-summary__item">
+                        <span class="discord-analytics-summary__label"><?php esc_html_e('Tendance des boosts', 'discord-bot-jlg'); ?></span>
+                        <span class="discord-analytics-summary__value" data-role="analytics-boost-trend">—</span>
+                    </div>
+                </div>
+            </div>
+            <p class="discord-analytics-panel__notice" data-role="analytics-notice"></p>
         </div>
         <?php
     }
@@ -1990,6 +2088,55 @@ class Discord_Bot_JLG_Admin {
             array(),
             DISCORD_BOT_JLG_VERSION
         );
+
+        if (empty($current_screen) || $current_screen->id !== 'discord-bot-jlg_page_discord-bot-demo') {
+            return;
+        }
+
+        wp_register_script(
+            'discord-bot-jlg-chartjs',
+            'https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js',
+            array(),
+            '4.4.1',
+            true
+        );
+
+        wp_register_script(
+            'discord-bot-jlg-admin-analytics',
+            DISCORD_BOT_JLG_PLUGIN_URL . 'assets/js/discord-bot-jlg-admin-analytics.js',
+            array('discord-bot-jlg-chartjs'),
+            DISCORD_BOT_JLG_VERSION,
+            true
+        );
+
+        $rest_url = rest_url('discord-bot-jlg/v1/analytics');
+        $options   = $this->api->get_plugin_options();
+        $retention = $this->api->get_analytics_retention_days($options);
+
+        wp_localize_script(
+            'discord-bot-jlg-admin-analytics',
+            'discordBotJlgAdminAnalytics',
+            array(
+                'restUrl'        => esc_url_raw($rest_url),
+                'nonce'          => wp_create_nonce('wp_rest'),
+                'canvasId'       => 'discord-analytics-chart',
+                'containerId'    => 'discord-analytics-panel',
+                'profileKey'     => '',
+                'days'           => 7,
+                'retentionDays'  => (int) $retention,
+                'labels'         => array(
+                    'averageOnline'    => esc_html__('Moyenne en ligne', 'discord-bot-jlg'),
+                    'averagePresence'  => esc_html__('Présence moyenne', 'discord-bot-jlg'),
+                    'averageTotal'     => esc_html__('Moyenne totale', 'discord-bot-jlg'),
+                    'peakPresence'     => esc_html__('Pic de présence', 'discord-bot-jlg'),
+                    'boostTrend'       => esc_html__('Tendance des boosts', 'discord-bot-jlg'),
+                    'noData'           => esc_html__('Pas encore de données collectées.', 'discord-bot-jlg'),
+                ),
+            )
+        );
+
+        wp_enqueue_script('discord-bot-jlg-chartjs');
+        wp_enqueue_script('discord-bot-jlg-admin-analytics');
     }
 
     /**

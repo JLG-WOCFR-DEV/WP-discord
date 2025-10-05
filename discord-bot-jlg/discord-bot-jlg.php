@@ -28,6 +28,7 @@ define('DISCORD_BOT_JLG_OPTION_NAME', 'discord_server_stats_options');
 define('DISCORD_BOT_JLG_CACHE_KEY', 'discord_server_stats_cache');
 define('DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION', 300);
 define('DISCORD_BOT_JLG_CRON_HOOK', 'discord_bot_jlg_refresh_cache');
+define('DISCORD_BOT_JLG_ANALYTICS_RETENTION_DEFAULT', 90);
 
 if (!function_exists('discord_bot_jlg_get_cron_interval')) {
     /**
@@ -109,6 +110,7 @@ if (!function_exists('discord_bot_jlg_get_default_options')) {
             'custom_css'     => '',
             'widget_title'   => 'Discord Server',
             'cache_duration' => DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION,
+            'analytics_retention_days' => DISCORD_BOT_JLG_ANALYTICS_RETENTION_DEFAULT,
         );
     }
 }
@@ -128,25 +130,44 @@ function discord_bot_jlg_uninstall() {
             require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-http.php';
         }
 
+        if (!class_exists('Discord_Bot_JLG_Analytics')) {
+            require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-analytics.php';
+        }
+
         require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-api.php';
     } elseif (!class_exists('Discord_Bot_JLG_Http_Client')) {
         require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-http.php';
+    }
+
+    if (!class_exists('Discord_Bot_JLG_Analytics')) {
+        require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-analytics.php';
     }
 
     if (class_exists('Discord_Bot_JLG_API')) {
         $api = new Discord_Bot_JLG_API(
             DISCORD_BOT_JLG_OPTION_NAME,
             DISCORD_BOT_JLG_CACHE_KEY,
-            DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION
+            DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION,
+            null,
+            new Discord_Bot_JLG_Analytics()
         );
 
         $api->purge_full_cache();
+    }
+
+    if (class_exists('Discord_Bot_JLG_Analytics')) {
+        global $wpdb;
+        $analytics = new Discord_Bot_JLG_Analytics($wpdb);
+        if ($wpdb && method_exists($wpdb, 'query')) {
+            $wpdb->query('DROP TABLE IF EXISTS ' . $analytics->get_table_name());
+        }
     }
 }
 
 register_uninstall_hook(__FILE__, 'discord_bot_jlg_uninstall');
 
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/helpers.php';
+require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-analytics.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-http.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-api.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-admin.php';
@@ -186,16 +207,25 @@ class DiscordServerStats {
     private $widget;
     private $site_health;
     private $rest_controller;
+    private $analytics;
 
     public function __construct() {
         $this->default_options = discord_bot_jlg_get_default_options();
 
-        $this->api       = new Discord_Bot_JLG_API(DISCORD_BOT_JLG_OPTION_NAME, DISCORD_BOT_JLG_CACHE_KEY, DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION);
-        $this->admin     = new Discord_Bot_JLG_Admin(DISCORD_BOT_JLG_OPTION_NAME, $this->api);
+        $this->analytics = new Discord_Bot_JLG_Analytics();
+
+        $this->api       = new Discord_Bot_JLG_API(
+            DISCORD_BOT_JLG_OPTION_NAME,
+            DISCORD_BOT_JLG_CACHE_KEY,
+            DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION,
+            null,
+            $this->analytics
+        );
+        $this->admin     = new Discord_Bot_JLG_Admin(DISCORD_BOT_JLG_OPTION_NAME, $this->api, $this->analytics);
         $this->shortcode = new Discord_Bot_JLG_Shortcode(DISCORD_BOT_JLG_OPTION_NAME, $this->api);
         $this->widget    = new Discord_Bot_JLG_Widget();
         $this->site_health = new Discord_Bot_JLG_Site_Health($this->api);
-        $this->rest_controller = new Discord_Bot_JLG_REST_Controller($this->api);
+        $this->rest_controller = new Discord_Bot_JLG_REST_Controller($this->api, $this->analytics);
 
         add_filter('default_option_' . DISCORD_BOT_JLG_OPTION_NAME, array($this, 'provide_default_options'));
         add_filter('option_' . DISCORD_BOT_JLG_OPTION_NAME, array($this, 'merge_options_with_defaults'));
@@ -370,6 +400,10 @@ class DiscordServerStats {
     public function activate() {
         add_option(DISCORD_BOT_JLG_OPTION_NAME, $this->default_options, '', false);
 
+        if ($this->analytics instanceof Discord_Bot_JLG_Analytics) {
+            $this->analytics->install();
+        }
+
         $this->reschedule_cron_event();
     }
 
@@ -431,6 +465,21 @@ class DiscordServerStats {
         $new_cache_duration = $this->normalize_cache_duration($new_cache_duration);
 
         $cache_duration_changed = ($old_cache_duration !== $new_cache_duration);
+
+        $old_retention = isset($old_value['analytics_retention_days'])
+            ? (int) $old_value['analytics_retention_days']
+            : $this->api->get_analytics_retention_days($old_value);
+        $new_retention = isset($value['analytics_retention_days'])
+            ? (int) $value['analytics_retention_days']
+            : $this->api->get_analytics_retention_days($value);
+
+        if ($old_retention !== $new_retention) {
+            $analytics = $this->api->get_analytics_service();
+
+            if ($analytics instanceof Discord_Bot_JLG_Analytics && $new_retention > 0) {
+                $analytics->purge_old_entries($new_retention);
+            }
+        }
 
         if ($old_server_id !== $new_server_id || $old_bot_token !== $new_bot_token) {
             $this->api->clear_all_cached_data();

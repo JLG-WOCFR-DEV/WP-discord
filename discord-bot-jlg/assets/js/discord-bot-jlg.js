@@ -20,6 +20,8 @@
     var SYNTHETIC_LABEL_SELECTOR = '[data-region-synthetic-label="true"]';
     var SYNTHETIC_LABEL_CLASS = 'discord-region-label';
     var SCREEN_READER_TEXT_CLASS = 'screen-reader-text';
+    var ANALYTICS_CACHE_TTL = 5 * 60 * 1000;
+    var analyticsCache = {};
 
     if (typeof window !== 'undefined' && window.discordBotJlg) {
         globalConfig = window.discordBotJlg;
@@ -175,6 +177,330 @@
         }
 
         return fetch(endpointUrl, options);
+    }
+
+    function buildAnalyticsRequestUrl(baseUrl, overrides, days) {
+        if (typeof baseUrl !== 'string' || !baseUrl) {
+            return '';
+        }
+
+        try {
+            var origin = (typeof window !== 'undefined' && window.location && window.location.origin)
+                ? window.location.origin
+                : undefined;
+            var url = new URL(baseUrl, origin);
+
+            if (overrides && overrides.profileKey) {
+                url.searchParams.set('profile_key', overrides.profileKey);
+            }
+
+            if (overrides && overrides.serverId) {
+                url.searchParams.set('server_id', overrides.serverId);
+            }
+
+            if (typeof days === 'number' && isFinite(days) && days > 0) {
+                url.searchParams.set('days', String(days));
+            }
+
+            return url.toString();
+        } catch (error) {
+            var queryParts = [];
+
+            if (overrides && overrides.profileKey) {
+                queryParts.push('profile_key=' + encodeURIComponent(overrides.profileKey));
+            }
+
+            if (overrides && overrides.serverId) {
+                queryParts.push('server_id=' + encodeURIComponent(overrides.serverId));
+            }
+
+            if (typeof days === 'number' && isFinite(days) && days > 0) {
+                queryParts.push('days=' + encodeURIComponent(days));
+            }
+
+            if (!queryParts.length) {
+                return baseUrl;
+            }
+
+            var separator = baseUrl.indexOf('?') === -1 ? '?' : '&';
+            return baseUrl + separator + queryParts.join('&');
+        }
+    }
+
+    function getAnalyticsCacheKey(overrides, days) {
+        var profileKey = overrides && overrides.profileKey ? overrides.profileKey : 'default';
+        var serverId = overrides && overrides.serverId ? overrides.serverId : '';
+        var normalizedDays = (typeof days === 'number' && isFinite(days) && days > 0) ? days : 7;
+
+        return [profileKey, serverId, normalizedDays].join('|');
+    }
+
+    function requestAnalyticsSnapshot(config, overrides, days, forceRefresh) {
+        if (!config || typeof config.analyticsRestUrl !== 'string' || !config.analyticsRestUrl) {
+            return Promise.reject(new Error('Analytics endpoint unavailable'));
+        }
+
+        var cacheKey = getAnalyticsCacheKey(overrides, days);
+        var now = Date.now();
+        var entry = analyticsCache[cacheKey];
+
+        if (!forceRefresh && entry && entry.data && (now - entry.timestamp) < ANALYTICS_CACHE_TTL) {
+            return Promise.resolve(entry.data);
+        }
+
+        if (!forceRefresh && entry && entry.pending) {
+            return entry.pending;
+        }
+
+        var endpoint = buildAnalyticsRequestUrl(config.analyticsRestUrl, overrides, days);
+        if (!endpoint) {
+            return Promise.reject(new Error('Invalid analytics URL'));
+        }
+
+        var options = {
+            method: 'GET',
+            credentials: 'same-origin'
+        };
+
+        if (config.analyticsRestNonce) {
+            options.headers = {
+                'X-WP-Nonce': config.analyticsRestNonce
+            };
+        }
+
+        var fetchPromise = fetch(endpoint, options)
+            .then(function (response) {
+                if (!response.ok) {
+                    var error = new Error('HTTP ' + response.status);
+                    error.status = response.status;
+                    throw error;
+                }
+
+                return response.json();
+            })
+            .then(function (payload) {
+                if (!payload || payload.success === false) {
+                    throw new Error('Invalid analytics payload');
+                }
+
+                var data = payload.data || {};
+                analyticsCache[cacheKey] = {
+                    timestamp: Date.now(),
+                    data: data
+                };
+
+                return data;
+            })
+            .catch(function (error) {
+                delete analyticsCache[cacheKey];
+                throw error;
+            });
+
+        analyticsCache[cacheKey] = analyticsCache[cacheKey] || {};
+        analyticsCache[cacheKey].pending = fetchPromise;
+
+        return fetchPromise;
+    }
+
+    function formatSparklineNumber(value, locale) {
+        if (typeof value !== 'number' || !isFinite(value)) {
+            return '—';
+        }
+
+        try {
+            return new Intl.NumberFormat(locale || (globalConfig && globalConfig.locale) || 'fr-FR', {
+                maximumFractionDigits: 0
+            }).format(value);
+        } catch (error) {
+            return Math.round(value).toString();
+        }
+    }
+
+    function renderSparklineEmbed(embedElement, analyticsData, settings, config) {
+        if (!embedElement) {
+            return;
+        }
+
+        var sparklineContainer = embedElement.querySelector('[data-role="discord-sparkline"]');
+        var noteElement = embedElement.querySelector('[data-role="discord-sparkline-note"]');
+
+        if (!sparklineContainer) {
+            return;
+        }
+
+        sparklineContainer.innerHTML = '';
+
+        var metric = settings && settings.metric ? settings.metric : 'online';
+        var timeseries = analyticsData && Array.isArray(analyticsData.timeseries)
+            ? analyticsData.timeseries
+            : [];
+
+        var field = 'online';
+        if ('presence' === metric) {
+            field = 'presence';
+        } else if ('premium' === metric) {
+            field = 'premium';
+        }
+
+        var values = [];
+        var processedPoints = [];
+
+        for (var index = 0; index < timeseries.length; index++) {
+            var point = timeseries[index];
+            if (!point || typeof point !== 'object') {
+                processedPoints.push(null);
+                continue;
+            }
+
+            var rawValue = point[field];
+            if (typeof rawValue !== 'number' || !isFinite(rawValue)) {
+                processedPoints.push(null);
+                continue;
+            }
+
+            processedPoints.push(rawValue);
+            values.push(rawValue);
+        }
+
+        if (!values.length) {
+            if (noteElement) {
+                noteElement.textContent = (config && config.sparklineNoData)
+                    ? config.sparklineNoData
+                    : '';
+            }
+
+            return;
+        }
+
+        var width = sparklineContainer.clientWidth || 160;
+        var height = sparklineContainer.clientHeight || 56;
+        var minValue = Math.min.apply(null, values);
+        var maxValue = Math.max.apply(null, values);
+
+        if (minValue === maxValue) {
+            minValue = minValue - 1;
+            maxValue = maxValue + 1;
+        }
+
+        var svgNS = 'http://www.w3.org/2000/svg';
+        var svg = document.createElementNS(svgNS, 'svg');
+        svg.setAttribute('viewBox', '0 0 ' + width + ' ' + height);
+        svg.setAttribute('preserveAspectRatio', 'none');
+
+        var strokeColor = '#22c55e';
+        if ('presence' === metric) {
+            strokeColor = '#3b82f6';
+        } else if ('premium' === metric) {
+            strokeColor = '#a855f7';
+        }
+
+        var pathData = '';
+        var pointCount = processedPoints.length;
+
+        for (var i = 0; i < pointCount; i++) {
+            var value = processedPoints[i];
+            if (typeof value !== 'number' || !isFinite(value)) {
+                continue;
+            }
+
+            var x = pointCount === 1 ? width : (i / (pointCount - 1)) * width;
+            var normalized = (value - minValue) / (maxValue - minValue);
+
+            if (!isFinite(normalized)) {
+                normalized = 0.5;
+            }
+
+            var y = height - (normalized * height);
+
+            if (y < 0) {
+                y = 0;
+            } else if (y > height) {
+                y = height;
+            }
+
+            pathData += (pathData ? ' L' : 'M') + x.toFixed(2) + ' ' + y.toFixed(2);
+        }
+
+        var path = document.createElementNS(svgNS, 'path');
+        path.setAttribute('d', pathData);
+        path.setAttribute('fill', 'none');
+        path.setAttribute('stroke', strokeColor);
+        path.setAttribute('stroke-width', 2);
+        path.setAttribute('stroke-linecap', 'round');
+        path.setAttribute('stroke-linejoin', 'round');
+
+        svg.appendChild(path);
+        sparklineContainer.appendChild(svg);
+
+        if (noteElement) {
+            var lastValue = values[values.length - 1];
+            var firstValue = values[0];
+            var delta = lastValue - firstValue;
+            var deltaLabel;
+
+            if (delta > 0) {
+                deltaLabel = '▲' + formatSparklineNumber(Math.abs(delta), config && config.locale);
+            } else if (delta < 0) {
+                deltaLabel = '▼' + formatSparklineNumber(Math.abs(delta), config && config.locale);
+            } else {
+                deltaLabel = '±0';
+            }
+
+            noteElement.textContent = formatSparklineNumber(lastValue, config && config.locale) + ' (' + deltaLabel + ')';
+        }
+    }
+
+    function updateSparklineForContainer(container, config, forceRefresh) {
+        if (!container || !config || container.dataset.showSparkline !== 'true') {
+            return;
+        }
+
+        if (!config.analyticsRestUrl) {
+            return;
+        }
+
+        var embed = container.querySelector('[data-role="discord-analytics-embed"]');
+        if (!embed) {
+            return;
+        }
+
+        var metric = embed.dataset.metric || container.dataset.sparklineMetric || 'online';
+        var daysRaw = embed.dataset.days || container.dataset.sparklineDays || '7';
+        var days = parseInt(daysRaw, 10);
+
+        if (isNaN(days) || days <= 0) {
+            days = 7;
+        }
+
+        var overrides = collectConnectionOverrides(container, config);
+
+        requestAnalyticsSnapshot(config, overrides, days, !!forceRefresh)
+            .then(function (data) {
+                renderSparklineEmbed(embed, data, { metric: metric }, config);
+            })
+            .catch(function () {
+                var note = embed.querySelector('[data-role="discord-sparkline-note"]');
+                if (note) {
+                    note.textContent = (config && config.sparklineError)
+                        ? config.sparklineError
+                        : '';
+                }
+            });
+    }
+
+    function setupSparklinePanels(config) {
+        if (!config || !config.analyticsRestUrl || typeof document === 'undefined') {
+            return;
+        }
+
+        var sparklineContainers = document.querySelectorAll('.discord-stats-container[data-show-sparkline="true"]');
+        if (!sparklineContainers.length) {
+            return;
+        }
+
+        Array.prototype.forEach.call(sparklineContainers, function (container) {
+            updateSparklineForContainer(container, config, false);
+        });
     }
 
     function getOrCreateErrorMessageElement(container) {
@@ -2113,6 +2439,10 @@
                 updatePremiumSubscriptions(container, payloadData, formatter);
                 refreshRegionAccessibility(container);
 
+                if (container && container.dataset && container.dataset.showSparkline === 'true') {
+                    updateSparklineForContainer(container, config, false);
+                }
+
                 resultInfo.success = true;
 
                 return resultInfo;
@@ -2258,6 +2588,8 @@
             : !!config.requiresNonce;
 
         config.requiresNonce = requiresNonce;
+
+        setupSparklinePanels(config);
 
         if (!config.ajaxUrl || (config.requiresNonce && !config.nonce)) {
             return;

@@ -25,6 +25,65 @@
     max-width: 100%;
 }
 
+.discord-analytics-panel {
+    background: #fff;
+    border-radius: 12px;
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.08);
+    margin: 30px 0;
+    padding: 24px;
+}
+
+.discord-analytics-panel__header {
+    margin-bottom: 16px;
+}
+
+.discord-analytics-panel__body {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 24px;
+    align-items: stretch;
+}
+
+.discord-analytics-panel__canvas {
+    flex: 1 1 420px;
+    min-width: 260px;
+}
+
+.discord-analytics-panel__summary {
+    flex: 0 0 240px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.discord-analytics-summary__item {
+    background: #f8fafc;
+    border-radius: 8px;
+    padding: 12px 14px;
+}
+
+.discord-analytics-summary__label {
+    display: block;
+    font-size: 13px;
+    color: #475569;
+    margin-bottom: 4px;
+}
+
+.discord-analytics-summary__value {
+    font-size: 18px;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.discord-analytics-panel__notice {
+    margin-top: 16px;
+    color: #64748b;
+}
+
+.discord-analytics-panel__notice.error {
+    color: #b91c1c;
+}
+
 @media (max-width: 782px) {
     .discord-bot-settings-layout {
         flex-direction: column;
@@ -33,5 +92,9 @@
     .discord-bot-settings-main,
     .discord-bot-settings-sidebar {
         flex: 1 1 100%;
+    }
+
+    .discord-analytics-panel__body {
+        flex-direction: column;
     }
 }
