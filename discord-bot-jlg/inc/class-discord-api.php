@@ -642,6 +642,250 @@ class Discord_Bot_JLG_API {
         );
     }
 
+    /**
+     * Normalise les réponses réussies renvoyées aux clients.
+     *
+     * @param array $data        Données de réponse.
+     * @param int   $retry_after Délai éventuel avant une prochaine tentative.
+     *
+     * @return array
+     */
+    private function build_success_payload($data = array(), $retry_after = null) {
+        if (!is_array($data)) {
+            $data = array();
+        }
+
+        if (null !== $retry_after) {
+            $data['retry_after'] = max(0, (int) $retry_after);
+        }
+
+        return $data;
+    }
+
+    /**
+     * Construit les charges utiles d'erreur standards de l'API.
+     *
+     * @param string $type    Identifiant de l'erreur.
+     * @param array  $context Contexte additionnel (retry_after, message, diagnostic...).
+     *
+     * @return array
+     */
+    private function build_error_payload($type, array $context = array()) {
+        $retry_after = null;
+
+        if (array_key_exists('retry_after', $context)) {
+            $retry_after = max(0, (int) $context['retry_after']);
+        }
+
+        switch ($type) {
+            case 'rate_limited':
+                $seconds = (null !== $retry_after) ? $retry_after : 0;
+                $message = isset($context['message']) ? (string) $context['message'] : '';
+
+                if ('' === $message) {
+                    $message = sprintf(
+                        /* translators: %d: number of seconds to wait before the next refresh. */
+                        __('Veuillez patienter %d secondes avant la prochaine actualisation.', 'discord-bot-jlg'),
+                        $seconds
+                    );
+                }
+
+                $payload = array(
+                    'rate_limited' => true,
+                    'message'      => $message,
+                );
+
+                if (null !== $retry_after) {
+                    $payload['retry_after'] = $retry_after;
+                }
+
+                break;
+
+            case 'refresh_in_progress':
+                $payload = array(
+                    'rate_limited' => false,
+                    'message'      => __('Actualisation en cours, veuillez réessayer dans quelques instants.', 'discord-bot-jlg'),
+                );
+
+                if (null !== $retry_after) {
+                    $payload['retry_after'] = $retry_after;
+                }
+
+                break;
+
+            case 'demo_mode':
+                $payload = array(
+                    'rate_limited' => false,
+                    'message'      => __('Mode démo actif', 'discord-bot-jlg'),
+                );
+
+                if (null !== $retry_after) {
+                    $payload['retry_after'] = $retry_after;
+                }
+
+                break;
+
+            default:
+                $message = isset($context['message']) ? (string) $context['message'] : '';
+
+                $payload = array(
+                    'rate_limited' => isset($context['rate_limited']) ? (bool) $context['rate_limited'] : false,
+                    'message'      => $message,
+                );
+
+                if (null !== $retry_after) {
+                    $payload['retry_after'] = $retry_after;
+                }
+
+                break;
+        }
+
+        if (!empty($context['diagnostic'])) {
+            $payload['diagnostic'] = (string) $context['diagnostic'];
+        }
+
+        if (isset($context['extra']) && is_array($context['extra'])) {
+            $payload = array_merge($payload, $context['extra']);
+        }
+
+        return $payload;
+    }
+
+    /**
+     * Calcule la stratégie d'actualisation en fonction de la requête et du cache courant.
+     *
+     * @param bool  $is_public_request Indique si la requête provient du frontal public.
+     * @param array $options           Options du plugin.
+     * @param bool  $force_refresh     Forçage éventuel depuis l'interface d'administration.
+     *
+     * @return array
+     */
+    private function compute_refresh_policy($is_public_request, $options, $force_refresh) {
+        $rate_limit_key        = $this->cache_key . self::REFRESH_LOCK_SUFFIX;
+        $client_rate_limit_key = $this->get_client_rate_limit_key($is_public_request);
+        $cache_duration        = $this->get_cache_duration($options);
+        $default_public_refresh = max(self::MIN_PUBLIC_REFRESH_INTERVAL, (int) $cache_duration);
+        $rate_limit_window = (int) apply_filters('discord_bot_jlg_public_refresh_interval', $default_public_refresh, $options);
+
+        if ($rate_limit_window < self::MIN_PUBLIC_REFRESH_INTERVAL) {
+            $rate_limit_window = self::MIN_PUBLIC_REFRESH_INTERVAL;
+        }
+
+        $cached_stats = get_transient($this->cache_key);
+        $cached_stats_is_fallback = (
+            is_array($cached_stats)
+            && !empty($cached_stats['is_demo'])
+            && !empty($cached_stats['fallback_demo'])
+        );
+
+        $fallback_retry_key   = $this->get_fallback_retry_key();
+        $fallback_retry_after = (int) get_transient($fallback_retry_key);
+
+        if ($fallback_retry_after > 0) {
+            $this->set_runtime_fallback_retry_timestamp($fallback_retry_after);
+        }
+
+        if (true === $cached_stats_is_fallback && $fallback_retry_after <= 0) {
+            $fallback_retry_after = $this->schedule_next_fallback_retry($cache_duration, $options);
+        }
+
+        $policy = array(
+            'rate_limit_key'            => $rate_limit_key,
+            'client_rate_limit_key'     => $client_rate_limit_key,
+            'rate_limit_window'         => $rate_limit_window,
+            'cache_duration'            => $cache_duration,
+            'cached_stats'              => $cached_stats,
+            'bypass_cache'              => false,
+            'refresh_requires_remote_call' => false,
+            'response'                  => null,
+        );
+
+        $now = time();
+
+        if (true === $is_public_request) {
+            if (!empty($client_rate_limit_key)) {
+                $client_retry_after = $this->get_retry_after($client_rate_limit_key, $rate_limit_window);
+
+                if ($client_retry_after > 0) {
+                    $policy['response'] = $this->build_refresh_response(
+                        false,
+                        $this->build_error_payload('rate_limited', array('retry_after' => $client_retry_after)),
+                        429
+                    );
+
+                    return $policy;
+                }
+            }
+
+            $last_refresh = get_transient($rate_limit_key);
+
+            if (false !== $last_refresh) {
+                $elapsed = time() - (int) $last_refresh;
+
+                if ($elapsed < $rate_limit_window) {
+                    $retry_after = max(0, $rate_limit_window - $elapsed);
+
+                    $policy['response'] = $this->build_refresh_response(
+                        false,
+                        $this->build_error_payload('rate_limited', array('retry_after' => $retry_after)),
+                        429
+                    );
+
+                    return $policy;
+                }
+            }
+
+            if ($cached_stats_is_fallback) {
+                if ($fallback_retry_after > $now) {
+                    $next_retry = $this->get_runtime_fallback_retry_timestamp();
+
+                    if ($next_retry <= 0) {
+                        $next_retry = (int) $fallback_retry_after;
+                    }
+
+                    $retry_after = max(0, (int) $next_retry - time());
+
+                    $policy['response'] = $this->build_refresh_response(
+                        true,
+                        $this->build_success_payload($cached_stats, $retry_after),
+                        200
+                    );
+
+                    return $policy;
+                }
+
+                $policy['refresh_requires_remote_call'] = true;
+                $policy['bypass_cache'] = true;
+            } elseif (is_array($cached_stats) && empty($cached_stats['is_demo'])) {
+                $policy['response'] = $this->build_refresh_response(
+                    true,
+                    $this->build_success_payload($cached_stats),
+                    200
+                );
+
+                return $policy;
+            } else {
+                $policy['refresh_requires_remote_call'] = true;
+            }
+        }
+
+        if (false === $is_public_request && $cached_stats_is_fallback) {
+            $policy['refresh_requires_remote_call'] = true;
+            $policy['bypass_cache'] = true;
+        }
+
+        if (
+            true === $force_refresh
+            && false === $is_public_request
+            && current_user_can('manage_options')
+        ) {
+            $policy['bypass_cache'] = true;
+            $policy['refresh_requires_remote_call'] = true;
+        }
+
+        return $policy;
+    }
+
     public function process_refresh_request($request_args = array()) {
         $defaults = array(
             'is_public_request' => true,
@@ -675,128 +919,33 @@ class Discord_Bot_JLG_API {
                 $error_message = __('Profil de serveur introuvable.', 'discord-bot-jlg');
             }
 
-            return $this->build_refresh_response(false, array(
+            return $this->build_refresh_response(false, $this->build_error_payload('custom', array(
                 'message' => $error_message,
-            ), 400);
+            )), 400);
         }
 
         $options = $context['options'];
 
         if (!empty($options['demo_mode'])) {
-            return $this->build_refresh_response(false, array(
-                'message' => __('Mode démo actif', 'discord-bot-jlg'),
-            ), 200);
+            return $this->build_refresh_response(false, $this->build_error_payload('demo_mode'), 200);
         }
 
         $original_cache_key = $this->cache_key;
         $this->cache_key     = $context['cache_key'];
 
         try {
-            $rate_limit_key        = $this->cache_key . self::REFRESH_LOCK_SUFFIX;
-            $client_rate_limit_key = $this->get_client_rate_limit_key($is_public_request);
-            $cache_duration        = $this->get_cache_duration($options);
-            $default_public_refresh = max(self::MIN_PUBLIC_REFRESH_INTERVAL, (int) $cache_duration);
-            $rate_limit_window = (int) apply_filters('discord_bot_jlg_public_refresh_interval', $default_public_refresh, $options);
-            if ($rate_limit_window < self::MIN_PUBLIC_REFRESH_INTERVAL) {
-                $rate_limit_window = self::MIN_PUBLIC_REFRESH_INTERVAL;
+            $policy = $this->compute_refresh_policy($is_public_request, $options, $force_refresh);
+
+            if (is_array($policy['response'])) {
+                return $policy['response'];
             }
 
-            $refresh_requires_remote_call = false;
-            $cached_stats                = get_transient($this->cache_key);
-            $cached_stats_is_fallback    = (
-                is_array($cached_stats)
-                && !empty($cached_stats['is_demo'])
-                && !empty($cached_stats['fallback_demo'])
-            );
-
-            $fallback_retry_key   = $this->get_fallback_retry_key();
-            $fallback_retry_after = (int) get_transient($fallback_retry_key);
-            if ($fallback_retry_after > 0) {
-                $this->set_runtime_fallback_retry_timestamp($fallback_retry_after);
-            }
-            $now                  = time();
-
-            if (true === $cached_stats_is_fallback && $fallback_retry_after <= 0) {
-                $fallback_retry_after = $this->schedule_next_fallback_retry($cache_duration, $options);
-            }
-
-            $bypass_cache = false;
-
-            if (true === $is_public_request) {
-                if (!empty($client_rate_limit_key)) {
-                    $client_retry_after = $this->get_retry_after($client_rate_limit_key, $rate_limit_window);
-
-                    if ($client_retry_after > 0) {
-                        $message = sprintf(
-                            /* translators: %d: number of seconds to wait before the next refresh. */
-                            __('Veuillez patienter %d secondes avant la prochaine actualisation.', 'discord-bot-jlg'),
-                            $client_retry_after
-                        );
-
-                        return $this->build_refresh_response(false, array(
-                            'rate_limited' => true,
-                            'message'      => $message,
-                            'retry_after'  => $client_retry_after,
-                        ), 429);
-                    }
-                }
-
-                $last_refresh = get_transient($rate_limit_key);
-                if (false !== $last_refresh) {
-                    $elapsed = time() - (int) $last_refresh;
-                    if ($elapsed < $rate_limit_window) {
-                        $retry_after = max(0, $rate_limit_window - $elapsed);
-                        $message = sprintf(
-                            /* translators: %d: number of seconds to wait before the next refresh. */
-                            __('Veuillez patienter %d secondes avant la prochaine actualisation.', 'discord-bot-jlg'),
-                            $retry_after
-                        );
-
-                        return $this->build_refresh_response(false, array(
-                            'rate_limited' => true,
-                            'message'      => $message,
-                            'retry_after'  => $retry_after,
-                        ), 429);
-                    }
-                }
-
-                if ($cached_stats_is_fallback) {
-                    if ($fallback_retry_after > $now) {
-                        $response_payload = $cached_stats;
-
-                        if (is_array($response_payload)) {
-                            $next_retry = $this->get_runtime_fallback_retry_timestamp();
-                            if ($next_retry <= 0) {
-                                $next_retry = (int) $fallback_retry_after;
-                            }
-                            $response_payload['retry_after'] = max(0, (int) $next_retry - time());
-                        }
-
-                        return $this->build_refresh_response(true, $response_payload, 200);
-                    }
-
-                    $refresh_requires_remote_call = true;
-                    $bypass_cache = true;
-                } elseif (is_array($cached_stats) && empty($cached_stats['is_demo'])) {
-                    return $this->build_refresh_response(true, $cached_stats, 200);
-                } else {
-                    $refresh_requires_remote_call = true;
-                }
-            }
-
-            if (false === $is_public_request && $cached_stats_is_fallback) {
-                $refresh_requires_remote_call = true;
-                $bypass_cache = true;
-            }
-
-            if (
-                true === $force_refresh
-                && false === $is_public_request
-                && current_user_can('manage_options')
-            ) {
-                $bypass_cache = true;
-                $refresh_requires_remote_call = true;
-            }
+            $rate_limit_key        = $policy['rate_limit_key'];
+            $client_rate_limit_key = $policy['client_rate_limit_key'];
+            $rate_limit_window     = $policy['rate_limit_window'];
+            $cache_duration        = $policy['cache_duration'];
+            $refresh_requires_remote_call = !empty($policy['refresh_requires_remote_call']);
+            $bypass_cache          = !empty($policy['bypass_cache']);
 
             $stats = $this->get_stats(
                 array(
@@ -830,12 +979,13 @@ class Discord_Bot_JLG_API {
                     }
                 }
 
-                $next_retry = $this->get_runtime_fallback_retry_timestamp();
+                $next_retry    = $this->get_runtime_fallback_retry_timestamp();
+                $retry_after   = null;
                 if ($next_retry > 0) {
-                    $stats['retry_after'] = max(0, (int) $next_retry - time());
+                    $retry_after = max(0, (int) $next_retry - time());
                 }
 
-                return $this->build_refresh_response(true, $stats, 200);
+                return $this->build_refresh_response(true, $this->build_success_payload($stats, $retry_after), 200);
             }
 
             if (is_array($stats) && empty($stats['is_demo'])) {
@@ -850,13 +1000,13 @@ class Discord_Bot_JLG_API {
                     }
                 }
 
-                return $this->build_refresh_response(true, $stats, 200);
+                return $this->build_refresh_response(true, $this->build_success_payload($stats), 200);
             }
 
             if (true === $is_public_request) {
                 $cached_stats = get_transient($this->cache_key);
                 if (is_array($cached_stats) && empty($cached_stats['is_demo'])) {
-                    return $this->build_refresh_response(true, $cached_stats, 200);
+                    return $this->build_refresh_response(true, $this->build_success_payload($cached_stats), 200);
                 }
 
                 delete_transient($rate_limit_key);
@@ -864,12 +1014,9 @@ class Discord_Bot_JLG_API {
                     $this->delete_client_rate_limit($client_rate_limit_key);
                 }
 
-                $error_payload = array(
-                    'rate_limited' => false,
-                    'message'      => __('Actualisation en cours, veuillez réessayer dans quelques instants.', 'discord-bot-jlg'),
-                );
-
-                $error_payload['retry_after'] = max(0, (int) $this->last_retry_after);
+                $error_payload = $this->build_error_payload('refresh_in_progress', array(
+                    'retry_after' => max(0, (int) $this->last_retry_after),
+                ));
 
                 if (!empty($last_error_message)) {
                     $this->log_debug(
@@ -878,27 +1025,15 @@ class Discord_Bot_JLG_API {
                             $last_error_message
                         )
                     );
-
-                    if (false === $is_public_request) {
-                        $error_payload['diagnostic'] = $last_error_message;
-                    }
                 }
 
                 return $this->build_refresh_response(false, $error_payload, 503);
             }
 
-            $error_payload = array(
-                'rate_limited' => false,
-                'message'      => __('Actualisation en cours, veuillez réessayer dans quelques instants.', 'discord-bot-jlg'),
-            );
-
-            if ($this->last_retry_after > 0) {
-                $error_payload['retry_after'] = (int) $this->last_retry_after;
-            }
-
-            if (!empty($last_error_message)) {
-                $error_payload['diagnostic'] = $last_error_message;
-            }
+            $error_payload = $this->build_error_payload('refresh_in_progress', array(
+                'retry_after' => ($this->last_retry_after > 0) ? (int) $this->last_retry_after : null,
+                'diagnostic'  => !empty($last_error_message) ? $last_error_message : null,
+            ));
 
             return $this->build_refresh_response(false, $error_payload, 503);
         } finally {
