@@ -1161,4 +1161,113 @@ class Test_Discord_Bot_JLG_API extends TestCase {
         $this->assertNotNull($captured_args);
         $this->assertSame('H', $captured_args['format']);
     }
+
+    public function test_merge_stats_prioritises_widget_metadata_when_incomplete() {
+        $option_name = 'discord_server_stats_options';
+        $cache_key   = 'discord_server_stats_cache';
+
+        $api = new Discord_Bot_JLG_API($option_name, $cache_key, 60);
+
+        $widget_stats = array(
+            'online'                    => 8,
+            'total'                     => 120,
+            'has_total'                 => true,
+            'total_is_approximate'      => false,
+            'server_name'               => 'Widget Guild',
+            'server_avatar_url'         => 'https://cdn.example.com/widget.png',
+            'server_avatar_base_url'    => 'https://cdn.example.com/',
+            'presence_count_by_status'  => array(
+                'online' => 6,
+                'idle'   => 2,
+            ),
+            'approximate_presence_count' => 15,
+        );
+
+        $bot_stats = array(
+            'online'                     => 10,
+            'total'                      => 118,
+            'has_total'                  => true,
+            'total_is_approximate'       => true,
+            'server_name'                => 'Bot Guild',
+            'server_avatar_url'          => 'https://cdn.example.com/bot.png',
+            'presence_count_by_status'   => array(
+                'online' => 4,
+                'dnd'    => 1,
+            ),
+            'approximate_member_count'   => 135,
+            'premium_subscription_count' => 7,
+        );
+
+        $reflection = new ReflectionMethod(Discord_Bot_JLG_API::class, 'merge_stats');
+        $reflection->setAccessible(true);
+
+        $result = $reflection->invoke($api, $widget_stats, $bot_stats, true);
+
+        $this->assertSame(8, $result['online']);
+        $this->assertSame(120, $result['total']);
+        $this->assertTrue($result['has_total']);
+        $this->assertFalse($result['total_is_approximate']);
+        $this->assertSame('Widget Guild', $result['server_name']);
+        $this->assertSame('https://cdn.example.com/widget.png', $result['server_avatar_url']);
+        $this->assertSame('https://cdn.example.com/', $result['server_avatar_base_url']);
+        $this->assertSame(
+            array('online' => 10, 'idle' => 2, 'dnd' => 1),
+            $result['presence_count_by_status']
+        );
+        $this->assertSame(15, $result['approximate_presence_count']);
+        $this->assertSame(135, $result['approximate_member_count']);
+        $this->assertSame(7, $result['premium_subscription_count']);
+    }
+
+    public function test_merge_stats_returns_widget_payload_when_not_incomplete() {
+        $option_name = 'discord_server_stats_options';
+        $cache_key   = 'discord_server_stats_cache';
+
+        $api = new Discord_Bot_JLG_API($option_name, $cache_key, 60);
+
+        $widget_stats = array(
+            'online'                    => 4,
+            'total'                     => 50,
+            'has_total'                 => true,
+            'server_name'               => 'Complete Widget',
+            'presence_count_by_status'  => array('online' => 4),
+            'approximate_presence_count' => 4,
+        );
+
+        $bot_stats = array(
+            'online' => 6,
+        );
+
+        $reflection = new ReflectionMethod(Discord_Bot_JLG_API::class, 'merge_stats');
+        $reflection->setAccessible(true);
+
+        $result = $reflection->invoke($api, $widget_stats, $bot_stats, false);
+
+        $this->assertSame($widget_stats, $result);
+    }
+
+    public function test_merge_stats_returns_bot_payload_when_widget_missing() {
+        $option_name = 'discord_server_stats_options';
+        $cache_key   = 'discord_server_stats_cache';
+
+        $api = new Discord_Bot_JLG_API($option_name, $cache_key, 60);
+
+        $widget_stats = null;
+
+        $bot_stats = array(
+            'online'                     => 11,
+            'total'                      => 210,
+            'has_total'                  => true,
+            'server_name'                => 'Only Bot',
+            'presence_count_by_status'   => array('online' => 11),
+            'approximate_presence_count' => 12,
+        );
+
+        $reflection = new ReflectionMethod(Discord_Bot_JLG_API::class, 'merge_stats');
+        $reflection->setAccessible(true);
+
+        $result = $reflection->invoke($api, $widget_stats, $bot_stats, null);
+
+        $this->assertSame($bot_stats, $result);
+    }
 }
