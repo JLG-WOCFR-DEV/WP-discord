@@ -75,6 +75,41 @@
     flex-wrap: wrap;
 }
 
+.discord-layout-horizontal .discord-stats-wrapper {
+    flex-direction: row;
+}
+
+.discord-layout-vertical .discord-stats-wrapper {
+    flex-direction: column;
+    flex-wrap: nowrap;
+}
+
+.discord-layout-vertical .discord-stat {
+    width: 100%;
+}
+
+.discord-compact {
+    --discord-gap: clamp(10px, 2.4vw, 18px);
+    --discord-padding: clamp(10px, 2.6vw, 16px);
+    --discord-number-size: clamp(18px, 3.5vw, 28px);
+    --discord-label-size: clamp(11px, 2.4vw, 14px);
+    --discord-avatar-size: clamp(46px, 12vw, 72px);
+}
+
+.discord-compact .discord-server-header {
+    gap: calc(var(--discord-gap) - 4px);
+}
+
+.discord-compact .discord-stats-wrapper {
+    gap: calc(var(--discord-gap) - 4px);
+}
+
+.discord-bot-toolbar-fallback-button {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+}
+
 .discord-server-header {
     display: flex;
     align-items: center;

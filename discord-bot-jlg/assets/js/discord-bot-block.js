@@ -10,6 +10,61 @@
     var useEffect = element.useEffect;
     var __ = i18n.__;
     var InspectorControls = blockEditor.InspectorControls;
+    var blockEditorComponents = (blockEditor && blockEditor.components) || {};
+    var BlockControls = blockEditorComponents.BlockControls || blockEditor.BlockControls;
+    var ToolbarGroup = blockEditorComponents.ToolbarGroup || components.ToolbarGroup;
+    var ToolbarButton = blockEditorComponents.ToolbarButton || components.ToolbarButton;
+    var Button = components.Button;
+
+    if (!BlockControls) {
+        BlockControls = function (props) {
+            return createElement(Fragment, null, props && props.children);
+        };
+    }
+
+    if (!ToolbarGroup) {
+        ToolbarGroup = function (props) {
+            return createElement(Fragment, null, props && props.children);
+        };
+    }
+
+    if (!ToolbarButton && Button) {
+        ToolbarButton = function (props) {
+            var buttonProps = {};
+
+            for (var key in props) {
+                if (!Object.prototype.hasOwnProperty.call(props, key)) {
+                    continue;
+                }
+
+                if (key === 'icon' || key === 'isPressed' || key === 'showTooltip' || key === 'label') {
+                    continue;
+                }
+
+                buttonProps[key] = props[key];
+            }
+
+            buttonProps.type = buttonProps.type || 'button';
+            buttonProps.className = (buttonProps.className || '') + ' discord-bot-toolbar-fallback-button';
+            buttonProps['aria-label'] = props.label || buttonProps['aria-label'];
+            buttonProps.title = props.label || buttonProps.title;
+
+            if (typeof props.isPressed !== 'undefined') {
+                buttonProps['aria-pressed'] = props.isPressed ? 'true' : 'false';
+            }
+
+            var children = props.children;
+
+            if (!children && props.icon) {
+                children = createElement('span', {
+                    className: 'dashicons dashicons-' + props.icon,
+                    'aria-hidden': 'true'
+                });
+            }
+
+            return createElement(Button, buttonProps, children || props.label);
+        };
+    }
     var useBlockProps = blockEditor.useBlockProps || function () { return {}; };
     var PanelBody = components.PanelBody;
     var ToolsPanel = components.__experimentalToolsPanel;
@@ -1548,9 +1603,132 @@
                 );
             }
 
+            var toolbarControls = null;
+            var hasToolbarSupport = !!(BlockControls && ToolbarGroup && ToolbarButton);
+
+            if (hasToolbarSupport) {
+                var setLayoutAttribute = updateAttribute(setAttributes, 'layout');
+                var setThemeAttribute = updateAttribute(setAttributes, 'theme');
+                var setCompactAttribute = updateAttribute(setAttributes, 'compact');
+                var setServerAvatarAttribute = updateAttribute(setAttributes, 'show_server_avatar');
+                var setServerNameAttribute = updateAttribute(setAttributes, 'show_server_name');
+
+                var normalizedLayout = (attributes.layout || defaultAttributes.layout || 'horizontal').toString().toLowerCase();
+                var layoutIsVertical = normalizedLayout === 'vertical';
+                var currentThemeValue = attributes.theme || defaultAttributes.theme || 'discord';
+                var currentThemeOption = null;
+                var nextThemeValue = currentThemeValue;
+
+                if (Array.isArray(themeOptions) && themeOptions.length) {
+                    for (var themeIndex = 0; themeIndex < themeOptions.length; themeIndex++) {
+                        var option = themeOptions[themeIndex];
+
+                        if (!option || typeof option.value === 'undefined') {
+                            continue;
+                        }
+
+                        if (option.value === currentThemeValue) {
+                            currentThemeOption = option;
+                            var nextIndex = (themeIndex + 1) % themeOptions.length;
+                            nextThemeValue = themeOptions[nextIndex] && themeOptions[nextIndex].value
+                                ? themeOptions[nextIndex].value
+                                : currentThemeValue;
+                            break;
+                        }
+                    }
+
+                    if (!currentThemeOption) {
+                        currentThemeOption = themeOptions[0];
+                        nextThemeValue = themeOptions.length > 1 && themeOptions[1]
+                            ? themeOptions[1].value
+                            : currentThemeOption.value;
+                    }
+                }
+
+                var toolbarButtons = [];
+
+                toolbarButtons.push(createElement(ToolbarButton, {
+                    key: 'discord-toggle-layout',
+                    icon: 'leftright',
+                    label: __('Basculer horizontal/vertical', 'discord-bot-jlg'),
+                    showTooltip: true,
+                    onClick: function () {
+                        setLayoutAttribute(layoutIsVertical ? 'horizontal' : 'vertical');
+                    },
+                    isPressed: layoutIsVertical
+                }));
+
+                if (currentThemeOption && Array.isArray(themeOptions) && themeOptions.length > 1 && typeof nextThemeValue !== 'undefined') {
+                    toolbarButtons.push(createElement(ToolbarButton, {
+                        key: 'discord-cycle-theme',
+                        icon: 'admin-appearance',
+                        label: __('Changer de thème', 'discord-bot-jlg') + ' · ' + (currentThemeOption.label || currentThemeOption.value),
+                        showTooltip: true,
+                        onClick: function () {
+                            setThemeAttribute(nextThemeValue);
+                        }
+                    }));
+                }
+
+                var isCompact = !!attributes.compact;
+                toolbarButtons.push(createElement(ToolbarButton, {
+                    key: 'discord-toggle-compact',
+                    icon: 'editor-contract',
+                    label: isCompact
+                        ? __('Désactiver le mode compact', 'discord-bot-jlg')
+                        : __('Activer le mode compact', 'discord-bot-jlg'),
+                    showTooltip: true,
+                    onClick: function () {
+                        setCompactAttribute(!isCompact);
+                    },
+                    isPressed: isCompact
+                }));
+
+                var showServerAvatar = !!attributes.show_server_avatar;
+                toolbarButtons.push(createElement(ToolbarButton, {
+                    key: 'discord-toggle-server-avatar',
+                    icon: 'id-alt',
+                    label: showServerAvatar
+                        ? __('Masquer l\'avatar du serveur', 'discord-bot-jlg')
+                        : __('Afficher l\'avatar du serveur', 'discord-bot-jlg'),
+                    showTooltip: true,
+                    onClick: function () {
+                        setServerAvatarAttribute(!showServerAvatar);
+                    },
+                    isPressed: showServerAvatar
+                }));
+
+                var showServerName = !!attributes.show_server_name;
+                toolbarButtons.push(createElement(ToolbarButton, {
+                    key: 'discord-toggle-server-name',
+                    icon: 'admin-users',
+                    label: showServerName
+                        ? __('Masquer le nom du serveur', 'discord-bot-jlg')
+                        : __('Afficher le nom du serveur', 'discord-bot-jlg'),
+                    showTooltip: true,
+                    onClick: function () {
+                        setServerNameAttribute(!showServerName);
+                    },
+                    isPressed: showServerName
+                }));
+
+                if (toolbarButtons.length) {
+                    toolbarControls = createElement(
+                        BlockControls,
+                        null,
+                        createElement(
+                            ToolbarGroup,
+                            { label: __('Options rapides Discord', 'discord-bot-jlg') },
+                            toolbarButtons
+                        )
+                    );
+                }
+            }
+
             return createElement(
                 Fragment,
                 null,
+                toolbarControls,
                 createElement(
                     InspectorControls,
                     null,
