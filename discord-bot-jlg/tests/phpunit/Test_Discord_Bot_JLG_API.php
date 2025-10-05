@@ -103,6 +103,31 @@ class Successful_Mock_Discord_Bot_JLG_Http_Client extends Discord_Bot_JLG_Http_C
     }
 }
 
+class Recording_Discord_Bot_JLG_Analytics extends Discord_Bot_JLG_Analytics {
+    public $snapshots = array();
+    public $purge_calls = array();
+
+    public function __construct() {
+        // Bypass parent initialization to avoid requiring a database connection.
+    }
+
+    public function log_snapshot($profile_key, $server_id, array $stats) {
+        $this->snapshots[] = array(
+            'profile_key' => $profile_key,
+            'server_id'   => $server_id,
+            'stats'       => $stats,
+        );
+
+        return true;
+    }
+
+    public function purge_old_entries($retention_days) {
+        $this->purge_calls[] = (int) $retention_days;
+
+        return 0;
+    }
+}
+
 class Stubbed_Discord_Bot_JLG_API extends Discord_Bot_JLG_API {
     private $mock_stats;
     private $has_mock_stats = false;
@@ -178,7 +203,8 @@ class Test_Discord_Bot_JLG_API extends TestCase {
         );
 
         $http_client = new Mock_Discord_Bot_JLG_Http_Client();
-        $api         = new Discord_Bot_JLG_API($option_name, $cache_key, 60, $http_client);
+        $analytics   = new Recording_Discord_Bot_JLG_Analytics();
+        $api         = new Discord_Bot_JLG_API($option_name, $cache_key, 60, $http_client, $analytics);
 
         $stats = $api->get_stats(array('bypass_cache' => true));
 
@@ -197,6 +223,8 @@ class Test_Discord_Bot_JLG_API extends TestCase {
         $cached = get_transient($cache_key);
         $this->assertSame($stats, $cached);
 
+        $this->assertEmpty($analytics->snapshots, 'Fallback stats should not trigger analytics logging.');
+
         $entry = wp_test_get_transient_entry($cache_key);
         $this->assertNotNull($entry);
         $this->assertSame(120, $entry['ttl']);
@@ -212,7 +240,8 @@ class Test_Discord_Bot_JLG_API extends TestCase {
         );
 
         $http_client = new Mock_Discord_Bot_JLG_Http_Client();
-        $api         = new Discord_Bot_JLG_API($option_name, $cache_key, 60, $http_client);
+        $analytics   = new Recording_Discord_Bot_JLG_Analytics();
+        $api         = new Discord_Bot_JLG_API($option_name, $cache_key, 60, $http_client, $analytics);
 
         $stats = $api->get_stats(array('bypass_cache' => true));
 
@@ -244,13 +273,16 @@ class Test_Discord_Bot_JLG_API extends TestCase {
         );
 
         $recovery_client = new Successful_Mock_Discord_Bot_JLG_Http_Client($widget_payload, $bot_payload);
-        $recovery_api    = new Discord_Bot_JLG_API($option_name, $cache_key, 60, $recovery_client);
+        $recovery_api    = new Discord_Bot_JLG_API($option_name, $cache_key, 60, $recovery_client, $analytics);
 
         $recovered_stats = $recovery_api->get_stats(array('bypass_cache' => true));
 
         $this->assertIsArray($recovered_stats);
         $this->assertArrayNotHasKey('is_demo', $recovered_stats);
         $this->assertFalse(get_option(Discord_Bot_JLG_API::LAST_FALLBACK_OPTION));
+        $this->assertCount(1, $analytics->snapshots, 'Successful stats should trigger analytics logging once.');
+        $this->assertSame('default', $analytics->snapshots[0]['profile_key']);
+        $this->assertSame('555666777', $analytics->snapshots[0]['server_id']);
     }
 
     public function test_clear_all_cached_data_removes_last_fallback_option() {
@@ -488,6 +520,70 @@ class Test_Discord_Bot_JLG_API extends TestCase {
         $this->assertSame($stats, $last_good_entry['value']['stats']);
         $this->assertIsInt($last_good_entry['value']['timestamp']);
         $this->assertGreaterThan(0, $last_good_entry['value']['timestamp']);
+    }
+
+    public function test_get_stats_merges_presence_breakdown_and_logs_snapshot() {
+        $option_name = 'discord_server_stats_options';
+        $cache_key   = 'discord_server_stats_cache';
+
+        $GLOBALS['wp_test_options'][$option_name] = array(
+            'server_id'      => '314159265',
+            'cache_duration' => 200,
+            'bot_token'      => 'token-merge',
+        );
+
+        $widget_payload = array(
+            'presence_count' => 5,
+            'name'           => 'Widget Merge Guild',
+            'members'        => array(
+                array('id' => 1, 'status' => 'online'),
+                array('id' => 2, 'status' => 'online'),
+                array('id' => 3, 'status' => 'idle'),
+                array('id' => 4, 'status' => 'streaming'),
+                array('id' => 5, 'status' => 'dnd'),
+            ),
+        );
+
+        $bot_payload = array(
+            'approximate_presence_count' => 10,
+            'approximate_member_count'   => 48,
+            'name'                       => 'Bot Merge Guild',
+            'premium_subscription_count' => 7,
+            'presence_count_by_status'   => array(
+                'online' => 6,
+                'idle'   => 1,
+                'dnd'    => 3,
+            ),
+        );
+
+        $analytics   = new Recording_Discord_Bot_JLG_Analytics();
+        $http_client = new Successful_Mock_Discord_Bot_JLG_Http_Client($widget_payload, $bot_payload);
+        $api         = new Discord_Bot_JLG_API($option_name, $cache_key, 60, $http_client, $analytics);
+
+        $stats = $api->get_stats(array('bypass_cache' => true));
+
+        $this->assertSame(2, count($http_client->requests));
+        $this->assertSame(
+            array(
+                'online'    => 8,
+                'idle'      => 2,
+                'dnd'       => 4,
+                'streaming' => 1,
+            ),
+            $stats['presence_count_by_status']
+        );
+        $this->assertSame(48, $stats['total']);
+        $this->assertTrue($stats['has_total']);
+        $this->assertTrue($stats['total_is_approximate']);
+        $this->assertSame(48, $stats['approximate_member_count']);
+        $this->assertSame(5, $stats['approximate_presence_count']);
+        $this->assertSame(7, $stats['premium_subscription_count']);
+
+        $this->assertCount(1, $analytics->snapshots);
+        $snapshot = $analytics->snapshots[0];
+        $this->assertSame('default', $snapshot['profile_key']);
+        $this->assertSame('314159265', $snapshot['server_id']);
+        $this->assertSame($stats, $snapshot['stats']);
     }
 
     public function test_refresh_cache_via_cron_refreshes_all_profiles() {
