@@ -580,6 +580,7 @@
         transform: translateX(-50%) scale(var(--discord-badge-scale));
         text-align: center;
         white-space: nowrap;
+        max-width: calc(100% - 24px);
     }
 }
 
@@ -617,7 +618,27 @@
         bottom: calc(12px + 38px);
         padding: 3px 8px;
         letter-spacing: 0.08em;
+        max-width: calc(100% - 20px);
     }
+}
+
+.discord-demo-badge {
+    position: absolute;
+    top: clamp(8px, var(--discord-padding), 16px);
+    right: clamp(8px, var(--discord-padding), 16px);
+    background: linear-gradient(45deg, var(--discord-badge-start, #ff6b6b), var(--discord-badge-end, #f06292));
+    color: var(--discord-badge-text, #ffffff);
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: clamp(8px, 1.8vw, 10px);
+    font-weight: bold;
+    text-transform: uppercase;
+    z-index: 10;
+    animation: pulse 2s infinite;
+    transform: scale(var(--discord-badge-scale));
+    transform-origin: top right;
+    max-width: calc(100% - (2 * clamp(8px, var(--discord-padding), 16px)));
+    box-sizing: border-box;
 }
 
 .discord-bot-jlg-preview-loading {
