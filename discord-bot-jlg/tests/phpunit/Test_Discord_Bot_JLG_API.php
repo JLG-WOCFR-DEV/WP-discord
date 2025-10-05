@@ -462,6 +462,72 @@ class Test_Discord_Bot_JLG_API extends TestCase {
         $this->assertEqualsWithDelta($expected_retry_after, $payload['retry_after'], 1.0);
     }
 
+    public function test_process_refresh_request_respects_client_rate_limit() {
+        $option_name = 'discord_server_stats_options';
+        $cache_key   = 'discord_server_stats_cache';
+
+        $GLOBALS['wp_test_options'][$option_name] = array(
+            'server_id'      => '123456789',
+            'cache_duration' => 30,
+        );
+
+        $api = new Discord_Bot_JLG_API($option_name, $cache_key, 30);
+
+        $reflection = new ReflectionClass($api);
+        $method     = $reflection->getMethod('get_client_rate_limit_key');
+        $method->setAccessible(true);
+
+        $client_key = $method->invoke($api, true);
+
+        $this->assertNotEmpty($client_key, 'Client rate limit key should not be empty for public requests.');
+
+        $set_at = time();
+        set_transient($client_key, $set_at, 30);
+
+        $result = $api->process_refresh_request(array('is_public_request' => true));
+
+        $this->assertFalse($result['success']);
+        $this->assertSame(429, $result['status']);
+        $this->assertArrayHasKey('data', $result);
+        $this->assertArrayHasKey('rate_limited', $result['data']);
+        $this->assertTrue($result['data']['rate_limited']);
+        $this->assertArrayHasKey('retry_after', $result['data']);
+        $this->assertStringContainsString('Veuillez patienter', $result['data']['message']);
+
+        $expected_retry = max(0, 30 - (time() - $set_at));
+        $this->assertEqualsWithDelta($expected_retry, $result['data']['retry_after'], 1.5);
+    }
+
+    public function test_process_refresh_request_respects_server_rate_limit() {
+        $option_name = 'discord_server_stats_options';
+        $cache_key   = 'discord_server_stats_cache';
+
+        $GLOBALS['wp_test_options'][$option_name] = array(
+            'server_id'      => '2233445566',
+            'cache_duration' => 30,
+        );
+
+        $api = new Discord_Bot_JLG_API($option_name, $cache_key, 30);
+
+        $rate_limit_key = $cache_key . Discord_Bot_JLG_API::REFRESH_LOCK_SUFFIX;
+
+        $set_at = time();
+        set_transient($rate_limit_key, $set_at, 30);
+
+        $result = $api->process_refresh_request(array('is_public_request' => true));
+
+        $this->assertFalse($result['success']);
+        $this->assertSame(429, $result['status']);
+        $this->assertArrayHasKey('data', $result);
+        $this->assertArrayHasKey('rate_limited', $result['data']);
+        $this->assertTrue($result['data']['rate_limited']);
+        $this->assertArrayHasKey('retry_after', $result['data']);
+        $this->assertStringContainsString('Veuillez patienter', $result['data']['message']);
+
+        $expected_retry = max(0, 30 - (time() - $set_at));
+        $this->assertEqualsWithDelta($expected_retry, $result['data']['retry_after'], 1.5);
+    }
+
     public function test_ajax_refresh_stats_handles_array_force_refresh_input() {
         $option_name = 'discord_server_stats_options';
         $cache_key   = 'discord_server_stats_cache';
