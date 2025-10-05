@@ -1240,8 +1240,8 @@ class Discord_Bot_JLG_Shortcode {
                 $polyfill_loader = wp_get_script_polyfill(
                     $GLOBALS['wp_scripts'],
                     array(
-                        'fetch'   => array('wp-polyfill-fetch'),
-                        'Promise' => array('wp-polyfill-promise'),
+                        'fetch'   => 'wp-polyfill-fetch',
+                        'Promise' => 'wp-polyfill-promise',
                     )
                 );
 
