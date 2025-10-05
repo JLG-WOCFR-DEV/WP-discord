@@ -524,6 +524,28 @@ function wp_safe_remote_get($url, $args = array()) {
 }
 
 function current_user_can($capability) {
+    if (isset($GLOBALS['wp_test_current_user_can'])) {
+        $current_user_can = $GLOBALS['wp_test_current_user_can'];
+
+        if (is_callable($current_user_can)) {
+            return (bool) call_user_func($current_user_can, $capability);
+        }
+
+        if (is_array($current_user_can)) {
+            if (array_key_exists($capability, $current_user_can)) {
+                return (bool) $current_user_can[$capability];
+            }
+
+            if (array_key_exists('*', $current_user_can)) {
+                return (bool) $current_user_can['*'];
+            }
+        }
+
+        if (is_bool($current_user_can)) {
+            return $current_user_can;
+        }
+    }
+
     return true;
 }
 
@@ -682,14 +704,26 @@ function wp_validate_boolean($value) {
 }
 
 class WP_Error {
+    private $code;
     private $message;
+    private $data;
 
-    public function __construct($code = '', $message = '') {
+    public function __construct($code = '', $message = '', $data = null) {
+        $this->code    = (string) $code;
         $this->message = $message;
+        $this->data    = $data;
+    }
+
+    public function get_error_code() {
+        return $this->code;
     }
 
     public function get_error_message() {
         return $this->message;
+    }
+
+    public function get_error_data() {
+        return $this->data;
     }
 }
 

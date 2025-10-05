@@ -20,6 +20,8 @@ Accédez à la page **Discord Bot** dans l’administration pour :
 - Personnaliser les icônes et libellés proposés par défaut (cartes principales, répartition des présences, boosts) ;
 - Ajouter du CSS personnalisé.
 
+> ℹ️ Les tableaux de bord d’analytics et l’API REST `discord-bot-jlg/v1/analytics` ne sont accessibles qu’aux utilisateurs connectés disposant de la capacité `manage_options` (ou via une clé API déclarée à l’aide du filtre `discord_bot_jlg_rest_access_key`).
+
 ### Définir le token via une constante
 
 Il est possible de forcer l'utilisation d'un token spécifique en définissant la constante `DISCORD_BOT_JLG_TOKEN` dans votre fichier `wp-config.php` ou dans un plugin mu. Lorsque cette constante est présente (et non vide), elle est utilisée à la place de la valeur enregistrée dans l'administration et le champ correspondant devient en lecture seule.
