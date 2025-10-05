@@ -7,6 +7,7 @@
     var createElement = element.createElement;
     var Fragment = element.Fragment;
     var useState = element.useState;
+    var useEffect = element.useEffect;
     var __ = i18n.__;
     var InspectorControls = blockEditor.InspectorControls;
     var useBlockProps = blockEditor.useBlockProps || function () { return {}; };
@@ -1089,7 +1090,13 @@
                 : [defaultPreviewRenderer, function () {}];
             var previewRenderer = stateTuple[0];
             var setPreviewRenderer = stateTuple[1];
+            var errorSignatureTuple = hasUseState
+                ? useState(null)
+                : [null, function () {}];
+            var lastErrorSignature = errorSignatureTuple[0];
+            var setLastErrorSignature = errorSignatureTuple[1];
             var canUseDynamicPreview = hasUseState && !!ServerSideRender;
+            var hasUseEffect = typeof useEffect === 'function';
             if (typeof previewRenderer !== 'function') {
                 previewRenderer = defaultPreviewRenderer;
             }
@@ -1099,27 +1106,169 @@
                 previewRenderer = defaultPreviewRenderer;
             }
 
+            var trimmedProfile = typeof attributes.profile === 'string'
+                ? attributes.profile.trim()
+                : '';
+            var trimmedServerId = typeof attributes.server_id === 'string'
+                ? attributes.server_id.trim()
+                : '';
+            var trimmedToken = typeof attributes.bot_token === 'string'
+                ? attributes.bot_token.trim()
+                : '';
+            var credentialsSignature = [trimmedProfile, trimmedServerId, trimmedToken].join('|');
+            var hasProfileCredentials = !!trimmedProfile;
+            var hasManualCredentials = !!trimmedServerId && !!trimmedToken;
+            var hasCredentials = hasProfileCredentials || hasManualCredentials;
+
+            if (hasUseEffect && typeof setPreviewRenderer === 'function') {
+                useEffect(function () {
+                    if (!canUseDynamicPreview) {
+                        if (previewRenderer === ServerSideRender) {
+                            setPreviewRenderer(function () {
+                                return defaultPreviewRenderer;
+                            });
+                        }
+
+                        if (typeof setLastErrorSignature === 'function' && lastErrorSignature) {
+                            setLastErrorSignature(function () {
+                                return null;
+                            });
+                        }
+
+                        return;
+                    }
+
+                    if (typeof setLastErrorSignature === 'function'
+                        && lastErrorSignature
+                        && lastErrorSignature !== credentialsSignature
+                    ) {
+                        setLastErrorSignature(function () {
+                            return null;
+                        });
+                    }
+
+                    if (!hasCredentials) {
+                        if (previewRenderer === ServerSideRender) {
+                            setPreviewRenderer(function () {
+                                return defaultPreviewRenderer;
+                            });
+                        }
+
+                        return;
+                    }
+
+                    if (lastErrorSignature && lastErrorSignature === credentialsSignature) {
+                        return;
+                    }
+
+                    if (hasCredentials && previewRenderer !== ServerSideRender) {
+                        setPreviewRenderer(function () {
+                            return ServerSideRender;
+                        });
+                    }
+                }, [
+                    canUseDynamicPreview,
+                    ServerSideRender,
+                    credentialsSignature,
+                    hasCredentials,
+                    lastErrorSignature,
+                    previewRenderer
+                ]);
+            }
+
+            var LoadingPlaceholder = function () {
+                var skeletonCards = [0, 1, 2].map(function (index) {
+                    return createElement(
+                        'div',
+                        { className: 'discord-bot-jlg-preview-loading__card', key: 'loading-card-' + index },
+                        createElement('div', { className: 'discord-bot-jlg-preview-loading__icon discord-bot-jlg-preview-loading__shimmer' }),
+                        createElement(
+                            'div',
+                            { className: 'discord-bot-jlg-preview-loading__card-lines' },
+                            createElement('div', { className: 'discord-bot-jlg-preview-loading__line discord-bot-jlg-preview-loading__line--short discord-bot-jlg-preview-loading__shimmer' }),
+                            createElement('div', { className: 'discord-bot-jlg-preview-loading__line discord-bot-jlg-preview-loading__shimmer' })
+                        )
+                    );
+                });
+
+                return createElement(
+                    'div',
+                    {
+                        className: 'discord-bot-jlg-preview-loading',
+                        role: 'status',
+                        'aria-live': 'polite'
+                    },
+                    createElement('span', { className: 'screen-reader-text' }, __('Chargement de l\'aperçu dynamique…', 'discord-bot-jlg')),
+                    createElement(
+                        'div',
+                        { className: 'discord-bot-jlg-preview-loading__header' },
+                        createElement('div', { className: 'discord-bot-jlg-preview-loading__avatar discord-bot-jlg-preview-loading__shimmer' }),
+                        createElement(
+                            'div',
+                            { className: 'discord-bot-jlg-preview-loading__titles' },
+                            createElement('div', { className: 'discord-bot-jlg-preview-loading__title discord-bot-jlg-preview-loading__shimmer' }),
+                            createElement('div', { className: 'discord-bot-jlg-preview-loading__subtitle discord-bot-jlg-preview-loading__shimmer' })
+                        )
+                    ),
+                    createElement(
+                        'div',
+                        { className: 'discord-bot-jlg-preview-loading__cards' },
+                        skeletonCards
+                    ),
+                    createElement('div', { className: 'discord-bot-jlg-preview-loading__cta discord-bot-jlg-preview-loading__shimmer' })
+                );
+            };
+
+            var ErrorPlaceholder = function () {
+                if (hasUseEffect && typeof setPreviewRenderer === 'function') {
+                    useEffect(function () {
+                        setPreviewRenderer(function () {
+                            return defaultPreviewRenderer;
+                        });
+
+                        if (typeof setLastErrorSignature === 'function') {
+                            setLastErrorSignature(function () {
+                                return credentialsSignature;
+                            });
+                        }
+                    }, []);
+                } else if (typeof setPreviewRenderer === 'function') {
+                    setTimeout(function () {
+                        setPreviewRenderer(function () {
+                            return defaultPreviewRenderer;
+                        });
+
+                        if (typeof setLastErrorSignature === 'function') {
+                            setLastErrorSignature(function () {
+                                return credentialsSignature;
+                            });
+                        }
+                    }, 0);
+                }
+
+                return createElement(
+                    'div',
+                    { className: 'discord-bot-jlg-preview-error' },
+                    createElement('p', { className: 'discord-bot-jlg-preview-error__title' },
+                        __('Impossible de charger l\'aperçu dynamique pour le moment.', 'discord-bot-jlg')
+                    ),
+                    createElement('p', { className: 'discord-bot-jlg-preview-error__description' },
+                        __('L\'API ne répond pas ou a retourné une erreur inattendue. Un aperçu statique est affiché ci-dessous.', 'discord-bot-jlg')
+                    ),
+                    createElement(
+                        'div',
+                        { className: 'discord-bot-jlg-preview-error__fallback' },
+                        defaultPreviewRenderer(attributes)
+                    )
+                );
+            };
+
             var preview = (ServerSideRender && isDynamicPreview)
                 ? createElement(ServerSideRender, {
                     block: blockName,
                     attributes: attributes,
-                    ErrorResponsePlaceholder: function () {
-                        return createElement(
-                            'div',
-                            { className: 'discord-bot-jlg-preview-error' },
-                            createElement('p', { className: 'discord-bot-jlg-preview-error__title' },
-                                __('Impossible de charger l\'aperçu dynamique pour le moment.', 'discord-bot-jlg')
-                            ),
-                            createElement('p', { className: 'discord-bot-jlg-preview-error__description' },
-                                __('L\'API ne répond pas ou a retourné une erreur inattendue. Un aperçu statique est affiché ci-dessous.', 'discord-bot-jlg')
-                            ),
-                            createElement(
-                                'div',
-                                { className: 'discord-bot-jlg-preview-error__fallback' },
-                                defaultPreviewRenderer(attributes)
-                            )
-                        );
-                    },
+                    LoadingResponsePlaceholder: LoadingPlaceholder,
+                    ErrorResponsePlaceholder: ErrorPlaceholder,
                     EmptyResponsePlaceholder: function () {
                         return createElement('div', { className: 'discord-bot-jlg-preview-error' },
                             createElement('p', null, __('Aucun aperçu dynamique disponible pour le moment.', 'discord-bot-jlg'))
@@ -1413,15 +1562,19 @@
                             checked: !!isDynamicPreview,
                             onChange: function (value) {
                                 if (!canUseDynamicPreview) {
-                                    setPreviewRenderer(defaultPreviewRenderer);
+                                    setPreviewRenderer(function () {
+                                        return defaultPreviewRenderer;
+                                    });
                                     return;
                                 }
 
-                                setPreviewRenderer(value ? ServerSideRender : defaultPreviewRenderer);
+                                setPreviewRenderer(function () {
+                                    return value ? ServerSideRender : defaultPreviewRenderer;
+                                });
                             },
                             disabled: !canUseDynamicPreview,
                             help: canUseDynamicPreview
-                                ? __('Basculer entre l\'aperçu statique et le rendu dynamique fourni par l\'API.', 'discord-bot-jlg')
+                                ? __('Basculer entre l\'aperçu statique et le rendu dynamique fourni par l\'API. L\'aperçu en direct s\'active automatiquement dès qu\'un profil ou un token valide est détecté.', 'discord-bot-jlg')
                                 : __('L\'aperçu dynamique nécessite la prise en charge du rendu côté serveur.', 'discord-bot-jlg')
                         }),
                         createElement(SelectControl, {
