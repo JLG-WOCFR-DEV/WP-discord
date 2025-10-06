@@ -7,6 +7,7 @@ class Discord_Bot_JLG_REST_Controller {
     const ROUTE_NAMESPACE = 'discord-bot-jlg/v1';
     const ROUTE_STATS = '/stats';
     const ROUTE_ANALYTICS = '/analytics';
+    const ANALYTICS_CACHE_GROUP = 'discord_bot_jlg_rest';
 
     /**
      * @var Discord_Bot_JLG_API
@@ -182,13 +183,26 @@ class Discord_Bot_JLG_REST_Controller {
             $days = 30;
         }
 
-        $aggregates = $analytics->get_aggregates(
-            array(
-                'profile_key' => $profile_key,
-                'server_id'   => $server_id,
-                'days'        => $days,
-            )
-        );
+        $cache_ttl = $this->get_analytics_cache_ttl($profile_key, $server_id, $days);
+        $cache_key = $this->get_analytics_cache_key($profile_key, $server_id, $days);
+
+        $aggregates = $this->maybe_get_cached_analytics($cache_key, $cache_ttl);
+
+        if (!is_array($aggregates)) {
+            $aggregates = $analytics->get_aggregates(
+                array(
+                    'profile_key' => $profile_key,
+                    'server_id'   => $server_id,
+                    'days'        => $days,
+                )
+            );
+
+            if (!is_array($aggregates)) {
+                $aggregates = array();
+            }
+
+            $this->maybe_store_cached_analytics($cache_key, $aggregates, $cache_ttl);
+        }
 
         $response = array(
             'success' => true,
@@ -196,6 +210,70 @@ class Discord_Bot_JLG_REST_Controller {
         );
 
         return rest_ensure_response(new WP_REST_Response($response, 200));
+    }
+
+    private function get_analytics_cache_key($profile_key, $server_id, $days) {
+        $parts = array(
+            (string) $profile_key,
+            (string) $server_id,
+            (string) (int) $days,
+        );
+
+        return 'discord_bot_jlg_analytics_' . md5(implode('|', $parts));
+    }
+
+    private function get_analytics_cache_ttl($profile_key, $server_id, $days) {
+        $default_ttl = defined('MINUTE_IN_SECONDS') ? 5 * MINUTE_IN_SECONDS : 300;
+
+        $ttl = (int) apply_filters(
+            'discord_bot_jlg_rest_analytics_cache_ttl',
+            $default_ttl,
+            $profile_key,
+            $server_id,
+            $days
+        );
+
+        if ($ttl < 0) {
+            $ttl = 0;
+        }
+
+        return $ttl;
+    }
+
+    private function maybe_get_cached_analytics($cache_key, $ttl) {
+        if ($ttl <= 0) {
+            return null;
+        }
+
+        if (function_exists('wp_cache_get')) {
+            $cached = wp_cache_get($cache_key, self::ANALYTICS_CACHE_GROUP);
+            if (false !== $cached && is_array($cached)) {
+                return $cached;
+            }
+        }
+
+        if (function_exists('get_transient')) {
+            $transient = get_transient($cache_key);
+            if (false !== $transient && is_array($transient)) {
+                return $transient;
+            }
+        }
+
+        return null;
+    }
+
+    private function maybe_store_cached_analytics($cache_key, $aggregates, $ttl) {
+        if ($ttl <= 0 || !is_array($aggregates)) {
+            return;
+        }
+
+        if (function_exists('wp_cache_set')) {
+            wp_cache_set($cache_key, $aggregates, self::ANALYTICS_CACHE_GROUP, $ttl);
+        }
+
+        if (function_exists('set_transient')) {
+            set_transient($cache_key, $aggregates, $ttl);
+        }
     }
 
     public function check_rest_permissions(WP_REST_Request $request) {
