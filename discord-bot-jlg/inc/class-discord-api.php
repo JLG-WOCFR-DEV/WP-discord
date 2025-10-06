@@ -2561,6 +2561,23 @@ class Discord_Bot_JLG_API {
             return ($retry_after > 0) ? $retry_after : 0;
         }
 
+        $normalized = str_replace(',', '.', $header);
+
+        if (preg_match('/^\s*([0-9]+(?:\.[0-9]+)?)\s*(ms|s)?\s*$/i', $normalized, $matches)) {
+            $value = (float) $matches[1];
+            $unit  = isset($matches[2]) ? strtolower($matches[2]) : 's';
+
+            if (!is_finite($value) || $value < 0) {
+                return 0;
+            }
+
+            if ('ms' === $unit) {
+                $value = $value / 1000;
+            }
+
+            return ($value > 0) ? (int) ceil($value) : 0;
+        }
+
         $timestamp = strtotime($header);
 
         if (false === $timestamp) {
