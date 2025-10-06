@@ -19,3 +19,36 @@
 3. **Renforcer la gestion des secrets** : chiffrer les tokens au repos (par exemple via Sodium) et enregistrer leur date de rotation pour déclencher des rappels automatiques, avec possibilité de segmenter les accès par profil serveur.【F:discord-bot-jlg/inc/class-discord-admin.php†L289-L423】【F:discord-bot-jlg/inc/class-discord-api.php†L200-L233】
 4. **Étendre l’observabilité** : exposer des événements structurés (hooks ou logs JSON), un endpoint de santé dédié et, idéalement, une intégration avec des outils de monitoring externes pour suivre erreurs, délais de réponse et taux de fallback.【F:discord-bot-jlg/inc/class-discord-api.php†L330-L358】【F:discord-bot-jlg/inc/class-discord-site-health.php†L58-L105】
 5. **Préparer le multi-serveur avancé** : migrer les profils dans une table custom ou un CPT avec capacités distinctes, activer la délégation d’accès (rôles personnalisés, clés par profil) et fournir des rapports agrégés multi-serveurs comparables aux dashboards pro.【F:discord-bot-jlg/inc/class-discord-api.php†L200-L233】【F:discord-bot-jlg/inc/class-discord-rest.php†L23-L199】
+
+### Focus sur la fiabilité des connecteurs
+
+Pour se rapprocher des attentes “entreprise”, la couche d’intégration avec l’API Discord doit gagner en résilience, en visibilité
+et en gouvernance. Un socle professionnel combine généralement un suivi granulaire des quotas, des stratégies de repli intelligentes
+et une observabilité partagée entre les équipes techniques et métiers. Voici les chantiers prioritaires :
+
+1. **Supervision en continu des appels**
+   * Ajouter une journalisation structurée (JSON) pour chaque requête sortante, incluant durée, quota restant, identifiant de
+     profil et résultat (succès, fallback, erreur).
+   * Exporter ces événements vers des outils compatibles (Site Health, endpoint REST `/logs`, syslog) afin de corréler incidents
+     et consommation d’API, et de constituer une base d’audit partageable.
+
+2. **Stratégies de retry et de backoff**
+   * Introduire un mécanisme de circuit breaker paramétrable qui coupe les appels après N échecs, bascule automatiquement sur les
+     instantanés de secours et notifie les équipes concernées.
+   * Implémenter un backoff exponentiel conscient des en-têtes Discord (`Retry-After`, limites de rate-limit) pour éviter les bans
+     temporaires tout en garantissant la reprise progressive du service.
+
+3. **Tableau de bord de santé**
+   * Enrichir l’écran “Site Health” avec des métriques clés : taux d’erreurs par endpoint, temps moyen de réponse, ratio de
+     fallback et nombre de tentatives en file d’attente.
+   * Prévoir des webhooks d’alerte (courriel, Slack) lorsque certains seuils sont dépassés, ainsi qu’un digest hebdomadaire pour
+     les équipes de support et de produit.
+
+4. **Tests de bout en bout et sandbox**
+   * Documenter un mode “sandbox” qui utilise un serveur Discord de test et des fixtures locales pour valider les évolutions sans
+     impacter la production.
+   * Mettre en place des tests automatisés (PHPUnit/WP-CLI) simulant les réponses API critiques afin de détecter les régressions
+     dans les scénarios de rate-limit, de timeouts et d’erreurs réseau.
+
+Avec ces évolutions, le connecteur gagnerait en robustesse, offrirait des garanties auditables et réduirait les interruptions
+perçues par les utilisateurs finaux, alignant le plugin sur les standards des solutions professionnelles.
