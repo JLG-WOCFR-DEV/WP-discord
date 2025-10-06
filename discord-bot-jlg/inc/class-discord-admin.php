@@ -1616,7 +1616,10 @@ class Discord_Bot_JLG_Admin {
      * Traite la demande de test de connexion depuis la page d'options.
      */
     private function handle_test_connection_request() {
-        if (!isset($_POST['test_connection']) || !check_admin_referer('discord_test_connection')) {
+        if (
+            !isset($_POST['test_connection'])
+            || !check_admin_referer('discord_test_connection', 'discord_test_connection_nonce')
+        ) {
             return;
         }
 
@@ -1675,7 +1678,7 @@ class Discord_Bot_JLG_Admin {
             <p><?php esc_html_e('Vérifiez que votre configuration fonctionne :', 'discord-bot-jlg'); ?></p>
             <form method="post" action="<?php echo esc_url(admin_url('admin.php?page=discord-bot-jlg')); ?>">
                 <input type="hidden" name="test_connection" value="1" />
-                <?php wp_nonce_field('discord_test_connection'); ?>
+                <?php wp_nonce_field('discord_test_connection', 'discord_test_connection_nonce'); ?>
                 <p>
                     <button type="submit" class="button button-secondary" style="width: 100%;"><?php esc_html_e('Tester la connexion', 'discord-bot-jlg'); ?></button>
                 </p>
