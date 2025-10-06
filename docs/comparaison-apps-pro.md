@@ -5,6 +5,7 @@
 - **Administration avancée** : les options couvrent profils multiples, thèmes, icônes, libellés, CTA et cache, avec sanitisation systématique pour sécuriser les entrées.【F:discord-bot-jlg/inc/class-discord-admin.php†L213-L423】【F:discord-bot-jlg/inc/class-discord-admin.php†L642-L907】
 - **Surface utilisateur complète** : shortcode, bloc Gutenberg et widget partagent une base commune d’options (layouts, auto-refresh, profils, overrides stylistiques) pour proposer des parcours riches sans code custom.【F:discord-bot-jlg/inc/class-discord-shortcode.php†L212-L671】【F:discord-bot-jlg/inc/class-discord-widget.php†L36-L155】
 - **Écosystème WordPress intégré** : REST API, WP-CLI, Site Health et analytics internes alignent le plugin sur les pratiques d’outillage attendues côté exploitation.【F:discord-bot-jlg/inc/class-discord-rest.php†L23-L244】【F:discord-bot-jlg/inc/class-discord-cli.php†L24-L81】【F:discord-bot-jlg/inc/class-discord-site-health.php†L17-L105】【F:discord-bot-jlg/inc/class-discord-analytics.php†L53-L217】
+- **Internationalisation et cycle de vie outillés** : chargement du textdomain, fichier `.pot` prêt à l’emploi, désinstallation nettoyant options/transients et CLI de maintenance offrent une base professionnelle pour packager le plugin sur plusieurs marchés.【F:discord-bot-jlg/discord-bot-jlg.php†L123-L198】【F:discord-bot-jlg/languages/discord-bot-jlg.pot†L1-L52】【F:discord-bot-jlg/inc/class-discord-cli.php†L24-L81】
 
 ## Écarts observés vs solutions professionnelles
 - **Orchestration centralisée** : `Discord_Bot_JLG_API::get_stats()` orchestre cache, appels réseau, bascules démo et persistance dans un seul bloc, ce qui complique l’instrumentation fine (metrics, retries ciblés, traçabilité) souvent exigée en production SaaS.【F:discord-bot-jlg/inc/class-discord-api.php†L240-L358】
@@ -12,6 +13,7 @@
 - **Stockage des secrets** : les tokens sont conservés en clair dans l’option sérialisée et simplement recopiés si le champ est vide, sans rotation ni chiffrement applicatif, contrairement aux politiques de secret management imposées par les solutions commerciales.【F:discord-bot-jlg/inc/class-discord-admin.php†L289-L423】
 - **Multi-tenancy limité** : les profils serveurs sont stockés dans la même option avec clés et tokens, ce qui complique l’isolement, l’audit et la délégation par profil qu’on retrouve sur les consoles pro multi-serveurs.【F:discord-bot-jlg/inc/class-discord-api.php†L200-L233】【F:discord-bot-jlg/inc/class-discord-admin.php†L428-L642】
 - **Observabilité partielle** : si les erreurs sont journalisées dans les transients de secours, il manque des événements structurés (logs JSON, métriques Prometheus, traces) et des webhooks d’alerte pour répondre aux exigences SRE des plateformes professionnelles.【F:discord-bot-jlg/inc/class-discord-api.php†L330-L358】
+- **Contrôle d’accès monolithique** : toutes les pages d’administration et endpoints REST reposent sur `manage_options` (ou une clé statique) sans différencier les profils, niveaux d’accès ni historiser les actions, là où les solutions pro offrent une gouvernance fine par rôle et par serveur.【F:discord-bot-jlg/inc/class-discord-admin.php†L38-L103】【F:discord-bot-jlg/inc/class-discord-rest.php†L279-L306】
 
 ## Recommandations inspirées des apps pro
 1. **Externaliser les use-cases** : découper `get_stats()` en services dédiés (fetch widget, fetch bot, merge, persistance) pour pouvoir instrumenter chaque étape, ajouter du tracing et brancher des stratégies de retry distinctes.【F:discord-bot-jlg/inc/class-discord-api.php†L240-L358】
@@ -19,6 +21,7 @@
 3. **Renforcer la gestion des secrets** : chiffrer les tokens au repos (par exemple via Sodium) et enregistrer leur date de rotation pour déclencher des rappels automatiques, avec possibilité de segmenter les accès par profil serveur.【F:discord-bot-jlg/inc/class-discord-admin.php†L289-L423】【F:discord-bot-jlg/inc/class-discord-api.php†L200-L233】
 4. **Étendre l’observabilité** : exposer des événements structurés (hooks ou logs JSON), un endpoint de santé dédié et, idéalement, une intégration avec des outils de monitoring externes pour suivre erreurs, délais de réponse et taux de fallback.【F:discord-bot-jlg/inc/class-discord-api.php†L330-L358】【F:discord-bot-jlg/inc/class-discord-site-health.php†L58-L105】
 5. **Préparer le multi-serveur avancé** : migrer les profils dans une table custom ou un CPT avec capacités distinctes, activer la délégation d’accès (rôles personnalisés, clés par profil) et fournir des rapports agrégés multi-serveurs comparables aux dashboards pro.【F:discord-bot-jlg/inc/class-discord-api.php†L200-L233】【F:discord-bot-jlg/inc/class-discord-rest.php†L23-L199】
+6. **Segmenter la gouvernance** : introduire une matrice d’autorisations (capacités custom, clés API périmétrées, audit trail) pour déléguer la gestion des profils, limiter l’exposition des tokens et répondre aux exigences de conformité (SOC2/ISO).【F:discord-bot-jlg/inc/class-discord-admin.php†L38-L103】【F:discord-bot-jlg/inc/class-discord-rest.php†L279-L306】
 
 ### Focus sur la fiabilité des connecteurs
 
@@ -52,3 +55,11 @@ et une observabilité partagée entre les équipes techniques et métiers. Voici
 
 Avec ces évolutions, le connecteur gagnerait en robustesse, offrirait des garanties auditables et réduirait les interruptions
 perçues par les utilisateurs finaux, alignant le plugin sur les standards des solutions professionnelles.
+
+### Axes opérationnels complémentaires
+
+Les éditeurs SaaS matures se distinguent aussi par la qualité de leur outillage interne : pipelines de tests, packaging multi-langues et procédures de réversibilité. Le plugin dispose déjà d’une base de tests unitaires/JS et de hooks de cycle de vie, mais gagnerait à formaliser ces aspects.
+
+1. **Capitaliser sur les tests existants** : généraliser l’exécution automatisée des suites PHPUnit et Jest (mock HTTP, scénarios front) dans un pipeline CI pour détecter les régressions avant déploiement public.【F:discord-bot-jlg/tests/phpunit/Test_Discord_Bot_JLG_API.php†L1-L34】【F:tests/js/discord-bot-jlg.test.js†L1-L160】
+2. **Documenter le packaging avancé** : compléter le README avec des guides marché (traductions, exigences RGPD, matrice de support) et proposer des scripts de build (Composer, `wp dist-archive`) afin de reproduire les standards de livraison des solutions pro.【F:README.md†L1-L120】【F:discord-bot-jlg/discord-bot-jlg.php†L123-L198】
+3. **Structurer la traçabilité** : coupler les hooks de nettoyage/install avec un journal d’opérations (création/suppression de profils, purges, appels REST) pour simplifier les audits de sécurité et la gestion des incidents.【F:discord-bot-jlg/discord-bot-jlg.php†L123-L167】【F:discord-bot-jlg/inc/class-discord-analytics.php†L164-L217】
