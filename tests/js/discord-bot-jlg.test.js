@@ -5,6 +5,7 @@ const scriptPath = path.resolve(__dirname, '../../discord-bot-jlg/assets/js/disc
 const readyStateDescriptor = Object.getOwnPropertyDescriptor(document, 'readyState');
 let setTimeoutSpy;
 let lastTimeoutCallIndex = -1;
+const originalIntersectionObserver = global.IntersectionObserver;
 
 class MockFormData {
     constructor() {
@@ -153,6 +154,13 @@ describe('discord-bot-jlg integration', () => {
         window.fetch = global.fetch;
         global.FormData = MockFormData;
         window.FormData = MockFormData;
+        if (typeof originalIntersectionObserver === 'function') {
+            global.IntersectionObserver = originalIntersectionObserver;
+            window.IntersectionObserver = originalIntersectionObserver;
+        } else {
+            delete global.IntersectionObserver;
+            delete window.IntersectionObserver;
+        }
         Object.defineProperty(document, 'readyState', {
             configurable: true,
             get: () => 'loading'
@@ -175,6 +183,13 @@ describe('discord-bot-jlg integration', () => {
         delete window.FormData;
         delete window.discordBotJlgInit;
         delete window.discordBotJlg;
+        if (typeof originalIntersectionObserver === 'function') {
+            global.IntersectionObserver = originalIntersectionObserver;
+            window.IntersectionObserver = originalIntersectionObserver;
+        } else {
+            delete global.IntersectionObserver;
+            delete window.IntersectionObserver;
+        }
         if (readyStateDescriptor) {
             Object.defineProperty(document, 'readyState', readyStateDescriptor);
         } else {
@@ -354,6 +369,72 @@ describe('discord-bot-jlg integration', () => {
         expect(container.dataset.refreshing).toBe('false');
         status = container.querySelector('.discord-refresh-status');
         expect(status).toBeNull();
+    });
+
+    test('defers refresh until container becomes visible when IntersectionObserver is supported', async () => {
+        const container = createContainer();
+
+        window.discordBotJlg = {
+            ajaxUrl: 'https://example.com/wp-admin/admin-ajax.php',
+            nonce: 'nonce',
+            requiresNonce: true,
+            locale: 'en-US',
+            minRefreshInterval: '15'
+        };
+
+        let observerCallback;
+        const observeMock = jest.fn();
+        const unobserveMock = jest.fn();
+        const disconnectMock = jest.fn();
+
+        global.IntersectionObserver = jest.fn((callback) => {
+            observerCallback = callback;
+
+            return {
+                observe: observeMock,
+                unobserve: unobserveMock,
+                disconnect: disconnectMock
+            };
+        });
+        window.IntersectionObserver = global.IntersectionObserver;
+
+        global.fetch.mockResolvedValue({
+            ok: true,
+            json: () => Promise.resolve({
+                success: true,
+                data: {
+                    online: 12,
+                    total: 48,
+                    has_total: true,
+                    total_is_approximate: false,
+                    stale: false,
+                    is_demo: false,
+                    fallback_demo: false
+                }
+            })
+        });
+
+        loadScript();
+
+        expect(observeMock).toHaveBeenCalledWith(container);
+        expect(global.fetch).not.toHaveBeenCalled();
+        expect(setTimeoutSpy).not.toHaveBeenCalled();
+
+        expect(typeof observerCallback).toBe('function');
+        observerCallback([
+            {
+                target: container,
+                isIntersecting: true,
+                intersectionRatio: 0.5
+            }
+        ]);
+
+        expect(setTimeoutSpy).toHaveBeenCalledTimes(1);
+
+        runTimerByDelay(15000);
+        await flushPromises();
+
+        expect(global.fetch).toHaveBeenCalledTimes(1);
     });
 
     test('hidden label remains available for assistive technologies across refreshes', async () => {

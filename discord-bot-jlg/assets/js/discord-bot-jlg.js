@@ -8,6 +8,7 @@
     var REFRESH_OVERLAY_CLASS = 'has-refresh-overlay';
     var DEMO_BADGE_CLASS = 'discord-demo-badge';
     var globalConfig = {};
+    var REFRESH_STATE_PROP = '__discordBotJlgRefreshState';
     var SERVER_NAME_SELECTOR = '[data-role="discord-server-name"]';
     var SERVER_NAME_CLASS = 'discord-server-name';
     var SERVER_NAME_TEXT_CLASS = 'discord-server-name__text';
@@ -2629,10 +2630,24 @@
                 effectiveDelay = state.intervalMs;
             }
 
+            state.lastScheduledDelay = effectiveDelay;
+
+            if (!state.isActive) {
+                state.pendingDelay = effectiveDelay;
+                return;
+            }
+
+            state.pendingDelay = null;
+
             state.timeoutId = window.setTimeout(function () {
                 state.timeoutId = null;
                 if (state.inFlight) {
                     scheduleNextRefresh(container, state, state.minIntervalMs);
+                    return;
+                }
+
+                if (!state.isActive) {
+                    state.pendingDelay = effectiveDelay;
                     return;
                 }
 
@@ -2641,7 +2656,7 @@
         }
 
         function triggerRefresh(container, state, overrideDelay) {
-            if (!state || state.inFlight) {
+            if (!state || state.inFlight || !state.isActive) {
                 return;
             }
 
@@ -2670,6 +2685,115 @@
                 resetInFlight();
                 hideRefreshIndicator(container);
             });
+        }
+
+        var supportsIntersectionObserver = typeof window !== 'undefined'
+            && typeof window.IntersectionObserver === 'function';
+        var stateStore = (typeof WeakMap === 'function') ? new WeakMap() : null;
+        var intersectionObserver = null;
+
+        function storeContainerState(container, state) {
+            if (!container) {
+                return;
+            }
+
+            if (stateStore) {
+                stateStore.set(container, state);
+            } else {
+                container[REFRESH_STATE_PROP] = state;
+            }
+        }
+
+        function getContainerState(container) {
+            if (!container) {
+                return null;
+            }
+
+            if (stateStore) {
+                return stateStore.get(container) || null;
+            }
+
+            if (Object.prototype.hasOwnProperty.call(container, REFRESH_STATE_PROP)) {
+                return container[REFRESH_STATE_PROP];
+            }
+
+            return null;
+        }
+
+        function activateContainer(container) {
+            var state = getContainerState(container);
+
+            if (!state || state.isActive) {
+                return;
+            }
+
+            state.isActive = true;
+
+            if (state.pendingImmediate) {
+                state.pendingImmediate = false;
+                triggerRefresh(container, state, state.intervalMs);
+                return;
+            }
+
+            var delay = state.pendingDelay;
+            if (typeof delay !== 'number' || isNaN(delay) || delay < 0) {
+                delay = state.intervalMs;
+            }
+
+            state.pendingDelay = null;
+            scheduleNextRefresh(container, state, delay);
+        }
+
+        function deactivateContainer(container) {
+            var state = getContainerState(container);
+
+            if (!state || !state.isActive) {
+                return;
+            }
+
+            state.isActive = false;
+
+            if (state.timeoutId) {
+                clearTimeout(state.timeoutId);
+                state.timeoutId = null;
+            }
+
+            if (typeof state.lastScheduledDelay === 'number' && !isNaN(state.lastScheduledDelay)) {
+                state.pendingDelay = state.lastScheduledDelay;
+            } else {
+                state.pendingDelay = state.intervalMs;
+            }
+        }
+
+        if (supportsIntersectionObserver) {
+            try {
+                intersectionObserver = new window.IntersectionObserver(
+                    function (entries) {
+                        if (!entries || !entries.length) {
+                            return;
+                        }
+
+                        entries.forEach(function (entry) {
+                            if (!entry || !entry.target) {
+                                return;
+                            }
+
+                            if (entry.isIntersecting || entry.intersectionRatio > 0) {
+                                activateContainer(entry.target);
+                            } else {
+                                deactivateContainer(entry.target);
+                            }
+                        });
+                    },
+                    {
+                        rootMargin: '200px 0px',
+                        threshold: [0, 0.1]
+                    }
+                );
+            } catch (error) {
+                supportsIntersectionObserver = false;
+                intersectionObserver = null;
+            }
         }
 
         Array.prototype.forEach.call(containers, function (container) {
@@ -2703,20 +2827,42 @@
                 intervalMs = minIntervalMs;
             }
 
+            var shouldForceImmediateRefresh = (container.dataset && container.dataset.stale === 'true')
+                || (container.dataset && container.dataset.fallbackDemo === 'true');
+
             var state = {
                 intervalMs: intervalMs,
                 minIntervalMs: minIntervalMs,
                 timeoutId: null,
-                inFlight: false
+                inFlight: false,
+                isActive: !supportsIntersectionObserver || !intersectionObserver,
+                pendingDelay: null,
+                pendingImmediate: shouldForceImmediateRefresh,
+                lastScheduledDelay: null
             };
 
-            var shouldForceImmediateRefresh = (container.dataset && container.dataset.stale === 'true')
-                || (container.dataset && container.dataset.fallbackDemo === 'true');
+            storeContainerState(container, state);
 
-            if (shouldForceImmediateRefresh) {
-                triggerRefresh(container, state, state.intervalMs);
+            if (supportsIntersectionObserver && intersectionObserver) {
+                if (!shouldForceImmediateRefresh) {
+                    scheduleNextRefresh(container, state, state.intervalMs);
+                }
+
+                intersectionObserver.observe(container);
+
+                if (shouldForceImmediateRefresh) {
+                    // Ensure the next activation triggers immediately once visible.
+                    state.pendingImmediate = true;
+                }
             } else {
-                scheduleNextRefresh(container, state, state.intervalMs);
+                state.isActive = true;
+
+                if (shouldForceImmediateRefresh) {
+                    state.pendingImmediate = false;
+                    triggerRefresh(container, state, state.intervalMs);
+                } else {
+                    scheduleNextRefresh(container, state, state.intervalMs);
+                }
             }
         });
     }
