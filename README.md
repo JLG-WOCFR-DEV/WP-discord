@@ -105,10 +105,37 @@ Cette méthode relit la configuration globale (`window.discordBotJlg`) et progra
 Un widget « Discord Bot - JLG » est disponible via le menu « Widgets ».
 
 ## Fonctionnalités
-- Affichage du nombre de membres en ligne et du total ;
-- Mise en cache des statistiques ;
-- Journalisation des erreurs de communication avec l'API Discord (accessible via `WP_DEBUG_LOG`) ;
-- Page de démonstration intégrée.
+
+### Collecte des données et cache
+- Récupération combinée des statistiques publiques du widget et, si besoin, des informations du bot afin de consolider les compteurs en un seul jeu de données exploitable, avec bascule automatique vers un mode démo ou des statistiques de secours en cas d'échec.【F:discord-bot-jlg/inc/class-discord-api.php†L240-L358】【F:discord-bot-jlg/inc/class-discord-api.php†L406-L489】
+- Mise en cache des réponses (transients) avec planification automatique du rafraîchissement via un cron dédié ajustable entre 60 et 3600 secondes, et purge du cache lors des changements de configuration sensibles.【F:discord-bot-jlg/discord-bot-jlg.php†L30-L88】【F:discord-bot-jlg/discord-bot-jlg.php†L394-L433】
+- Journalisation des instantanés dans une table dédiée pour alimenter les analytics, avec rétention configurable et purge des entrées expirées.【F:discord-bot-jlg/inc/class-discord-analytics.php†L53-L165】【F:discord-bot-jlg/inc/class-discord-analytics.php†L164-L217】
+
+### Configuration & administration
+- Page d’options complète pour définir l’ID du serveur, les tokens (y compris plusieurs profils avec labels, IDs et jetons distincts), le mode démo, la durée du cache, les thèmes, les icônes/libellés par défaut, l’URL et le libellé d’invitation, ainsi qu’un champ CSS personnalisé.【F:discord-bot-jlg/inc/class-discord-admin.php†L38-L213】【F:discord-bot-jlg/inc/class-discord-admin.php†L213-L356】【F:discord-bot-jlg/inc/class-discord-admin.php†L428-L642】【F:discord-bot-jlg/inc/class-discord-admin.php†L775-L1007】
+- Sous-menu « Guide & Démo » pour visualiser le rendu et les instructions directement depuis l’administration.【F:discord-bot-jlg/inc/class-discord-admin.php†L60-L103】
+- Validation stricte des entrées (intervalle de rafraîchissement, couleurs, textes, profils) afin d’éviter l’injection de valeurs invalides et de conserver les secrets existants si aucun nouveau jeton n’est fourni.【F:discord-bot-jlg/inc/class-discord-admin.php†L251-L423】【F:discord-bot-jlg/inc/class-discord-admin.php†L642-L770】
+
+### Affichage public (shortcode, bloc & widget)
+- Shortcode `[discord_stats]`, bloc Gutenberg associé et widget classique partageant la même API, avec héritage des options d’administration (thème, libellés, icônes, couleurs, rafraîchissement auto).【F:discord-bot-jlg/discord-bot-jlg.php†L226-L315】【F:discord-bot-jlg/inc/class-discord-shortcode.php†L23-L211】【F:discord-bot-jlg/inc/class-discord-widget.php†L16-L155】
+- Large éventail d’attributs : choix de layout, mode compact, alignement, largeur, présence/boosts, affichage du nom et de l’avatar du serveur, position de l’icône Discord, bouton CTA secondaire, surcharge des couleurs et textes, intervalle de rafraîchissement (min. 10 s) et sélection du profil serveur.【F:discord-bot-jlg/inc/class-discord-shortcode.php†L212-L420】【F:discord-bot-jlg/inc/class-discord-shortcode.php†L459-L671】【F:discord-bot-jlg/inc/class-discord-shortcode.php†L704-L1059】
+- Ré-initialisation JavaScript publique via `window.discordBotJlgInit()` pour re-synchroniser les conteneurs injectés dynamiquement, et indicateurs visuels/ARIA lors des rafraîchissements automatiques.【F:discord-bot-jlg/assets/js/discord-bot-jlg.js†L2710-L2795】【F:discord-bot-jlg/inc/class-discord-shortcode.php†L731-L1008】
+
+### Accessibilité & UX
+- Styles embarqués reproduisant la classe `.screen-reader-text` WordPress, labels cachés, attributs `aria-live`/`aria-busy` et gestion du mode « prefers-reduced-motion » pour des rafraîchissements non intrusifs.【F:discord-bot-jlg/assets/css/discord-bot-jlg.css†L35-L71】【F:discord-bot-jlg/inc/class-discord-shortcode.php†L704-L1040】
+- Panneaux Gutenberg et champs d’administration accessibles (légendes cachées, descriptions) pour guider la configuration des icônes et libellés.【F:discord-bot-jlg/inc/class-discord-admin.php†L878-L939】【F:discord-bot-jlg/inc/class-discord-admin.php†L1299-L1385】
+
+### API, analytics & supervision
+- Endpoints REST `discord-bot-jlg/v1/stats` et `discord-bot-jlg/v1/analytics` pour récupérer les compteurs en temps réel ou agrégés, protégés par la capacité `manage_options` ou une clé d’accès filtrable (`discord_bot_jlg_rest_access_key`).【F:discord-bot-jlg/inc/class-discord-rest.php†L23-L199】【F:discord-bot-jlg/inc/class-discord-rest.php†L201-L244】
+- Intégration WP-CLI avec commandes `wp discord-bot refresh-cache` et `wp discord-bot clear-cache` pour forcer une synchronisation ou purger les données sans passer par l’UI.【F:discord-bot-jlg/inc/class-discord-cli.php†L24-L81】
+- Test « Site Health » dédié indiquant l’état de la connexion Discord, les erreurs récentes et les prochaines tentatives de rafraîchissement.【F:discord-bot-jlg/inc/class-discord-site-health.php†L17-L105】
+- Chargement des traductions et assets spécifiques (bloc, scripts, styles) afin d’assurer une intégration native à l’écosystème WordPress.【F:discord-bot-jlg/discord-bot-jlg.php†L105-L180】【F:discord-bot-jlg/discord-bot-jlg.php†L226-L315】
+
+### Axes d’amélioration inspirés des apps pro
+- Structurer davantage le pipeline de collecte pour isoler les responsabilités (fetch widget/bot, fusion, persistance) et améliorer l’instrumentation des erreurs et latences.【F:docs/comparaison-apps-pro.md†L33-L58】【F:docs/comparaison-apps-pro.md†L71-L83】
+- Remplacer la planification simple par une file asynchrone (Action Scheduler/queue) capable de backoff, retries ciblés et supervision pour se rapprocher des pratiques observées dans les solutions SaaS spécialisées.【F:docs/comparaison-apps-pro.md†L60-L69】【F:docs/comparaison-apps-pro.md†L85-L92】
+- Renforcer la sécurité des secrets (chiffrement, rotation, segmentation par profil) et l’observabilité (logs structurés, endpoint de santé, webhooks) afin d’adresser les attentes conformité/SRE des environnements professionnels.【F:docs/comparaison-apps-pro.md†L62-L69】【F:docs/comparaison-apps-pro.md†L94-L110】
+- Préparer un mode multi-tenant avancé (table dédiée, rôles personnalisés, exports agrégés) pour gérer plusieurs serveurs avec des droits granulaires comparables aux consoles pro.【F:docs/comparaison-apps-pro.md†L62-L69】【F:docs/comparaison-apps-pro.md†L112-L119】
 
 ## Désinstallation
 La suppression du plugin depuis WordPress efface automatiquement l’option `discord_server_stats_options` et le transient `discord_server_stats_cache` associés aux statistiques du serveur.
@@ -137,5 +164,8 @@ Deux commandes WP-CLI facilitent les opérations :
 
 - `wp discord-bot refresh-cache` force l'appel API immédiat en ignorant le cache ;
 - `wp discord-bot clear-cache` purge toutes les données (transients, sauvegardes et limites de taux).
+
+## Ressources complémentaires
+- [Comparaison avec des applications professionnelles](docs/comparaison-apps-pro.md)
 
 Les deux commandes retournent un code de sortie non nul en cas d'erreur afin de permettre l'automatisation dans vos scripts d'exploitation.
