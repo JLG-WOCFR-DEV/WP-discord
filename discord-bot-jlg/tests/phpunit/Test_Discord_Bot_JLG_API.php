@@ -124,6 +124,27 @@ class Recording_Server_Id_Discord_Bot_JLG_Http_Client extends Discord_Bot_JLG_Ht
     }
 }
 
+class Rate_Limited_Discord_Bot_JLG_Http_Client extends Discord_Bot_JLG_Http_Client {
+    private $retry_after_header;
+
+    public function __construct($retry_after_header) {
+        $this->retry_after_header = $retry_after_header;
+    }
+
+    public function get($url, array $args = array(), $context = '') {
+        return array(
+            'response' => array(
+                'code'    => 429,
+                'message' => 'Too Many Requests',
+            ),
+            'body'    => '',
+            'headers' => array(
+                'Retry-After' => $this->retry_after_header,
+            ),
+        );
+    }
+}
+
 class Recording_Discord_Bot_JLG_Analytics extends Discord_Bot_JLG_Analytics {
     public $snapshots = array();
     public $purge_calls = array();
@@ -539,6 +560,41 @@ class Test_Discord_Bot_JLG_API extends TestCase {
         $expected_retry_after = max(0, (int) $transient_entry['value'] - time());
 
         $this->assertEqualsWithDelta($expected_retry_after, $payload['retry_after'], 1.0);
+    }
+
+    /**
+     * @dataProvider retry_after_header_provider
+     */
+    public function test_get_stats_honors_fractional_retry_after_headers($header_value, $expected_seconds) {
+        $option_name = 'discord_server_stats_options';
+        $cache_key   = 'discord_server_stats_cache';
+
+        $GLOBALS['wp_test_options'][$option_name] = array(
+            'server_id'      => '555555555555555555',
+            'cache_duration' => 60,
+        );
+
+        $http_client = new Rate_Limited_Discord_Bot_JLG_Http_Client($header_value);
+        $api         = new Discord_Bot_JLG_API($option_name, $cache_key, 60, $http_client);
+
+        $api->get_stats(array('bypass_cache' => true));
+
+        $reflection = new ReflectionProperty(Discord_Bot_JLG_API::class, 'last_retry_after');
+        $reflection->setAccessible(true);
+
+        $this->assertSame($expected_seconds, $reflection->getValue($api));
+    }
+
+    public function retry_after_header_provider() {
+        return array(
+            'fractional-seconds' => array('0.5', 1),
+            'milliseconds-suffix' => array('250ms', 1),
+            'seconds-with-unit' => array('1.2s', 2),
+            'decimal-comma' => array('1,4', 2),
+            'uppercase-ms' => array('150MS', 1),
+            'plain-integer' => array('42', 42),
+            'invalid-header' => array('not-a-delay', 0),
+        );
     }
 
     public function test_process_refresh_request_respects_client_rate_limit() {
