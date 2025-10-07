@@ -134,6 +134,10 @@ function discord_bot_jlg_uninstall() {
             require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-analytics.php';
         }
 
+        if (!class_exists('Discord_Bot_JLG_Event_Logger')) {
+            require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-event-logger.php';
+        }
+
         require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-api.php';
     } elseif (!class_exists('Discord_Bot_JLG_Http_Client')) {
         require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-http.php';
@@ -143,13 +147,20 @@ function discord_bot_jlg_uninstall() {
         require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-analytics.php';
     }
 
+    if (!class_exists('Discord_Bot_JLG_Event_Logger')) {
+        require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-event-logger.php';
+    }
+
     if (class_exists('Discord_Bot_JLG_API')) {
+        $analytics = new Discord_Bot_JLG_Analytics();
+        $event_logger = new Discord_Bot_JLG_Event_Logger();
         $api = new Discord_Bot_JLG_API(
             DISCORD_BOT_JLG_OPTION_NAME,
             DISCORD_BOT_JLG_CACHE_KEY,
             DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION,
             null,
-            new Discord_Bot_JLG_Analytics()
+            $analytics,
+            $event_logger
         );
 
         $api->purge_full_cache();
@@ -162,6 +173,10 @@ function discord_bot_jlg_uninstall() {
             $wpdb->query('DROP TABLE IF EXISTS ' . $analytics->get_table_name());
         }
     }
+
+    if (class_exists('Discord_Bot_JLG_Event_Logger')) {
+        delete_option(Discord_Bot_JLG_Event_Logger::OPTION_NAME);
+    }
 }
 
 register_uninstall_hook(__FILE__, 'discord_bot_jlg_uninstall');
@@ -169,6 +184,7 @@ register_uninstall_hook(__FILE__, 'discord_bot_jlg_uninstall');
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/helpers.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-analytics.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-http.php';
+require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-event-logger.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-api.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-admin.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-shortcode.php';
@@ -185,7 +201,10 @@ if (defined('WP_CLI') && WP_CLI) {
             new Discord_Bot_JLG_API(
                 DISCORD_BOT_JLG_OPTION_NAME,
                 DISCORD_BOT_JLG_CACHE_KEY,
-                DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION
+                DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION,
+                null,
+                null,
+                new Discord_Bot_JLG_Event_Logger()
             )
         )
     );
@@ -208,24 +227,27 @@ class DiscordServerStats {
     private $site_health;
     private $rest_controller;
     private $analytics;
+    private $event_logger;
 
     public function __construct() {
         $this->default_options = discord_bot_jlg_get_default_options();
 
         $this->analytics = new Discord_Bot_JLG_Analytics();
+        $this->event_logger = new Discord_Bot_JLG_Event_Logger();
 
         $this->api       = new Discord_Bot_JLG_API(
             DISCORD_BOT_JLG_OPTION_NAME,
             DISCORD_BOT_JLG_CACHE_KEY,
             DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION,
             null,
-            $this->analytics
+            $this->analytics,
+            $this->event_logger
         );
         $this->admin     = new Discord_Bot_JLG_Admin(DISCORD_BOT_JLG_OPTION_NAME, $this->api, $this->analytics);
         $this->shortcode = new Discord_Bot_JLG_Shortcode(DISCORD_BOT_JLG_OPTION_NAME, $this->api);
         $this->widget    = new Discord_Bot_JLG_Widget();
         $this->site_health = new Discord_Bot_JLG_Site_Health($this->api);
-        $this->rest_controller = new Discord_Bot_JLG_REST_Controller($this->api, $this->analytics);
+        $this->rest_controller = new Discord_Bot_JLG_REST_Controller($this->api, $this->analytics, $this->event_logger);
 
         add_filter('default_option_' . DISCORD_BOT_JLG_OPTION_NAME, array($this, 'provide_default_options'));
         add_filter('option_' . DISCORD_BOT_JLG_OPTION_NAME, array($this, 'merge_options_with_defaults'));
