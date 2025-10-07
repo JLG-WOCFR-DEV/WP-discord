@@ -436,7 +436,11 @@ msgid "<strong>layout</strong> : horizontal, vertical, compact"
 msgstr ""
 
 #: inc/class-discord-admin.php:718
-msgid "<strong>theme</strong> : discord, dark, light, minimal"
+msgid "<strong>theme</strong> : discord, dark, light, minimal, radix"
+msgstr ""
+
+#: assets/js/discord-bot-block.js:101 inc/class-discord-admin.php:1467 inc/class-discord-widget.php:307
+msgid "Radix UI"
 msgstr ""
 
 #: inc/class-discord-admin.php:719

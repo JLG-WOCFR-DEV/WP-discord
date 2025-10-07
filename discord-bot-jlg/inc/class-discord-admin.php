@@ -1464,6 +1464,7 @@ class Discord_Bot_JLG_Admin {
             'dark'    => __('Sombre', 'discord-bot-jlg'),
             'light'   => __('Clair', 'discord-bot-jlg'),
             'minimal' => __('Minimal', 'discord-bot-jlg'),
+            'radix'   => __('Radix UI', 'discord-bot-jlg'),
         );
 
         $choices = array();
@@ -1931,7 +1932,7 @@ class Discord_Bot_JLG_Admin {
                 <h5><?php esc_html_e('🎨 Apparence & Layout :', 'discord-bot-jlg'); ?></h5>
                 <ul style="columns: 2; column-gap: 30px;">
                     <li><?php echo wp_kses_post(__('<strong>layout</strong> : horizontal, vertical, compact', 'discord-bot-jlg')); ?></li>
-                    <li><?php echo wp_kses_post(__('<strong>theme</strong> : discord, dark, light, minimal', 'discord-bot-jlg')); ?></li>
+                    <li><?php echo wp_kses_post(__('<strong>theme</strong> : discord, dark, light, minimal, radix', 'discord-bot-jlg')); ?></li>
                     <li><?php echo wp_kses_post(__('<strong>align</strong> : left, center, right', 'discord-bot-jlg')); ?></li>
                     <li><?php echo wp_kses_post(__('<strong>width</strong> : largeur CSS (ex: "300px", "100%")', 'discord-bot-jlg')); ?></li>
                     <li><?php echo wp_kses_post(__('<strong>compact</strong> : true/false (version réduite)', 'discord-bot-jlg')); ?></li>

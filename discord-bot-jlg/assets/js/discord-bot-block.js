@@ -97,7 +97,8 @@
         { label: __('Discord', 'discord-bot-jlg'), value: 'discord' },
         { label: __('Sombre', 'discord-bot-jlg'), value: 'dark' },
         { label: __('Clair', 'discord-bot-jlg'), value: 'light' },
-        { label: __('Minimal', 'discord-bot-jlg'), value: 'minimal' }
+        { label: __('Minimal', 'discord-bot-jlg'), value: 'minimal' },
+        { label: __('Radix UI', 'discord-bot-jlg'), value: 'radix' }
     ];
 
     var alignOptions = [
