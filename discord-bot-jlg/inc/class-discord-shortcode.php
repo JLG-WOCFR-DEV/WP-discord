@@ -601,94 +601,6 @@ class Discord_Bot_JLG_Shortcode {
             $region_label_text = trim($region_label_text);
         }
 
-        $attributes = array(
-            sprintf('id="%s"', esc_attr($unique_id)),
-            sprintf('class="%s"', esc_attr(implode(' ', $container_classes))),
-            'role="region"',
-            sprintf('data-demo="%s"', esc_attr($is_forced_demo ? 'true' : 'false')),
-            sprintf('data-fallback-demo="%s"', esc_attr($is_fallback_demo ? 'true' : 'false')),
-            sprintf('data-stale="%s"', esc_attr($is_stale ? 'true' : 'false')),
-            sprintf('data-hide-labels="%s"', esc_attr($hide_labels ? 'true' : 'false')),
-            'aria-live="polite"',
-            'aria-busy="false"',
-            sprintf('data-region-label-base="%s"', esc_attr($region_label_base)),
-            sprintf('data-region-label-pattern="%s"', esc_attr($region_label_pattern)),
-            sprintf('data-region-title-id="%s"', esc_attr($title_id)),
-            sprintf('data-region-server-id="%s"', esc_attr($server_name_id)),
-            sprintf('data-region-synthetic-id="%s"', esc_attr($region_synthetic_label_id)),
-        );
-
-        if (!empty($region_label_ids)) {
-            $labelledby_value = implode(' ', $region_label_ids);
-            $attributes[]     = sprintf('aria-labelledby="%s"', esc_attr($labelledby_value));
-            $attributes[]     = sprintf('data-region-label-ids="%s"', esc_attr($labelledby_value));
-            $attributes[]     = 'data-region-labelling="labelledby"';
-        }
-
-        if ($render_synthetic_label) {
-            $attributes[] = sprintf('aria-label="%s"', esc_attr($region_label_text));
-            $attributes[] = sprintf('data-region-label="%s"', esc_attr($region_label_text));
-        }
-
-        if ('' !== $server_name) {
-            $attributes[] = sprintf('data-region-server-name="%s"', esc_attr($server_name));
-        }
-
-        if ($is_stale && $last_updated > 0) {
-            $attributes[] = sprintf('data-last-updated="%s"', esc_attr($last_updated));
-        }
-
-        if ('' !== $status_meta_json) {
-            $attributes[] = sprintf('data-status-meta="%s"', esc_attr($status_meta_json));
-        }
-
-        $attributes[] = sprintf('data-status-variant="%s"', esc_attr($status_variant));
-        $attributes[] = sprintf('data-can-force-refresh="%s"', esc_attr($can_force_refresh ? 'true' : 'false'));
-
-        if ($cache_duration > 0) {
-            $attributes[] = sprintf('data-cache-duration="%d"', (int) $cache_duration);
-        }
-
-        if (!empty($style_declarations)) {
-            $attributes[] = sprintf('style="%s"', esc_attr(implode('; ', $style_declarations)));
-        }
-
-        if ($show_server_name) {
-            $attributes[] = 'data-show-server-name="true"';
-
-            if ('' !== $server_name) {
-                $attributes[] = sprintf('data-server-name="%s"', esc_attr($server_name));
-            }
-        }
-
-        if ($show_server_avatar) {
-            $attributes[] = 'data-show-server-avatar="true"';
-            $attributes[] = sprintf('data-avatar-size="%s"', esc_attr($avatar_size));
-
-            if ('' !== $server_avatar_url) {
-                $attributes[] = sprintf('data-server-avatar-url="%s"', esc_url($server_avatar_url));
-            }
-
-            if ('' !== $server_avatar_base) {
-                $attributes[] = sprintf('data-server-avatar-base-url="%s"', esc_url($server_avatar_base));
-            }
-        }
-
-        if ('' !== $profile_key) {
-            $attributes[] = sprintf('data-profile-key="%s"', esc_attr($profile_key));
-        }
-
-        if ('' !== $override_server_id) {
-            $attributes[] = sprintf('data-server-id-override="%s"', esc_attr($override_server_id));
-        }
-
-        if ($show_sparkline) {
-            $attributes[] = 'data-show-sparkline="true"';
-            $attributes[] = sprintf('data-sparkline-metric="%s"', esc_attr($sparkline_metric));
-            $attributes[] = sprintf('data-sparkline-days="%d"', (int) $sparkline_days);
-        }
-
-
         $date_format_option = trim(get_option('date_format'));
         $time_format_option = trim(get_option('time_format'));
         $combined_datetime_format = trim($date_format_option . ' ' . $time_format_option);
@@ -869,6 +781,93 @@ class Discord_Bot_JLG_Shortcode {
         $status_meta_json = wp_json_encode($status_meta);
         if (false === $status_meta_json) {
             $status_meta_json = '{}';
+        }
+
+        $attributes = array(
+            sprintf('id="%s"', esc_attr($unique_id)),
+            sprintf('class="%s"', esc_attr(implode(' ', $container_classes))),
+            'role="region"',
+            sprintf('data-demo="%s"', esc_attr($is_forced_demo ? 'true' : 'false')),
+            sprintf('data-fallback-demo="%s"', esc_attr($is_fallback_demo ? 'true' : 'false')),
+            sprintf('data-stale="%s"', esc_attr($is_stale ? 'true' : 'false')),
+            sprintf('data-hide-labels="%s"', esc_attr($hide_labels ? 'true' : 'false')),
+            'aria-live="polite"',
+            'aria-busy="false"',
+            sprintf('data-region-label-base="%s"', esc_attr($region_label_base)),
+            sprintf('data-region-label-pattern="%s"', esc_attr($region_label_pattern)),
+            sprintf('data-region-title-id="%s"', esc_attr($title_id)),
+            sprintf('data-region-server-id="%s"', esc_attr($server_name_id)),
+            sprintf('data-region-synthetic-id="%s"', esc_attr($region_synthetic_label_id)),
+        );
+
+        if (!empty($region_label_ids)) {
+            $labelledby_value = implode(' ', $region_label_ids);
+            $attributes[]     = sprintf('aria-labelledby="%s"', esc_attr($labelledby_value));
+            $attributes[]     = sprintf('data-region-label-ids="%s"', esc_attr($labelledby_value));
+            $attributes[]     = 'data-region-labelling="labelledby"';
+        }
+
+        if ($render_synthetic_label) {
+            $attributes[] = sprintf('aria-label="%s"', esc_attr($region_label_text));
+            $attributes[] = sprintf('data-region-label="%s"', esc_attr($region_label_text));
+        }
+
+        if ('' !== $server_name) {
+            $attributes[] = sprintf('data-region-server-name="%s"', esc_attr($server_name));
+        }
+
+        if ($is_stale && $last_updated > 0) {
+            $attributes[] = sprintf('data-last-updated="%s"', esc_attr($last_updated));
+        }
+
+        if ('' !== $status_meta_json) {
+            $attributes[] = sprintf('data-status-meta="%s"', esc_attr($status_meta_json));
+        }
+
+        $attributes[] = sprintf('data-status-variant="%s"', esc_attr($status_variant));
+        $attributes[] = sprintf('data-can-force-refresh="%s"', esc_attr($can_force_refresh ? 'true' : 'false'));
+
+        if ($cache_duration > 0) {
+            $attributes[] = sprintf('data-cache-duration="%d"', (int) $cache_duration);
+        }
+
+        if (!empty($style_declarations)) {
+            $attributes[] = sprintf('style="%s"', esc_attr(implode('; ', $style_declarations)));
+        }
+
+        if ($show_server_name) {
+            $attributes[] = 'data-show-server-name="true"';
+
+            if ('' !== $server_name) {
+                $attributes[] = sprintf('data-server-name="%s"', esc_attr($server_name));
+            }
+        }
+
+        if ($show_server_avatar) {
+            $attributes[] = 'data-show-server-avatar="true"';
+            $attributes[] = sprintf('data-avatar-size="%s"', esc_attr($avatar_size));
+
+            if ('' !== $server_avatar_url) {
+                $attributes[] = sprintf('data-server-avatar-url="%s"', esc_url($server_avatar_url));
+            }
+
+            if ('' !== $server_avatar_base) {
+                $attributes[] = sprintf('data-server-avatar-base-url="%s"', esc_url($server_avatar_base));
+            }
+        }
+
+        if ('' !== $profile_key) {
+            $attributes[] = sprintf('data-profile-key="%s"', esc_attr($profile_key));
+        }
+
+        if ('' !== $override_server_id) {
+            $attributes[] = sprintf('data-server-id-override="%s"', esc_attr($override_server_id));
+        }
+
+        if ($show_sparkline) {
+            $attributes[] = 'data-show-sparkline="true"';
+            $attributes[] = sprintf('data-sparkline-metric="%s"', esc_attr($sparkline_metric));
+            $attributes[] = sprintf('data-sparkline-days="%d"', (int) $sparkline_days);
         }
 
         $status_panel_id        = $unique_id . '-status-panel';
