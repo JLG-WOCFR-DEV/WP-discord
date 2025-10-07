@@ -42,6 +42,389 @@
     --discord-badge-text: #ffffff;
 }
 
+.discord-stats-container[data-status-variant="live"] {
+    --discord-badge-start: #22c55e;
+    --discord-badge-end: #16a34a;
+    --discord-badge-text: #0b1120;
+}
+
+.discord-stats-container[data-status-variant="cache"] {
+    --discord-badge-start: #f59e0b;
+    --discord-badge-end: #f97316;
+    --discord-badge-text: #0b1120;
+}
+
+.discord-stats-container[data-status-variant="fallback"] {
+    --discord-badge-start: #ef4444;
+    --discord-badge-end: #dc2626;
+    --discord-badge-text: #ffffff;
+}
+
+.discord-stats-container[data-status-variant="demo"] {
+    --discord-badge-start: #38bdf8;
+    --discord-badge-end: #6366f1;
+    --discord-badge-text: #0b1120;
+}
+
+.discord-status-surface {
+    position: absolute;
+    top: 10px;
+    right: 10px;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    gap: 10px;
+    z-index: 5;
+    max-width: calc(100% - 20px);
+}
+
+.discord-status-badge {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 14px 6px 44px;
+    border-radius: 999px;
+    border: none;
+    font-size: 13px;
+    font-weight: 600;
+    letter-spacing: 0.01em;
+    background: linear-gradient(135deg, var(--discord-badge-start, #818cf8), var(--discord-badge-end, #6366f1));
+    color: var(--discord-badge-text, #ffffff);
+    box-shadow: 0 16px 36px rgba(15, 23, 42, 0.3);
+    cursor: pointer;
+    transition: transform 0.2s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+
+.discord-status-badge:hover,
+.discord-status-badge:focus-visible {
+    transform: translateY(-1px);
+    box-shadow: 0 20px 44px rgba(15, 23, 42, 0.34);
+}
+
+.discord-status-badge:focus-visible {
+    outline: 2px solid var(--discord-focus-outline, #ffd37a);
+    outline-offset: 2px;
+}
+
+.discord-status-badge__indicator {
+    position: absolute;
+    top: 50%;
+    left: 12px;
+    width: 22px;
+    height: 22px;
+    transform: translateY(-50%);
+}
+
+.discord-status-badge__dot {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 11px;
+    height: 11px;
+    background: rgba(255, 255, 255, 0.95);
+    border-radius: 999px;
+    transform: translate(-50%, -50%);
+    box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.16);
+}
+
+.discord-status-badge__progress {
+    width: 22px;
+    height: 22px;
+    transform: rotate(-90deg);
+}
+
+.discord-status-badge__progress-indicator {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.35);
+    stroke-width: 3;
+    stroke-linecap: round;
+    stroke-dasharray: 100;
+    stroke-dashoffset: 100;
+    transition: stroke-dashoffset 0.4s ease;
+}
+
+.discord-status-badge__label {
+    white-space: nowrap;
+}
+
+.discord-status-badge__countdown {
+    font-size: 12px;
+    font-variant-numeric: tabular-nums;
+    opacity: 0.8;
+}
+
+.discord-status-badge__chevron {
+    width: 0;
+    height: 0;
+    border-left: 5px solid transparent;
+    border-right: 5px solid transparent;
+    border-top: 6px solid currentColor;
+    opacity: 0.65;
+    transition: transform 0.2s ease;
+}
+
+.discord-status-badge[aria-expanded="true"] .discord-status-badge__chevron {
+    transform: rotate(180deg);
+}
+
+.discord-status-panel {
+    background: rgba(15, 23, 42, 0.95);
+    color: #f8fafc;
+    border-radius: 14px;
+    padding: 16px;
+    min-width: 240px;
+    max-width: min(320px, calc(100vw - 28px));
+    box-shadow: 0 24px 48px rgba(15, 23, 42, 0.38);
+    backdrop-filter: blur(12px);
+}
+
+.discord-status-panel[hidden] {
+    display: none;
+}
+
+.discord-status-panel__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.discord-status-panel__title {
+    font-size: 15px;
+    font-weight: 600;
+    line-height: 1.3;
+}
+
+.discord-status-panel__close {
+    background: transparent;
+    border: none;
+    color: inherit;
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.discord-status-panel__close:hover,
+.discord-status-panel__close:focus-visible {
+    background: rgba(248, 250, 252, 0.12);
+    transform: rotate(90deg);
+}
+
+.discord-status-panel__close:focus-visible {
+    outline: 2px solid var(--discord-focus-outline, #ffd37a);
+    outline-offset: 2px;
+}
+
+.discord-status-panel__content {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.discord-status-meta {
+    margin: 0;
+    display: grid;
+    gap: 12px;
+}
+
+.discord-status-meta__item {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+
+.discord-status-meta__item dt {
+    margin: 0;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    opacity: 0.7;
+}
+
+.discord-status-meta__item dd {
+    margin: 0;
+    font-size: 14px;
+    font-weight: 600;
+}
+
+.discord-status-panel__note {
+    margin: 0;
+    padding: 11px 13px;
+    border-radius: 12px;
+    background: rgba(248, 250, 252, 0.08);
+    font-size: 13px;
+    line-height: 1.4;
+}
+
+.discord-status-panel__actions {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 9px;
+    align-items: center;
+}
+
+.discord-status-panel__action {
+    background: rgba(248, 250, 252, 0.16);
+    color: #f8fafc;
+    border: none;
+    border-radius: 999px;
+    padding: 8px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.discord-status-panel__action:hover,
+.discord-status-panel__action:focus-visible {
+    background: rgba(248, 250, 252, 0.24);
+    transform: translateY(-1px);
+}
+
+.discord-status-panel__action:focus-visible {
+    outline: 2px solid var(--discord-focus-outline, #ffd37a);
+    outline-offset: 2px;
+}
+
+.discord-status-panel__action.is-disabled,
+.discord-status-panel__action[disabled] {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.discord-status-panel__link {
+    font-size: 13px;
+    font-weight: 600;
+    color: inherit;
+    text-decoration: none;
+    opacity: 0.85;
+    transition: opacity 0.2s ease;
+}
+
+.discord-status-panel__link:hover,
+.discord-status-panel__link:focus-visible {
+    opacity: 1;
+    text-decoration: underline;
+}
+
+.discord-status-panel__link:focus-visible {
+    outline: 2px solid var(--discord-focus-outline, #ffd37a);
+    outline-offset: 2px;
+}
+
+.discord-status-history {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+}
+
+.discord-status-history__toggle {
+    align-self: flex-start;
+    border: none;
+    border-radius: 999px;
+    background: rgba(248, 250, 252, 0.16);
+    color: inherit;
+    font-size: 12px;
+    font-weight: 600;
+    letter-spacing: 0.04em;
+    padding: 6px 14px;
+    cursor: pointer;
+    transition: background 0.2s ease, transform 0.2s ease;
+}
+
+.discord-status-history__toggle:hover,
+.discord-status-history__toggle:focus-visible {
+    background: rgba(248, 250, 252, 0.24);
+    transform: translateY(-1px);
+}
+
+.discord-status-history__toggle[disabled] {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.discord-status-history__toggle:focus-visible {
+    outline: 2px solid var(--discord-focus-outline, #ffd37a);
+    outline-offset: 2px;
+}
+
+.discord-status-history__empty {
+    margin: 0;
+    font-size: 12px;
+    opacity: 0.7;
+}
+
+.discord-status-history__list {
+    margin: 0;
+    padding: 0;
+    list-style: none;
+    display: grid;
+    gap: 9px;
+}
+
+.discord-status-history__item {
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: rgba(15, 23, 42, 0.55);
+    box-shadow: inset 0 0 0 1px rgba(248, 250, 252, 0.08);
+}
+
+.discord-status-history__item-title {
+    font-size: 13px;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.discord-status-history__item-meta {
+    font-size: 12px;
+    opacity: 0.75;
+}
+
+.discord-status-history__item-reason {
+    font-size: 12px;
+    margin-top: 6px;
+    line-height: 1.4;
+}
+
+@media (max-width: 600px) {
+    .discord-status-surface {
+        position: static;
+        align-items: stretch;
+        max-width: none;
+        margin-bottom: 14px;
+    }
+
+    .discord-status-badge {
+        width: 100%;
+        justify-content: space-between;
+    }
+
+    .discord-status-panel {
+        width: 100%;
+        max-width: none;
+    }
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .discord-status-badge,
+    .discord-status-badge__progress-indicator,
+    .discord-status-badge__chevron,
+    .discord-status-panel__close,
+    .discord-status-panel__action,
+    .discord-status-history__toggle {
+        transition: none;
+    }
+}
+
 .screen-reader-text {
     position: absolute !important;
     width: 1px;

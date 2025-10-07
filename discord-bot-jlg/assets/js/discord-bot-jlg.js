@@ -647,6 +647,16 @@
             }
 
             container.dataset.canForceRefresh = normalized.canForceRefresh ? 'true' : 'false';
+
+            if (typeof normalized.cacheDuration === 'number' && isFinite(normalized.cacheDuration) && normalized.cacheDuration > 0) {
+                container.dataset.cacheDuration = String(Math.round(normalized.cacheDuration));
+            } else if (Object.prototype.hasOwnProperty.call(container.dataset, 'cacheDuration')) {
+                try {
+                    delete container.dataset.cacheDuration;
+                } catch (datasetError) {
+                    container.dataset.cacheDuration = '';
+                }
+            }
         } else if (container && container.setAttribute) {
             container.setAttribute('data-status-variant', normalized.variant || 'unknown');
             container.setAttribute('data-can-force-refresh', normalized.canForceRefresh ? 'true' : 'false');
@@ -3174,8 +3184,15 @@
                     isStale: isStale
                 };
 
-                if (resultInfo.retryAfter && resultInfo.retryAfter > 0) {
-                    metaOverrides.retryAfter = Math.round(resultInfo.retryAfter / 1000);
+                var nowSeconds = Math.floor(Date.now() / 1000);
+                metaOverrides.generatedAt = nowSeconds;
+
+                var cacheDurationAttr = container && container.dataset && container.dataset.cacheDuration
+                    ? parseInt(container.dataset.cacheDuration, 10)
+                    : NaN;
+
+                if (!isNaN(cacheDurationAttr) && cacheDurationAttr > 0) {
+                    metaOverrides.cacheDuration = cacheDurationAttr;
                 }
 
                 if (!statusMetaPayload) {
@@ -3186,6 +3203,25 @@
                     }
                 } else if (fallbackDetailsPayload && typeof statusMetaPayload.fallbackDetails === 'undefined') {
                     statusMetaPayload.fallbackDetails = fallbackDetailsPayload;
+                }
+
+                if (resultInfo.retryAfter && resultInfo.retryAfter > 0) {
+                    var retrySeconds = Math.max(1, Math.round(resultInfo.retryAfter / 1000));
+                    metaOverrides.retryAfter = retrySeconds;
+                    metaOverrides.nextRefresh = nowSeconds + retrySeconds;
+                    metaOverrides.refreshInterval = retrySeconds;
+                } else if (stateForMeta && typeof stateForMeta.intervalMs === 'number' && stateForMeta.intervalMs > 0) {
+                    var intervalSeconds = Math.round(stateForMeta.intervalMs / 1000);
+
+                    if (intervalSeconds > 0) {
+                        if (typeof metaOverrides.refreshInterval === 'undefined') {
+                            metaOverrides.refreshInterval = intervalSeconds;
+                        }
+
+                        if (typeof metaOverrides.nextRefresh === 'undefined') {
+                            metaOverrides.nextRefresh = nowSeconds + intervalSeconds;
+                        }
+                    }
                 }
 
                 if (stateForMeta) {
