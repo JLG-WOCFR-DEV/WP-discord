@@ -35,7 +35,7 @@ class Discord_Stats_Widget extends WP_Widget {
 
         $allowed_layouts   = array('horizontal', 'vertical');
         $allowed_positions = array('left', 'right', 'top');
-        $allowed_themes    = array('discord', 'dark', 'light', 'minimal');
+        $allowed_themes    = array('discord', 'dark', 'light', 'minimal', 'radix');
 
         $layout = sanitize_key($instance['layout']);
         if (!in_array($layout, $allowed_layouts, true)) {
@@ -177,7 +177,7 @@ class Discord_Stats_Widget extends WP_Widget {
         $instance['discord_icon_position'] = in_array($icon_position, array('left', 'right', 'top'), true) ? $icon_position : 'left';
 
         $theme = isset($new_instance['theme']) ? sanitize_key($new_instance['theme']) : 'discord';
-        $instance['theme'] = in_array($theme, array('discord', 'dark', 'light', 'minimal'), true) ? $theme : 'discord';
+        $instance['theme'] = in_array($theme, array('discord', 'dark', 'light', 'minimal', 'radix'), true) ? $theme : 'discord';
 
         $instance['refresh'] = !empty($new_instance['refresh']) ? 1 : 0;
         $min_refresh = defined('Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL')
@@ -304,6 +304,7 @@ class Discord_Stats_Widget extends WP_Widget {
                 <option value="dark" <?php selected($instance['theme'], 'dark'); ?>><?php esc_html_e('Sombre', 'discord-bot-jlg'); ?></option>
                 <option value="light" <?php selected($instance['theme'], 'light'); ?>><?php esc_html_e('Clair', 'discord-bot-jlg'); ?></option>
                 <option value="minimal" <?php selected($instance['theme'], 'minimal'); ?>><?php esc_html_e('Minimal', 'discord-bot-jlg'); ?></option>
+                <option value="radix" <?php selected($instance['theme'], 'radix'); ?>><?php esc_html_e('Radix UI', 'discord-bot-jlg'); ?></option>
             </select>
         </p>
 

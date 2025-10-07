@@ -18,7 +18,7 @@ if (!function_exists('discord_bot_jlg_get_available_themes')) {
      * @return string[]
      */
     function discord_bot_jlg_get_available_themes() {
-        $themes = array('discord', 'dark', 'light', 'minimal');
+        $themes = array('discord', 'dark', 'light', 'minimal', 'radix');
 
         if (function_exists('apply_filters')) {
             $filtered = apply_filters('discord_bot_jlg_available_themes', $themes);
