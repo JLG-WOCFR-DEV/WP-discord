@@ -638,17 +638,6 @@ class Discord_Bot_JLG_Shortcode {
             $attributes[] = sprintf('data-last-updated="%s"', esc_attr($last_updated));
         }
 
-        if ('' !== $status_meta_json) {
-            $attributes[] = sprintf('data-status-meta="%s"', esc_attr($status_meta_json));
-        }
-
-        $attributes[] = sprintf('data-status-variant="%s"', esc_attr($status_variant));
-        $attributes[] = sprintf('data-can-force-refresh="%s"', esc_attr($can_force_refresh ? 'true' : 'false'));
-
-        if ($cache_duration > 0) {
-            $attributes[] = sprintf('data-cache-duration="%d"', (int) $cache_duration);
-        }
-
         if (!empty($style_declarations)) {
             $attributes[] = sprintf('style="%s"', esc_attr(implode('; ', $style_declarations)));
         }
@@ -869,6 +858,17 @@ class Discord_Bot_JLG_Shortcode {
         $status_meta_json = wp_json_encode($status_meta);
         if (false === $status_meta_json) {
             $status_meta_json = '{}';
+        }
+
+        if ('' !== $status_meta_json) {
+            $attributes[] = sprintf('data-status-meta="%s"', esc_attr($status_meta_json));
+        }
+
+        $attributes[] = sprintf('data-status-variant="%s"', esc_attr($status_variant));
+        $attributes[] = sprintf('data-can-force-refresh="%s"', esc_attr($can_force_refresh ? 'true' : 'false'));
+
+        if ($cache_duration > 0) {
+            $attributes[] = sprintf('data-cache-duration="%d"', (int) $cache_duration);
         }
 
         $status_panel_id        = $unique_id . '-status-panel';
