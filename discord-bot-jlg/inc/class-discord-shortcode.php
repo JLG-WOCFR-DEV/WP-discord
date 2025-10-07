@@ -638,6 +638,17 @@ class Discord_Bot_JLG_Shortcode {
             $attributes[] = sprintf('data-last-updated="%s"', esc_attr($last_updated));
         }
 
+        if ('' !== $status_meta_json) {
+            $attributes[] = sprintf('data-status-meta="%s"', esc_attr($status_meta_json));
+        }
+
+        $attributes[] = sprintf('data-status-variant="%s"', esc_attr($status_variant));
+        $attributes[] = sprintf('data-can-force-refresh="%s"', esc_attr($can_force_refresh ? 'true' : 'false'));
+
+        if ($cache_duration > 0) {
+            $attributes[] = sprintf('data-cache-duration="%d"', (int) $cache_duration);
+        }
+
         if (!empty($style_declarations)) {
             $attributes[] = sprintf('style="%s"', esc_attr(implode('; ', $style_declarations)));
         }
@@ -678,6 +689,32 @@ class Discord_Bot_JLG_Shortcode {
         }
 
 
+        $date_format_option = trim(get_option('date_format'));
+        $time_format_option = trim(get_option('time_format'));
+        $combined_datetime_format = trim($date_format_option . ' ' . $time_format_option);
+
+        if ('' === $combined_datetime_format) {
+            $combined_datetime_format = 'F j, Y H:i';
+        }
+
+        $format_status_timestamp = static function ($timestamp) use ($combined_datetime_format) {
+            $timestamp = (int) $timestamp;
+
+            if ($timestamp <= 0) {
+                return '';
+            }
+
+            if (function_exists('discord_bot_jlg_format_datetime')) {
+                return discord_bot_jlg_format_datetime($combined_datetime_format, $timestamp);
+            }
+
+            if (function_exists('wp_date')) {
+                return wp_date($combined_datetime_format, $timestamp);
+            }
+
+            return date_i18n($combined_datetime_format, $timestamp);
+        };
+
         $refresh_interval = 0;
         $min_refresh_interval = $min_refresh_option;
 
@@ -697,29 +734,146 @@ class Discord_Bot_JLG_Shortcode {
             $stale_notice_text = __('Données mises en cache', 'discord-bot-jlg');
 
             if ($last_updated > 0) {
-                $date_format = trim(get_option('date_format'));
-                $time_format = trim(get_option('time_format'));
-                $combined_format = trim($date_format . ' ' . $time_format);
+                $formatted_timestamp = $format_status_timestamp($last_updated);
 
-                if ('' === $combined_format) {
-                    $combined_format = 'F j, Y H:i';
-                }
+                if ('' !== $formatted_timestamp) {
+                    $template = __('Données mises en cache du %s', 'discord-bot-jlg');
 
-                if (function_exists('wp_date')) {
-                    $formatted_timestamp = wp_date($combined_format, $last_updated);
-                } else {
-                    $formatted_timestamp = date_i18n($combined_format, $last_updated);
-                }
-
-                $template = __('Données mises en cache du %s', 'discord-bot-jlg');
-
-                if (false !== strpos($template, '%s')) {
-                    $stale_notice_text = sprintf($template, $formatted_timestamp);
-                } else {
-                    $stale_notice_text = trim($template . ' ' . $formatted_timestamp);
+                    if (false !== strpos($template, '%s')) {
+                        $stale_notice_text = sprintf($template, $formatted_timestamp);
+                    } else {
+                        $stale_notice_text = trim($template . ' ' . $formatted_timestamp);
+                    }
                 }
             }
         }
+
+        $cache_duration = isset($options['cache_duration']) ? (int) $options['cache_duration'] : 0;
+        if ($cache_duration < $min_refresh_option || $cache_duration > 3600) {
+            $cache_duration = 300;
+        }
+
+        $now_timestamp = (int) current_time('timestamp', true);
+        $next_refresh_estimate = 0;
+
+        if ($refresh_interval > 0) {
+            $next_refresh_estimate = $now_timestamp + $refresh_interval;
+        } elseif ($cache_duration > 0) {
+            $reference_timestamp = ($last_updated > 0) ? $last_updated : $now_timestamp;
+            $next_refresh_estimate = $reference_timestamp + $cache_duration;
+        }
+
+        $fallback_details = array();
+        if ($is_fallback_demo) {
+            $fallback_details = $this->api->get_last_fallback_details();
+        }
+
+        $fallback_reason = '';
+        $fallback_timestamp = 0;
+        $fallback_next_retry = 0;
+
+        if (is_array($fallback_details) && !empty($fallback_details)) {
+            $fallback_reason     = isset($fallback_details['reason']) ? trim((string) $fallback_details['reason']) : '';
+            $fallback_timestamp  = isset($fallback_details['timestamp']) ? (int) $fallback_details['timestamp'] : 0;
+            $fallback_next_retry = isset($fallback_details['next_retry']) ? (int) $fallback_details['next_retry'] : 0;
+
+            if ($fallback_timestamp > 0 && $last_updated <= 0) {
+                $last_updated = $fallback_timestamp;
+            }
+        }
+
+        $status_variant = 'live';
+        if ($is_fallback_demo) {
+            $status_variant = 'fallback';
+        } elseif ($is_demo) {
+            $status_variant = 'demo';
+        } elseif ($is_stale) {
+            $status_variant = 'cache';
+        }
+
+        $status_labels = array(
+            'live'     => __('Live', 'discord-bot-jlg'),
+            'cache'    => __('Cache', 'discord-bot-jlg'),
+            'fallback' => __('Secours', 'discord-bot-jlg'),
+            'demo'     => __('Démo', 'discord-bot-jlg'),
+            'unknown'  => __('Statut', 'discord-bot-jlg'),
+        );
+
+        $status_descriptions = array(
+            'live'     => __('Données à jour en provenance de Discord.', 'discord-bot-jlg'),
+            'cache'    => __('Données servies depuis le cache local.', 'discord-bot-jlg'),
+            'fallback' => __('Statistiques de secours utilisées le temps de la reprise.', 'discord-bot-jlg'),
+            'demo'     => __('Jeu de données de démonstration.', 'discord-bot-jlg'),
+            'unknown'  => '',
+        );
+
+        $status_label_initial = isset($status_labels[$status_variant]) ? $status_labels[$status_variant] : $status_labels['unknown'];
+        $status_description_initial = isset($status_descriptions[$status_variant]) ? $status_descriptions[$status_variant] : $status_descriptions['unknown'];
+
+        $status_mode_initial = $status_label_initial;
+        if ('' !== $status_description_initial) {
+            /* translators: 1: human readable status, 2: textual description. */
+            $status_mode_initial = sprintf(__('%1$s – %2$s', 'discord-bot-jlg'), $status_label_initial, $status_description_initial);
+        }
+
+        $formatted_last_updated = $format_status_timestamp($last_updated);
+        $formatted_next_refresh = $format_status_timestamp($next_refresh_estimate);
+        $formatted_next_retry   = $format_status_timestamp($fallback_next_retry);
+
+        $no_data_label = __('Non disponible', 'discord-bot-jlg');
+
+        if ('' === $formatted_last_updated) {
+            $formatted_last_updated = $no_data_label;
+        }
+
+        if ('' === $formatted_next_refresh) {
+            $formatted_next_refresh = $no_data_label;
+        }
+
+        if ('' === $formatted_next_retry) {
+            $formatted_next_retry = $no_data_label;
+        }
+
+        $can_force_refresh = current_user_can('manage_options');
+        $logs_url = $can_force_refresh ? admin_url('admin.php?page=discord-bot-jlg') : '';
+
+        $status_meta = array(
+            'variant'          => $status_variant,
+            'isDemo'           => $is_demo,
+            'isFallbackDemo'   => $is_fallback_demo,
+            'isStale'          => $is_stale,
+            'lastUpdated'      => ($last_updated > 0) ? $last_updated : null,
+            'refreshInterval'  => ($refresh_interval > 0) ? $refresh_interval : null,
+            'cacheDuration'    => ($cache_duration > 0) ? $cache_duration : null,
+            'nextRefresh'      => ($next_refresh_estimate > 0) ? $next_refresh_estimate : null,
+            'generatedAt'      => $now_timestamp,
+            'retryAfter'       => null,
+            'nextRetry'        => ($fallback_next_retry > 0) ? $fallback_next_retry : null,
+            'profileKey'       => $profile_key,
+            'serverId'         => ('' !== $override_server_id) ? $override_server_id : (isset($stats['server_id']) ? (string) $stats['server_id'] : ''),
+            'forceDemo'        => $force_demo,
+            'canForceRefresh'  => $can_force_refresh,
+            'logsUrl'          => $logs_url,
+            'fallbackDetails'  => array(),
+            'history'          => array(),
+        );
+
+        if (!empty($fallback_reason) || $fallback_timestamp > 0 || $fallback_next_retry > 0) {
+            $status_meta['fallbackDetails'] = array(
+                'timestamp' => $fallback_timestamp,
+                'reason'    => $fallback_reason,
+                'nextRetry' => $fallback_next_retry,
+            );
+        }
+
+        $status_meta_json = wp_json_encode($status_meta);
+        if (false === $status_meta_json) {
+            $status_meta_json = '{}';
+        }
+
+        $status_panel_id        = $unique_id . '-status-panel';
+        $status_panel_title_id  = $status_panel_id . '-title';
+        $status_history_id      = $unique_id . '-status-history';
 
         $discord_svg = '<svg class="discord-logo-svg" aria-hidden="true" focusable="false" viewBox="0 0 127.14 96.36" xmlns="http://www.w3.org/2000/svg"><path d="M107.7,8.07A105.15,105.15,0,0,0,81.47,0a72.06,72.06,0,0,0-3.36,6.83A97.68,97.68,0,0,0,49,6.83,72.37,72.37,0,0,0,45.64,0,105.89,105.89,0,0,0,19.39,8.09C2.79,32.65-1.71,56.6.54,80.21h0A105.73,105.73,0,0,0,32.71,96.36,77.7,77.7,0,0,0,39.6,85.25a68.42,68.42,0,0,1-10.85-5.18c.91-.66,1.8-1.34,2.66-2a75.57,75.57,0,0,0,64.32,0c.87.71,1.76,1.39,2.66,2a68.68,68.68,0,0,1-10.87,5.19,77,77,0,0,0,6.89,11.1A105.25,105.25,0,0,0,126.6,80.22h0C129.24,52.84,122.09,29.11,107.7,8.07ZM42.45,65.69C36.18,65.69,31,60,31,53s5-12.74,11.43-12.74S54,46,53.89,53,48.84,65.69,42.45,65.69Zm42.24,0C78.41,65.69,73.25,60,73.25,53s5-12.74,11.44-12.74S96.23,46,96.12,53,91.08,65.69,84.69,65.69Z"/></svg>';
 
@@ -732,6 +886,76 @@ class Discord_Bot_JLG_Shortcode {
                 data-region-synthetic-label="true"
                 id="<?php echo esc_attr($region_synthetic_label_id); ?>"><?php echo esc_html($region_label_text); ?></span>
             <?php endif; ?>
+
+            <div class="discord-status-surface">
+                <button type="button"
+                    class="discord-status-badge"
+                    data-status-badge="true"
+                    data-status-toggle="true"
+                    aria-expanded="false"
+                    aria-haspopup="dialog"
+                    aria-controls="<?php echo esc_attr($status_panel_id); ?>"
+                    aria-label="<?php echo esc_attr__('Afficher le statut détaillé des données Discord', 'discord-bot-jlg'); ?>">
+                    <span class="discord-status-badge__indicator" aria-hidden="true">
+                        <span class="discord-status-badge__dot"></span>
+                        <svg class="discord-status-badge__progress" viewBox="0 0 36 36" role="presentation" focusable="false">
+                            <circle class="discord-status-badge__progress-indicator" cx="18" cy="18" r="16"></circle>
+                        </svg>
+                    </span>
+                    <span class="discord-status-badge__label" data-status-label><?php echo esc_html($status_label_initial); ?></span>
+                    <span class="discord-status-badge__countdown" data-status-countdown></span>
+                    <span class="discord-status-badge__chevron" aria-hidden="true"></span>
+                </button>
+                <div class="discord-status-panel"
+                    data-status-panel
+                    id="<?php echo esc_attr($status_panel_id); ?>"
+                    role="dialog"
+                    aria-modal="false"
+                    aria-labelledby="<?php echo esc_attr($status_panel_title_id); ?>"
+                    aria-describedby="<?php echo esc_attr($status_history_id); ?>"
+                    hidden>
+                    <div class="discord-status-panel__header">
+                        <div class="discord-status-panel__title" id="<?php echo esc_attr($status_panel_title_id); ?>" data-status-mode><?php echo esc_html($status_mode_initial); ?></div>
+                        <button type="button" class="discord-status-panel__close" data-status-close aria-label="<?php echo esc_attr__('Fermer le panneau de statut', 'discord-bot-jlg'); ?>">
+                            <span aria-hidden="true">&times;</span>
+                        </button>
+                    </div>
+                    <div class="discord-status-panel__content">
+                        <dl class="discord-status-meta">
+                            <div class="discord-status-meta__item">
+                                <dt><?php esc_html_e('Dernière synchronisation', 'discord-bot-jlg'); ?></dt>
+                                <dd data-status-last-sync><?php echo esc_html($formatted_last_updated); ?></dd>
+                            </div>
+                            <div class="discord-status-meta__item">
+                                <dt><?php esc_html_e('Prochaine actualisation', 'discord-bot-jlg'); ?></dt>
+                                <dd data-status-next-sync><?php echo esc_html($formatted_next_refresh); ?></dd>
+                            </div>
+                            <div class="discord-status-meta__item">
+                                <dt><?php esc_html_e('Prochaine tentative', 'discord-bot-jlg'); ?></dt>
+                                <dd data-status-next-retry><?php echo esc_html($formatted_next_retry); ?></dd>
+                            </div>
+                        </dl>
+                        <?php if ('' !== $fallback_reason) : ?>
+                        <div class="discord-status-panel__note"><?php echo esc_html($fallback_reason); ?></div>
+                        <?php endif; ?>
+                        <div class="discord-status-panel__actions">
+                            <button type="button"
+                                class="discord-status-panel__action<?php echo $can_force_refresh ? '' : ' is-disabled'; ?>"
+                                data-status-force-refresh<?php echo $can_force_refresh ? '' : ' disabled="disabled"'; ?>>
+                                <?php esc_html_e('Forcer une synchronisation', 'discord-bot-jlg'); ?>
+                            </button>
+                            <a class="discord-status-panel__link" data-status-log-link href="<?php echo esc_url('' !== $logs_url ? $logs_url : '#'); ?>"<?php echo '' === $logs_url ? ' hidden' : ''; ?> target="_blank" rel="noreferrer noopener">
+                                <?php esc_html_e('Voir le journal', 'discord-bot-jlg'); ?>
+                            </a>
+                        </div>
+                        <div class="discord-status-history">
+                            <button type="button" class="discord-status-history__toggle" data-status-history-toggle disabled="disabled"><?php esc_html_e('Voir le journal', 'discord-bot-jlg'); ?></button>
+                            <p class="discord-status-history__empty" data-status-history-empty><?php esc_html_e('Aucun incident récent.', 'discord-bot-jlg'); ?></p>
+                            <ul class="discord-status-history__list" data-status-history id="<?php echo esc_attr($status_history_id); ?>" hidden></ul>
+                        </div>
+                    </div>
+                </div>
+            </div>
 
             <?php if (!empty($stats['is_demo'])): ?>
             <div class="discord-demo-badge"><?php echo esc_html__('Mode Démo', 'discord-bot-jlg'); ?></div>
@@ -1281,6 +1505,23 @@ class Discord_Bot_JLG_Shortcode {
                 'serverAvatarAltFallback' => __('Avatar du serveur Discord', 'discord-bot-jlg'),
                 'sparklineNoData'      => __('Tendance indisponible pour le moment.', 'discord-bot-jlg'),
                 'sparklineError'       => __('Impossible de charger la tendance.', 'discord-bot-jlg'),
+                'statusLabelLive'      => __('Live', 'discord-bot-jlg'),
+                'statusLabelCache'     => __('Cache', 'discord-bot-jlg'),
+                'statusLabelFallback'  => __('Secours', 'discord-bot-jlg'),
+                'statusLabelDemo'      => __('Démo', 'discord-bot-jlg'),
+                'statusLabelUnknown'   => __('Statut', 'discord-bot-jlg'),
+                'statusDescriptionLive'     => __('Données à jour en provenance de Discord.', 'discord-bot-jlg'),
+                'statusDescriptionCache'    => __('Données servies depuis le cache local.', 'discord-bot-jlg'),
+                'statusDescriptionFallback' => __('Statistiques de secours utilisées le temps de la reprise.', 'discord-bot-jlg'),
+                'statusDescriptionDemo'     => __('Jeu de données de démonstration.', 'discord-bot-jlg'),
+                'statusDescriptionUnknown'  => __('Statut en attente.', 'discord-bot-jlg'),
+                'statusCountdownPaused' => __('En pause', 'discord-bot-jlg'),
+                'statusCountdownReady'  => __('Actualisation imminente', 'discord-bot-jlg'),
+                'statusHistoryEmpty'    => __('Aucun incident récent.', 'discord-bot-jlg'),
+                'statusHistoryShow'     => __('Voir le journal', 'discord-bot-jlg'),
+                'statusHistoryHide'     => __('Masquer le journal', 'discord-bot-jlg'),
+                'statusBadgeAriaLabel'  => __('Statut des données Discord', 'discord-bot-jlg'),
+                'statusNoData'          => __('Non disponible', 'discord-bot-jlg'),
             )
         );
 
