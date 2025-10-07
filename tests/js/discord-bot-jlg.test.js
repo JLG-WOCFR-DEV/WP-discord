@@ -48,8 +48,104 @@ function createContainer(options = {}) {
         }
     }
 
+    const now = Math.floor(Date.now() / 1000);
+    container.dataset.statusMeta = JSON.stringify({
+        variant: 'live',
+        lastUpdated: now,
+        refreshInterval: 60,
+        nextRefresh: now + 60,
+        history: []
+    });
+
     const wrapper = document.createElement('div');
     wrapper.className = 'discord-stats-wrapper';
+
+    const statusRibbon = document.createElement('div');
+    statusRibbon.className = 'discord-status-ribbon';
+    statusRibbon.setAttribute('data-status-root', '');
+
+    const statusBadge = document.createElement('div');
+    statusBadge.className = 'discord-status-badge';
+    statusBadge.setAttribute('data-status-badge', '');
+    statusBadge.setAttribute('role', 'status');
+    statusBadge.setAttribute('aria-live', 'polite');
+
+    const statusProgress = document.createElement('div');
+    statusProgress.className = 'discord-status-badge__progress-indicator';
+    statusBadge.appendChild(statusProgress);
+
+    const statusLabel = document.createElement('span');
+    statusLabel.className = 'discord-status-badge__label';
+    statusLabel.setAttribute('data-status-label', '');
+    statusBadge.appendChild(statusLabel);
+
+    const statusCountdown = document.createElement('span');
+    statusCountdown.className = 'discord-status-badge__countdown';
+    statusCountdown.setAttribute('data-status-countdown', '');
+    statusBadge.appendChild(statusCountdown);
+
+    statusRibbon.appendChild(statusBadge);
+
+    const statusToggle = document.createElement('button');
+    statusToggle.type = 'button';
+    statusToggle.className = 'discord-status-toggle';
+    statusToggle.setAttribute('data-status-toggle', '');
+    statusToggle.setAttribute('aria-expanded', 'false');
+    statusRibbon.appendChild(statusToggle);
+
+    const statusPanel = document.createElement('div');
+    statusPanel.className = 'discord-status-drawer';
+    statusPanel.setAttribute('data-status-panel', '');
+    statusPanel.hidden = true;
+
+    const statusClose = document.createElement('button');
+    statusClose.type = 'button';
+    statusClose.setAttribute('data-status-close', '');
+    statusPanel.appendChild(statusClose);
+
+    const statusHistoryToggle = document.createElement('button');
+    statusHistoryToggle.type = 'button';
+    statusHistoryToggle.setAttribute('data-status-history-toggle', '');
+    statusPanel.appendChild(statusHistoryToggle);
+
+    const statusHistoryList = document.createElement('ul');
+    statusHistoryList.setAttribute('data-status-history', '');
+    statusHistoryList.hidden = true;
+    statusPanel.appendChild(statusHistoryList);
+
+    const statusHistoryEmpty = document.createElement('p');
+    statusHistoryEmpty.setAttribute('data-status-history-empty', '');
+    statusPanel.appendChild(statusHistoryEmpty);
+
+    const statusMode = document.createElement('div');
+    statusMode.setAttribute('data-status-mode', '');
+    statusPanel.appendChild(statusMode);
+
+    const statusLastSync = document.createElement('div');
+    statusLastSync.setAttribute('data-status-last-sync', '');
+    statusPanel.appendChild(statusLastSync);
+
+    const statusNextSync = document.createElement('div');
+    statusNextSync.setAttribute('data-status-next-sync', '');
+    statusPanel.appendChild(statusNextSync);
+
+    const statusNextRetry = document.createElement('div');
+    statusNextRetry.setAttribute('data-status-next-retry', '');
+    statusPanel.appendChild(statusNextRetry);
+
+    const statusForceButton = document.createElement('button');
+    statusForceButton.type = 'button';
+    statusForceButton.setAttribute('data-status-force-refresh', '');
+    statusPanel.appendChild(statusForceButton);
+
+    const statusLogLink = document.createElement('a');
+    statusLogLink.setAttribute('data-status-log-link', '');
+    statusLogLink.href = '#';
+    statusPanel.appendChild(statusLogLink);
+
+    statusRibbon.appendChild(statusPanel);
+
+    container.appendChild(statusRibbon);
 
     const online = document.createElement('div');
     online.className = 'discord-stat discord-online';

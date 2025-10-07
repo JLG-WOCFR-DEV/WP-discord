@@ -23,6 +23,53 @@
     var SCREEN_READER_TEXT_CLASS = 'screen-reader-text';
     var ANALYTICS_CACHE_TTL = 5 * 60 * 1000;
     var analyticsCache = {};
+    var STATUS_BADGE_SELECTOR = '[data-status-badge]';
+    var STATUS_PANEL_SELECTOR = '[data-status-panel]';
+    var STATUS_TOGGLE_SELECTOR = '[data-status-toggle]';
+    var STATUS_CLOSE_SELECTOR = '[data-status-close]';
+    var STATUS_HISTORY_LIST_SELECTOR = '[data-status-history]';
+    var STATUS_HISTORY_TOGGLE_SELECTOR = '[data-status-history-toggle]';
+    var STATUS_HISTORY_EMPTY_SELECTOR = '[data-status-history-empty]';
+    var STATUS_LABEL_SELECTOR = '[data-status-label]';
+    var STATUS_COUNTDOWN_SELECTOR = '[data-status-countdown]';
+    var STATUS_PROGRESS_SELECTOR = '.discord-status-badge__progress-indicator';
+    var STATUS_MODE_SELECTOR = '[data-status-mode]';
+    var STATUS_LAST_SYNC_SELECTOR = '[data-status-last-sync]';
+    var STATUS_NEXT_SYNC_SELECTOR = '[data-status-next-sync]';
+    var STATUS_NEXT_RETRY_SELECTOR = '[data-status-next-retry]';
+    var STATUS_FORCE_SELECTOR = '[data-status-force-refresh]';
+    var STATUS_LOG_LINK_SELECTOR = '[data-status-log-link]';
+    var STATUS_STATE_KEY = '__discordStatusState';
+    var containerStateStore = (typeof WeakMap === 'function') ? new WeakMap() : null;
+
+    function storeContainerState(container, state) {
+        if (!container) {
+            return;
+        }
+
+        if (containerStateStore) {
+            containerStateStore.set(container, state);
+            return;
+        }
+
+        container[REFRESH_STATE_PROP] = state;
+    }
+
+    function getContainerState(container) {
+        if (!container) {
+            return null;
+        }
+
+        if (containerStateStore) {
+            return containerStateStore.get(container) || null;
+        }
+
+        if (Object.prototype.hasOwnProperty.call(container, REFRESH_STATE_PROP)) {
+            return container[REFRESH_STATE_PROP];
+        }
+
+        return null;
+    }
 
     if (typeof window !== 'undefined' && window.discordBotJlg) {
         globalConfig = window.discordBotJlg;
@@ -39,6 +86,750 @@
         }
 
         return fallback;
+    }
+
+    function getStatusLabelByVariant(variant) {
+        var map = {
+            live: 'statusLabelLive',
+            cache: 'statusLabelCache',
+            fallback: 'statusLabelFallback',
+            demo: 'statusLabelDemo',
+            unknown: 'statusLabelUnknown'
+        };
+
+        var key = map[variant] || map.unknown;
+        var fallback = variant ? variant.charAt(0).toUpperCase() + variant.slice(1) : 'Statut';
+
+        return getLocalizedString(key, fallback);
+    }
+
+    function getStatusDescriptionByVariant(variant) {
+        var map = {
+            live: 'statusDescriptionLive',
+            cache: 'statusDescriptionCache',
+            fallback: 'statusDescriptionFallback',
+            demo: 'statusDescriptionDemo',
+            unknown: 'statusDescriptionUnknown'
+        };
+
+        var key = map[variant] || map.unknown;
+
+        return getLocalizedString(key, '');
+    }
+
+    function formatStatusTimestamp(timestamp, locale) {
+        if (typeof timestamp !== 'number' || !isFinite(timestamp) || timestamp <= 0) {
+            return '';
+        }
+
+        var date;
+        try {
+            date = new Date(timestamp * 1000);
+        } catch (error) {
+            date = null;
+        }
+
+        if (!date || isNaN(date.getTime())) {
+            return '';
+        }
+
+        try {
+            return date.toLocaleString(locale || undefined);
+        } catch (error) {
+            try {
+                return date.toLocaleString('fr-FR');
+            } catch (fallbackError) {
+                return date.toISOString();
+            }
+        }
+    }
+
+    function formatStatusCountdown(seconds) {
+        if (typeof seconds !== 'number' || isNaN(seconds)) {
+            return '';
+        }
+
+        var remaining = Math.floor(seconds);
+
+        if (remaining <= 0) {
+            return getLocalizedString('statusCountdownReady', 'Actualisation imminente');
+        }
+
+        var hours = Math.floor(remaining / 3600);
+        var minutes = Math.floor((remaining % 3600) / 60);
+        var secs = remaining % 60;
+
+        if (hours > 0) {
+            return String(hours) + ':' + String(minutes).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+        }
+
+        return String(minutes).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+    }
+
+    function normalizeStatusMeta(meta) {
+        var base = {
+            variant: 'unknown',
+            isDemo: false,
+            isFallbackDemo: false,
+            isStale: false,
+            lastUpdated: null,
+            refreshInterval: null,
+            cacheDuration: null,
+            nextRefresh: null,
+            generatedAt: Math.floor(Date.now() / 1000),
+            retryAfter: null,
+            nextRetry: null,
+            profileKey: '',
+            serverId: '',
+            forceDemo: false,
+            canForceRefresh: false,
+            logsUrl: '',
+            fallbackDetails: {
+                timestamp: 0,
+                reason: '',
+                nextRetry: 0
+            },
+            history: []
+        };
+
+        if (!meta || typeof meta !== 'object') {
+            return base;
+        }
+
+        if (typeof meta.variant === 'string' && meta.variant) {
+            base.variant = meta.variant.toLowerCase();
+        }
+
+        base.isDemo = !!meta.isDemo;
+        base.isFallbackDemo = !!meta.isFallbackDemo;
+        base.isStale = !!meta.isStale;
+        base.forceDemo = !!meta.forceDemo;
+        base.canForceRefresh = !!meta.canForceRefresh;
+
+        if (typeof meta.profileKey === 'string') {
+            base.profileKey = meta.profileKey;
+        }
+
+        if (typeof meta.serverId === 'string') {
+            base.serverId = meta.serverId;
+        }
+
+        if (typeof meta.logsUrl === 'string') {
+            base.logsUrl = meta.logsUrl;
+        }
+
+        var lastUpdated = parseInt(meta.lastUpdated, 10);
+        if (!isNaN(lastUpdated) && lastUpdated > 0) {
+            base.lastUpdated = lastUpdated;
+        }
+
+        var refreshInterval = parseInt(meta.refreshInterval, 10);
+        if (!isNaN(refreshInterval) && refreshInterval > 0) {
+            base.refreshInterval = refreshInterval;
+        }
+
+        var cacheDuration = parseInt(meta.cacheDuration, 10);
+        if (!isNaN(cacheDuration) && cacheDuration > 0) {
+            base.cacheDuration = cacheDuration;
+        }
+
+        var retryAfter = parseInt(meta.retryAfter, 10);
+        if (!isNaN(retryAfter) && retryAfter >= 0) {
+            base.retryAfter = retryAfter;
+        }
+
+        var nextRetry = parseInt(meta.nextRetry, 10);
+        if (!isNaN(nextRetry) && nextRetry > 0) {
+            base.nextRetry = nextRetry;
+        }
+
+        var nextRefresh = parseInt(meta.nextRefresh, 10);
+        if (!isNaN(nextRefresh) && nextRefresh > 0) {
+            base.nextRefresh = nextRefresh;
+        }
+
+        if (typeof meta.generatedAt !== 'undefined') {
+            var generatedAt = parseInt(meta.generatedAt, 10);
+            if (!isNaN(generatedAt) && generatedAt > 0) {
+                base.generatedAt = generatedAt;
+            }
+        }
+
+        var fallback = meta.fallbackDetails || meta.fallback || {};
+        var fallbackTimestamp = parseInt(fallback.timestamp, 10);
+        var fallbackNextRetry = fallback.nextRetry;
+        if (typeof fallbackNextRetry === 'undefined') {
+            fallbackNextRetry = fallback.next_retry;
+        }
+        fallbackNextRetry = parseInt(fallbackNextRetry, 10);
+
+        base.fallbackDetails = {
+            timestamp: (!isNaN(fallbackTimestamp) && fallbackTimestamp > 0) ? fallbackTimestamp : 0,
+            reason: (typeof fallback.reason === 'string') ? fallback.reason : '',
+            nextRetry: (!isNaN(fallbackNextRetry) && fallbackNextRetry > 0) ? fallbackNextRetry : 0
+        };
+
+        if (!base.nextRetry && base.fallbackDetails.nextRetry) {
+            base.nextRetry = base.fallbackDetails.nextRetry;
+        }
+
+        if (!Array.isArray(meta.history)) {
+            base.history = [];
+        } else {
+            base.history = meta.history.map(function (entry) {
+                if (!entry || typeof entry !== 'object') {
+                    return null;
+                }
+
+                var entryTimestamp = parseInt(entry.timestamp, 10);
+                var entryLabel = typeof entry.label === 'string' ? entry.label : '';
+                var entryReason = typeof entry.reason === 'string' ? entry.reason : '';
+                var entryType = typeof entry.type === 'string' ? entry.type : '';
+
+                if (isNaN(entryTimestamp) || entryTimestamp <= 0) {
+                    entryTimestamp = 0;
+                }
+
+                return {
+                    timestamp: entryTimestamp,
+                    label: entryLabel,
+                    reason: entryReason,
+                    type: entryType
+                };
+            }).filter(function (entry) {
+                return !!entry;
+            });
+        }
+
+        if (!base.nextRefresh) {
+            if (base.retryAfter) {
+                base.nextRefresh = base.generatedAt + base.retryAfter;
+            } else if (base.refreshInterval) {
+                var baseTimestamp = base.lastUpdated ? base.lastUpdated : base.generatedAt;
+                base.nextRefresh = baseTimestamp + base.refreshInterval;
+            }
+        }
+
+        return base;
+    }
+
+    function mergeStatusMeta(base, updates) {
+        if (!updates || typeof updates !== 'object') {
+            return base;
+        }
+
+        var merged = {};
+
+        Object.keys(base).forEach(function (key) {
+            merged[key] = base[key];
+        });
+
+        Object.keys(updates).forEach(function (key) {
+            var value = updates[key];
+
+            if (typeof value === 'undefined' || value === null) {
+                return;
+            }
+
+            if ('fallbackDetails' === key && typeof value === 'object') {
+                merged.fallbackDetails = value;
+                return;
+            }
+
+            if ('history' === key && Array.isArray(value)) {
+                merged.history = value;
+                return;
+            }
+
+            merged[key] = value;
+        });
+
+        return merged;
+    }
+
+    function ensureStatusState(state) {
+        if (!state) {
+            return null;
+        }
+
+        if (!state[STATUS_STATE_KEY]) {
+            state[STATUS_STATE_KEY] = {
+                meta: null,
+                elements: null,
+                countdownId: null,
+                nextTimestamp: null,
+                totalDuration: null,
+                isPaused: false,
+                historyExpanded: false
+            };
+        }
+
+        return state[STATUS_STATE_KEY];
+    }
+
+    function getStatusElements(container, statusState) {
+        if (!statusState) {
+            return null;
+        }
+
+        if (!statusState.elements) {
+            statusState.elements = {
+                badge: container.querySelector(STATUS_BADGE_SELECTOR),
+                label: container.querySelector(STATUS_LABEL_SELECTOR),
+                countdown: container.querySelector(STATUS_COUNTDOWN_SELECTOR),
+                progress: container.querySelector(STATUS_PROGRESS_SELECTOR),
+                panel: container.querySelector(STATUS_PANEL_SELECTOR),
+                toggle: container.querySelector(STATUS_TOGGLE_SELECTOR),
+                close: container.querySelector(STATUS_CLOSE_SELECTOR),
+                historyList: container.querySelector(STATUS_HISTORY_LIST_SELECTOR),
+                historyToggle: container.querySelector(STATUS_HISTORY_TOGGLE_SELECTOR),
+                historyEmpty: container.querySelector(STATUS_HISTORY_EMPTY_SELECTOR),
+                mode: container.querySelector(STATUS_MODE_SELECTOR),
+                lastSync: container.querySelector(STATUS_LAST_SYNC_SELECTOR),
+                nextSync: container.querySelector(STATUS_NEXT_SYNC_SELECTOR),
+                nextRetry: container.querySelector(STATUS_NEXT_RETRY_SELECTOR),
+                forceButton: container.querySelector(STATUS_FORCE_SELECTOR),
+                logLink: container.querySelector(STATUS_LOG_LINK_SELECTOR)
+            };
+        }
+
+        return statusState.elements;
+    }
+
+    function updateCountdownDisplay(container, statusState, remainingSeconds) {
+        var elements = getStatusElements(container, statusState);
+
+        if (!elements || !elements.countdown) {
+            return;
+        }
+
+        if (statusState.isPaused) {
+            elements.countdown.textContent = getLocalizedString('statusCountdownPaused', 'En pause');
+        } else if (typeof remainingSeconds === 'number' && !isNaN(remainingSeconds)) {
+            if (remainingSeconds <= 0) {
+                elements.countdown.textContent = getLocalizedString('statusCountdownReady', 'Actualisation imminente');
+            } else {
+                elements.countdown.textContent = formatStatusCountdown(remainingSeconds);
+            }
+        } else {
+            elements.countdown.textContent = '';
+        }
+
+        if (!elements.progress) {
+            return;
+        }
+
+        if (statusState.isPaused || !statusState.nextTimestamp) {
+            elements.progress.style.strokeDashoffset = 100;
+            return;
+        }
+
+        var total = statusState.totalDuration;
+
+        if (typeof total !== 'number' || !isFinite(total) || total <= 0) {
+            elements.progress.style.strokeDashoffset = 100;
+            return;
+        }
+
+        var remaining = (typeof remainingSeconds === 'number' && !isNaN(remainingSeconds)) ? remainingSeconds : (statusState.nextTimestamp - Math.floor(Date.now() / 1000));
+
+        if (remaining <= 0) {
+            elements.progress.style.strokeDashoffset = 0;
+            return;
+        }
+
+        if (remaining > total) {
+            remaining = total;
+        }
+
+        var progress = 100 - (remaining / total) * 100;
+        elements.progress.style.strokeDashoffset = progress;
+    }
+
+    function stopStatusCountdown(state) {
+        var statusState = ensureStatusState(state);
+
+        if (!statusState) {
+            return;
+        }
+
+        if (statusState.countdownId) {
+            window.clearInterval(statusState.countdownId);
+            statusState.countdownId = null;
+        }
+    }
+
+    function startStatusCountdown(container, state) {
+        var statusState = ensureStatusState(state);
+
+        if (!statusState || statusState.isPaused) {
+            updateCountdownDisplay(container, statusState, null);
+            return;
+        }
+
+        stopStatusCountdown(state);
+
+        if (!statusState.nextTimestamp) {
+            updateCountdownDisplay(container, statusState, null);
+            return;
+        }
+
+        function tick() {
+            var now = Math.floor(Date.now() / 1000);
+            var remaining = statusState.nextTimestamp - now;
+            updateCountdownDisplay(container, statusState, remaining);
+
+            if (remaining <= 0) {
+                stopStatusCountdown(state);
+            }
+        }
+
+        tick();
+
+        statusState.countdownId = window.setInterval(tick, 1000);
+    }
+
+    function setStatusNextRefresh(container, state, timestampSeconds, durationSeconds) {
+        var statusState = ensureStatusState(state);
+
+        if (!statusState) {
+            return;
+        }
+
+        if (typeof timestampSeconds === 'number' && !isNaN(timestampSeconds) && timestampSeconds > 0) {
+            statusState.nextTimestamp = Math.floor(timestampSeconds);
+        } else {
+            statusState.nextTimestamp = null;
+        }
+
+        if (typeof durationSeconds === 'number' && !isNaN(durationSeconds) && durationSeconds > 0) {
+            statusState.totalDuration = durationSeconds;
+        } else if (statusState.meta && statusState.meta.refreshInterval) {
+            statusState.totalDuration = statusState.meta.refreshInterval;
+        } else {
+            statusState.totalDuration = null;
+        }
+
+        if (!statusState.nextTimestamp) {
+            stopStatusCountdown(state);
+            updateCountdownDisplay(container, statusState, null);
+            return;
+        }
+
+        startStatusCountdown(container, state);
+    }
+
+    function pauseStatusCountdown(container, state) {
+        var statusState = ensureStatusState(state);
+
+        if (!statusState) {
+            return;
+        }
+
+        statusState.isPaused = true;
+        stopStatusCountdown(state);
+        updateCountdownDisplay(container, statusState, null);
+    }
+
+    function resumeStatusCountdown(container, state) {
+        var statusState = ensureStatusState(state);
+
+        if (!statusState) {
+            return;
+        }
+
+        statusState.isPaused = false;
+        startStatusCountdown(container, state);
+    }
+
+    function renderStatusHistory(container, statusState, locale) {
+        var elements = getStatusElements(container, statusState);
+
+        if (!elements || !elements.historyList || !elements.historyEmpty) {
+            return;
+        }
+
+        var history = (statusState.meta && Array.isArray(statusState.meta.history))
+            ? statusState.meta.history.slice(0, 5)
+            : [];
+
+        elements.historyList.innerHTML = '';
+
+        if (!history.length) {
+            elements.historyList.hidden = true;
+            elements.historyEmpty.textContent = getLocalizedString('statusHistoryEmpty', 'Aucun incident récent.');
+            elements.historyEmpty.hidden = false;
+
+            if (elements.historyToggle) {
+                elements.historyToggle.disabled = true;
+                elements.historyToggle.textContent = getLocalizedString('statusHistoryShow', 'Voir le journal');
+            }
+
+            return;
+        }
+
+        elements.historyEmpty.hidden = true;
+
+        if (elements.historyToggle) {
+            elements.historyToggle.disabled = false;
+            elements.historyToggle.textContent = statusState.historyExpanded
+                ? getLocalizedString('statusHistoryHide', 'Masquer le journal')
+                : getLocalizedString('statusHistoryShow', 'Voir le journal');
+        }
+
+        elements.historyList.hidden = !statusState.historyExpanded;
+
+        var fragment = document.createDocumentFragment();
+
+        history.forEach(function (entry) {
+            if (!entry || typeof entry !== 'object') {
+                return;
+            }
+
+            var item = document.createElement('li');
+            item.className = 'discord-status-history__item';
+
+            var title = document.createElement('div');
+            title.className = 'discord-status-history__item-title';
+            var titleLabel = typeof entry.label === 'string' && entry.label
+                ? entry.label
+                : getStatusLabelByVariant(entry.type === 'fallback' ? 'fallback' : statusState.meta.variant);
+            title.textContent = titleLabel;
+            item.appendChild(title);
+
+            var metaLine = document.createElement('div');
+            metaLine.className = 'discord-status-history__item-meta';
+            metaLine.textContent = formatStatusTimestamp(entry.timestamp, locale)
+                || getLocalizedString('statusNoData', 'Non disponible');
+            item.appendChild(metaLine);
+
+            if (entry.reason) {
+                var reason = document.createElement('div');
+                reason.className = 'discord-status-history__item-reason';
+                reason.textContent = entry.reason;
+                item.appendChild(reason);
+            }
+
+            fragment.appendChild(item);
+        });
+
+        elements.historyList.appendChild(fragment);
+    }
+
+    function applyStatusMeta(container, state, meta, locale, overrides) {
+        var statusState = ensureStatusState(state);
+
+        if (!statusState) {
+            return;
+        }
+
+        var normalized = normalizeStatusMeta(meta);
+
+        if (statusState.meta) {
+            normalized = mergeStatusMeta(statusState.meta, normalized);
+        }
+
+        if (overrides) {
+            normalized = mergeStatusMeta(normalized, overrides);
+        }
+
+        statusState.meta = normalized;
+
+        if (container && container.dataset) {
+            try {
+                container.dataset.statusMeta = JSON.stringify(normalized);
+            } catch (error) {
+                // Ignore serialization issues.
+            }
+
+            if (normalized.variant) {
+                container.dataset.statusVariant = normalized.variant;
+            }
+
+            container.dataset.canForceRefresh = normalized.canForceRefresh ? 'true' : 'false';
+        } else if (container && container.setAttribute) {
+            container.setAttribute('data-status-variant', normalized.variant || 'unknown');
+            container.setAttribute('data-can-force-refresh', normalized.canForceRefresh ? 'true' : 'false');
+        }
+
+        var elements = getStatusElements(container, statusState);
+
+        if (elements && elements.badge) {
+            var label = getStatusLabelByVariant(normalized.variant);
+
+            if (elements.label) {
+                elements.label.textContent = label;
+            }
+
+            var ariaLabel = getLocalizedString('statusBadgeAriaLabel', 'Statut des données Discord') + ' : ' + label;
+            elements.badge.setAttribute('aria-label', ariaLabel);
+        }
+
+        if (elements && elements.mode) {
+            var description = getStatusDescriptionByVariant(normalized.variant);
+            var modeText = getStatusLabelByVariant(normalized.variant);
+
+            if (description) {
+                modeText += ' – ' + description;
+            }
+
+            elements.mode.textContent = modeText;
+        }
+
+        if (elements && elements.lastSync) {
+            var lastSyncText = formatStatusTimestamp(normalized.lastUpdated, locale);
+            elements.lastSync.textContent = lastSyncText || getLocalizedString('statusNoData', 'Non disponible');
+        }
+
+        if (elements && elements.nextSync) {
+            var nextSyncText = formatStatusTimestamp(normalized.nextRefresh, locale);
+            elements.nextSync.textContent = nextSyncText || getLocalizedString('statusNoData', 'Non disponible');
+        }
+
+        if (elements && elements.nextRetry) {
+            var nextRetryText = formatStatusTimestamp(normalized.nextRetry, locale);
+            elements.nextRetry.textContent = nextRetryText || getLocalizedString('statusNoData', 'Non disponible');
+        }
+
+        if (elements && elements.forceButton) {
+            if (normalized.canForceRefresh) {
+                elements.forceButton.classList.remove('is-disabled');
+                elements.forceButton.removeAttribute('disabled');
+            } else {
+                elements.forceButton.classList.add('is-disabled');
+                elements.forceButton.setAttribute('disabled', 'disabled');
+            }
+        }
+
+        if (elements && elements.logLink) {
+            if (normalized.logsUrl) {
+                elements.logLink.href = normalized.logsUrl;
+                elements.logLink.hidden = false;
+            } else {
+                elements.logLink.hidden = true;
+            }
+        }
+
+        renderStatusHistory(container, statusState, locale);
+
+        if (typeof normalized.nextRefresh === 'number' && normalized.nextRefresh > 0) {
+            var durationSeconds = null;
+
+            if (typeof normalized.retryAfter === 'number' && normalized.retryAfter > 0) {
+                durationSeconds = normalized.retryAfter;
+            } else if (typeof normalized.refreshInterval === 'number' && normalized.refreshInterval > 0) {
+                durationSeconds = normalized.refreshInterval;
+            }
+
+            setStatusNextRefresh(container, state, normalized.nextRefresh, durationSeconds);
+        } else {
+            setStatusNextRefresh(container, state, null, null);
+        }
+    }
+
+    function openStatusPanel(container, statusState) {
+        var elements = getStatusElements(container, statusState);
+
+        if (!elements || !elements.panel) {
+            return;
+        }
+
+        elements.panel.hidden = false;
+
+        if (elements.toggle) {
+            elements.toggle.setAttribute('aria-expanded', 'true');
+        }
+    }
+
+    function closeStatusPanel(container, statusState) {
+        var elements = getStatusElements(container, statusState);
+
+        if (!elements || !elements.panel) {
+            return;
+        }
+
+        elements.panel.hidden = true;
+
+        if (elements.toggle) {
+            elements.toggle.setAttribute('aria-expanded', 'false');
+        }
+    }
+
+    function toggleStatusPanel(container, statusState) {
+        var elements = getStatusElements(container, statusState);
+
+        if (!elements || !elements.panel) {
+            return;
+        }
+
+        if (elements.panel.hasAttribute('hidden')) {
+            openStatusPanel(container, statusState);
+        } else {
+            closeStatusPanel(container, statusState);
+        }
+    }
+
+    function parseStatusMetaFromDataset(container) {
+        if (!container || !container.dataset || !container.dataset.statusMeta) {
+            return null;
+        }
+
+        try {
+            return JSON.parse(container.dataset.statusMeta);
+        } catch (error) {
+            return null;
+        }
+    }
+
+    function initializeStatusPanel(container, state, locale) {
+        var statusState = ensureStatusState(state);
+
+        if (!statusState) {
+            return;
+        }
+
+        var elements = getStatusElements(container, statusState);
+
+        if (!elements || !elements.badge) {
+            return;
+        }
+
+        var initialMeta = parseStatusMetaFromDataset(container);
+        applyStatusMeta(container, state, initialMeta, locale);
+
+        if (elements.toggle) {
+            elements.toggle.addEventListener('click', function () {
+                toggleStatusPanel(container, statusState);
+            });
+        }
+
+        if (elements.close) {
+            elements.close.addEventListener('click', function () {
+                closeStatusPanel(container, statusState);
+            });
+        }
+
+        if (elements.historyToggle) {
+            elements.historyToggle.addEventListener('click', function () {
+                statusState.historyExpanded = !statusState.historyExpanded;
+                renderStatusHistory(container, statusState, locale);
+            });
+        }
+
+        if (elements.forceButton) {
+            elements.forceButton.addEventListener('click', function (event) {
+                event.preventDefault();
+
+                if (!statusState.meta || !statusState.meta.canForceRefresh) {
+                    return;
+                }
+
+                if (typeof state.forceRefresh === 'function') {
+                    state.forceRefresh();
+                    closeStatusPanel(container, statusState);
+                }
+            });
+        }
     }
 
     function collectConnectionOverrides(container, config) {
@@ -133,7 +924,7 @@
         return baseUrl + separator + queryParts.join('&');
     }
 
-    function requestStatsViaAjax(config, overrides) {
+    function requestStatsViaAjax(config, overrides, extraOptions) {
         if (!config || typeof config.ajaxUrl !== 'string' || !config.ajaxUrl) {
             return Promise.reject(new Error('Missing AJAX endpoint URL'));
         }
@@ -151,6 +942,10 @@
 
         if (overrides && overrides.serverId) {
             formData.append('server_id', overrides.serverId);
+        }
+
+        if (extraOptions && extraOptions.forceRefresh) {
+            formData.append('force_refresh', 'true');
         }
 
         return fetch(config.ajaxUrl, {
@@ -2107,7 +2902,7 @@
         updateDemoBadge(container, shouldShowBadge);
     }
 
-    function updateStats(container, config, formatter, locale) {
+    function updateStats(container, config, formatter, locale, options) {
         var managesRefreshIndicator = false;
 
         if (container) {
@@ -2126,28 +2921,30 @@
         };
 
         var overrides = collectConnectionOverrides(container, config);
+        var requestOptions = options || {};
+        var forceRefresh = !!requestOptions.forceRefresh;
 
         var useRestEndpoint = !!(config && typeof config.restUrl === 'string' && config.restUrl);
         var fetchPromise;
 
-        if (useRestEndpoint) {
+        if (useRestEndpoint && !forceRefresh) {
             fetchPromise = requestStatsViaRest(config, overrides)
                 .then(function (response) {
                     if (response && response.status === 404 && config && config.ajaxUrl) {
-                        return requestStatsViaAjax(config, overrides);
+                        return requestStatsViaAjax(config, overrides, requestOptions);
                     }
 
                     return response;
                 })
                 .catch(function (error) {
                     if (config && config.ajaxUrl) {
-                        return requestStatsViaAjax(config, overrides);
+                        return requestStatsViaAjax(config, overrides, requestOptions);
                     }
 
                     throw error;
                 });
         } else {
-            fetchPromise = requestStatsViaAjax(config, overrides);
+            fetchPromise = requestStatsViaAjax(config, overrides, requestOptions);
         }
 
         var requestPromise = fetchPromise
@@ -2366,6 +3163,35 @@
                 updateServerName(container, serverNameValue);
                 updateServerAvatar(container, serverAvatarUrlValue, serverAvatarBaseValue, serverNameValue);
 
+                var stateForMeta = getContainerState(container);
+                var payloadData = data.data || {};
+                var statusMetaPayload = payloadData.status_meta || null;
+                var fallbackDetailsPayload = payloadData.fallback_details || null;
+                var metaOverrides = {
+                    lastUpdated: lastUpdated > 0 ? lastUpdated : null,
+                    isDemo: isDemo,
+                    isFallbackDemo: isFallbackDemo,
+                    isStale: isStale
+                };
+
+                if (resultInfo.retryAfter && resultInfo.retryAfter > 0) {
+                    metaOverrides.retryAfter = Math.round(resultInfo.retryAfter / 1000);
+                }
+
+                if (!statusMetaPayload) {
+                    metaOverrides.variant = isFallbackDemo ? 'fallback' : (isDemo ? 'demo' : (isStale ? 'cache' : 'live'));
+
+                    if (fallbackDetailsPayload) {
+                        metaOverrides.fallbackDetails = fallbackDetailsPayload;
+                    }
+                } else if (fallbackDetailsPayload && typeof statusMetaPayload.fallbackDetails === 'undefined') {
+                    statusMetaPayload.fallbackDetails = fallbackDetailsPayload;
+                }
+
+                if (stateForMeta) {
+                    applyStatusMeta(container, stateForMeta, statusMetaPayload, locale, metaOverrides);
+                }
+
                 ensureOnlineLabelElement(container);
                 updateStatElement(container, '.discord-online .discord-number', onlineValue, formatter);
 
@@ -2434,7 +3260,7 @@
                     }
                 }
 
-                var payloadData = data.data || {};
+                payloadData = data.data || {};
                 updatePresenceBreakdown(container, payloadData, formatter);
                 updateApproximateMembers(container, payloadData, formatter);
                 updatePremiumSubscriptions(container, payloadData, formatter);
@@ -2606,6 +3432,36 @@
         var minIntervalMs = minIntervalSeconds * 1000;
 
         var containers = document.querySelectorAll('.discord-stats-container[data-refresh]');
+
+        var staticContainers = document.querySelectorAll('.discord-stats-container:not([data-refresh])');
+        Array.prototype.forEach.call(staticContainers, function (container) {
+            var state = getContainerState(container);
+
+            if (!state) {
+                state = {
+                    intervalMs: minIntervalMs,
+                    minIntervalMs: minIntervalMs,
+                    timeoutId: null,
+                    inFlight: false,
+                    isActive: true,
+                    pendingDelay: null,
+                    pendingImmediate: false,
+                    lastScheduledDelay: null
+                };
+
+                storeContainerState(container, state);
+            }
+
+            ensureStatusState(state);
+            initializeStatusPanel(container, state, locale);
+            pauseStatusCountdown(container, state);
+
+            state.forceRefresh = function () {
+                activateContainer(container);
+                triggerRefresh(container, state, state.minIntervalMs, { forceRefresh: true });
+            };
+        });
+
         if (!containers.length) {
             return;
         }
@@ -2632,6 +3488,13 @@
 
             state.lastScheduledDelay = effectiveDelay;
 
+            var statusState = ensureStatusState(state);
+            if (statusState) {
+                var nextTimestampSeconds = Math.floor((Date.now() + effectiveDelay) / 1000);
+                var durationSeconds = Math.max(1, Math.round(effectiveDelay / 1000));
+                setStatusNextRefresh(container, state, nextTimestampSeconds, durationSeconds);
+            }
+
             if (!state.isActive) {
                 state.pendingDelay = effectiveDelay;
                 return;
@@ -2655,7 +3518,7 @@
             }, effectiveDelay);
         }
 
-        function triggerRefresh(container, state, overrideDelay) {
+        function triggerRefresh(container, state, overrideDelay, requestOptions) {
             if (!state || state.inFlight || !state.isActive) {
                 return;
             }
@@ -2668,7 +3531,7 @@
                 state.inFlight = false;
             }
 
-            updateStats(container, config, formatter, locale).then(function (result) {
+            updateStats(container, config, formatter, locale, requestOptions).then(function (result) {
                 var nextDelay = state.intervalMs;
 
                 if (result && typeof result.retryAfter === 'number' && result.retryAfter >= 0) {
@@ -2689,36 +3552,7 @@
 
         var supportsIntersectionObserver = typeof window !== 'undefined'
             && typeof window.IntersectionObserver === 'function';
-        var stateStore = (typeof WeakMap === 'function') ? new WeakMap() : null;
         var intersectionObserver = null;
-
-        function storeContainerState(container, state) {
-            if (!container) {
-                return;
-            }
-
-            if (stateStore) {
-                stateStore.set(container, state);
-            } else {
-                container[REFRESH_STATE_PROP] = state;
-            }
-        }
-
-        function getContainerState(container) {
-            if (!container) {
-                return null;
-            }
-
-            if (stateStore) {
-                return stateStore.get(container) || null;
-            }
-
-            if (Object.prototype.hasOwnProperty.call(container, REFRESH_STATE_PROP)) {
-                return container[REFRESH_STATE_PROP];
-            }
-
-            return null;
-        }
 
         function activateContainer(container) {
             var state = getContainerState(container);
@@ -2728,6 +3562,7 @@
             }
 
             state.isActive = true;
+            resumeStatusCountdown(container, state);
 
             if (state.pendingImmediate) {
                 state.pendingImmediate = false;
@@ -2752,6 +3587,7 @@
             }
 
             state.isActive = false;
+            pauseStatusCountdown(container, state);
 
             if (state.timeoutId) {
                 clearTimeout(state.timeoutId);
@@ -2842,6 +3678,13 @@
             };
 
             storeContainerState(container, state);
+            ensureStatusState(state);
+            initializeStatusPanel(container, state, locale);
+
+            state.forceRefresh = function () {
+                activateContainer(container);
+                triggerRefresh(container, state, state.minIntervalMs, { forceRefresh: true });
+            };
 
             if (supportsIntersectionObserver && intersectionObserver) {
                 if (!shouldForceImmediateRefresh) {
