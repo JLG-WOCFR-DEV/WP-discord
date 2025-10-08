@@ -1,25 +1,27 @@
 <?php
 
-require_once __DIR__ . '/includes/bootstrap.php';
+use PHPUnit\Framework\TestCase;
 
-if (!function_exists('discord_bot_jlg_get_cron_interval')) {
-    require_once dirname(__DIR__) . '/discord-bot-jlg.php';
-}
+require_once __DIR__ . '/bootstrap.php';
 
-/**
- * @group discord-bot-jlg
- */
-class Test_Discord_Bot_JLG_Cron extends WP_UnitTestCase {
+class Test_Discord_Bot_JLG_Cron extends TestCase {
+
+    protected function setUp(): void {
+        parent::setUp();
+
+        remove_all_filters('discord_bot_jlg_cron_interval');
+        delete_option(DISCORD_BOT_JLG_OPTION_NAME);
+        $GLOBALS['wp_test_options'] = array();
+    }
 
     protected function tearDown(): void {
         remove_all_filters('discord_bot_jlg_cron_interval');
         delete_option(DISCORD_BOT_JLG_OPTION_NAME);
+
         parent::tearDown();
     }
 
     public function test_get_cron_interval_returns_default_when_option_missing(): void {
-        delete_option(DISCORD_BOT_JLG_OPTION_NAME);
-
         $this->assertSame(
             DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION,
             discord_bot_jlg_get_cron_interval()
@@ -69,3 +71,4 @@ class Test_Discord_Bot_JLG_Cron extends WP_UnitTestCase {
         );
     }
 }
+
