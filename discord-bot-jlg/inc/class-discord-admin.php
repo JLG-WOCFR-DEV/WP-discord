@@ -1658,14 +1658,63 @@ class Discord_Bot_JLG_Admin {
     private function render_options_form() {
         ?>
         <div class="discord-bot-settings-main">
-            <form action="options.php" method="post">
-                <?php
-                settings_fields('discord_stats_settings');
-                do_settings_sections('discord_stats_settings');
-                submit_button();
-                ?>
-            </form>
+            <?php
+            $this->render_settings_section_form(
+                'discord_stats_api_section',
+                esc_html__('Enregistrer la configuration API', 'discord-bot-jlg')
+            );
+
+            $this->render_settings_section_form(
+                'discord_stats_profiles_section',
+                esc_html__('Mettre à jour les profils', 'discord-bot-jlg')
+            );
+
+            $this->render_settings_section_form(
+                'discord_stats_display_section',
+                esc_html__('Mettre à jour les options d\'affichage', 'discord-bot-jlg')
+            );
+            ?>
         </div>
+        <?php
+    }
+
+    /**
+     * Affiche un formulaire autonome pour une section spécifique des réglages.
+     *
+     * @param string $section_id Identifiant de la section enregistrée via l'API des réglages.
+     * @param string $submit_label Libellé du bouton de soumission.
+     */
+    private function render_settings_section_form($section_id, $submit_label) {
+        $page = 'discord_stats_settings';
+
+        global $wp_settings_sections, $wp_settings_fields;
+
+        if (
+            !isset($wp_settings_sections[$page][$section_id])
+            || empty($wp_settings_fields[$page][$section_id])
+        ) {
+            return;
+        }
+
+        $section = $wp_settings_sections[$page][$section_id];
+        ?>
+        <form action="options.php" method="post" class="discord-bot-settings-form">
+            <?php settings_fields($page); ?>
+
+            <h2><?php echo esc_html($section['title']); ?></h2>
+
+            <?php
+            if (isset($section['callback']) && is_callable($section['callback'])) {
+                call_user_func($section['callback'], $section);
+            }
+            ?>
+
+            <table class="form-table" role="presentation">
+                <?php do_settings_fields($page, $section_id); ?>
+            </table>
+
+            <?php submit_button($submit_label); ?>
+        </form>
         <?php
     }
 
