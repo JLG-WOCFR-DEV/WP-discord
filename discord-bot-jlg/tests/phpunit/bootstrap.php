@@ -42,6 +42,7 @@ require_once __DIR__ . '/../../inc/class-discord-widget.php';
 require_once __DIR__ . '/../../inc/class-discord-shortcode.php';
 require_once __DIR__ . '/../../inc/class-discord-site-health.php';
 require_once __DIR__ . '/../../inc/class-discord-rest.php';
+require_once __DIR__ . '/../../inc/cron.php';
 
 if (!defined('DISCORD_BOT_JLG_OPTION_NAME')) {
     define('DISCORD_BOT_JLG_OPTION_NAME', 'discord_server_stats_options');
