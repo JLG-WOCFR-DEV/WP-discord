@@ -90,3 +90,30 @@ En priorisant ces évolutions, l'extension pourra rivaliser avec les solutions p
 | Long terme | Gouvernance affinée & segmentation des accès | Introduire des rôles personnalisés, des clés API scoped et un audit trail des actions. | 【F:docs/comparaison-apps-pro.md†L34-L87】 |
 
 Cette synthèse peut alimenter la roadmap officielle du plugin et servir de base aux arbitrages produit/technique lors des prochains sprints.
+
+## Matrice RICE (Reach, Impact, Confidence, Effort)
+
+| Initiative | Reach (sites) | Impact (1–3) | Confidence (0–100 %) | Effort (jours) | Score RICE |
+| --- | --- | --- | --- | --- | --- |
+| Presets & variations Gutenberg | 320 | 2.0 | 70 % | 8 | 56 |
+| Notifications & exports analytics | 210 | 2.5 | 65 % | 10 | 34.1 |
+| Multi-profils comparatifs | 150 | 3.0 | 55 % | 14 | 17.6 |
+| Accessibilité AAA | 400 | 1.8 | 60 % | 6 | 72 |
+| Gouvernance multi-rôles | 120 | 2.8 | 50 % | 18 | 9.3 |
+
+> Estimations basées sur les statistiques d'installation actuelles et les retours clients 2024 Q2. Les initiatives avec score RICE élevé doivent être priorisées lors des prochains sprints.
+
+## Parcours utilisateurs cibles
+
+1. **Community manager** : souhaite surveiller l'engagement quotidien et recevoir des alertes lorsque l'activité descend en dessous d'un seuil. Attend des exports CSV pour préparer ses rapports hebdomadaires.
+2. **Responsable marketing** : compare plusieurs communautés (public vs. privée) et doit visualiser rapidement les tendances pour planifier des campagnes. Nécessite un mode comparatif et des graphiques enrichis.
+3. **Administrateur WordPress** : gère la configuration technique, la rotation des tokens et les intégrations analytics. A besoin d'un dashboard Site Health détaillé et de guides de remédiation.
+
+Chaque initiative de la roadmap doit préciser quels parcours elle améliore, ainsi que les métriques de succès associées (ex. réduction du temps de configuration, augmentation du taux de consultation des analytics).
+
+## Cadre de pilotage
+
+- **Ateliers trimestriels** : réunir produit, développement et support pour passer en revue la roadmap, analyser les retours utilisateurs et ajuster la priorisation.
+- **Tableau de bord KPI** : suivre les indicateurs clés (taux de rafraîchissement réussi, nombre d'alertes envoyées, adoption des presets) pour mesurer l'impact des évolutions.
+- **Processus de release** : adopter un cycle mensuel avec phase bêta (1 semaine) et release stable (semaine suivante), incluant une checklist QA (tests automatiques, tests manuels, revue de sécurité).
+- **Canaux de feedback** : centraliser les retours (GitHub Issues, formulaire dédié, salon Discord) et catégoriser par thématique (UX, performance, intégration) afin de guider les décisions.
