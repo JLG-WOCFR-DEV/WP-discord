@@ -89,7 +89,17 @@ class Discord_Bot_JLG_Options_Repository {
             $this->options_cache = $options;
         }
 
-        return $this->options_cache;
+        $options = $this->options_cache;
+
+        if (function_exists('apply_filters')) {
+            $filtered = apply_filters('option_' . $this->option_name, $options, $this->option_name);
+
+            if (is_array($filtered)) {
+                $options = $filtered;
+            }
+        }
+
+        return $options;
     }
 
     /**
