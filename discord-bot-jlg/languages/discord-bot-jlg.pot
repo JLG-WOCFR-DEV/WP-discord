@@ -436,11 +436,31 @@ msgid "<strong>layout</strong> : horizontal, vertical, compact"
 msgstr ""
 
 #: inc/class-discord-admin.php:718
-msgid "<strong>theme</strong> : discord, dark, light, minimal, radix"
+msgid "<strong>theme</strong> : discord, dark, light, minimal, radix, headless, shadcn, bootstrap, semantic, anime"
 msgstr ""
 
-#: assets/js/discord-bot-block.js:101 inc/class-discord-admin.php:1467 inc/class-discord-widget.php:307
-msgid "Radix UI"
+#: assets/js/discord-bot-block.js:101 inc/class-discord-admin.php:1467 inc/class-discord-widget.php:305
+msgid "Radix Structure"
+msgstr ""
+
+#: assets/js/discord-bot-block.js:102 inc/class-discord-admin.php:1468 inc/class-discord-widget.php:306
+msgid "Headless Essence"
+msgstr ""
+
+#: assets/js/discord-bot-block.js:103 inc/class-discord-admin.php:1469 inc/class-discord-widget.php:307
+msgid "Shadcn Minimal"
+msgstr ""
+
+#: assets/js/discord-bot-block.js:104 inc/class-discord-admin.php:1470 inc/class-discord-widget.php:308
+msgid "Bootstrap Fluent"
+msgstr ""
+
+#: assets/js/discord-bot-block.js:105 inc/class-discord-admin.php:1471 inc/class-discord-widget.php:309
+msgid "Semantic Harmony"
+msgstr ""
+
+#: assets/js/discord-bot-block.js:106 inc/class-discord-admin.php:1472 inc/class-discord-widget.php:310
+msgid "Anime Pulse"
 msgstr ""
 
 #: inc/class-discord-admin.php:719

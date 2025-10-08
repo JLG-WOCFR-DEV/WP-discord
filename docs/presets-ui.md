@@ -4,6 +4,7 @@ Ce document rassemble plusieurs pistes de presets graphiques pouvant être inté
 
 ## 1. Preset « Headless Essence » (inspiré de Headless UI)
 - **Philosophie** : composants sans styles imposés, accent sur la structure et l'accessibilité. Chaque module expose des classes utilitaires prêtes pour Tailwind ou du CSS personnalisé.
+- **Identifiant plugin** : `headless` (`.discord-stats-container.discord-theme-headless`).
 - **Palette** : gris froid (#0f172a, #1e293b, #334155) avec accent bleu ardoise (#3b82f6) et focus visibles (#f97316).
 - **Typographie** : `Inter`, `system-ui` ou équivalent, tailles fluides (`clamp(0.95rem, 1vw + 0.5rem, 1.1rem)`).
 - **Composants clés** :
@@ -15,6 +16,7 @@ Ce document rassemble plusieurs pistes de presets graphiques pouvant être inté
 
 ## 2. Preset « Shadcn Minimal » (inspiré de shadcn/ui)
 - **Philosophie** : composants Tailwind pré-stylés avec variantes via classes data-attributes (`data-state="open"`).
+- **Identifiant plugin** : `shadcn` (`.discord-stats-container.discord-theme-shadcn`).
 - **Palette** : neutres chauds (#f8fafc, #e2e8f0, #64748b) et accent vert céladon (#34d399). Mode sombre automatique (`@media (prefers-color-scheme: dark)`).
 - **Typographie** : `Geist`, `Satoshi` ou fallback `Inter`, titres en `font-semibold`.
 - **Composants clés** :
@@ -26,6 +28,7 @@ Ce document rassemble plusieurs pistes de presets graphiques pouvant être inté
 
 ## 3. Preset « Radix Structure » (inspiré de Radix UI)
 - **Philosophie** : neutralité chromatique, composant piloté par `data-state`/`data-side`, accent sur la cohérence entre les plateformes.
+- **Identifiant plugin** : `radix` (`.discord-stats-container.discord-theme-radix`).
 - **Palette** : dégradés gris-bleu (`--surface: #18181b`, `--surface-alt: #27272a`, `--accent: #6366f1`), contrastes élevés pour l'accessibilité.
 - **Typographie** : `Work Sans` pour titres (`600`), `IBM Plex Sans` pour contenu.
 - **Composants clés** :
@@ -37,6 +40,7 @@ Ce document rassemble plusieurs pistes de presets graphiques pouvant être inté
 
 ## 4. Preset « Bootstrap Fluent » (inspiré de Bootstrap 5)
 - **Philosophie** : grille responsive, composants classiques (cards, alertes, badges) avec design modernisé (angles de 0.75rem).
+- **Identifiant plugin** : `bootstrap` (`.discord-stats-container.discord-theme-bootstrap`).
 - **Palette** : bleu primaire (#0d6efd), success (#198754), danger (#dc3545), warning (#ffc107), background clair (#f8f9fa). Mode sombre via classes `.theme-dark`.
 - **Typographie** : `"Helvetica Neue", Arial, sans-serif`, titres en uppercase légère (`text-transform: uppercase; letter-spacing: 0.08em`).
 - **Composants clés** :
@@ -48,6 +52,7 @@ Ce document rassemble plusieurs pistes de presets graphiques pouvant être inté
 
 ## 5. Preset « Semantic Harmony » (inspiré de Semantic UI)
 - **Philosophie** : langage visuel riche, classes sémantiques (`.ui.primary.button`, `.ui.segment`).
+- **Identifiant plugin** : `semantic` (`.discord-stats-container.discord-theme-semantic`).
 - **Palette** : base pastel (primary #2185d0, secondary #a333c8, positive #21ba45, negative #db2828), arrière-plan `#f9fafb`.
 - **Typographie** : `Lato` (400, 700), `line-height` généreux (1.6).
 - **Composants clés** :
@@ -59,6 +64,7 @@ Ce document rassemble plusieurs pistes de presets graphiques pouvant être inté
 
 ## 6. Preset « Anime Pulse » (inspiré d'Anime.js)
 - **Philosophie** : accent sur les micro-animations orchestrées (séquences, timelines), tout en respectant le critère `prefers-reduced-motion`.
+- **Identifiant plugin** : `anime` (`.discord-stats-container.discord-theme-anime`).
 - **Palette** : fond sombre dégradé (`linear-gradient(135deg,#0f172a,#1f2937)`), accents néon cyan (#38bdf8) et magenta (#f472b6).
 - **Typographie** : `Space Grotesk` pour l'effet futuriste, `font-weight: 500-700`.
 - **Composants clés** :
