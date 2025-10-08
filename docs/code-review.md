@@ -40,3 +40,14 @@ Le plugin « Discord Bot - JLG » fournit une intégration très complète (cr
 4. Nettoyer le dépôt (`.gitignore` pour `node_modules/`, documentation de la stack de build/test).
 
 En procédant par itérations (extraction d'un service à la fois), le refactoring restera maîtrisé tout en apportant des bénéfices immédiats sur la qualité du code.
+
+## Plan d'action court terme
+
+| Statut | Étape | Description | Livrables associés |
+| --- | --- | --- | --- |
+| ⏳ À planifier | Mettre en place un autoloader PSR-4 | Déplacer les `require_once` vers Composer et introduire un `PluginServiceProvider` pour centraliser le bootstrap. | Schéma d’autoload + documentation d’installation.【F:docs/code-review.md†L25-L43】 |
+| ⏳ À planifier | Dédier des services au cache et aux appels HTTP | Extraire `CacheManager` et `DiscordHttpClient` afin d’alléger `Discord_Bot_JLG_API` et d’autoriser le mocking. | Nouveaux services + tests unitaires ciblés.【F:docs/code-review.md†L15-L33】 |
+| 🛠️ Préparation | Segmenter l’administration en sous-modules | Créer des classes par section d’écran (Profils, Présentation, Analytics) avec vues dédiées. | Carte des écrans + plan de migration.【F:docs/code-review.md†L35-L48】 |
+| ✅ Prêt pour dev | Nettoyer le dépôt JS | Retirer `node_modules/` du suivi Git, documenter l’installation et automatiser les tests Jest. | `.gitignore` mis à jour + guide contributeur.【F:docs/code-review.md†L63-L66】 |
+
+Ce plan servira de checklist lors des prochains cycles de développement. Les statuts sont à mettre à jour au fur et à mesure des livraisons.

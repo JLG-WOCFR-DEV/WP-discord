@@ -124,6 +124,7 @@ Un widget « Discord Bot - JLG » est disponible via le menu « Widgets ».
 ### Accessibilité & UX
 - Styles embarqués reproduisant la classe `.screen-reader-text` WordPress, labels cachés, attributs `aria-live`/`aria-busy` et gestion du mode « prefers-reduced-motion » pour des rafraîchissements non intrusifs.【F:discord-bot-jlg/assets/css/discord-bot-jlg.css†L35-L71】【F:discord-bot-jlg/inc/class-discord-shortcode.php†L704-L1040】
 - Panneaux Gutenberg et champs d’administration accessibles (légendes cachées, descriptions) pour guider la configuration des icônes et libellés.【F:discord-bot-jlg/inc/class-discord-admin.php†L878-L939】【F:discord-bot-jlg/inc/class-discord-admin.php†L1299-L1385】
+- Le panneau d’état public agrège automatiquement les cinq derniers événements (succès API, erreurs HTTP, limites de taux) pour diagnostiquer les incidents sans quitter la page.【F:discord-bot-jlg/inc/class-discord-api.php†L1018-L1087】【F:discord-bot-jlg/inc/class-discord-shortcode.php†L678-L713】
 
 ### API, analytics & supervision
 - Endpoints REST `discord-bot-jlg/v1/stats` et `discord-bot-jlg/v1/analytics` pour récupérer les compteurs en temps réel ou agrégés, protégés par la capacité `manage_options` ou une clé d’accès filtrable (`discord_bot_jlg_rest_access_key`).【F:discord-bot-jlg/inc/class-discord-rest.php†L23-L199】【F:discord-bot-jlg/inc/class-discord-rest.php†L201-L244】
@@ -148,6 +149,17 @@ phpunit --testsuite discord-bot-jlg
 La suite couvre à la fois la couche API et la sanitisation des options d'administration (ID serveur, token, durée du cache et CSS personnalisé).
 
 Le fichier `phpunit.xml.dist` du plugin référence automatiquement le bootstrap de la suite de tests.
+
+## Feuille de route & chantiers en cours
+
+Les analyses consignées dans `docs/` ont permis d'identifier plusieurs axes d'amélioration afin de rapprocher l'extension des standards professionnels :
+
+- **Refactorer les services volumineux** : extraire des classes dédiées pour l'API, l'administration et le bootstrap afin de réduire le couplage et faciliter les tests unitaires.【F:docs/code-review.md†L9-L56】
+- **Renforcer la résilience et l'observabilité** : introduire un scheduler plus robuste, un backoff adaptatif et des exports de télémétrie pour suivre la santé des connecteurs Discord.【F:docs/comparaison-apps-pro.md†L38-L87】【F:docs/audit-fonctions.md†L3-L41】
+- **Enrichir l'expérience utilisateur** : proposer des modes comparatifs multi-profils, des presets graphiques documentés et une signalétique d'état inspirée des solutions pro.【F:docs/ux-ui-ameliorations-suite.md†L1-L117】【F:docs/presets-ui.md†L1-L69】
+- **Industrialiser l'analytics** : améliorer la timeline d'administration, offrir des exports automatisés et préparer des pipelines d'alerting.【F:docs/audit-professionnel.md†L1-L120】【F:docs/ux-ui-ameliorations-suite.md†L63-L108】
+
+Ces chantiers peuvent être traités de manière incrémentale. Le dossier `docs/` fournit des plans détaillés et des recommandations inspirées d'outils SaaS pour guider la priorisation.
 
 ## Support
 - Portail développeur Discord : https://discord.com/developers/applications

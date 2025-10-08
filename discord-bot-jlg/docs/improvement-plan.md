@@ -26,3 +26,14 @@ Ce document recense les zones du plugin qui gagneraient à être rapprochées de
 * **Couplage fort avec l'analytics** : l'écriture en base et le logging analytics sont imbriqués. Les applications pro utilisent des bus d'événements ou des jobs asynchrones pour éviter que des erreurs de reporting n'empêchent le cache d'être écrit.【F:discord-bot-jlg/inc/class-discord-api.php†L552-L582】
 * **Absence de métadonnées temporelles** : seul l'instant de mise en cache est implicite. En production, on stocke souvent un horodatage, la latence des appels et la source (widget/bot) pour diagnostiquer les incohérences.
 * **Observabilité** : pas de métriques sur la fraîcheur des snapshots ni de limites pour éviter un flood analytics. Ajouter des quotas et une télémétrie compatible StatsD/Prometheus rapprocherait le plugin des pratiques entreprises.
+
+## Feuille de route technique consolidée
+
+| Phase | Objectif | Actions clés | Suivi |
+| --- | --- | --- | --- |
+| 1. Stabilisation | Séparer les responsabilités et renforcer la journalisation. | Créer les services `ProfileRepository`, `HttpConnector`, `CacheGateway` et brancher un logger PSR-3. | Dépend de la refonte `get_stats()`.【F:discord-bot-jlg/docs/improvement-plan.md†L6-L33】 |
+| 2. Résilience | Introduire des stratégies de retry, circuit breaker et backoff. | Implémenter un scheduler avancé (Action Scheduler) et des métriques sur les quotas. | Aligné avec `reschedule_cron_event()`.【F:docs/audit-fonctions.md†L56-L71】 |
+| 3. Observabilité | Exposer des événements structurés et des exports analytics. | Publier un endpoint `/logs`, exporter CSV/JSON et connecter des webhooks. | Voir audit professionnel.【F:docs/audit-professionnel.md†L42-L75】 |
+| 4. Expérience admin | Modulariser la sanitisation et les écrans de réglages. | Schéma de validation, rotation des secrets, écrans segmentés. | Dépend du plan de revue de code.【F:docs/code-review.md†L35-L48】 |
+
+Chaque phase peut être traitée indépendamment, mais respecter l’ordre garantit une montée en maturité progressive (stabilité ➜ résilience ➜ visibilité ➜ ergonomie).

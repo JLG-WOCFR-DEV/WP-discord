@@ -84,3 +84,14 @@ Ce document rassemble plusieurs pistes de presets graphiques pouvant être inté
 - Tester les presets avec les composants WordPress (`wp-components`) pour assurer la cohérence avec le back-office.
 
 Ces presets peuvent être combinés ou ajustés selon les besoins : par exemple, adopter la structure Headless UI et appliquer les teintes Shadcn UI, ou intégrer les micro-animations Anime.js sur une base Bootstrap.
+
+## Prochaines étapes d'implémentation
+
+| Priorité | Action | Détails | Dépendances |
+| --- | --- | --- | --- |
+| 🟠 | Formaliser les variables de thème | Définir un fichier source (`scss` ou `css`) regroupant les tokens communs (`--discord-surface`, `--discord-accent`) utilisés par chaque preset. | Refactoring CSS en cours dans `discord-bot-jlg/assets/css/`. |
+| 🟡 | Exposer les presets dans Gutenberg | Ajouter des `block.json` variations et panels dédiés pour sélectionner `headless`, `shadcn`, `radix`, etc. | Extension des attributs du bloc et mapping PHP/JS.【F:discord-bot-jlg/block/discord-stats/block.json†L1-L239】 |
+| 🟢 | Préparer une librairie de snippets | Documenter des extraits HTML/CSS prêts à l’emploi (navigation, cards, toasts) réutilisables dans les pages d’administration. | Documentation contributeurs dans `docs/`. |
+| 🟢 | Tester les interactions `prefers-reduced-motion` | Vérifier que les animations des presets `anime` et `shadcn` respectent la désactivation automatique. | Suite de tests front existante (`tests/js`). |
+
+Les presets peuvent être intégrés de manière incrémentale : commencer par un thème (ex. Headless Essence) puis décliner les autres en tirant parti des mêmes tokens pour limiter la dette de maintenance.
