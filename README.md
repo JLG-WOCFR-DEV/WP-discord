@@ -166,6 +166,17 @@ La suite couvre à la fois la couche API et la sanitisation des options d'admini
 
 Le fichier `phpunit.xml.dist` du plugin référence automatiquement le bootstrap de la suite de tests.
 
+## Feuille de route & chantiers en cours
+
+Les analyses consignées dans `docs/` ont permis d'identifier plusieurs axes d'amélioration afin de rapprocher l'extension des standards professionnels :
+
+- **Refactorer les services volumineux** : extraire des classes dédiées pour l'API, l'administration et le bootstrap afin de réduire le couplage et faciliter les tests unitaires.【F:docs/code-review.md†L9-L56】
+- **Renforcer la résilience et l'observabilité** : introduire un scheduler plus robuste, un backoff adaptatif et des exports de télémétrie pour suivre la santé des connecteurs Discord.【F:docs/comparaison-apps-pro.md†L38-L87】【F:docs/audit-fonctions.md†L3-L41】
+- **Enrichir l'expérience utilisateur** : proposer des modes comparatifs multi-profils, des presets graphiques documentés et une signalétique d'état inspirée des solutions pro.【F:docs/ux-ui-ameliorations-suite.md†L1-L117】【F:docs/presets-ui.md†L1-L69】
+- **Industrialiser l'analytics** : améliorer la timeline d'administration, offrir des exports automatisés et préparer des pipelines d'alerting.【F:docs/audit-professionnel.md†L1-L120】【F:docs/ux-ui-ameliorations-suite.md†L63-L108】
+
+Ces chantiers peuvent être traités de manière incrémentale. Le dossier `docs/` fournit des plans détaillés et des recommandations inspirées d'outils SaaS pour guider la priorisation.
+
 ## Support
 - Portail développeur Discord : https://discord.com/developers/applications
 - Notes de version disponibles dans l’interface du plugin.
