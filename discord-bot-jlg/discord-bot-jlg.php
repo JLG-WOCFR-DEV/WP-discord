@@ -79,6 +79,10 @@ function discord_bot_jlg_uninstall() {
             require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-event-logger.php';
         }
 
+        if (!class_exists('Discord_Bot_JLG_Options_Repository')) {
+            require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-options-repository.php';
+        }
+
         require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-api.php';
     } elseif (!class_exists('Discord_Bot_JLG_Http_Client')) {
         require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-http.php';
@@ -92,16 +96,25 @@ function discord_bot_jlg_uninstall() {
         require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-event-logger.php';
     }
 
+    if (!class_exists('Discord_Bot_JLG_Options_Repository')) {
+        require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-options-repository.php';
+    }
+
     if (class_exists('Discord_Bot_JLG_API')) {
         $analytics = new Discord_Bot_JLG_Analytics();
         $event_logger = new Discord_Bot_JLG_Event_Logger();
+        $options_repository = new Discord_Bot_JLG_Options_Repository(
+            DISCORD_BOT_JLG_OPTION_NAME,
+            'discord_bot_jlg_get_default_options'
+        );
         $api = new Discord_Bot_JLG_API(
             DISCORD_BOT_JLG_OPTION_NAME,
             DISCORD_BOT_JLG_CACHE_KEY,
             DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION,
             null,
             $analytics,
-            $event_logger
+            $event_logger,
+            $options_repository
         );
 
         $api->purge_full_cache();
@@ -126,6 +139,7 @@ require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/helpers.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-analytics.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-http.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-event-logger.php';
+require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-options-repository.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-api.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-admin.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-shortcode.php';
@@ -136,6 +150,11 @@ require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-rest.php';
 if (defined('WP_CLI') && WP_CLI) {
     require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-cli.php';
 
+    $cli_options_repository = new Discord_Bot_JLG_Options_Repository(
+        DISCORD_BOT_JLG_OPTION_NAME,
+        'discord_bot_jlg_get_default_options'
+    );
+
     WP_CLI::add_command(
         'discord-bot',
         new Discord_Bot_JLG_CLI(
@@ -145,7 +164,8 @@ if (defined('WP_CLI') && WP_CLI) {
                 DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION,
                 null,
                 null,
-                new Discord_Bot_JLG_Event_Logger()
+                new Discord_Bot_JLG_Event_Logger(),
+                $cli_options_repository
             )
         )
     );
@@ -169,12 +189,17 @@ class DiscordServerStats {
     private $rest_controller;
     private $analytics;
     private $event_logger;
+    private $options_repository;
 
     public function __construct() {
         $this->default_options = discord_bot_jlg_get_default_options();
 
         $this->analytics = new Discord_Bot_JLG_Analytics();
         $this->event_logger = new Discord_Bot_JLG_Event_Logger();
+        $this->options_repository = new Discord_Bot_JLG_Options_Repository(
+            DISCORD_BOT_JLG_OPTION_NAME,
+            'discord_bot_jlg_get_default_options'
+        );
 
         $this->api       = new Discord_Bot_JLG_API(
             DISCORD_BOT_JLG_OPTION_NAME,
@@ -182,7 +207,8 @@ class DiscordServerStats {
             DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION,
             null,
             $this->analytics,
-            $this->event_logger
+            $this->event_logger,
+            $this->options_repository
         );
         $this->admin     = new Discord_Bot_JLG_Admin(DISCORD_BOT_JLG_OPTION_NAME, $this->api, $this->analytics);
         $this->shortcode = new Discord_Bot_JLG_Shortcode(DISCORD_BOT_JLG_OPTION_NAME, $this->api);
