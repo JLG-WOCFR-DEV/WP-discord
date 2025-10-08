@@ -82,3 +82,28 @@ Les éditeurs SaaS matures se distinguent aussi par la qualité de leur outillag
 | 🟢 Basse | Industrialiser les presets graphiques | Packager les thèmes Headless/Shadcn/Radix avec variables CSS et variations Gutenberg. | 【F:docs/presets-ui.md†L1-L112】 |
 
 Ce tableau fait office de vue d’ensemble pour les discussions produit. Chaque piste est détaillée dans les sections précédentes et dans les autres documents du dossier `docs/`.
+
+## Checklist de conformité (SOC2 / RGPD)
+
+- **Journalisation** : conserver un historique des accès aux données Discord (lecture/écriture) avec horodatage, identifiant utilisateur et action réalisée.
+- **Gestion des secrets** : chiffrer les tokens au repos, auditer les accès administrateurs et documenter la procédure de rotation (au moins trimestrielle).
+- **Sécurité réseau** : valider que tous les appels sortants utilisent HTTPS/TLS 1.2+, stocker les certificats de confiance et consigner les erreurs de handshake.
+- **Protection des données** : exposer une politique de conservation des analytics (purge automatique au-delà de 18 mois) et permettre la suppression sur demande.
+- **Plan de reprise** : définir des scénarios de restauration en cas de corruption du cache ou de la table analytics, incluant des tests de restauration semestriels.
+
+## Tableau de dépendances techniques
+
+| Sujet | Dépendances | Impact si non résolu | Mitigation |
+| --- | --- | --- | --- |
+| Backoff cron | API WordPress Cron, Action Scheduler | Risque de doublons/chevauchement, saturation quotas API | Utiliser Action Scheduler avec clé de groupe et verrou distribué |
+| Chiffrement des secrets | Extension Sodium, clé secrète définie | Impossible de stocker les tokens si Sodium absent | Prévoir fallback OpenSSL + détection lors de l'activation |
+| Exports analytics | WP REST, outils front (CSV, charts) | Expérience dégradée pour les CM, impossibilité de partager les insights | Introduire pipeline CSV server-side + endpoint async |
+| Variations Gutenberg | Versions WordPress >= 6.3, compatibilité React | Bloc non chargeable sur anciennes versions, erreurs UI | Détecter la version WP et fournir fallback (shortcode) |
+
+## Calendrier indicatif
+
+1. **Août 2024** : livraison du lot L1 (Options & secrets) + mise en place du chiffrement et des hooks de rotation.
+2. **Septembre 2024** : refactor du cache/cron (lot L2) + introduction d'Action Scheduler et des métriques de backoff.
+3. **Octobre 2024** : connecteur Discord isolé (lot L3) + publication d'un endpoint d'observabilité enrichi.
+4. **Novembre 2024** : refonte analytics/journal (lot L4) et bêta publique des exports CSV.
+5. **Décembre 2024** : segmentation des écrans admin et variations Gutenberg (lot L5) + release 3.0.0.

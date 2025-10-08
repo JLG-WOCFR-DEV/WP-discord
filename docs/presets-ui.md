@@ -95,3 +95,37 @@ Ces presets peuvent être combinés ou ajustés selon les besoins : par exemple,
 | 🟢 | Tester les interactions `prefers-reduced-motion` | Vérifier que les animations des presets `anime` et `shadcn` respectent la désactivation automatique. | Suite de tests front existante (`tests/js`). |
 
 Les presets peuvent être intégrés de manière incrémentale : commencer par un thème (ex. Headless Essence) puis décliner les autres en tirant parti des mêmes tokens pour limiter la dette de maintenance.
+
+## Tokens CSS communs
+
+- `--discord-surface-background`
+- `--discord-surface-text`
+- `--discord-accent`
+- `--discord-accent-secondary`
+- `--discord-accent-contrast`
+- `--discord-border-radius`
+- `--discord-shadow-elevated`
+
+Ces variables doivent être définies dans un fichier source (`assets/css/themes.css`) et surchargées par chaque preset via un sélecteur racine (`.discord-theme-<preset>`). Les composants (cards, boutons, toasts) consommeront uniquement ces tokens pour rester compatibles avec les thèmes WordPress.
+
+## Guide d'intégration Gutenberg
+
+1. Ajouter un contrôle `SelectControl` ou `ButtonGroup` dans l'inspecteur pour choisir le preset.
+2. Propager l'attribut `theme_preset` vers le rendu PHP (shortcode/widget) afin d'appliquer la classe CSS correspondante.
+3. Utiliser `useSelect` pour récupérer la palette globale du thème (`theme.json`) et proposer des suggestions cohérentes avec les presets (ex. associer `accent_color` aux couleurs globales).
+4. Prévoir un panneau "Prévisualisation" (Storybook interne ou modal) affichant le rendu de chaque preset avec des données fictives afin de faciliter la sélection.
+
+## Roadmap d'implémentation
+
+| Sprint | Livrables | Notes |
+| --- | --- | --- |
+| S1 | Extraction des tokens CSS + preset Headless Essence | Prioriser l'accessibilité et documenter les variables dans README |
+| S2 | Ajout des presets Shadcn Minimal & Bootstrap Fluent | Créer des snippets Gutenberg et mettre à jour la documentation de design |
+| S3 | Variations avancées (Radix Structure, Semantic Harmony) | Introduire les transitions `data-state` et tester le mode sombre |
+| S4 | Preset Anime Pulse + animations paramétrables | Ajouter un toggle `reducedMotion` et des hooks d'initialisation JS |
+
+Chaque sprint se conclut par :
+
+- Une revue design/QA (compatibilité responsive, accessibilité).
+- Des tests manuels dans Gutenberg (insertion, changement de preset, publication).
+- Une mise à jour du changelog et des captures d'écran marketing.

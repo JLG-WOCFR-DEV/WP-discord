@@ -41,3 +41,33 @@
 | `persist_successful_stats()` | Déléguer l’écriture analytics à une file asynchrone (Action Scheduler). | Évite que l’échec du reporting bloque le cache front. | 【F:discord-bot-jlg/inc/class-discord-api.php†L552-L582】 |
 
 Ces actions sont alignées avec la comparaison « apps pro » et peuvent être traitées indépendamment pour livrer de la valeur rapidement.
+
+## Scénarios de tests recommandés
+
+1. **Unitaires (PHPUnit)**
+   - Simuler des réponses HTTP variées (200, 429 avec `Retry-After`, 500) et vérifier que `FetchStats` ou `Discord_Bot_JLG_API::get_stats()` délègue correctement aux services de fallback.
+   - Couvrir la rotation des secrets (expiration, régénération forcée) pour s'assurer qu'un token expiré déclenche bien l'alerte et que le chiffrement/déchiffrement ne fuit aucune donnée.
+   - Tester le backoff exponentiel : plusieurs échecs consécutifs doivent augmenter l'intervalle programmé et consigner l'état dans le logger.
+
+2. **Intégration (WP-CLI / REST)**
+   - Exécuter `wp discord-bot refresh-cache --profile=<id>` et vérifier que le job programme correctement la prochaine exécution (lecture dans `wp cron`).
+   - Interroger `GET /wp-json/discord-bot-jlg/v1/events` après une série d'échecs pour s'assurer que les événements contiennent les nouveaux champs (`retry_count`, `backoff_until`).
+   - Lancer la page d'administration et soumettre un formulaire avec champs invalides pour confirmer que la validation schématique renvoie des messages précis et réécrit les valeurs sécurisées.
+
+3. **End-to-end (navigateur)**
+   - Charger une page front avec le widget en mode comparaison multi-profils, activer/désactiver le rafraîchissement et vérifier la cohérence des deltas affichés.
+   - Tester l'expérience mobile (Chrome DevTools) pour s'assurer que les bannières d'état et skeletons s'affichent correctement lors des changements de statut.
+
+## Indicateurs de suivi post-livraison
+
+- **Taux d'échec des jobs cron** : suivre la métrique dans Site Health ou via un dashboard externe, objectif < 2 % sur 30 jours.
+- **Durée moyenne des rafraîchissements** : viser une médiane < 1,2 s et un 95e percentile < 2,5 s grâce au backoff et à la mutualisation du cache.
+- **Temps de traitement des formulaires d'administration** : garantir un rendu < 400 ms après soumission malgré la validation schématique et le chiffrement.
+- **Nombre d'alertes de rotation de secrets** : suivre la fréquence des alertes pour calibrer les durées d'expiration et éviter le bruit opérationnel.
+
+## Plan de communication
+
+1. **Avant refactor** : annoncer la feuille de route aux utilisateurs via le changelog et le canal de support, préciser les bénéfices attendus (stabilité, sécurité).
+2. **Pendant la migration** : publier des notes d'aperçu (release candidates) et solliciter des tests communautaires, notamment sur les environnements multi-sites.
+3. **Après la livraison** : documenter les changements majeurs (nouvelles classes, hooks, endpoints) dans le README et produire un tutoriel de rotation des tokens.
+4. **Support continu** : maintenir une FAQ (docs/faq.md) recensant les incidents connus et les procédures de dépannage liées aux nouveaux mécanismes (backoff, queue, chiffrement).

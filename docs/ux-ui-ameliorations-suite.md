@@ -103,3 +103,21 @@
 | 🟢 Idea bank | Sparkline multi-couches | Déterminer les métriques à exposer par défaut et la logique d’alerting. | 【F:docs/ux-ui-ameliorations-suite.md†L166-L210】 |
 
 Ce tableau complète la roadmap produit en fournissant un état synthétique des initiatives UX. Mettre à jour les statuts à mesure des validations ateliers/design.
+
+## KPI UX à suivre
+
+- **Temps moyen de configuration** : durée entre l'ajout du bloc et la publication, objectif < 6 minutes pour les nouveaux utilisateurs.
+- **Taux d'utilisation du mode comparatif** : part des sessions où le mode multi-profils est activé, objectif 35 % dans les trois mois suivant la sortie.
+- **Satisfaction visuelle** : score moyen (sur 5) collecté via un sondage in-app sur l'aperçu Gutenberg.
+- **Taux de clic sur les CTA contextuels** : mesurer la performance des boutons additionnels proposés dans la signalétique d'état.
+
+## Budget design & recherche utilisateur
+
+| Activité | Temps estimé | Livrable |
+| --- | --- | --- |
+| Tests utilisateurs (5 sessions) | 2 jours | Rapport synthèse + enregistrements anonymisés |
+| Atelier design multi-profils | 1 jour | Wireframes responsives + prototype Figma |
+| Benchmark motion/animations | 0,5 jour | Bibliothèque d'interactions validées (Figma) |
+| Mise à jour design system | 1,5 jour | Documentation tokens + components Storybook |
+
+Planifier ces activités avant le développement pour aligner les équipes et réduire les retours tardifs.

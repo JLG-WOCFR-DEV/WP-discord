@@ -53,3 +53,47 @@ En procédant par itérations (extraction d'un service à la fois), le refactori
 | ✅ Prêt pour dev | Nettoyer le dépôt JS | Retirer `node_modules/` du suivi Git, documenter l’installation et automatiser les tests Jest. | `.gitignore` mis à jour + guide contributeur.【F:docs/code-review.md†L63-L66】 |
 
 Ce plan servira de checklist lors des prochains cycles de développement. Les statuts sont à mettre à jour au fur et à mesure des livraisons.
+
+## Architecture cible (vision 2024 Q4)
+
+Pour converger vers un socle proche des standards PSR, l'architecture applicative du plugin peut être organisée autour des couches suivantes :
+
+1. **Domaine** : objets métier (`Profile`, `StatsSnapshot`, `RefreshSchedule`) responsables des invariants. Ces classes ne connaissent pas WordPress et peuvent être testées de manière isolée.
+2. **Application/Use-cases** : services comme `FetchStats`, `RotateSecrets`, `RescheduleRefresh` qui orchestrent la logique métier en s'appuyant sur des ports (interfaces) décrivant les dépendances externes.
+3. **Infrastructure** : implémentations des ports (`WpOptionsRepository`, `TransientCache`, `DiscordHttpClient`, `WpCronScheduler`) qui encapsulent l'API WordPress, HTTP et les librairies tierces.
+4. **Interface** : adaptateurs pour l'administration, le bloc Gutenberg, les shortcodes et REST endpoints. Cette couche se contente de mapper les requêtes utilisateur vers les use-cases.
+
+Le bootstrap (`PluginServiceProvider`) assemble ces briques en injectant les implémentations concrètes et en exposant les hooks nécessaires. Cette découpe permet de cibler progressivement les refactors : chaque extraction consiste à introduire un port dans la couche application, puis à migrer la logique existante de la classe monolithique vers une implémentation infrastructure.
+
+## Checklist de migration par lot
+
+| Lot | Objectif | Tâches clés | Livrables |
+| --- | --- | --- | --- |
+| L1 – Options & secrets | Isoler la gestion des options et sécuriser les tokens | Créer `OptionsRepository`, déplacer lecture/écriture des options, introduire un chiffrage via Sodium | Nouvelle classe + tests unitaires, documentation de rotation | 
+| L2 – Cache & verrous | Centraliser les transients et verrous anti-concurrence | Implémenter `CacheManager`, déléguer les accès à `get_transient`/`set_transient`, ajouter un verrou redistribuable | Classe `CacheManager`, tests sur TTL/verrous, hooks d'observabilité |
+| L3 – Connecteur Discord | Encapsuler les appels HTTP, retries et instrumentation | Créer `DiscordHttpClient`, déplacer la logique `wp_remote_request`, gérer `Retry-After` et instrumentation PSR-3 | Client dédié, tests de résilience (mocks HTTP), logs structurés |
+| L4 – Analytics & journal | Sortir la persistance analytics et les événements REST | Définir `AnalyticsLogger`, migrer `persist_successful_stats` et le journal REST, préparer l'export CSV | Classes analytics, endpoint REST refactoré, script d'export |
+| L5 – Interfaces admin | Segmenter les écrans d'administration | Introduire des sous-modules (`ProfilesSettings`, `DisplaySettings`), migrer les callbacks, ajouter tests d'intégration | Nouvelles classes UI, couverture Jest/React, guide de contribution |
+
+Chaque lot doit être livré avec :
+
+- **Tests automatisés** couvrant la nouvelle classe et les régressions critiques.
+- **Documentation** dans `docs/` (diagramme de séquence, guide d'intégration).
+- **Journal de migration** (notes dans CHANGELOG ou README) pour faciliter les retours arrière.
+
+## Indicateurs de réussite
+
+- **Couverture unitaire** : atteindre au moins 70 % de couverture sur les nouvelles classes extraites (`OptionsRepository`, `CacheManager`, `DiscordHttpClient`).
+- **Temps moyen d'exécution des tests** : rester sous 90 s sur la suite PHPUnit pour garantir un feedback rapide en CI.
+- **Complexité cyclomatique** : réduire la complexité des méthodes critiques (`Discord_Bot_JLG_API::get_stats`, `Discord_Bot_JLG_Admin::render_settings_page`) en dessous de 15 via les extractions proposées.
+- **Stabilité** : zéro régression signalée dans les logs Site Health (`discord_bot_jlg`) sur deux cycles de release consécutifs après refactor.
+
+## Suivi opérationnel
+
+Mettre en place un tableau de bord (Notion, Jira ou GitHub Projects) reprenant les lots ci-dessus, avec pour chaque tâche :
+
+- Description, critères d'acceptation, tests à exécuter.
+- Estimation (en points ou en jours) et dépendances identifiées.
+- Checklists de revue (code review, QA, documentation) pour sécuriser les merges.
+
+Un point hebdomadaire de synchronisation entre développeurs backend, frontend et QA permettra d'ajuster la priorisation et d'identifier en amont les impacts croisés (ex. bloc Gutenberg vs. API REST).
