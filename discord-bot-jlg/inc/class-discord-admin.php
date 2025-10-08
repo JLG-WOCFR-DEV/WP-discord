@@ -327,6 +327,14 @@ class Discord_Bot_JLG_Admin {
             'accent_text_color'  => isset($current_options['accent_text_color']) ? discord_bot_jlg_sanitize_color($current_options['accent_text_color']) : '',
         );
 
+        $default_retention = defined('DISCORD_BOT_JLG_ANALYTICS_RETENTION_DEFAULT')
+            ? (int) DISCORD_BOT_JLG_ANALYTICS_RETENTION_DEFAULT
+            : Discord_Bot_JLG_Analytics::DEFAULT_RETENTION_DAYS;
+
+        $current_retention = isset($current_options['analytics_retention_days'])
+            ? max(0, (int) $current_options['analytics_retention_days'])
+            : $default_retention;
+
         $sanitized = array(
             'server_id'      => '',
             'bot_token'      => isset($current_options['bot_token']) ? $current_options['bot_token'] : '',
@@ -355,6 +363,7 @@ class Discord_Bot_JLG_Admin {
                 : 300,
             'custom_css'     => '',
             'default_refresh_interval' => $current_refresh_interval,
+            'analytics_retention_days' => $current_retention,
             'stat_bg_color'      => $existing_colors['stat_bg_color'],
             'stat_text_color'    => $existing_colors['stat_text_color'],
             'accent_color'       => $existing_colors['accent_color'],
@@ -561,7 +570,7 @@ class Discord_Bot_JLG_Admin {
                 : $input['analytics_retention_days'];
 
             if ('' === $raw_retention) {
-                $sanitized['analytics_retention_days'] = $sanitized['analytics_retention_days'];
+                $sanitized['analytics_retention_days'] = $current_retention;
             } else {
                 $retention = absint($raw_retention);
 
