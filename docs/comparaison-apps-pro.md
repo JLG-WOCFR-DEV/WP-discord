@@ -1,5 +1,12 @@
 # Comparaison avec des applications professionnelles
 
+## Résumé exécutif (2024-07)
+
+- **Robustesse opérationnelle** : la collecte actuelle est fiable mais manque de backoff, de retry différenciés et de supervision exportable (Prometheus/Webhooks).【F:docs/comparaison-apps-pro.md†L17-L54】 Priorité haute pour préparer des SLA.
+- **Gouvernance & secrets** : stockage des tokens en clair et option unique pour tous les profils — migrer vers une architecture multi-tenant dédiée et introduire chiffrement/rotation automatisée.【F:docs/comparaison-apps-pro.md†L41-L63】
+- **Expérience analytics** : analytics solides mais sans segmentation, exports ni notifications. Compléter avec comparaisons multi-profils et centre d’alertes (voir `docs/ux-ui-ameliorations-suite.md`).【F:docs/comparaison-apps-pro.md†L5-L36】
+- **Outillage développeur** : aligner le packaging (CI, dist-archive, .gitignore) pour approcher les standards SaaS, en cohérence avec `docs/code-review.md`.
+
 ## Forces actuelles
 - **Chaîne de collecte robuste** : la récupération combine widget public, bot et modes de secours pour éviter les interruptions d’affichage, tout en journalisant les erreurs et en conservant des statistiques de repli.【F:discord-bot-jlg/inc/class-discord-api.php†L240-L358】【F:discord-bot-jlg/inc/class-discord-api.php†L406-L489】
 - **Administration avancée** : les options couvrent profils multiples, thèmes, icônes, libellés, CTA et cache, avec sanitisation systématique pour sécuriser les entrées.【F:discord-bot-jlg/inc/class-discord-admin.php†L213-L423】【F:discord-bot-jlg/inc/class-discord-admin.php†L642-L907】
@@ -64,3 +71,11 @@ Les éditeurs SaaS matures se distinguent aussi par la qualité de leur outillag
 1. **Capitaliser sur les tests existants** : généraliser l’exécution automatisée des suites PHPUnit et Jest (mock HTTP, scénarios front) dans un pipeline CI pour détecter les régressions avant déploiement public.【F:discord-bot-jlg/tests/phpunit/Test_Discord_Bot_JLG_API.php†L1-L34】【F:tests/js/discord-bot-jlg.test.js†L1-L160】
 2. **Documenter le packaging avancé** : compléter le README avec des guides marché (traductions, exigences RGPD, matrice de support) et proposer des scripts de build (Composer, `wp dist-archive`) afin de reproduire les standards de livraison des solutions pro.【F:README.md†L1-L120】【F:discord-bot-jlg/discord-bot-jlg.php†L123-L198】
 3. **Structurer la traçabilité** : coupler les hooks de nettoyage/install avec un journal d’opérations (création/suppression de profils, purges, appels REST) pour simplifier les audits de sécurité et la gestion des incidents.【F:discord-bot-jlg/discord-bot-jlg.php†L123-L167】【F:discord-bot-jlg/inc/class-discord-analytics.php†L164-L217】
+
+## Points de convergence avec les autres plans
+
+- **Refactoring API/cron** : suivre le `Plan d'amélioration` pour décomposer l’accès aux stats et introduire un scheduler résilient partagé (docs/audit-fonctions.md).
+- **UX & presets** : exploiter les recommandations UX pour proposer des fonctionnalités différenciantes une fois la base technique renforcée (docs/ux-ui-ameliorations-suite.md, docs/presets-ui.md).
+- **Observabilité** : capitaliser sur l’audit professionnel pour prioriser l’export de métriques et les webhooks dans le backlog technique (docs/code-review.md).
+
+> Mise à jour : 2024-07-02 — ce résumé doit ouvrir chaque revue stratégique afin de vérifier l’avancement des actions listées ci-dessus.

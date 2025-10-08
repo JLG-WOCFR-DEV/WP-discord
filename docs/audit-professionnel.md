@@ -78,3 +78,15 @@
 
 ---
 En priorisant ces évolutions, l'extension pourra rivaliser avec les solutions professionnelles tout en capitalisant sur les fondations techniques déjà solides.
+
+## Tableau de suivi (vue produit)
+
+| Thème | Problème identifié | Solution proposée | Impact attendu | Priorité |
+| --- | --- | --- | --- | --- |
+| Multi-tenant | Profils et secrets stockés dans une option unique non segmentée.【F:discord-bot-jlg/inc/class-discord-admin.php†L428-L642】 | Migrer vers un dépôt dédié (table custom ou CPT) avec capacités par profil et clés API périmétrées. | Accès délégué par serveur, conformité sécurité accrue. | 🚨 Haute |
+| Observabilité | Journal REST non exploité dans des outils externes, absence d’alertes en temps réel.【F:discord-bot-jlg/inc/class-discord-api.php†L1991-L2133】 | Ajouter exports Prometheus/OpenTelemetry, webhooks et seuils configurables. | Réduction du MTTR, supervision proactive. | 🚨 Haute |
+| Fiabilité API | Cron linéaire sans backoff ni idempotence.【F:discord-bot-jlg/discord-bot-jlg.php†L394-L417】 | Implémenter une file asynchrone + backoff exponentiel + verrouillage distribué. | Moins de rate-limit, meilleure fraîcheur des données. | ⚠️ Moyenne |
+| UX Analytics | Timeline admin limitée (pas de zoom, pas d’annotations).【F:docs/ux-ui-ameliorations-suite.md†L40-L69】 | Ajouter sélecteurs de période, annotations et exports (CSV/PNG). | Adoption analytics, insights actionnables. | ⚠️ Moyenne |
+| Packaging | `node_modules/` versionné, pipeline CI absent.【F:docs/code-review.md†L39-L60】 | Ignorer les dépendances vendoriées, définir un workflow CI (tests, lint). | Déploiements reproductibles, repo allégé. | ✅ Faible |
+
+> Dernière révision : 2024-07-02 — voir également `docs/audit-fonctions.md` pour le détail des extractions techniques.

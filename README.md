@@ -131,6 +131,23 @@ Un widget « Discord Bot - JLG » est disponible via le menu « Widgets ».
 - Intégration WP-CLI avec commandes `wp discord-bot refresh-cache` et `wp discord-bot clear-cache` pour forcer une synchronisation ou purger les données sans passer par l’UI.【F:discord-bot-jlg/inc/class-discord-cli.php†L24-L81】
 - Test « Site Health » dédié indiquant l’état de la connexion Discord, les erreurs récentes et les prochaines tentatives de rafraîchissement.【F:discord-bot-jlg/inc/class-discord-site-health.php†L17-L105】
 - Chargement des traductions et assets spécifiques (bloc, scripts, styles) afin d’assurer une intégration native à l’écosystème WordPress.【F:discord-bot-jlg/discord-bot-jlg.php†L105-L180】【F:discord-bot-jlg/discord-bot-jlg.php†L226-L315】
+- Actions et filtres d’observabilité permettant de brancher des systèmes d’alerte ou de télémétrie externes autour des appels HTTP (`discord_bot_jlg_pre_http_request`, `discord_bot_jlg_before_http_request`, `discord_bot_jlg_http_response`, `discord_bot_jlg_after_http_request`) et du journal d’événements (`discord_bot_jlg_discord_http_event_context`, `discord_bot_jlg_should_log_discord_http_event`, `discord_bot_jlg_discord_http_event_logged`).【F:discord-bot-jlg/inc/class-discord-http.php†L66-L160】【F:discord-bot-jlg/inc/class-discord-api.php†L2214-L2248】
+
+```php
+add_action('discord_bot_jlg_after_http_request', function ($response, $url, $args, $context, $request_id, $duration_ms) {
+    error_log(sprintf(
+        '[Discord Bot] %s (%s) -> %d in %dms',
+        $context,
+        $request_id,
+        is_wp_error($response) ? $response->get_error_code() : wp_remote_retrieve_response_code($response),
+        $duration_ms
+    ));
+});
+
+add_filter('discord_bot_jlg_should_log_discord_http_event', function ($should_log, $event_context) {
+    return !empty($event_context['status_code']); // Ignore les entrées sans statut HTTP.
+}, 10, 2);
+```
 
 ## Désinstallation
 La suppression du plugin depuis WordPress efface automatiquement l’option `discord_server_stats_options` et le transient `discord_server_stats_cache` associés aux statistiques du serveur.
@@ -153,11 +170,22 @@ Le fichier `phpunit.xml.dist` du plugin référence automatiquement le bootstrap
 - Portail développeur Discord : https://discord.com/developers/applications
 - Notes de version disponibles dans l’interface du plugin.
 
+## Feuille de route & documentation interne
+
+Pour préparer les prochaines itérations, plusieurs audits et plans d’amélioration ont été consignés dans le dossier [`docs/`](docs). Ils servent de base à la priorisation produit et au suivi des chantiers techniques :
+
+- **Refontes techniques critiques** : l’audit des fonctions `get_stats()`, `sanitize_options()` et du cron identifie les extractions de services et stratégies de résilience à mener avant toute nouvelle feature.【F:docs/audit-fonctions.md†L4-L45】【F:discord-bot-jlg/docs/improvement-plan.md†L1-L43】
+- **Alignement avec les solutions professionnelles** : la comparaison détaillée liste les écarts majeurs (multi-tenant, observabilité temps réel, gestion des secrets) et propose des actions concrètes pour se rapprocher des standards SaaS.【F:docs/comparaison-apps-pro.md†L1-L79】
+- **Expériences utilisateurs avancées** : les pistes UX/UI (tableaux comparatifs, explorateur de présence, timeline enrichie) et les presets graphiques documentent les futures évolutions front-office et back-office.【F:docs/ux-ui-ameliorations-suite.md†L1-L83】【F:docs/presets-ui.md†L1-L60】
+- **Refactoring global** : le plan de revue de code centralise les tâches de découpage, l’introduction d’un autoloader et le nettoyage du dépôt pour fiabiliser les livraisons continues.【F:docs/code-review.md†L1-L68】
+
+Ces documents sont tenus à jour à mesure que les chantiers avancent ; reportez-vous à leurs sections « Priorités » pour connaître l’état actuel et les décisions récentes.
+
 ### CLI
 
-Deux commandes WP-CLI facilitent les opérations :
+Deux commandes WP-CLI facilitent les opérations :
 
-- `wp discord-bot refresh-cache` force l'appel API immédiat en ignorant le cache ;
+- `wp discord-bot refresh-cache` force l'appel API immédiat en ignorant le cache ;
 - `wp discord-bot clear-cache` purge toutes les données (transients, sauvegardes et limites de taux).
 
 Les deux commandes retournent un code de sortie non nul en cas d'erreur afin de permettre l'automatisation dans vos scripts d'exploitation.

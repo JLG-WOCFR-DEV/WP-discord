@@ -2276,7 +2276,40 @@ class Discord_Bot_JLG_API {
             }
         }
 
-        $this->event_logger->log('discord_http', $event_context);
+        $filtered_context = apply_filters(
+            'discord_bot_jlg_discord_http_event_context',
+            $event_context,
+            $channel,
+            $response,
+            $context
+        );
+
+        if (!is_array($filtered_context)) {
+            $filtered_context = $event_context;
+        }
+
+        $should_log = apply_filters(
+            'discord_bot_jlg_should_log_discord_http_event',
+            true,
+            $filtered_context,
+            $channel,
+            $response,
+            $context
+        );
+
+        if (!$should_log) {
+            return;
+        }
+
+        $event = $this->event_logger->log('discord_http', $filtered_context);
+
+        do_action(
+            'discord_bot_jlg_discord_http_event_logged',
+            $event,
+            $channel,
+            $response,
+            $context
+        );
     }
 
     private function log_connector_event($channel, array $context = array()) {
