@@ -26,3 +26,15 @@ Ce document recense les zones du plugin qui gagneraient à être rapprochées de
 * **Couplage fort avec l'analytics** : l'écriture en base et le logging analytics sont imbriqués. Les applications pro utilisent des bus d'événements ou des jobs asynchrones pour éviter que des erreurs de reporting n'empêchent le cache d'être écrit.【F:discord-bot-jlg/inc/class-discord-api.php†L552-L582】
 * **Absence de métadonnées temporelles** : seul l'instant de mise en cache est implicite. En production, on stocke souvent un horodatage, la latence des appels et la source (widget/bot) pour diagnostiquer les incohérences.
 * **Observabilité** : pas de métriques sur la fraîcheur des snapshots ni de limites pour éviter un flood analytics. Ajouter des quotas et une télémétrie compatible StatsD/Prometheus rapprocherait le plugin des pratiques entreprises.
+
+## Synthèse & prochaines étapes
+
+| Action | Objectif | Dépendances | Échéance cible | Statut |
+| --- | --- | --- | --- | --- |
+| Décomposer `get_stats()` en orchestrateur + services spécialisés | Réduire la complexité cyclomatique, introduire instrumentation PSR-3 | Décision d’architecture (docs/code-review.md) | Sprint +1 | À planifier |
+| Introduire un scheduler résilient (`StatsRefreshJob`) | Assurer backoff, idempotence et observabilité des rafraîchissements | Extraction cron (`docs/audit-fonctions.md`) | Sprint +2 | À planifier |
+| Créer un dépôt de profils sécurisé | Chiffrer/rotater les tokens, préparer le multi-tenant | Choix stockage (table custom vs CPT) | Sprint +3 | À cadrer |
+| Étendre l’API analytics (historique présence, annotations) | Supporter les fonctionnalités UX (comparatif, timeline enrichie) | Alignement avec `docs/ux-ui-ameliorations-suite.md` | Sprint +3 | Dépend du refactoring |
+| Mettre en place une télémétrie exportable | Alimenter Prometheus/webhooks pour observabilité | Choix outillage (Stack SRE) | Sprint +4 | À cadrer |
+
+> Mise à jour : 2024-07-02 — synchroniser cette table avec `docs/audit-professionnel.md` et `docs/audit-fonctions.md` pour conserver une vue cohérente produit/technique.

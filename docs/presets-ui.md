@@ -84,3 +84,13 @@ Ce document rassemble plusieurs pistes de presets graphiques pouvant être inté
 - Tester les presets avec les composants WordPress (`wp-components`) pour assurer la cohérence avec le back-office.
 
 Ces presets peuvent être combinés ou ajustés selon les besoins : par exemple, adopter la structure Headless UI et appliquer les teintes Shadcn UI, ou intégrer les micro-animations Anime.js sur une base Bootstrap.
+
+## Mise en œuvre progressive
+
+1. **Phase 1 – Documentation & tokens** : définir un fichier de variables CSS commun (`discord-theme-tokens.css`) afin de centraliser les couleurs, rayons et espacements. Cette étape conditionne l’implémentation rapide de chaque preset.
+2. **Phase 2 – Presets admin** : appliquer `Headless Essence` et `Bootstrap Fluent` aux écrans d’options existants pour valider la compatibilité avec `wp-components` (test manuel + capture). Priorité aux composants réutilisés (accordéons, onglets, modales).
+3. **Phase 3 – Front public** : intégrer `Shadcn Minimal` et `Radix Structure` comme thèmes sélectionnables dans les options (`discord_bot_jlg_theme`), avec prévisualisation côté bloc Gutenberg.
+4. **Phase 4 – Animations avancées** : activer `Anime Pulse` sur la page de démonstration et documenter les dépendances éventuelles (fallback CSS si Anime.js absent). Prévoir un toggle global « Réduire les animations ».
+5. **Phase 5 – Industrialisation** : automatiser la génération des variantes (PostCSS/Tailwind) et documenter les tests visuels (Percy, Playwright) pour garantir la stabilité des thèmes.
+
+> Mettre à jour cette feuille de route après chaque livraison de preset afin d’assurer la cohérence avec le plan UX détaillé (`docs/ux-ui-ameliorations-suite.md`).

@@ -40,3 +40,13 @@ Le plugin « Discord Bot - JLG » fournit une intégration très complète (cr
 4. Nettoyer le dépôt (`.gitignore` pour `node_modules/`, documentation de la stack de build/test).
 
 En procédant par itérations (extraction d'un service à la fois), le refactoring restera maîtrisé tout en apportant des bénéfices immédiats sur la qualité du code.
+
+## Suivi des chantiers
+
+- [ ] Créer un autoloader Composer (`composer.json`, PSR-4 `DiscordBotJLG\`) et déplacer les classes extraites dans `src/`.
+- [ ] Extraire `Discord_Bot_JLG_API::get_stats()` en orchestrateur + services `WidgetClient`, `BotClient`, `StatsMerger` avec interface commune.【F:discord-bot-jlg/inc/class-discord-api.php†L240-L358】
+- [ ] Refondre `Discord_Bot_JLG_Admin` en sous-modules (`SettingsPage`, `ProfilesSection`, `DisplaySection`) et couvrir chaque module par des tests PHPUnit ciblés.【F:discord-bot-jlg/inc/class-discord-admin.php†L8-L155】
+- [ ] Déplacer la planification cron et le verrouillage dans un service injectable (`StatsRefreshJob`) afin de permettre des tests unitaires du scheduling.【F:discord-bot-jlg/discord-bot-jlg.php†L394-L417】
+- [ ] Nettoyer le dépôt (ajout de `node_modules/` au `.gitignore`, documentation du workflow `npm test` + `phpunit`).【F:package.json†L1-L16】
+
+> Mise à jour : 2024-07-02 — synchroniser avec `docs/audit-fonctions.md` pour l’état détaillé de chaque extraction.
