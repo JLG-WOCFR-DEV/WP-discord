@@ -345,8 +345,12 @@ function wp_parse_args($args, $defaults = array()) {
     return array_merge($defaults, $args);
 }
 
-function get_option($name) {
-    return isset($GLOBALS['wp_test_options'][$name]) ? $GLOBALS['wp_test_options'][$name] : false;
+function get_option($name, $default = false) {
+    if (isset($GLOBALS['wp_test_options']) && array_key_exists($name, $GLOBALS['wp_test_options'])) {
+        return $GLOBALS['wp_test_options'][$name];
+    }
+
+    return $default;
 }
 
 function update_option($name, $value, $autoload = null) {
