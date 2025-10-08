@@ -124,6 +124,7 @@ Un widget « Discord Bot - JLG » est disponible via le menu « Widgets ».
 ### Accessibilité & UX
 - Styles embarqués reproduisant la classe `.screen-reader-text` WordPress, labels cachés, attributs `aria-live`/`aria-busy` et gestion du mode « prefers-reduced-motion » pour des rafraîchissements non intrusifs.【F:discord-bot-jlg/assets/css/discord-bot-jlg.css†L35-L71】【F:discord-bot-jlg/inc/class-discord-shortcode.php†L704-L1040】
 - Panneaux Gutenberg et champs d’administration accessibles (légendes cachées, descriptions) pour guider la configuration des icônes et libellés.【F:discord-bot-jlg/inc/class-discord-admin.php†L878-L939】【F:discord-bot-jlg/inc/class-discord-admin.php†L1299-L1385】
+- Le panneau d’état public agrège automatiquement les cinq derniers événements (succès API, erreurs HTTP, limites de taux) pour diagnostiquer les incidents sans quitter la page.【F:discord-bot-jlg/inc/class-discord-api.php†L1018-L1087】【F:discord-bot-jlg/inc/class-discord-shortcode.php†L678-L713】
 
 ### API, analytics & supervision
 - Endpoints REST `discord-bot-jlg/v1/stats` et `discord-bot-jlg/v1/analytics` pour récupérer les compteurs en temps réel ou agrégés, protégés par la capacité `manage_options` ou une clé d’accès filtrable (`discord_bot_jlg_rest_access_key`).【F:discord-bot-jlg/inc/class-discord-rest.php†L23-L199】【F:discord-bot-jlg/inc/class-discord-rest.php†L201-L244】

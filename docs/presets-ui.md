@@ -85,12 +85,13 @@ Ce document rassemble plusieurs pistes de presets graphiques pouvant être inté
 
 Ces presets peuvent être combinés ou ajustés selon les besoins : par exemple, adopter la structure Headless UI et appliquer les teintes Shadcn UI, ou intégrer les micro-animations Anime.js sur une base Bootstrap.
 
-## Mise en œuvre progressive
+## Prochaines étapes d'implémentation
 
-1. **Phase 1 – Documentation & tokens** : définir un fichier de variables CSS commun (`discord-theme-tokens.css`) afin de centraliser les couleurs, rayons et espacements. Cette étape conditionne l’implémentation rapide de chaque preset.
-2. **Phase 2 – Presets admin** : appliquer `Headless Essence` et `Bootstrap Fluent` aux écrans d’options existants pour valider la compatibilité avec `wp-components` (test manuel + capture). Priorité aux composants réutilisés (accordéons, onglets, modales).
-3. **Phase 3 – Front public** : intégrer `Shadcn Minimal` et `Radix Structure` comme thèmes sélectionnables dans les options (`discord_bot_jlg_theme`), avec prévisualisation côté bloc Gutenberg.
-4. **Phase 4 – Animations avancées** : activer `Anime Pulse` sur la page de démonstration et documenter les dépendances éventuelles (fallback CSS si Anime.js absent). Prévoir un toggle global « Réduire les animations ».
-5. **Phase 5 – Industrialisation** : automatiser la génération des variantes (PostCSS/Tailwind) et documenter les tests visuels (Percy, Playwright) pour garantir la stabilité des thèmes.
+| Priorité | Action | Détails | Dépendances |
+| --- | --- | --- | --- |
+| 🟠 | Formaliser les variables de thème | Définir un fichier source (`scss` ou `css`) regroupant les tokens communs (`--discord-surface`, `--discord-accent`) utilisés par chaque preset. | Refactoring CSS en cours dans `discord-bot-jlg/assets/css/`. |
+| 🟡 | Exposer les presets dans Gutenberg | Ajouter des `block.json` variations et panels dédiés pour sélectionner `headless`, `shadcn`, `radix`, etc. | Extension des attributs du bloc et mapping PHP/JS.【F:discord-bot-jlg/block/discord-stats/block.json†L1-L239】 |
+| 🟢 | Préparer une librairie de snippets | Documenter des extraits HTML/CSS prêts à l’emploi (navigation, cards, toasts) réutilisables dans les pages d’administration. | Documentation contributeurs dans `docs/`. |
+| 🟢 | Tester les interactions `prefers-reduced-motion` | Vérifier que les animations des presets `anime` et `shadcn` respectent la désactivation automatique. | Suite de tests front existante (`tests/js`). |
 
-> Mettre à jour cette feuille de route après chaque livraison de preset afin d’assurer la cohérence avec le plan UX détaillé (`docs/ux-ui-ameliorations-suite.md`).
+Les presets peuvent être intégrés de manière incrémentale : commencer par un thème (ex. Headless Essence) puis décliner les autres en tirant parti des mêmes tokens pour limiter la dette de maintenance.

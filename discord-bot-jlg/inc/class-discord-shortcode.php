@@ -778,6 +778,22 @@ class Discord_Bot_JLG_Shortcode {
             );
         }
 
+        $history_args = array(
+            'limit'       => 5,
+            'profile_key' => ('' !== $profile_key) ? $profile_key : 'default',
+        );
+
+        if ('' !== $override_server_id) {
+            $history_args['server_id'] = $override_server_id;
+        } elseif (isset($stats['server_id'])) {
+            $history_args['server_id'] = $this->sanitize_server_id_attribute($stats['server_id']);
+        }
+
+        $status_history = $this->api->get_status_history($history_args);
+        if (is_array($status_history)) {
+            $status_meta['history'] = $status_history;
+        }
+
         $status_meta_json = wp_json_encode($status_meta);
         if (false === $status_meta_json) {
             $status_meta_json = '{}';

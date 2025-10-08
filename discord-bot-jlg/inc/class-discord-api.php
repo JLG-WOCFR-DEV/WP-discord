@@ -103,6 +103,98 @@ class Discord_Bot_JLG_API {
         return $this->event_logger;
     }
 
+    public function get_status_history($args = array()) {
+        if (!($this->event_logger instanceof Discord_Bot_JLG_Event_Logger)) {
+            return array();
+        }
+
+        $defaults = array(
+            'limit'       => 5,
+            'profile_key' => '',
+            'server_id'   => '',
+            'types'       => array('discord_http', 'discord_connector'),
+        );
+
+        $args = wp_parse_args($args, $defaults);
+
+        $limit = (int) $args['limit'];
+        if ($limit <= 0) {
+            $limit = $defaults['limit'];
+        } elseif ($limit > 20) {
+            $limit = 20;
+        }
+
+        $allowed_types = array();
+        if (is_array($args['types'])) {
+            foreach ($args['types'] as $type) {
+                $type = sanitize_key($type);
+                if ('' !== $type) {
+                    $allowed_types[] = $type;
+                }
+            }
+        }
+
+        if (empty($allowed_types)) {
+            $allowed_types = $defaults['types'];
+        }
+
+        $profile_key = sanitize_key($args['profile_key']);
+        $server_id   = $this->sanitize_server_id($args['server_id']);
+
+        $fetch_limit = min(50, max($limit * 4, $limit));
+
+        $raw_events = $this->event_logger->get_events(
+            array(
+                'limit' => $fetch_limit,
+            )
+        );
+
+        if (!is_array($raw_events) || empty($raw_events)) {
+            return array();
+        }
+
+        $history = array();
+
+        foreach ($raw_events as $event) {
+            if (!is_array($event) || empty($event['type'])) {
+                continue;
+            }
+
+            $event_type = sanitize_key($event['type']);
+            if (!in_array($event_type, $allowed_types, true)) {
+                continue;
+            }
+
+            $context = isset($event['context']) && is_array($event['context']) ? $event['context'] : array();
+
+            if ('' !== $profile_key && isset($context['profile_key'])) {
+                if (sanitize_key($context['profile_key']) !== $profile_key) {
+                    continue;
+                }
+            }
+
+            if ('' !== $server_id && isset($context['server_id'])) {
+                if ($this->sanitize_server_id($context['server_id']) !== $server_id) {
+                    continue;
+                }
+            }
+
+            $entry = $this->transform_event_to_status_history_entry($event_type, $event);
+
+            if (empty($entry)) {
+                continue;
+            }
+
+            $history[] = $entry;
+
+            if (count($history) >= $limit) {
+                break;
+            }
+        }
+
+        return $history;
+    }
+
     private function register_current_cache_key() {
         $this->remember_cache_key_for_registry($this->cache_key);
     }
@@ -1051,6 +1143,7 @@ class Discord_Bot_JLG_API {
                 && !empty($stats['is_demo'])
                 && !empty($stats['fallback_demo'])
             ) {
+                $stats = $this->enrich_stats_with_status_meta($stats, $options, $cache_duration);
                 $this->schedule_next_fallback_retry($cache_duration, $options);
             } else {
                 $this->clear_fallback_retry_schedule();
@@ -1078,6 +1171,7 @@ class Discord_Bot_JLG_API {
             }
 
             if (is_array($stats) && empty($stats['is_demo'])) {
+                $stats = $this->enrich_stats_with_status_meta($stats, $options, $cache_duration);
                 if (
                     true === $is_public_request
                     && true === $refresh_requires_remote_call
@@ -1095,6 +1189,7 @@ class Discord_Bot_JLG_API {
             if (true === $is_public_request) {
                 $cached_stats = get_transient($this->cache_key);
                 if (is_array($cached_stats) && empty($cached_stats['is_demo'])) {
+                    $cached_stats = $this->enrich_stats_with_status_meta($cached_stats, $options, $cache_duration);
                     return $this->build_refresh_response(true, $this->build_success_payload($cached_stats), 200);
                 }
 
@@ -2327,6 +2422,194 @@ class Discord_Bot_JLG_API {
         $this->event_logger->log('discord_connector', $event_context);
     }
 
+    private function transform_event_to_status_history_entry($event_type, array $event) {
+        $timestamp = isset($event['timestamp']) ? (int) $event['timestamp'] : 0;
+        if ($timestamp <= 0) {
+            $timestamp = (int) current_time('timestamp', true);
+        }
+
+        $context = isset($event['context']) && is_array($event['context']) ? $event['context'] : array();
+
+        $channel = '';
+        if (isset($context['channel'])) {
+            $channel = sanitize_key($context['channel']);
+        }
+
+        $outcome = '';
+        if (isset($context['outcome'])) {
+            $outcome = sanitize_key($context['outcome']);
+        }
+
+        $status_code = 0;
+        if (isset($context['status_code'])) {
+            $status_code = (int) $context['status_code'];
+        }
+
+        $label = $this->build_status_history_label($event_type, $channel, $outcome, $status_code);
+
+        $reason = $this->build_status_history_reason($context);
+
+        return array(
+            'timestamp' => $timestamp,
+            'label'     => $label,
+            'reason'    => $reason,
+            'type'      => $event_type,
+        );
+    }
+
+    private function build_status_history_label($event_type, $channel, $outcome, $status_code) {
+        $channel_label = $this->get_status_history_channel_label($channel);
+
+        if ('discord_http' === $event_type) {
+            $source_label = ('' !== $channel_label)
+                ? sprintf(__('API Discord (%s)', 'discord-bot-jlg'), $channel_label)
+                : __('API Discord', 'discord-bot-jlg');
+        } else {
+            $source_label = ('' !== $channel_label)
+                ? sprintf(__('Connecteur (%s)', 'discord-bot-jlg'), $channel_label)
+                : __('Connecteur Discord', 'discord-bot-jlg');
+        }
+
+        $outcome_label = $this->get_status_history_outcome_label($event_type, $outcome, $status_code);
+
+        if ('' === $outcome_label) {
+            return $source_label;
+        }
+
+        return sprintf('%s – %s', $source_label, $outcome_label);
+    }
+
+    private function get_status_history_channel_label($channel) {
+        switch ($channel) {
+            case 'widget':
+                return __('Widget', 'discord-bot-jlg');
+            case 'bot':
+                return __('Bot', 'discord-bot-jlg');
+            case 'cron':
+                return __('Cron', 'discord-bot-jlg');
+            case 'rest':
+                return __('REST', 'discord-bot-jlg');
+            default:
+                return '';
+        }
+    }
+
+    private function get_status_history_outcome_label($event_type, $outcome, $status_code) {
+        if ('discord_http' === $event_type) {
+            switch ($outcome) {
+                case 'success':
+                    return __('Succès', 'discord-bot-jlg');
+                case 'network_error':
+                    return __('Erreur réseau', 'discord-bot-jlg');
+                case 'incomplete':
+                    return __('Données incomplètes', 'discord-bot-jlg');
+                case 'rate_limited':
+                    return __('Limite de taux atteinte', 'discord-bot-jlg');
+                case 'http_error':
+                    if ($status_code > 0) {
+                        return sprintf(
+                            /* translators: %d: HTTP status code. */
+                            __('Erreur HTTP %d', 'discord-bot-jlg'),
+                            $status_code
+                        );
+                    }
+
+                    return __('Erreur HTTP', 'discord-bot-jlg');
+                default:
+                    break;
+            }
+        } else {
+            switch ($outcome) {
+                case 'success':
+                    return __('Succès', 'discord-bot-jlg');
+                case 'skipped':
+                    return __('Action ignorée', 'discord-bot-jlg');
+                case 'failure':
+                    return __('Échec', 'discord-bot-jlg');
+                default:
+                    break;
+            }
+        }
+
+        return __('Statut inconnu', 'discord-bot-jlg');
+    }
+
+    private function build_status_history_reason(array $context) {
+        $parts = array();
+
+        if (isset($context['reason']) && '' !== trim((string) $context['reason'])) {
+            $parts[] = trim((string) $context['reason']);
+        }
+
+        if (isset($context['error_message']) && '' !== trim((string) $context['error_message'])) {
+            $parts[] = trim((string) $context['error_message']);
+        }
+
+        if (isset($context['diagnostic']) && '' !== trim((string) $context['diagnostic'])) {
+            $parts[] = trim((string) $context['diagnostic']);
+        }
+
+        if (!empty($context['missing_fields']) && is_array($context['missing_fields'])) {
+            $fields = array();
+            foreach ($context['missing_fields'] as $field) {
+                if (!is_scalar($field)) {
+                    continue;
+                }
+
+                $field_value = trim((string) $field);
+                if ('' === $field_value) {
+                    continue;
+                }
+
+                $fields[] = $field_value;
+            }
+
+            if (!empty($fields)) {
+                $parts[] = sprintf(
+                    /* translators: %s: comma-separated list of missing fields. */
+                    __('Champs manquants : %s', 'discord-bot-jlg'),
+                    implode(', ', $fields)
+                );
+            }
+        }
+
+        if (isset($context['error_code']) && '' !== trim((string) $context['error_code'])) {
+            $parts[] = sprintf(
+                /* translators: %s: error code. */
+                __('Code erreur : %s', 'discord-bot-jlg'),
+                trim((string) $context['error_code'])
+            );
+        }
+
+        if (isset($context['retry_after']) && is_numeric($context['retry_after'])) {
+            $retry_after = (int) round((float) $context['retry_after']);
+            if ($retry_after > 0) {
+                $parts[] = sprintf(
+                    /* translators: %d: number of seconds before the next retry. */
+                    __('Réessayer dans %d s', 'discord-bot-jlg'),
+                    $retry_after
+                );
+            }
+        }
+
+        if (isset($context['duration_ms']) && is_numeric($context['duration_ms'])) {
+            $duration_ms = (int) round((float) $context['duration_ms']);
+            if ($duration_ms > 0) {
+                $parts[] = sprintf(
+                    /* translators: %d: duration in milliseconds. */
+                    __('Durée : %d ms', 'discord-bot-jlg'),
+                    $duration_ms
+                );
+            }
+        }
+
+        if (empty($parts)) {
+            return '';
+        }
+
+        return implode(' – ', $parts);
+    }
+
     private function calculate_duration_ms($start_time) {
         if (!is_float($start_time) && !is_int($start_time)) {
             return 0;
@@ -3184,6 +3467,57 @@ class Discord_Bot_JLG_API {
         }
 
         return $this->base_cache_key . '_' . md5($signature);
+    }
+
+    private function enrich_stats_with_status_meta($stats, $options, $cache_duration = null) {
+        if (!is_array($stats)) {
+            return $stats;
+        }
+
+        $profile_key = 'default';
+        if (isset($options['__active_profile_key'])) {
+            $candidate = sanitize_key($options['__active_profile_key']);
+            if ('' !== $candidate) {
+                $profile_key = $candidate;
+            }
+        }
+
+        $server_id = '';
+        if (isset($options['server_id'])) {
+            $server_id = $this->sanitize_server_id($options['server_id']);
+        }
+
+        $history = $this->get_status_history(
+            array(
+                'limit'       => 5,
+                'profile_key' => $profile_key,
+                'server_id'   => $server_id,
+            )
+        );
+
+        $status_meta = array(
+            'profileKey'  => $profile_key,
+            'serverId'    => $server_id,
+            'generatedAt' => (int) current_time('timestamp', true),
+            'history'     => $history,
+        );
+
+        if (null !== $cache_duration) {
+            $status_meta['cacheDuration'] = max(0, (int) $cache_duration);
+        }
+
+        $fallback_details = $this->get_last_fallback_details();
+        if (is_array($fallback_details) && !empty($fallback_details)) {
+            $status_meta['fallbackDetails'] = $fallback_details;
+        }
+
+        if (isset($stats['status_meta']) && is_array($stats['status_meta'])) {
+            $stats['status_meta'] = array_merge($stats['status_meta'], $status_meta);
+        } else {
+            $stats['status_meta'] = $status_meta;
+        }
+
+        return $stats;
     }
 
     private function sanitize_server_id($value) {

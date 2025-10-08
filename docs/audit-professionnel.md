@@ -79,14 +79,14 @@
 ---
 En priorisant ces évolutions, l'extension pourra rivaliser avec les solutions professionnelles tout en capitalisant sur les fondations techniques déjà solides.
 
-## Tableau de suivi (vue produit)
+## Synthèse des prochains incréments
 
-| Thème | Problème identifié | Solution proposée | Impact attendu | Priorité |
-| --- | --- | --- | --- | --- |
-| Multi-tenant | Profils et secrets stockés dans une option unique non segmentée.【F:discord-bot-jlg/inc/class-discord-admin.php†L428-L642】 | Migrer vers un dépôt dédié (table custom ou CPT) avec capacités par profil et clés API périmétrées. | Accès délégué par serveur, conformité sécurité accrue. | 🚨 Haute |
-| Observabilité | Journal REST non exploité dans des outils externes, absence d’alertes en temps réel.【F:discord-bot-jlg/inc/class-discord-api.php†L1991-L2133】 | Ajouter exports Prometheus/OpenTelemetry, webhooks et seuils configurables. | Réduction du MTTR, supervision proactive. | 🚨 Haute |
-| Fiabilité API | Cron linéaire sans backoff ni idempotence.【F:discord-bot-jlg/discord-bot-jlg.php†L394-L417】 | Implémenter une file asynchrone + backoff exponentiel + verrouillage distribué. | Moins de rate-limit, meilleure fraîcheur des données. | ⚠️ Moyenne |
-| UX Analytics | Timeline admin limitée (pas de zoom, pas d’annotations).【F:docs/ux-ui-ameliorations-suite.md†L40-L69】 | Ajouter sélecteurs de période, annotations et exports (CSV/PNG). | Adoption analytics, insights actionnables. | ⚠️ Moyenne |
-| Packaging | `node_modules/` versionné, pipeline CI absent.【F:docs/code-review.md†L39-L60】 | Ignorer les dépendances vendoriées, définir un workflow CI (tests, lint). | Déploiements reproductibles, repo allégé. | ✅ Faible |
+| Horizon | Initiative | Résultat attendu | Références |
+| --- | --- | --- | --- |
+| Court terme | Modes presets & variations Gutenberg | Réduire le temps de configuration en exposant des templates prêts à l’emploi. | 【F:docs/audit-professionnel.md†L5-L41】【F:docs/presets-ui.md†L1-L112】 |
+| Court terme | Notifications & exports analytics | Prévenir les chutes d’activité via alertes et permettre les analyses externes. | 【F:docs/audit-professionnel.md†L42-L75】【F:docs/ux-ui-ameliorations-suite.md†L63-L108】 |
+| Moyen terme | Expérience multi-profils & comparatifs | Offrir un tableau de bord transverse pour plusieurs serveurs Discord. | 【F:docs/audit-professionnel.md†L10-L41】【F:docs/ux-ui-ameliorations-suite.md†L1-L42】 |
+| Moyen terme | Accessibilité avancée | Proposer un thème AAA, navigation clavier enrichie et exports accessibles. | 【F:docs/audit-professionnel.md†L76-L120】 |
+| Long terme | Gouvernance affinée & segmentation des accès | Introduire des rôles personnalisés, des clés API scoped et un audit trail des actions. | 【F:docs/comparaison-apps-pro.md†L34-L87】 |
 
-> Dernière révision : 2024-07-02 — voir également `docs/audit-fonctions.md` pour le détail des extractions techniques.
+Cette synthèse peut alimenter la roadmap officielle du plugin et servir de base aux arbitrages produit/technique lors des prochains sprints.

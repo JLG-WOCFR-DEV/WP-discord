@@ -92,11 +92,14 @@
   - Ajouter une logique de détection d’anomalies côté PHP ou JS (calcul d’écart-type glissant) et stocker les playbooks associés dans une option WordPress.
   - Prévoir un mécanisme de presets (JSON) pour enregistrer/partager des configurations de métriques via le bloc.
 
-## Prochaines étapes
+## Tableau de suivi UX/UI
 
-1. Valider le découpage produit (MVP vs. évolutions avancées) avec l’équipe communauté et documenter les exigences analytics complémentaires (export CSV, annotations) dans `docs/audit-professionnel.md`.
-2. Démarrer un prototype Figma pour le comparatif multi-profils et collecter du feedback sur la hiérarchie visuelle avant implémentation.
-3. Préparer un backlog technique partagé avec `docs/code-review.md` pour aligner les évolutions front sur l’extraction des services (mutualisation du cache multi-profils, API analytics étendue).
-4. Planifier des tests utilisateurs ciblés (3 administrateurs, 3 membres communauté) afin de mesurer la compréhension des nouveaux panneaux et ajuster la microcopie.
+| Statut | Sujet | Prochaine décision | Références |
+| --- | --- | --- | --- |
+| 🛠️ Design en cours | Tableau comparatif multi-profils | Valider le rendu responsive (colonnes vs. carrousel) et définir le coût API. | 【F:docs/ux-ui-ameliorations-suite.md†L1-L42】 |
+| ⏳ À prioriser | Explorateur de présence segmenté | Choisir la librairie graphique (Chart.js vs. D3) et cadrer la volumétrie analytics. | 【F:docs/ux-ui-ameliorations-suite.md†L44-L82】 |
+| ⏳ À prioriser | Timeline analytics enrichie | Identifier les besoins d’export (CSV/PNG) et les droits d’accès associés. | 【F:docs/ux-ui-ameliorations-suite.md†L84-L117】 |
+| ✅ Livraison initiale | Signalétique d’état proactive | Consolider les métriques affichées et brancher l’export CSV depuis le panneau d’état. | 【F:docs/ux-ui-ameliorations-suite.md†L119-L164】 |
+| 🟢 Idea bank | Sparkline multi-couches | Déterminer les métriques à exposer par défaut et la logique d’alerting. | 【F:docs/ux-ui-ameliorations-suite.md†L166-L210】 |
 
-> État mis à jour le 2024-07-02 — synchroniser avec les tableaux de suivi produit et technique pour garantir la cohérence des priorités.
+Ce tableau complète la roadmap produit en fournissant un état synthétique des initiatives UX. Mettre à jour les statuts à mesure des validations ateliers/design.

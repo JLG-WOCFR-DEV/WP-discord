@@ -30,15 +30,14 @@
 - Utiliser un système de jobs (Action Scheduler, queues Redis) pour éviter les doublons de cron si plusieurs sites partagent la même configuration, et suivre chaque tentative via des métriques consolidées.
 - Vérifier l’état du verrou côté API (`Discord_Bot_JLG_API`) avant planification afin de prévenir les chevauchements de rafraîchissements, à l’image des orchestrateurs de bots professionnels.
 
-## Plan d’action priorisé
 
-| Priorité | Action | Livrable attendu | Statut |
+## Priorités court terme
+
+| Fonction | Action recommandée | Bénéfice | Références |
 | --- | --- | --- | --- |
-| 🚨 Haute | Extraire un service `StatsRefreshJob` qui encapsule la logique de cron et le verrouillage pour permettre l’ajout d’un backoff exponentiel configurable.【F:discord-bot-jlg/discord-bot-jlg.php†L394-L417】 | Nouvelle classe + tests d’intégration cron | À cadrer |
-| 🚨 Haute | Scinder `Discord_Bot_JLG_API::get_stats()` en façade + connecteurs HTTP séparés (widget/bot) avec instrumentation PSR-3 pour suivre les échecs et la latence.【F:discord-bot-jlg/inc/class-discord-api.php†L240-L358】 | Services dédiés + journalisation structurée | À cadrer |
-| ⚠️ Moyenne | Introduire un gestionnaire de profils (`ProfilesRepository`) afin de sortir la persistance des tokens de la méthode `sanitize_options()` et préparer le chiffrement applicatif.【F:discord-bot-jlg/inc/class-discord-admin.php†L283-L472】 | Classe repository + migration d’option | À prioriser |
-| ⚠️ Moyenne | Ajouter des hooks d’observabilité (actions/filters) autour des appels Discord pour brancher des compteurs Prometheus ou des webhooks d’alerte.【F:discord-bot-jlg/inc/class-discord-api.php†L1991-L2133】 | Hooks documentés + échantillons de métriques | En cours (HTTP instrumenté) |
-| ✅ Faible | Documenter un scénario de tests automatisés couvrant la fusion `merge_stats()` avec des fixtures multi-sources pour préparer l’extraction en stratégie pluggable.【F:discord-bot-jlg/inc/class-discord-api.php†L444-L538】 | Cas de tests + checklist QA | En cours de rédaction |
+| `get_stats()` | Découper en services (`ProfileResolver`, `StatsFetcher`, `SnapshotWriter`) et ajouter un logger PSR-3. | Facilite les tests ciblés et l’observabilité temps réel. | 【F:docs/audit-fonctions.md†L3-L33】【F:docs/comparaison-apps-pro.md†L38-L64】 |
+| `sanitize_options()` | Passer à une validation déclarative (schéma) avec rotation automatique des tokens. | Sécurise la configuration et prépare la gouvernance multi-profils. | 【F:docs/audit-fonctions.md†L35-L54】 |
+| `reschedule_cron_event()` | Introduire un backoff exponentiel et consigner les échecs successifs. | Améliore la résilience face aux quotas API Discord. | 【F:docs/audit-fonctions.md†L56-L71】 |
+| `persist_successful_stats()` | Déléguer l’écriture analytics à une file asynchrone (Action Scheduler). | Évite que l’échec du reporting bloque le cache front. | 【F:discord-bot-jlg/inc/class-discord-api.php†L552-L582】 |
 
-> ℹ️ Statuts mis à jour le 2024-07-02. Synchroniser cette table avec le plan global (`docs/code-review.md`) à chaque sprint.
-
+Ces actions sont alignées avec la comparaison « apps pro » et peuvent être traitées indépendamment pour livrer de la valeur rapidement.

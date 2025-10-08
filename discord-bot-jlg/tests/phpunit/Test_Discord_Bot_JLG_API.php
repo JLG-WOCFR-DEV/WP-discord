@@ -235,6 +235,62 @@ class Test_Discord_Bot_JLG_API extends TestCase {
         );
     }
 
+    public function test_get_status_history_returns_recent_events_for_profile_and_server() {
+        $option_name  = 'discord_bot_jlg_history_options';
+        $cache_key    = 'discord_bot_jlg_history_cache';
+        $event_option = 'discord_bot_jlg_history_log';
+
+        $event_logger = new Discord_Bot_JLG_Event_Logger($event_option, 20, 3600);
+        $event_logger->reset();
+
+        $api = new Discord_Bot_JLG_API($option_name, $cache_key, 60, null, null, $event_logger);
+
+        $event_logger->log('discord_http', array(
+            'profile_key' => 'default',
+            'server_id'   => '123456',
+            'channel'     => 'widget',
+            'outcome'     => 'http_error',
+            'status_code' => 503,
+            'reason'      => 'Service indisponible',
+            'retry_after' => 12,
+        ));
+
+        $event_logger->log('discord_connector', array(
+            'profile_key' => 'other',
+            'server_id'   => '999',
+            'channel'     => 'bot',
+            'outcome'     => 'success',
+        ));
+
+        $history = $api->get_status_history(
+            array(
+                'profile_key' => 'default',
+                'server_id'   => '123456',
+                'limit'       => 5,
+            )
+        );
+
+        $this->assertNotEmpty($history);
+        $this->assertSame('discord_http', $history[0]['type']);
+        $this->assertGreaterThan(0, $history[0]['timestamp']);
+        $this->assertStringContainsString('API Discord', $history[0]['label']);
+        $this->assertStringContainsString('503', $history[0]['label']);
+        $this->assertStringContainsString('Service indisponible', $history[0]['reason']);
+        $this->assertStringContainsString('12', $history[0]['reason']);
+
+        $history_other = $api->get_status_history(
+            array(
+                'profile_key' => 'other',
+                'server_id'   => '999',
+                'limit'       => 5,
+            )
+        );
+
+        $this->assertCount(1, $history_other);
+        $this->assertSame('discord_connector', $history_other[0]['type']);
+        $this->assertStringContainsString('Connecteur', $history_other[0]['label']);
+    }
+
     public function test_get_server_profiles_normalizes_entries() {
         $option_name = DISCORD_BOT_JLG_OPTION_NAME;
 
