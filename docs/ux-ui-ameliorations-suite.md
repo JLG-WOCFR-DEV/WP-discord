@@ -1,5 +1,12 @@
 # Améliorations UX/UI supplémentaires inspirées des outils professionnels
 
+## Synthèse rapide (2024-07)
+
+- **Comparaison multi-profils** : objectif sprint +2 pour un MVP en deux panneaux (desktop) et carrousel (mobile). Nécessite la mutualisation du cache et un nouvel attribut `profiles[]` partagé entre bloc/shortcode.【F:docs/ux-ui-ameliorations-suite.md†L5-L27】
+- **Explorateur de présence segmenté** : dépend de l’extension de l’API analytics pour exposer les séries historiques `presence_breakdown`. Prévoir une itération de recherche utilisateur avec les CM pilotes.【F:docs/ux-ui-ameliorations-suite.md†L29-L57】
+- **Timeline analytique enrichie** : à coupler avec le chantier observabilité pour consolider annotations et exports dans le back-office.【F:docs/ux-ui-ameliorations-suite.md†L59-L83】
+- **Signalétique proactive & sparkline multi-couches** : livrables complémentaires pour renforcer la perception de fraîcheur des données et l’orientation action.【F:docs/ux-ui-ameliorations-suite.md†L85-L133】
+
 ## 1. Tableau comparatif multi-profils
 - **Constat** : chaque instance du bloc ou du shortcode ne pointe que vers un profil serveur unique via l’attribut `profile`, ce qui limite les comparaisons simultanées.【F:discord-bot-jlg/block/discord-stats/block.json†L263-L269】【F:discord-bot-jlg/inc/class-discord-shortcode.php†L666-L672】
 - **Inspiration pro** : les suites analytics Discord/Slack destinées aux équipes communautaires offrent des vues côte à côte pour benchmarquer plusieurs espaces.
@@ -85,14 +92,11 @@
   - Ajouter une logique de détection d’anomalies côté PHP ou JS (calcul d’écart-type glissant) et stocker les playbooks associés dans une option WordPress.
   - Prévoir un mécanisme de presets (JSON) pour enregistrer/partager des configurations de métriques via le bloc.
 
-## Tableau de suivi UX/UI
+## Prochaines étapes
 
-| Statut | Sujet | Prochaine décision | Références |
-| --- | --- | --- | --- |
-| 🛠️ Design en cours | Tableau comparatif multi-profils | Valider le rendu responsive (colonnes vs. carrousel) et définir le coût API. | 【F:docs/ux-ui-ameliorations-suite.md†L1-L42】 |
-| ⏳ À prioriser | Explorateur de présence segmenté | Choisir la librairie graphique (Chart.js vs. D3) et cadrer la volumétrie analytics. | 【F:docs/ux-ui-ameliorations-suite.md†L44-L82】 |
-| ⏳ À prioriser | Timeline analytics enrichie | Identifier les besoins d’export (CSV/PNG) et les droits d’accès associés. | 【F:docs/ux-ui-ameliorations-suite.md†L84-L117】 |
-| 🟢 Idea bank | Signalétique d’état proactive | Prototyper le badge sticky + drawer historique pour évaluer l’impact visuel. | 【F:docs/ux-ui-ameliorations-suite.md†L119-L164】 |
-| 🟢 Idea bank | Sparkline multi-couches | Déterminer les métriques à exposer par défaut et la logique d’alerting. | 【F:docs/ux-ui-ameliorations-suite.md†L166-L210】 |
+1. Valider le découpage produit (MVP vs. évolutions avancées) avec l’équipe communauté et documenter les exigences analytics complémentaires (export CSV, annotations) dans `docs/audit-professionnel.md`.
+2. Démarrer un prototype Figma pour le comparatif multi-profils et collecter du feedback sur la hiérarchie visuelle avant implémentation.
+3. Préparer un backlog technique partagé avec `docs/code-review.md` pour aligner les évolutions front sur l’extraction des services (mutualisation du cache multi-profils, API analytics étendue).
+4. Planifier des tests utilisateurs ciblés (3 administrateurs, 3 membres communauté) afin de mesurer la compréhension des nouveaux panneaux et ajuster la microcopie.
 
-Ce tableau complète la roadmap produit en fournissant un état synthétique des initiatives UX. Mettre à jour les statuts à mesure des validations ateliers/design.
+> État mis à jour le 2024-07-02 — synchroniser avec les tableaux de suivi produit et technique pour garantir la cohérence des priorités.

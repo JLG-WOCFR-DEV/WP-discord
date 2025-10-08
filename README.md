@@ -164,11 +164,22 @@ Ces chantiers peuvent être traités de manière incrémentale. Le dossier `docs
 - Portail développeur Discord : https://discord.com/developers/applications
 - Notes de version disponibles dans l’interface du plugin.
 
+## Feuille de route & documentation interne
+
+Pour préparer les prochaines itérations, plusieurs audits et plans d’amélioration ont été consignés dans le dossier [`docs/`](docs). Ils servent de base à la priorisation produit et au suivi des chantiers techniques :
+
+- **Refontes techniques critiques** : l’audit des fonctions `get_stats()`, `sanitize_options()` et du cron identifie les extractions de services et stratégies de résilience à mener avant toute nouvelle feature.【F:docs/audit-fonctions.md†L4-L45】【F:discord-bot-jlg/docs/improvement-plan.md†L1-L43】
+- **Alignement avec les solutions professionnelles** : la comparaison détaillée liste les écarts majeurs (multi-tenant, observabilité temps réel, gestion des secrets) et propose des actions concrètes pour se rapprocher des standards SaaS.【F:docs/comparaison-apps-pro.md†L1-L79】
+- **Expériences utilisateurs avancées** : les pistes UX/UI (tableaux comparatifs, explorateur de présence, timeline enrichie) et les presets graphiques documentent les futures évolutions front-office et back-office.【F:docs/ux-ui-ameliorations-suite.md†L1-L83】【F:docs/presets-ui.md†L1-L60】
+- **Refactoring global** : le plan de revue de code centralise les tâches de découpage, l’introduction d’un autoloader et le nettoyage du dépôt pour fiabiliser les livraisons continues.【F:docs/code-review.md†L1-L68】
+
+Ces documents sont tenus à jour à mesure que les chantiers avancent ; reportez-vous à leurs sections « Priorités » pour connaître l’état actuel et les décisions récentes.
+
 ### CLI
 
-Deux commandes WP-CLI facilitent les opérations :
+Deux commandes WP-CLI facilitent les opérations :
 
-- `wp discord-bot refresh-cache` force l'appel API immédiat en ignorant le cache ;
+- `wp discord-bot refresh-cache` force l'appel API immédiat en ignorant le cache ;
 - `wp discord-bot clear-cache` purge toutes les données (transients, sauvegardes et limites de taux).
 
 Les deux commandes retournent un code de sortie non nul en cas d'erreur afin de permettre l'automatisation dans vos scripts d'exploitation.

@@ -27,13 +27,14 @@ Ce document recense les zones du plugin qui gagneraient à être rapprochées de
 * **Absence de métadonnées temporelles** : seul l'instant de mise en cache est implicite. En production, on stocke souvent un horodatage, la latence des appels et la source (widget/bot) pour diagnostiquer les incohérences.
 * **Observabilité** : pas de métriques sur la fraîcheur des snapshots ni de limites pour éviter un flood analytics. Ajouter des quotas et une télémétrie compatible StatsD/Prometheus rapprocherait le plugin des pratiques entreprises.
 
-## Feuille de route technique consolidée
+## Synthèse & prochaines étapes
 
-| Phase | Objectif | Actions clés | Suivi |
-| --- | --- | --- | --- |
-| 1. Stabilisation | Séparer les responsabilités et renforcer la journalisation. | Créer les services `ProfileRepository`, `HttpConnector`, `CacheGateway` et brancher un logger PSR-3. | Dépend de la refonte `get_stats()`.【F:discord-bot-jlg/docs/improvement-plan.md†L6-L33】 |
-| 2. Résilience | Introduire des stratégies de retry, circuit breaker et backoff. | Implémenter un scheduler avancé (Action Scheduler) et des métriques sur les quotas. | Aligné avec `reschedule_cron_event()`.【F:docs/audit-fonctions.md†L56-L71】 |
-| 3. Observabilité | Exposer des événements structurés et des exports analytics. | Publier un endpoint `/logs`, exporter CSV/JSON et connecter des webhooks. | Voir audit professionnel.【F:docs/audit-professionnel.md†L42-L75】 |
-| 4. Expérience admin | Modulariser la sanitisation et les écrans de réglages. | Schéma de validation, rotation des secrets, écrans segmentés. | Dépend du plan de revue de code.【F:docs/code-review.md†L35-L48】 |
+| Action | Objectif | Dépendances | Échéance cible | Statut |
+| --- | --- | --- | --- | --- |
+| Décomposer `get_stats()` en orchestrateur + services spécialisés | Réduire la complexité cyclomatique, introduire instrumentation PSR-3 | Décision d’architecture (docs/code-review.md) | Sprint +1 | À planifier |
+| Introduire un scheduler résilient (`StatsRefreshJob`) | Assurer backoff, idempotence et observabilité des rafraîchissements | Extraction cron (`docs/audit-fonctions.md`) | Sprint +2 | À planifier |
+| Créer un dépôt de profils sécurisé | Chiffrer/rotater les tokens, préparer le multi-tenant | Choix stockage (table custom vs CPT) | Sprint +3 | À cadrer |
+| Étendre l’API analytics (historique présence, annotations) | Supporter les fonctionnalités UX (comparatif, timeline enrichie) | Alignement avec `docs/ux-ui-ameliorations-suite.md` | Sprint +3 | Dépend du refactoring |
+| Mettre en place une télémétrie exportable | Alimenter Prometheus/webhooks pour observabilité | Choix outillage (Stack SRE) | Sprint +4 | À cadrer |
 
-Chaque phase peut être traitée indépendamment, mais respecter l’ordre garantit une montée en maturité progressive (stabilité ➜ résilience ➜ visibilité ➜ ergonomie).
+> Mise à jour : 2024-07-02 — synchroniser cette table avec `docs/audit-professionnel.md` et `docs/audit-fonctions.md` pour conserver une vue cohérente produit/technique.
