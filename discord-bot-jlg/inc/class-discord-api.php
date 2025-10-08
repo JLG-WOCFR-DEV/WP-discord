@@ -8,6 +8,10 @@ if (!function_exists('discord_bot_jlg_validate_bool')) {
     require_once __DIR__ . '/helpers.php';
 }
 
+if (!class_exists('Discord_Bot_JLG_Options_Repository')) {
+    require_once __DIR__ . '/class-discord-options-repository.php';
+}
+
 /**
  * Fournit les appels à l'API Discord ainsi que la gestion du cache et des données de démonstration.
  */
@@ -34,7 +38,7 @@ class Discord_Bot_JLG_API {
     private $last_retry_after;
     private $runtime_retry_after;
     private $http_client;
-    private $options_cache;
+    private $options_repository;
     private $runtime_fallback_retry_timestamp;
     private $analytics;
     private $event_logger;
@@ -48,7 +52,7 @@ class Discord_Bot_JLG_API {
      *
      * @return void
      */
-    public function __construct($option_name, $cache_key, $default_cache_duration = 300, $http_client = null, $analytics = null, $event_logger = null) {
+    public function __construct($option_name, $cache_key, $default_cache_duration = 300, $http_client = null, $analytics = null, $event_logger = null, $options_repository = null) {
         $this->option_name = $option_name;
         $this->base_cache_key = $cache_key;
         $this->cache_key = $cache_key;
@@ -61,7 +65,17 @@ class Discord_Bot_JLG_API {
         $this->http_client = ($http_client instanceof Discord_Bot_JLG_Http_Client)
             ? $http_client
             : new Discord_Bot_JLG_Http_Client();
-        $this->options_cache = null;
+        if ($options_repository instanceof Discord_Bot_JLG_Options_Repository) {
+            $this->options_repository = $options_repository;
+        } else {
+            $default_provider = function_exists('discord_bot_jlg_get_default_options')
+                ? 'discord_bot_jlg_get_default_options'
+                : null;
+            $this->options_repository = new Discord_Bot_JLG_Options_Repository(
+                $this->option_name,
+                $default_provider
+            );
+        }
         $this->runtime_fallback_retry_timestamp = 0;
         $this->analytics = ($analytics instanceof Discord_Bot_JLG_Analytics) ? $analytics : null;
         $this->event_logger = ($event_logger instanceof Discord_Bot_JLG_Event_Logger)
@@ -152,7 +166,9 @@ class Discord_Bot_JLG_API {
      * @return void
      */
     public function flush_options_cache() {
-        $this->options_cache = null;
+        if ($this->options_repository instanceof Discord_Bot_JLG_Options_Repository) {
+            $this->options_repository->flush_cache();
+        }
     }
 
     /**
@@ -163,37 +179,33 @@ class Discord_Bot_JLG_API {
      * @return array
      */
     public function get_plugin_options($force_refresh = false) {
-        if (true === $force_refresh || !is_array($this->options_cache)) {
-            $options = get_option($this->option_name);
-
-            if (false === is_array($options)) {
-                $options = array();
-            }
-
-            $this->options_cache = $options;
+        if ($this->options_repository instanceof Discord_Bot_JLG_Options_Repository) {
+            return $this->options_repository->get_options($force_refresh);
         }
 
-        return $this->options_cache;
+        $options = get_option($this->option_name);
+
+        return is_array($options) ? $options : array();
     }
 
     public function get_analytics_retention_days($options = null) {
+        if ($this->options_repository instanceof Discord_Bot_JLG_Options_Repository) {
+            return $this->options_repository->get_analytics_retention_days($options);
+        }
+
         if (!is_array($options)) {
             $options = $this->get_plugin_options();
         }
 
         $default_retention = defined('DISCORD_BOT_JLG_ANALYTICS_RETENTION_DEFAULT')
             ? (int) DISCORD_BOT_JLG_ANALYTICS_RETENTION_DEFAULT
-            : Discord_Bot_JLG_Analytics::DEFAULT_RETENTION_DAYS;
+            : (class_exists('Discord_Bot_JLG_Analytics') ? (int) Discord_Bot_JLG_Analytics::DEFAULT_RETENTION_DAYS : 0);
 
         $retention = isset($options['analytics_retention_days'])
             ? (int) $options['analytics_retention_days']
             : $default_retention;
 
-        if ($retention < 0) {
-            $retention = 0;
-        }
-
-        return $retention;
+        return ($retention < 0) ? 0 : $retention;
     }
 
     public function get_server_profiles($include_sensitive = false) {
