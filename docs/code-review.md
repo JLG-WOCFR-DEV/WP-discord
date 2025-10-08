@@ -33,6 +33,8 @@ Le plugin « Discord Bot - JLG » fournit une intégration très complète (cr
 * **Testabilité** : des classes plus petites et injectées rendent possible la couverture unitaire des scénarios critiques (rate limiting, fallback, sanitisation des options) sans devoir charger l'ensemble de WordPress.
 * **Maintenance** : la séparation des couches évite que des changements dans le front (ex. nouveaux champs de formulaire) n'impactent la logique réseau ou le suivi analytique.
 
+> Mise à jour 2024-07 : une première étape d’instrumentation est en place via les hooks `discord_bot_jlg_pre_http_request`, `discord_bot_jlg_after_http_request` et le filtre `discord_bot_jlg_discord_http_event_context`, ce qui facilite l’agrégation de métriques externes en attendant l’extraction complète des services.
+
 ## Étapes suggérées
 1. Introduire un autoloader et définir un namespace de base (`DiscordBotJLG\`).
 2. Extraire progressivement les responsabilités principales (`OptionsRepository`, `CacheManager`, `DiscordHttpClient`, `SettingsPage`…).

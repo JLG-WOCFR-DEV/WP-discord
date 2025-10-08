@@ -132,6 +132,23 @@ Un widget « Discord Bot - JLG » est disponible via le menu « Widgets ».
 - Intégration WP-CLI avec commandes `wp discord-bot refresh-cache` et `wp discord-bot clear-cache` pour forcer une synchronisation ou purger les données sans passer par l’UI.【F:discord-bot-jlg/inc/class-discord-cli.php†L24-L81】
 - Test « Site Health » dédié indiquant l’état de la connexion Discord, les erreurs récentes et les prochaines tentatives de rafraîchissement.【F:discord-bot-jlg/inc/class-discord-site-health.php†L17-L105】
 - Chargement des traductions et assets spécifiques (bloc, scripts, styles) afin d’assurer une intégration native à l’écosystème WordPress.【F:discord-bot-jlg/discord-bot-jlg.php†L105-L180】【F:discord-bot-jlg/discord-bot-jlg.php†L226-L315】
+- Actions et filtres d’observabilité permettant de brancher des systèmes d’alerte ou de télémétrie externes autour des appels HTTP (`discord_bot_jlg_pre_http_request`, `discord_bot_jlg_before_http_request`, `discord_bot_jlg_http_response`, `discord_bot_jlg_after_http_request`) et du journal d’événements (`discord_bot_jlg_discord_http_event_context`, `discord_bot_jlg_should_log_discord_http_event`, `discord_bot_jlg_discord_http_event_logged`).【F:discord-bot-jlg/inc/class-discord-http.php†L66-L160】【F:discord-bot-jlg/inc/class-discord-api.php†L2214-L2248】
+
+```php
+add_action('discord_bot_jlg_after_http_request', function ($response, $url, $args, $context, $request_id, $duration_ms) {
+    error_log(sprintf(
+        '[Discord Bot] %s (%s) -> %d in %dms',
+        $context,
+        $request_id,
+        is_wp_error($response) ? $response->get_error_code() : wp_remote_retrieve_response_code($response),
+        $duration_ms
+    ));
+});
+
+add_filter('discord_bot_jlg_should_log_discord_http_event', function ($should_log, $event_context) {
+    return !empty($event_context['status_code']); // Ignore les entrées sans statut HTTP.
+}, 10, 2);
+```
 
 ## Désinstallation
 La suppression du plugin depuis WordPress efface automatiquement l’option `discord_server_stats_options` et le transient `discord_server_stats_cache` associés aux statistiques du serveur.
