@@ -1095,6 +1095,308 @@
     border-color: rgba(37, 99, 235, 0.6);
 }
 
+.discord-stats-container.discord-theme-headless {
+    font-family: "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --discord-gap: clamp(16px, 3.6vw, 26px);
+    --discord-padding: clamp(16px, 3.4vw, 26px);
+    --discord-radius: clamp(10px, 2.4vw, 18px);
+    --discord-surface-background: rgba(15, 23, 42, 0.03);
+    --discord-surface-text: #0f172a;
+    --discord-surface-border: rgba(15, 23, 42, 0.08);
+    --discord-surface-shadow: 0 1px 0 rgba(15, 23, 42, 0.08), 0 18px 32px -26px rgba(15, 23, 42, 0.5);
+    --discord-surface-hover-shadow: 0 2px 0 rgba(15, 23, 42, 0.12), 0 28px 42px -26px rgba(15, 23, 42, 0.55);
+    --discord-accent: #3b82f6;
+    --discord-accent-secondary: #1d4ed8;
+    --discord-accent-contrast: #f8fafc;
+    --discord-focus-outline: rgba(249, 115, 22, 0.5);
+    --discord-outline-contrast: rgba(249, 115, 22, 0.45);
+    --discord-avatar-background: rgba(59, 130, 246, 0.08);
+    --discord-avatar-shadow: 0 14px 38px -28px rgba(15, 23, 42, 0.65);
+    --discord-button-shadow: rgba(59, 130, 246, 0.24);
+    --discord-button-shadow-hover: rgba(59, 130, 246, 0.34);
+    --discord-refresh-background: rgba(15, 23, 42, 0.96);
+    --discord-refresh-text: #f8fafc;
+    --discord-refresh-border: rgba(148, 163, 184, 0.3);
+    --discord-logo-color: #1f2937;
+    --discord-badge-start: #3b82f6;
+    --discord-badge-end: #f97316;
+    --discord-badge-text: #0f172a;
+}
+
+.discord-stats-container.discord-theme-headless .discord-stats-main {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.95) 0%, rgba(241, 245, 249, 0.75) 100%);
+    border: 1px solid rgba(15, 23, 42, 0.08);
+    border-radius: calc(var(--discord-radius) * 1.2);
+    box-shadow: 0 24px 38px -32px rgba(15, 23, 42, 0.45);
+}
+
+.discord-stats-container.discord-theme-headless .discord-stat {
+    border: 1px solid rgba(148, 163, 184, 0.18);
+    background: rgba(255, 255, 255, 0.88);
+    box-shadow: none;
+}
+
+.discord-stats-container.discord-theme-headless .discord-presence-breakdown {
+    border: 1px dashed rgba(148, 163, 184, 0.4);
+    border-radius: calc(var(--discord-radius) * 1.1);
+}
+
+.discord-stats-container.discord-theme-shadcn {
+    font-family: "Geist", "Satoshi", "Inter", system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    --discord-gap: clamp(18px, 4vw, 28px);
+    --discord-padding: clamp(18px, 4vw, 28px);
+    --discord-radius: clamp(14px, 2.6vw, 22px);
+    --discord-surface-background: rgba(248, 250, 252, 0.88);
+    --discord-surface-text: #0f172a;
+    --discord-surface-border: rgba(148, 163, 184, 0.32);
+    --discord-surface-shadow: 0 18px 38px -22px rgba(15, 23, 42, 0.45);
+    --discord-surface-hover-shadow: 0 26px 56px -24px rgba(15, 23, 42, 0.5);
+    --discord-accent: #34d399;
+    --discord-accent-secondary: #22c55e;
+    --discord-accent-contrast: #0f172a;
+    --discord-focus-outline: rgba(52, 211, 153, 0.45);
+    --discord-outline-contrast: rgba(30, 64, 175, 0.35);
+    --discord-avatar-background: rgba(52, 211, 153, 0.12);
+    --discord-avatar-shadow: 0 12px 34px -24px rgba(15, 23, 42, 0.5);
+    --discord-button-shadow: rgba(52, 211, 153, 0.26);
+    --discord-button-shadow-hover: rgba(52, 211, 153, 0.36);
+    --discord-refresh-background: rgba(15, 23, 42, 0.9);
+    --discord-refresh-text: #f8fafc;
+    --discord-refresh-border: rgba(148, 163, 184, 0.26);
+    --discord-logo-color: #1f2937;
+    --discord-badge-start: #34d399;
+    --discord-badge-end: #22d3ee;
+    --discord-badge-text: #0f172a;
+}
+
+.discord-stats-container.discord-theme-shadcn .discord-stats-main {
+    background: rgba(255, 255, 255, 0.9);
+    border: 1px solid rgba(148, 163, 184, 0.24);
+    border-radius: calc(var(--discord-radius) * 1.25);
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.4);
+}
+
+.discord-stats-container.discord-theme-shadcn .discord-stat {
+    border-radius: calc(var(--discord-radius) * 0.9);
+    border: 1px solid rgba(148, 163, 184, 0.26);
+    background: rgba(248, 250, 252, 0.95);
+}
+
+.discord-stats-container.discord-theme-shadcn .discord-cta-button--solid {
+    font-weight: 600;
+}
+
+@media (prefers-color-scheme: dark) {
+    .discord-stats-container.discord-theme-shadcn {
+        --discord-surface-background: rgba(15, 23, 42, 0.84);
+        --discord-surface-text: #e2e8f0;
+        --discord-surface-border: rgba(94, 234, 212, 0.18);
+        --discord-avatar-background: rgba(94, 234, 212, 0.18);
+        --discord-logo-color: #e2e8f0;
+        --discord-surface-shadow: 0 22px 60px -24px rgba(15, 23, 42, 0.9);
+        --discord-surface-hover-shadow: 0 32px 68px -18px rgba(45, 212, 191, 0.35);
+        --discord-accent-contrast: #022c22;
+    }
+
+    .discord-stats-container.discord-theme-shadcn .discord-stats-main {
+        background: rgba(15, 23, 42, 0.82);
+        border-color: rgba(94, 234, 212, 0.24);
+    }
+}
+
+.discord-stats-container.discord-theme-bootstrap {
+    --discord-gap: clamp(16px, 3.4vw, 24px);
+    --discord-padding: clamp(18px, 4vw, 28px);
+    --discord-radius: clamp(12px, 2.8vw, 20px);
+    --discord-surface-background: #f8f9fa;
+    --discord-surface-text: #212529;
+    --discord-surface-border: rgba(0, 0, 0, 0.1);
+    --discord-surface-shadow: 0 0.75rem 2rem rgba(33, 37, 41, 0.08);
+    --discord-surface-hover-shadow: 0 1.5rem 3rem rgba(33, 37, 41, 0.12);
+    --discord-accent: #0d6efd;
+    --discord-accent-secondary: #0b5ed7;
+    --discord-accent-contrast: #ffffff;
+    --discord-focus-outline: rgba(13, 110, 253, 0.35);
+    --discord-outline-contrast: rgba(13, 110, 253, 0.28);
+    --discord-avatar-background: rgba(13, 110, 253, 0.12);
+    --discord-avatar-shadow: 0 16px 40px -26px rgba(13, 110, 253, 0.4);
+    --discord-button-shadow: rgba(13, 110, 253, 0.3);
+    --discord-button-shadow-hover: rgba(13, 110, 253, 0.38);
+    --discord-refresh-background: rgba(33, 37, 41, 0.95);
+    --discord-refresh-text: #f8f9fa;
+    --discord-refresh-border: rgba(248, 249, 250, 0.18);
+    --discord-logo-color: #0d6efd;
+    --discord-badge-start: #0d6efd;
+    --discord-badge-end: #6610f2;
+    --discord-badge-text: #ffffff;
+}
+
+.discord-stats-container.discord-theme-bootstrap .discord-stats-main {
+    background: #ffffff;
+    border-radius: calc(var(--discord-radius) * 1.4);
+    border: 1px solid rgba(0, 0, 0, 0.08);
+    box-shadow: 0 1rem 2.5rem rgba(33, 37, 41, 0.08);
+}
+
+.discord-stats-container.discord-theme-bootstrap .discord-stat {
+    background: #ffffff;
+    border: 1px solid rgba(0, 0, 0, 0.06);
+    border-radius: calc(var(--discord-radius) * 0.9);
+}
+
+.discord-stats-container.discord-theme-bootstrap .discord-cta-button--solid {
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+}
+
+.discord-stats-container.discord-theme-semantic {
+    --discord-gap: clamp(18px, 4.2vw, 28px);
+    --discord-padding: clamp(18px, 4vw, 28px);
+    --discord-radius: clamp(14px, 2.8vw, 22px);
+    --discord-surface-background: #f9fafb;
+    --discord-surface-text: #1f2937;
+    --discord-surface-border: rgba(17, 24, 39, 0.08);
+    --discord-surface-shadow: 0 22px 46px -28px rgba(24, 24, 27, 0.4);
+    --discord-surface-hover-shadow: 0 28px 60px -24px rgba(24, 24, 27, 0.45);
+    --discord-accent: #2185d0;
+    --discord-accent-secondary: #a333c8;
+    --discord-accent-contrast: #fdf2f8;
+    --discord-focus-outline: rgba(161, 51, 200, 0.4);
+    --discord-outline-contrast: rgba(33, 133, 208, 0.32);
+    --discord-avatar-background: rgba(161, 51, 200, 0.1);
+    --discord-avatar-shadow: 0 12px 38px -26px rgba(33, 133, 208, 0.45);
+    --discord-button-shadow: rgba(33, 133, 208, 0.24);
+    --discord-button-shadow-hover: rgba(161, 51, 200, 0.32);
+    --discord-refresh-background: rgba(30, 64, 175, 0.95);
+    --discord-refresh-text: #f8fafc;
+    --discord-refresh-border: rgba(33, 133, 208, 0.28);
+    --discord-logo-color: #1f2937;
+    --discord-badge-start: #2185d0;
+    --discord-badge-end: #a333c8;
+    --discord-badge-text: #f9fafb;
+}
+
+.discord-stats-container.discord-theme-semantic .discord-stats-main {
+    background: linear-gradient(180deg, rgba(255, 255, 255, 0.92) 0%, rgba(249, 250, 251, 0.85) 100%);
+    border-radius: calc(var(--discord-radius) * 1.3);
+    border: 1px solid rgba(33, 133, 208, 0.18);
+}
+
+.discord-stats-container.discord-theme-semantic .discord-stat {
+    border-radius: calc(var(--discord-radius) * 0.95);
+    border: 1px solid rgba(161, 51, 200, 0.14);
+    background: rgba(255, 255, 255, 0.92);
+}
+
+.discord-stats-container.discord-theme-anime {
+    --discord-gap: clamp(18px, 4.6vw, 32px);
+    --discord-padding: clamp(22px, 4.8vw, 34px);
+    --discord-radius: clamp(16px, 3vw, 24px);
+    --discord-icon-size: clamp(20px, 4vw, 28px);
+    --discord-number-size: clamp(26px, 4.8vw, 38px);
+    --discord-label-size: clamp(13px, 3vw, 18px);
+    --discord-surface-background: rgba(17, 24, 39, 0.72);
+    --discord-surface-text: #f1f5f9;
+    --discord-surface-border: rgba(56, 189, 248, 0.22);
+    --discord-surface-shadow: 0 38px 70px -28px rgba(56, 189, 248, 0.45);
+    --discord-surface-hover-shadow: 0 48px 80px -24px rgba(244, 114, 182, 0.55);
+    --discord-accent: #38bdf8;
+    --discord-accent-secondary: #f472b6;
+    --discord-accent-contrast: #0f172a;
+    --discord-focus-outline: rgba(244, 114, 182, 0.6);
+    --discord-outline-contrast: rgba(56, 189, 248, 0.6);
+    --discord-avatar-background: rgba(56, 189, 248, 0.14);
+    --discord-avatar-shadow: 0 26px 66px -34px rgba(244, 114, 182, 0.55);
+    --discord-button-shadow: rgba(56, 189, 248, 0.32);
+    --discord-button-shadow-hover: rgba(244, 114, 182, 0.42);
+    --discord-refresh-background: rgba(15, 23, 42, 0.92);
+    --discord-refresh-text: #cffafe;
+    --discord-refresh-border: rgba(244, 114, 182, 0.36);
+    --discord-logo-color: #f8fafc;
+    --discord-badge-start: #38bdf8;
+    --discord-badge-end: #f472b6;
+    --discord-badge-text: #0f172a;
+    background: linear-gradient(135deg, #0f172a 0%, #1f2937 50%, #111827 100%);
+    position: relative;
+    z-index: 0;
+    overflow: hidden;
+}
+
+.discord-stats-container.discord-theme-anime::before {
+    content: "";
+    position: absolute;
+    inset: -35%;
+    background: radial-gradient(ellipse at top, rgba(244, 114, 182, 0.32) 0%, transparent 55%),
+        radial-gradient(ellipse at bottom, rgba(56, 189, 248, 0.35) 0%, transparent 60%);
+    filter: blur(20px);
+    opacity: 0.75;
+    transform: scale(1) rotate(0deg);
+    animation: discord-anime-pulse 12s ease-in-out infinite;
+    z-index: -1;
+}
+
+.discord-stats-container.discord-theme-anime .discord-stats-main {
+    background: rgba(15, 23, 42, 0.72);
+    border: 1px solid rgba(56, 189, 248, 0.28);
+    border-radius: calc(var(--discord-radius) * 1.35);
+    box-shadow: 0 34px 90px -36px rgba(56, 189, 248, 0.55);
+    backdrop-filter: blur(18px) saturate(1.35);
+}
+
+.discord-stats-container.discord-theme-anime .discord-stat {
+    background: rgba(15, 23, 42, 0.78);
+    border: 1px solid rgba(244, 114, 182, 0.2);
+    box-shadow: inset 0 0 0 1px rgba(56, 189, 248, 0.12);
+}
+
+.discord-stats-container.discord-theme-anime .discord-cta-button--solid {
+    box-shadow: 0 18px 42px -22px rgba(244, 114, 182, 0.6);
+    position: relative;
+    overflow: hidden;
+}
+
+.discord-stats-container.discord-theme-anime .discord-cta-button--solid::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(120deg, rgba(56, 189, 248, 0.35), rgba(244, 114, 182, 0.45));
+    mix-blend-mode: screen;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.discord-stats-container.discord-theme-anime .discord-cta-button--solid:hover::after,
+.discord-stats-container.discord-theme-anime .discord-cta-button--solid:focus-visible::after {
+    opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+    .discord-stats-container.discord-theme-anime::before {
+        animation: none;
+    }
+
+    .discord-stats-container.discord-theme-anime .discord-cta-button--solid::after {
+        transition-duration: 0s;
+    }
+}
+
+@keyframes discord-anime-pulse {
+    0% {
+        transform: scale(1) rotate(0deg);
+        opacity: 0.7;
+    }
+
+    50% {
+        transform: scale(1.1) rotate(8deg);
+        opacity: 0.95;
+    }
+
+    100% {
+        transform: scale(1) rotate(0deg);
+        opacity: 0.7;
+    }
+}
+
 .discord-stats-container.discord-align-center .discord-stats-main {
     justify-content: center;
 }

@@ -35,7 +35,7 @@ class Discord_Stats_Widget extends WP_Widget {
 
         $allowed_layouts   = array('horizontal', 'vertical');
         $allowed_positions = array('left', 'right', 'top');
-        $allowed_themes    = array('discord', 'dark', 'light', 'minimal', 'radix');
+        $allowed_themes    = discord_bot_jlg_get_available_themes();
 
         $layout = sanitize_key($instance['layout']);
         if (!in_array($layout, $allowed_layouts, true)) {
@@ -177,7 +177,7 @@ class Discord_Stats_Widget extends WP_Widget {
         $instance['discord_icon_position'] = in_array($icon_position, array('left', 'right', 'top'), true) ? $icon_position : 'left';
 
         $theme = isset($new_instance['theme']) ? sanitize_key($new_instance['theme']) : 'discord';
-        $instance['theme'] = in_array($theme, array('discord', 'dark', 'light', 'minimal', 'radix'), true) ? $theme : 'discord';
+        $instance['theme'] = in_array($theme, discord_bot_jlg_get_available_themes(), true) ? $theme : 'discord';
 
         $instance['refresh'] = !empty($new_instance['refresh']) ? 1 : 0;
         $min_refresh = defined('Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL')
@@ -296,15 +296,33 @@ class Discord_Stats_Widget extends WP_Widget {
             </select>
         </p>
 
+        <?php
+        $theme_labels = array(
+            'discord'   => __('Discord', 'discord-bot-jlg'),
+            'dark'      => __('Sombre', 'discord-bot-jlg'),
+            'light'     => __('Clair', 'discord-bot-jlg'),
+            'minimal'   => __('Minimal', 'discord-bot-jlg'),
+            'radix'     => __('Radix Structure', 'discord-bot-jlg'),
+            'headless'  => __('Headless Essence', 'discord-bot-jlg'),
+            'shadcn'    => __('Shadcn Minimal', 'discord-bot-jlg'),
+            'bootstrap' => __('Bootstrap Fluent', 'discord-bot-jlg'),
+            'semantic'  => __('Semantic Harmony', 'discord-bot-jlg'),
+            'anime'     => __('Anime Pulse', 'discord-bot-jlg'),
+        );
+
+        $available_themes = discord_bot_jlg_get_available_themes();
+        ?>
         <p>
             <label for="<?php echo esc_attr($this->get_field_id('theme')); ?>"><?php esc_html_e('Thème visuel', 'discord-bot-jlg'); ?></label>
             <select class="widefat" id="<?php echo esc_attr($this->get_field_id('theme')); ?>"
                     name="<?php echo esc_attr($this->get_field_name('theme')); ?>">
-                <option value="discord" <?php selected($instance['theme'], 'discord'); ?>><?php esc_html_e('Discord', 'discord-bot-jlg'); ?></option>
-                <option value="dark" <?php selected($instance['theme'], 'dark'); ?>><?php esc_html_e('Sombre', 'discord-bot-jlg'); ?></option>
-                <option value="light" <?php selected($instance['theme'], 'light'); ?>><?php esc_html_e('Clair', 'discord-bot-jlg'); ?></option>
-                <option value="minimal" <?php selected($instance['theme'], 'minimal'); ?>><?php esc_html_e('Minimal', 'discord-bot-jlg'); ?></option>
-                <option value="radix" <?php selected($instance['theme'], 'radix'); ?>><?php esc_html_e('Radix UI', 'discord-bot-jlg'); ?></option>
+                <?php foreach ($available_themes as $theme_value) :
+                    $label = isset($theme_labels[$theme_value]) ? $theme_labels[$theme_value] : ucfirst($theme_value);
+                    ?>
+                    <option value="<?php echo esc_attr($theme_value); ?>" <?php selected($instance['theme'], $theme_value); ?>>
+                        <?php echo esc_html($label); ?>
+                    </option>
+                <?php endforeach; ?>
             </select>
         </p>
 

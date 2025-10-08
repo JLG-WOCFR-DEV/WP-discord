@@ -98,7 +98,12 @@
         { label: __('Sombre', 'discord-bot-jlg'), value: 'dark' },
         { label: __('Clair', 'discord-bot-jlg'), value: 'light' },
         { label: __('Minimal', 'discord-bot-jlg'), value: 'minimal' },
-        { label: __('Radix UI', 'discord-bot-jlg'), value: 'radix' }
+        { label: __('Radix Structure', 'discord-bot-jlg'), value: 'radix' },
+        { label: __('Headless Essence', 'discord-bot-jlg'), value: 'headless' },
+        { label: __('Shadcn Minimal', 'discord-bot-jlg'), value: 'shadcn' },
+        { label: __('Bootstrap Fluent', 'discord-bot-jlg'), value: 'bootstrap' },
+        { label: __('Semantic Harmony', 'discord-bot-jlg'), value: 'semantic' },
+        { label: __('Anime Pulse', 'discord-bot-jlg'), value: 'anime' }
     ];
 
     var alignOptions = [
