@@ -15,6 +15,104 @@ if (!defined('DAY_IN_SECONDS')) {
     define('DAY_IN_SECONDS', 86400);
 }
 
+if (!function_exists('plugin_dir_path')) {
+    function plugin_dir_path($file) {
+        return rtrim(dirname($file), '/\\') . '/';
+    }
+}
+
+if (!function_exists('plugin_dir_url')) {
+    function plugin_dir_url($file) {
+        $path = trim(str_replace(dirname(dirname($file)), '', dirname($file)), '/\\');
+
+        if ('' !== $path) {
+            $path .= '/';
+        }
+
+        return 'https://example.com/wp-content/plugins/' . $path;
+    }
+}
+
+if (!function_exists('plugin_basename')) {
+    function plugin_basename($file) {
+        return ltrim(str_replace('\\', '/', $file), '/');
+    }
+}
+
+if (!function_exists('register_activation_hook')) {
+    function register_activation_hook($file, $callback) {
+        $GLOBALS['wp_test_activation_hooks'][$file] = $callback;
+    }
+}
+
+if (!function_exists('register_deactivation_hook')) {
+    function register_deactivation_hook($file, $callback) {
+        $GLOBALS['wp_test_deactivation_hooks'][$file] = $callback;
+    }
+}
+
+if (!function_exists('register_uninstall_hook')) {
+    function register_uninstall_hook($file, $callback) {
+        $GLOBALS['wp_test_uninstall_hooks'][$file] = $callback;
+    }
+}
+
+if (!function_exists('load_plugin_textdomain')) {
+    function load_plugin_textdomain($domain, $deprecated = false, $plugin_rel_path = '') {
+        $GLOBALS['wp_test_loaded_textdomains'][$domain] = array(
+            'path' => $plugin_rel_path,
+        );
+    }
+}
+
+if (!function_exists('wp_schedule_event')) {
+    function wp_schedule_event($timestamp, $recurrence, $hook, $args = array()) {
+        $GLOBALS['wp_test_scheduled_events'][] = array(
+            'timestamp'  => $timestamp,
+            'recurrence' => $recurrence,
+            'hook'       => $hook,
+            'args'       => $args,
+        );
+
+        return true;
+    }
+}
+
+if (!function_exists('wp_clear_scheduled_hook')) {
+    function wp_clear_scheduled_hook($hook) {
+        if (!isset($GLOBALS['wp_test_scheduled_events']) || !is_array($GLOBALS['wp_test_scheduled_events'])) {
+            return;
+        }
+
+        $GLOBALS['wp_test_scheduled_events'] = array_values(array_filter(
+            $GLOBALS['wp_test_scheduled_events'],
+            function ($event) use ($hook) {
+                return isset($event['hook']) && $event['hook'] !== $hook;
+            }
+        ));
+    }
+}
+
+if (!function_exists('register_block_type')) {
+    function register_block_type($path, $args = array()) {
+        $GLOBALS['wp_test_registered_blocks'][] = array(
+            'path' => $path,
+            'args' => $args,
+        );
+
+        return true;
+    }
+}
+
+if (!function_exists('wp_set_script_translations')) {
+    function wp_set_script_translations($handle, $domain, $path = '') {
+        $GLOBALS['wp_test_script_translations'][$handle] = array(
+            'domain' => $domain,
+            'path'   => $path,
+        );
+    }
+}
+
 if (!class_exists('WP_Widget')) {
     class WP_Widget {
         public $id_base;
@@ -92,6 +190,12 @@ if (!function_exists('do_shortcode')) {
     function do_shortcode($shortcode) {
         $GLOBALS['discord_bot_jlg_last_shortcode'] = $shortcode;
         return $shortcode;
+    }
+}
+
+if (!function_exists('add_shortcode')) {
+    function add_shortcode($tag, $callback) {
+        $GLOBALS['wp_test_shortcodes'][$tag] = $callback;
     }
 }
 
@@ -247,6 +351,16 @@ function get_option($name) {
 }
 
 function update_option($name, $value, $autoload = null) {
+    $GLOBALS['wp_test_options'][$name] = $value;
+
+    return true;
+}
+
+function add_option($name, $value = '', $deprecated = '', $autoload = 'yes') {
+    if (isset($GLOBALS['wp_test_options'][$name])) {
+        return false;
+    }
+
     $GLOBALS['wp_test_options'][$name] = $value;
 
     return true;
