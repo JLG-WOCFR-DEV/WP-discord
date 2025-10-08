@@ -7,7 +7,7 @@
 *Pistes inspirées des apps pro :*
 
 - Extraire les appels réseau, la fusion et la persistance dans des services dédiés (pattern « use-case + gateway ») pour pouvoir monitorer chaque étape et appliquer des stratégies de retry ou de circuit-breaker indépendantes.【F:discord-bot-jlg/inc/class-discord-api.php†L334-L358】
-- Ajouter de la télémétrie structurée (logs normalisés, événements analytics) avant/après chaque point de sortie pour faciliter l’observabilité en production.
+- Ajouter de la télémétrie structurée (logs normalisés, événements analytics) avant/après chaque point de sortie pour faciliter l’observabilité en production. _Mise à jour 2024-07 : les nouveaux hooks `discord_bot_jlg_pre_http_request` / `discord_bot_jlg_after_http_request` exposent les métadonnées nécessaires aux métriques externes._
 - Déporter les rafraîchissements lourds dans une file asynchrone (cron, queue, Action Scheduler) afin de ne pas bloquer les requêtes front-office tout en conservant des garanties de fraîcheur similaires aux bots professionnels.
 
 ## 2. `Discord_Bot_JLG_Admin::sanitize_options()`
@@ -37,7 +37,7 @@
 | 🚨 Haute | Extraire un service `StatsRefreshJob` qui encapsule la logique de cron et le verrouillage pour permettre l’ajout d’un backoff exponentiel configurable.【F:discord-bot-jlg/discord-bot-jlg.php†L394-L417】 | Nouvelle classe + tests d’intégration cron | À cadrer |
 | 🚨 Haute | Scinder `Discord_Bot_JLG_API::get_stats()` en façade + connecteurs HTTP séparés (widget/bot) avec instrumentation PSR-3 pour suivre les échecs et la latence.【F:discord-bot-jlg/inc/class-discord-api.php†L240-L358】 | Services dédiés + journalisation structurée | À cadrer |
 | ⚠️ Moyenne | Introduire un gestionnaire de profils (`ProfilesRepository`) afin de sortir la persistance des tokens de la méthode `sanitize_options()` et préparer le chiffrement applicatif.【F:discord-bot-jlg/inc/class-discord-admin.php†L283-L472】 | Classe repository + migration d’option | À prioriser |
-| ⚠️ Moyenne | Ajouter des hooks d’observabilité (actions/filters) autour des appels Discord pour brancher des compteurs Prometheus ou des webhooks d’alerte.【F:discord-bot-jlg/inc/class-discord-api.php†L1991-L2133】 | Hooks documentés + échantillons de métriques | À prioriser |
+| ⚠️ Moyenne | Ajouter des hooks d’observabilité (actions/filters) autour des appels Discord pour brancher des compteurs Prometheus ou des webhooks d’alerte.【F:discord-bot-jlg/inc/class-discord-api.php†L1991-L2133】 | Hooks documentés + échantillons de métriques | En cours (HTTP instrumenté) |
 | ✅ Faible | Documenter un scénario de tests automatisés couvrant la fusion `merge_stats()` avec des fixtures multi-sources pour préparer l’extraction en stratégie pluggable.【F:discord-bot-jlg/inc/class-discord-api.php†L444-L538】 | Cas de tests + checklist QA | En cours de rédaction |
 
 > ℹ️ Statuts mis à jour le 2024-07-02. Synchroniser cette table avec le plan global (`docs/code-review.md`) à chaque sprint.
