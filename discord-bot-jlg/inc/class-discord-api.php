@@ -515,38 +515,33 @@ class Discord_Bot_JLG_API {
                 $stats['server_avatar_base_url'] = $bot_stats['server_avatar_base_url'];
             }
 
-            $presence_breakdown = array();
+            $presence_selection = $this->select_presence_breakdown_for_merge($widget_stats, $bot_stats);
 
-            foreach (array($widget_stats, $bot_stats) as $source_stats) {
-                if (
-                    !is_array($source_stats)
-                    || empty($source_stats['presence_count_by_status'])
-                    || !is_array($source_stats['presence_count_by_status'])
-                ) {
-                    continue;
-                }
-
-                foreach ($source_stats['presence_count_by_status'] as $status_key => $count_value) {
-                    if (!isset($presence_breakdown[$status_key])) {
-                        $presence_breakdown[$status_key] = 0;
-                    }
-
-                    $presence_breakdown[$status_key] += (int) $count_value;
-                }
-            }
-
-            if (!empty($presence_breakdown)) {
-                $stats['presence_count_by_status'] = $presence_breakdown;
+            if (!empty($presence_selection['breakdown'])) {
+                $stats['presence_count_by_status'] = $presence_selection['breakdown'];
             } elseif (isset($widget_stats['presence_count_by_status'])) {
                 $stats['presence_count_by_status'] = $widget_stats['presence_count_by_status'];
             } elseif (isset($bot_stats['presence_count_by_status'])) {
                 $stats['presence_count_by_status'] = $bot_stats['presence_count_by_status'];
             }
 
-            if (isset($widget_stats['approximate_presence_count']) && null !== $widget_stats['approximate_presence_count']) {
-                $stats['approximate_presence_count'] = (int) $widget_stats['approximate_presence_count'];
-            } elseif (isset($bot_stats['approximate_presence_count'])) {
-                $stats['approximate_presence_count'] = (int) $bot_stats['approximate_presence_count'];
+            if (!empty($presence_selection['source'])) {
+                $preferred_stats = 'widget' === $presence_selection['source'] ? $widget_stats : $bot_stats;
+
+                if (
+                    isset($preferred_stats['approximate_presence_count'])
+                    && null !== $preferred_stats['approximate_presence_count']
+                ) {
+                    $stats['approximate_presence_count'] = (int) $preferred_stats['approximate_presence_count'];
+                }
+            }
+
+            if (!array_key_exists('approximate_presence_count', $stats)) {
+                if (isset($widget_stats['approximate_presence_count']) && null !== $widget_stats['approximate_presence_count']) {
+                    $stats['approximate_presence_count'] = (int) $widget_stats['approximate_presence_count'];
+                } elseif (isset($bot_stats['approximate_presence_count'])) {
+                    $stats['approximate_presence_count'] = (int) $bot_stats['approximate_presence_count'];
+                }
             }
 
             if (isset($bot_stats['approximate_member_count']) && null !== $bot_stats['approximate_member_count']) {
@@ -573,6 +568,74 @@ class Discord_Bot_JLG_API {
         }
 
         return null;
+    }
+
+    private function select_presence_breakdown_for_merge($widget_stats, $bot_stats) {
+        $selection = array(
+            'source'    => null,
+            'breakdown' => array(),
+        );
+
+        $widget_candidate = $this->build_presence_breakdown_candidate($widget_stats);
+        $bot_candidate    = $this->build_presence_breakdown_candidate($bot_stats);
+
+        if ($widget_candidate && $bot_candidate) {
+            if ($bot_candidate['non_zero_statuses'] > $widget_candidate['non_zero_statuses']) {
+                $selection['source']    = 'bot';
+                $selection['breakdown'] = $bot_candidate['breakdown'];
+            } elseif (
+                $bot_candidate['non_zero_statuses'] === $widget_candidate['non_zero_statuses']
+                && $bot_candidate['total'] > $widget_candidate['total']
+            ) {
+                $selection['source']    = 'bot';
+                $selection['breakdown'] = $bot_candidate['breakdown'];
+            } else {
+                $selection['source']    = 'widget';
+                $selection['breakdown'] = $widget_candidate['breakdown'];
+            }
+        } elseif ($widget_candidate) {
+            $selection['source']    = 'widget';
+            $selection['breakdown'] = $widget_candidate['breakdown'];
+        } elseif ($bot_candidate) {
+            $selection['source']    = 'bot';
+            $selection['breakdown'] = $bot_candidate['breakdown'];
+        }
+
+        return $selection;
+    }
+
+    private function build_presence_breakdown_candidate($source_stats) {
+        if (
+            !is_array($source_stats)
+            || empty($source_stats['presence_count_by_status'])
+            || !is_array($source_stats['presence_count_by_status'])
+        ) {
+            return null;
+        }
+
+        $breakdown = array();
+        $total     = 0;
+        $non_zero  = 0;
+
+        foreach ($source_stats['presence_count_by_status'] as $status_key => $count_value) {
+            $int_value = max(0, (int) $count_value);
+            $breakdown[$status_key] = $int_value;
+            $total += $int_value;
+
+            if ($int_value > 0) {
+                $non_zero++;
+            }
+        }
+
+        if (empty($breakdown)) {
+            return null;
+        }
+
+        return array(
+            'breakdown'          => $breakdown,
+            'total'              => $total,
+            'non_zero_statuses'  => $non_zero,
+        );
     }
 
     private function persist_successful_stats($stats, $options, $context, $args) {

@@ -134,10 +134,11 @@ class Discord_Bot_JLG_REST_Controller {
     }
 
     public function handle_get_stats(WP_REST_Request $request) {
-        $is_user_logged_in      = is_user_logged_in();
+        $is_user_logged_in       = is_user_logged_in();
         $force_refresh_requested = discord_bot_jlg_validate_bool($request->get_param('force_refresh'));
+        $nonce_required          = $is_user_logged_in && $this->request_requires_cookie_nonce($request);
 
-        if ($is_user_logged_in) {
+        if ($nonce_required) {
             $nonce = $request->get_header('X-WP-Nonce');
             if (empty($nonce) || !wp_verify_nonce($nonce, 'wp_rest')) {
                 $error_payload = array(
@@ -240,6 +241,20 @@ class Discord_Bot_JLG_REST_Controller {
                     'days'        => $days,
                 )
             );
+
+            if (is_wp_error($aggregates)) {
+                return $aggregates;
+            }
+
+            if (false === $aggregates) {
+                return rest_ensure_response(
+                    new WP_Error(
+                        'discord_bot_jlg_analytics_unavailable',
+                        __('Impossible de récupérer les analyses.', 'discord-bot-jlg'),
+                        array('status' => 500)
+                    )
+                );
+            }
 
             if (!is_array($aggregates)) {
                 $aggregates = array();
@@ -406,6 +421,63 @@ class Discord_Bot_JLG_REST_Controller {
             __('Vous devez être connecté avec les droits appropriés pour accéder à ces données.', 'discord-bot-jlg'),
             array('status' => 403)
         );
+    }
+
+    private function request_requires_cookie_nonce(WP_REST_Request $request) {
+        if ($this->request_uses_authorization_header($request)) {
+            return false;
+        }
+
+        return $this->request_has_logged_in_cookie();
+    }
+
+    private function request_uses_authorization_header(WP_REST_Request $request) {
+        $header_names = array('authorization', 'x-wp-authentication');
+
+        foreach ($header_names as $header_name) {
+            $header_value = $request->get_header($header_name);
+            if (!empty($header_value)) {
+                return true;
+            }
+        }
+
+        if (!empty($_SERVER['PHP_AUTH_USER']) || !empty($_SERVER['PHP_AUTH_PW'])) {
+            return true;
+        }
+
+        if (!empty($_SERVER['HTTP_AUTHORIZATION'])) {
+            return true;
+        }
+
+        return false;
+    }
+
+    private function request_has_logged_in_cookie() {
+        if (empty($_COOKIE) || !is_array($_COOKIE)) {
+            return false;
+        }
+
+        $cookie_names = array();
+
+        if (defined('LOGGED_IN_COOKIE')) {
+            $cookie_names[] = LOGGED_IN_COOKIE;
+        }
+
+        if (defined('AUTH_COOKIE')) {
+            $cookie_names[] = AUTH_COOKIE;
+        }
+
+        if (defined('SECURE_AUTH_COOKIE')) {
+            $cookie_names[] = SECURE_AUTH_COOKIE;
+        }
+
+        foreach ($cookie_names as $cookie_name) {
+            if (!empty($cookie_name) && !empty($_COOKIE[$cookie_name])) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function extract_request_access_key(WP_REST_Request $request) {
