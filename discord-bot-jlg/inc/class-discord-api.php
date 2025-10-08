@@ -42,6 +42,7 @@ class Discord_Bot_JLG_API {
     private $runtime_fallback_retry_timestamp;
     private $analytics;
     private $event_logger;
+    private $runtime_status_history;
 
     /**
      * Prépare le service d'accès aux statistiques avec les clés et durées nécessaires.
@@ -81,6 +82,7 @@ class Discord_Bot_JLG_API {
         $this->event_logger = ($event_logger instanceof Discord_Bot_JLG_Event_Logger)
             ? $event_logger
             : new Discord_Bot_JLG_Event_Logger();
+        $this->runtime_status_history = array();
     }
 
     public function set_analytics_service($analytics) {
@@ -141,6 +143,18 @@ class Discord_Bot_JLG_API {
         $profile_key = sanitize_key($args['profile_key']);
         $server_id   = $this->sanitize_server_id($args['server_id']);
 
+        $normalized_args = array(
+            'limit'       => $limit,
+            'profile_key' => $profile_key,
+            'server_id'   => $server_id,
+            'types'       => $allowed_types,
+        );
+
+        $cache_key = md5(wp_json_encode($normalized_args));
+        if (isset($this->runtime_status_history[$cache_key])) {
+            return $this->runtime_status_history[$cache_key];
+        }
+
         $fetch_limit = min(50, max($limit * 4, $limit));
 
         $raw_events = $this->event_logger->get_events(
@@ -191,6 +205,8 @@ class Discord_Bot_JLG_API {
                 break;
             }
         }
+
+        $this->runtime_status_history[$cache_key] = $history;
 
         return $history;
     }
