@@ -84,3 +84,15 @@
   - Étendre la configuration Chart.js pour gérer plusieurs datasets, légendes dynamiques et zones colorées.
   - Ajouter une logique de détection d’anomalies côté PHP ou JS (calcul d’écart-type glissant) et stocker les playbooks associés dans une option WordPress.
   - Prévoir un mécanisme de presets (JSON) pour enregistrer/partager des configurations de métriques via le bloc.
+
+## Tableau de suivi UX/UI
+
+| Statut | Sujet | Prochaine décision | Références |
+| --- | --- | --- | --- |
+| 🛠️ Design en cours | Tableau comparatif multi-profils | Valider le rendu responsive (colonnes vs. carrousel) et définir le coût API. | 【F:docs/ux-ui-ameliorations-suite.md†L1-L42】 |
+| ⏳ À prioriser | Explorateur de présence segmenté | Choisir la librairie graphique (Chart.js vs. D3) et cadrer la volumétrie analytics. | 【F:docs/ux-ui-ameliorations-suite.md†L44-L82】 |
+| ⏳ À prioriser | Timeline analytics enrichie | Identifier les besoins d’export (CSV/PNG) et les droits d’accès associés. | 【F:docs/ux-ui-ameliorations-suite.md†L84-L117】 |
+| 🟢 Idea bank | Signalétique d’état proactive | Prototyper le badge sticky + drawer historique pour évaluer l’impact visuel. | 【F:docs/ux-ui-ameliorations-suite.md†L119-L164】 |
+| 🟢 Idea bank | Sparkline multi-couches | Déterminer les métriques à exposer par défaut et la logique d’alerting. | 【F:docs/ux-ui-ameliorations-suite.md†L166-L210】 |
+
+Ce tableau complète la roadmap produit en fournissant un état synthétique des initiatives UX. Mettre à jour les statuts à mesure des validations ateliers/design.

@@ -30,3 +30,14 @@
 - Utiliser un système de jobs (Action Scheduler, queues Redis) pour éviter les doublons de cron si plusieurs sites partagent la même configuration, et suivre chaque tentative via des métriques consolidées.
 - Vérifier l’état du verrou côté API (`Discord_Bot_JLG_API`) avant planification afin de prévenir les chevauchements de rafraîchissements, à l’image des orchestrateurs de bots professionnels.
 
+
+## Priorités court terme
+
+| Fonction | Action recommandée | Bénéfice | Références |
+| --- | --- | --- | --- |
+| `get_stats()` | Découper en services (`ProfileResolver`, `StatsFetcher`, `SnapshotWriter`) et ajouter un logger PSR-3. | Facilite les tests ciblés et l’observabilité temps réel. | 【F:docs/audit-fonctions.md†L3-L33】【F:docs/comparaison-apps-pro.md†L38-L64】 |
+| `sanitize_options()` | Passer à une validation déclarative (schéma) avec rotation automatique des tokens. | Sécurise la configuration et prépare la gouvernance multi-profils. | 【F:docs/audit-fonctions.md†L35-L54】 |
+| `reschedule_cron_event()` | Introduire un backoff exponentiel et consigner les échecs successifs. | Améliore la résilience face aux quotas API Discord. | 【F:docs/audit-fonctions.md†L56-L71】 |
+| `persist_successful_stats()` | Déléguer l’écriture analytics à une file asynchrone (Action Scheduler). | Évite que l’échec du reporting bloque le cache front. | 【F:discord-bot-jlg/inc/class-discord-api.php†L552-L582】 |
+
+Ces actions sont alignées avec la comparaison « apps pro » et peuvent être traitées indépendamment pour livrer de la valeur rapidement.

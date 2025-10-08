@@ -78,3 +78,15 @@
 
 ---
 En priorisant ces évolutions, l'extension pourra rivaliser avec les solutions professionnelles tout en capitalisant sur les fondations techniques déjà solides.
+
+## Synthèse des prochains incréments
+
+| Horizon | Initiative | Résultat attendu | Références |
+| --- | --- | --- | --- |
+| Court terme | Modes presets & variations Gutenberg | Réduire le temps de configuration en exposant des templates prêts à l’emploi. | 【F:docs/audit-professionnel.md†L5-L41】【F:docs/presets-ui.md†L1-L112】 |
+| Court terme | Notifications & exports analytics | Prévenir les chutes d’activité via alertes et permettre les analyses externes. | 【F:docs/audit-professionnel.md†L42-L75】【F:docs/ux-ui-ameliorations-suite.md†L63-L108】 |
+| Moyen terme | Expérience multi-profils & comparatifs | Offrir un tableau de bord transverse pour plusieurs serveurs Discord. | 【F:docs/audit-professionnel.md†L10-L41】【F:docs/ux-ui-ameliorations-suite.md†L1-L42】 |
+| Moyen terme | Accessibilité avancée | Proposer un thème AAA, navigation clavier enrichie et exports accessibles. | 【F:docs/audit-professionnel.md†L76-L120】 |
+| Long terme | Gouvernance affinée & segmentation des accès | Introduire des rôles personnalisés, des clés API scoped et un audit trail des actions. | 【F:docs/comparaison-apps-pro.md†L34-L87】 |
+
+Cette synthèse peut alimenter la roadmap officielle du plugin et servir de base aux arbitrages produit/technique lors des prochains sprints.

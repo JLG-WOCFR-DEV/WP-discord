@@ -64,3 +64,14 @@ Les éditeurs SaaS matures se distinguent aussi par la qualité de leur outillag
 1. **Capitaliser sur les tests existants** : généraliser l’exécution automatisée des suites PHPUnit et Jest (mock HTTP, scénarios front) dans un pipeline CI pour détecter les régressions avant déploiement public.【F:discord-bot-jlg/tests/phpunit/Test_Discord_Bot_JLG_API.php†L1-L34】【F:tests/js/discord-bot-jlg.test.js†L1-L160】
 2. **Documenter le packaging avancé** : compléter le README avec des guides marché (traductions, exigences RGPD, matrice de support) et proposer des scripts de build (Composer, `wp dist-archive`) afin de reproduire les standards de livraison des solutions pro.【F:README.md†L1-L120】【F:discord-bot-jlg/discord-bot-jlg.php†L123-L198】
 3. **Structurer la traçabilité** : coupler les hooks de nettoyage/install avec un journal d’opérations (création/suppression de profils, purges, appels REST) pour simplifier les audits de sécurité et la gestion des incidents.【F:discord-bot-jlg/discord-bot-jlg.php†L123-L167】【F:discord-bot-jlg/inc/class-discord-analytics.php†L164-L217】
+
+### Backlog priorisé (synthèse)
+
+| Priorité | Sujet | Objectif | Références |
+| --- | --- | --- | --- |
+| 🔴 Haute | Externaliser les services critiques (`API`, `Admin`, scheduler) | Réduire la taille des classes et permettre l’instrumentation des appels Discord. | 【F:docs/code-review.md†L9-L73】【F:docs/audit-fonctions.md†L3-L60】 |
+| 🟠 Moyenne | Préparer l’export et l’alerting analytics | Offrir des exports CSV/JSON et une diffusion temps réel des anomalies. | 【F:docs/audit-professionnel.md†L1-L120】【F:docs/ux-ui-ameliorations-suite.md†L63-L108】 |
+| 🟡 Moyenne | Étendre l’expérience multi-profils | Permettre la comparaison simultanée de plusieurs serveurs dans le widget/bloc. | 【F:docs/ux-ui-ameliorations-suite.md†L1-L42】 |
+| 🟢 Basse | Industrialiser les presets graphiques | Packager les thèmes Headless/Shadcn/Radix avec variables CSS et variations Gutenberg. | 【F:docs/presets-ui.md†L1-L112】 |
+
+Ce tableau fait office de vue d’ensemble pour les discussions produit. Chaque piste est détaillée dans les sections précédentes et dans les autres documents du dossier `docs/`.
