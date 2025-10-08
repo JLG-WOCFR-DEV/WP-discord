@@ -7,6 +7,20 @@ if (!defined('ABSPATH')) {
 class Discord_Bot_JLG_Widget {
 
     public function register_widget() {
+        if (!class_exists('WP_Widget')) {
+            if (defined('ABSPATH') && defined('WPINC')) {
+                $widget_file = ABSPATH . WPINC . '/class-wp-widget.php';
+
+                if (file_exists($widget_file)) {
+                    require_once $widget_file;
+                }
+            }
+        }
+
+        if (!class_exists('WP_Widget') || !class_exists('Discord_Stats_Widget')) {
+            return;
+        }
+
         register_widget('Discord_Stats_Widget');
     }
 }
