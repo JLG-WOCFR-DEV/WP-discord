@@ -37,6 +37,7 @@ class Discord_Bot_JLG_API {
     private $options_cache;
     private $runtime_fallback_retry_timestamp;
     private $analytics;
+    private $event_logger;
 
     /**
      * Prépare le service d'accès aux statistiques avec les clés et durées nécessaires.
@@ -47,7 +48,7 @@ class Discord_Bot_JLG_API {
      *
      * @return void
      */
-    public function __construct($option_name, $cache_key, $default_cache_duration = 300, $http_client = null, $analytics = null) {
+    public function __construct($option_name, $cache_key, $default_cache_duration = 300, $http_client = null, $analytics = null, $event_logger = null) {
         $this->option_name = $option_name;
         $this->base_cache_key = $cache_key;
         $this->cache_key = $cache_key;
@@ -63,6 +64,9 @@ class Discord_Bot_JLG_API {
         $this->options_cache = null;
         $this->runtime_fallback_retry_timestamp = 0;
         $this->analytics = ($analytics instanceof Discord_Bot_JLG_Analytics) ? $analytics : null;
+        $this->event_logger = ($event_logger instanceof Discord_Bot_JLG_Event_Logger)
+            ? $event_logger
+            : new Discord_Bot_JLG_Event_Logger();
     }
 
     public function set_analytics_service($analytics) {
@@ -73,6 +77,16 @@ class Discord_Bot_JLG_API {
 
     public function get_analytics_service() {
         return $this->analytics;
+    }
+
+    public function set_event_logger($event_logger) {
+        if ($event_logger instanceof Discord_Bot_JLG_Event_Logger) {
+            $this->event_logger = $event_logger;
+        }
+    }
+
+    public function get_event_logger() {
+        return $this->event_logger;
     }
 
     private function register_current_cache_key() {
@@ -2076,8 +2090,189 @@ class Discord_Bot_JLG_API {
         set_transient($this->get_last_good_cache_key(), $payload, 0);
     }
 
+    private function build_event_base_context($options) {
+        $context = array();
+
+        if (!is_array($options)) {
+            $options = array();
+        }
+
+        $profile_key = 'default';
+
+        if (isset($options['__active_profile_key'])) {
+            $candidate = sanitize_key($options['__active_profile_key']);
+            if ('' !== $candidate) {
+                $profile_key = $candidate;
+            }
+        } elseif (isset($options['profile_key'])) {
+            $candidate = sanitize_key($options['profile_key']);
+            if ('' !== $candidate) {
+                $profile_key = $candidate;
+            }
+        }
+
+        $context['profile_key'] = $profile_key;
+
+        if (isset($options['server_id'])) {
+            $server_id = $this->sanitize_server_id($options['server_id']);
+            if ('' !== $server_id) {
+                $context['server_id'] = $server_id;
+            }
+        }
+
+        if (isset($options['__request_signature'])) {
+            $signature = wp_strip_all_tags((string) $options['__request_signature']);
+            if (strlen($signature) > 120) {
+                $signature = substr($signature, 0, 117) . '…';
+            }
+
+            if ('' !== $signature) {
+                $context['request_signature'] = $signature;
+            }
+        }
+
+        return $context;
+    }
+
+    private function record_discord_http_event($channel, $start_time, $response, array $context = array()) {
+        if (!($this->event_logger instanceof Discord_Bot_JLG_Event_Logger)) {
+            return;
+        }
+
+        $duration_ms = $this->calculate_duration_ms($start_time);
+
+        $event_context = array_merge(
+            array(
+                'channel'     => sanitize_key($channel),
+                'duration_ms' => $duration_ms,
+            ),
+            $context
+        );
+
+        if ($response instanceof WP_Error) {
+            if (!isset($event_context['outcome'])) {
+                $event_context['outcome'] = 'network_error';
+            }
+
+            $event_context['error_code'] = $response->get_error_code();
+            $event_context['error_message'] = $response->get_error_message();
+        } elseif (is_array($response)) {
+            $status_code = (int) wp_remote_retrieve_response_code($response);
+            $event_context['status_code'] = $status_code;
+
+            if (!isset($event_context['outcome'])) {
+                $event_context['outcome'] = ($status_code >= 200 && $status_code < 300)
+                    ? 'success'
+                    : 'http_error';
+            }
+
+            $retry_after = $this->extract_retry_after_seconds($response);
+            if ($retry_after > 0) {
+                $event_context['retry_after'] = $retry_after;
+            }
+
+            $limit = $this->extract_numeric_header($response, 'x-ratelimit-limit');
+            if (null !== $limit) {
+                $event_context['rate_limit_limit'] = $limit;
+            }
+
+            $remaining = $this->extract_numeric_header($response, 'x-ratelimit-remaining');
+            if (null !== $remaining) {
+                $event_context['rate_limit_remaining'] = $remaining;
+            }
+
+            $reset_after = $this->extract_numeric_header($response, 'x-ratelimit-reset-after', true);
+            if (null !== $reset_after) {
+                $event_context['rate_limit_reset_after'] = $reset_after;
+            }
+
+            $bucket = $this->get_first_header_value($response, 'x-ratelimit-bucket');
+            if ('' !== $bucket) {
+                $event_context['rate_limit_bucket'] = $bucket;
+            }
+
+            $global_flag = $this->get_first_header_value($response, 'x-ratelimit-global');
+            if ('' !== $global_flag) {
+                $event_context['rate_limit_global'] = ('1' === $global_flag || 'true' === strtolower($global_flag));
+            }
+        } else {
+            if (!isset($event_context['outcome'])) {
+                $event_context['outcome'] = 'unknown';
+            }
+        }
+
+        $this->event_logger->log('discord_http', $event_context);
+    }
+
+    private function log_connector_event($channel, array $context = array()) {
+        if (!($this->event_logger instanceof Discord_Bot_JLG_Event_Logger)) {
+            return;
+        }
+
+        $event_context = array_merge(
+            array(
+                'channel' => sanitize_key($channel),
+            ),
+            $context
+        );
+
+        $this->event_logger->log('discord_connector', $event_context);
+    }
+
+    private function calculate_duration_ms($start_time) {
+        if (!is_float($start_time) && !is_int($start_time)) {
+            return 0;
+        }
+
+        $duration = microtime(true) - (float) $start_time;
+
+        if (!is_finite($duration) || $duration < 0) {
+            $duration = 0;
+        }
+
+        return (int) round($duration * 1000);
+    }
+
+    private function get_first_header_value($response, $header_name) {
+        if (!is_array($response)) {
+            return '';
+        }
+
+        $value = wp_remote_retrieve_header($response, $header_name);
+
+        if (is_array($value)) {
+            $value = reset($value);
+        }
+
+        if (!is_string($value)) {
+            return '';
+        }
+
+        return trim($value);
+    }
+
+    private function extract_numeric_header($response, $header_name, $allow_float = false) {
+        $raw_value = $this->get_first_header_value($response, $header_name);
+
+        if ('' === $raw_value) {
+            return null;
+        }
+
+        if (!is_numeric($raw_value)) {
+            return null;
+        }
+
+        if ($allow_float) {
+            return (float) $raw_value;
+        }
+
+        return (int) round((float) $raw_value);
+    }
+
     private function get_stats_from_widget($options) {
         $widget_url = 'https://discord.com/api/guilds/' . $options['server_id'] . '/widget.json';
+        $base_context = $this->build_event_base_context($options);
+        $start_time = microtime(true);
 
         $response = $this->http_client->get(
             $widget_url,
@@ -2094,6 +2289,12 @@ class Discord_Bot_JLG_API {
                 $response->get_error_message()
             );
             $this->log_debug('Discord API error (widget): ' . $response->get_error_message());
+            $this->record_discord_http_event('widget', $start_time, $response, array_merge(
+                $base_context,
+                array(
+                    'outcome' => 'network_error',
+                )
+            ));
             return false;
         }
 
@@ -2117,6 +2318,19 @@ class Discord_Bot_JLG_API {
                 );
             }
             $this->log_debug('Discord API error (widget): HTTP ' . $response_code);
+            $event_context = array_merge(
+                $base_context,
+                array(
+                    'outcome'      => 'http_error',
+                    'status_code'  => $response_code,
+                )
+            );
+
+            if (!empty($error_detail)) {
+                $event_context['error_detail'] = $error_detail;
+            }
+
+            $this->record_discord_http_event('widget', $start_time, $response, $event_context);
             return false;
         }
 
@@ -2140,6 +2354,13 @@ class Discord_Bot_JLG_API {
 
             $this->log_debug('Discord API error (widget): invalid JSON response (' . implode(', ', $error_context) . ')');
             $this->last_error = __('Réponse JSON invalide reçue depuis le widget Discord.', 'discord-bot-jlg');
+            $this->record_discord_http_event('widget', $start_time, $response, array_merge(
+                $base_context,
+                array(
+                    'outcome'    => 'invalid_json',
+                    'diagnostic' => $error_context,
+                )
+            ));
             return false;
         }
 
@@ -2186,6 +2407,13 @@ class Discord_Bot_JLG_API {
                 implode(', ', $missing_parts),
                 $this->get_debug_body_preview($body)
             ));
+            $this->record_discord_http_event('widget', $start_time, $response, array_merge(
+                $base_context,
+                array(
+                    'outcome'        => 'incomplete',
+                    'missing_fields' => $missing_parts,
+                )
+            ));
             return false;
         }
 
@@ -2219,17 +2447,54 @@ class Discord_Bot_JLG_API {
             $stats['total_is_approximate'] = true;
         }
 
+        $event_context = array_merge(
+            $base_context,
+            array(
+                'outcome'               => 'success',
+                'online'                => $online,
+                'has_total'             => !empty($stats['has_total']),
+                'total_is_approximate'  => !empty($stats['total_is_approximate']),
+            )
+        );
+
+        if (isset($stats['total']) && null !== $stats['total']) {
+            $event_context['total'] = (int) $stats['total'];
+        }
+
+        if (isset($stats['approximate_presence_count']) && null !== $stats['approximate_presence_count']) {
+            $event_context['approximate_presence_count'] = (int) $stats['approximate_presence_count'];
+        }
+
+        if (isset($stats['approximate_member_count']) && null !== $stats['approximate_member_count']) {
+            $event_context['approximate_member_count'] = (int) $stats['approximate_member_count'];
+        }
+
+        if (!empty($presence_breakdown)) {
+            $event_context['presence_breakdown'] = $presence_breakdown;
+        }
+
+        $this->record_discord_http_event('widget', $start_time, $response, $event_context);
+
         return $stats;
     }
 
     private function get_stats_from_bot($options) {
         $bot_token = $this->get_bot_token($options);
+        $base_context = $this->build_event_base_context($options);
 
         if (empty($bot_token)) {
+            $this->log_connector_event('bot', array_merge(
+                $base_context,
+                array(
+                    'outcome' => 'skipped',
+                    'reason'  => 'missing_token',
+                )
+            ));
             return false;
         }
 
         $api_url = 'https://discord.com/api/v10/guilds/' . $options['server_id'] . '?with_counts=true';
+        $start_time = microtime(true);
 
         $response = $this->http_client->get(
             $api_url,
@@ -2249,6 +2514,12 @@ class Discord_Bot_JLG_API {
                 $response->get_error_message()
             );
             $this->log_debug('Discord API error (bot): ' . $response->get_error_message());
+            $this->record_discord_http_event('bot', $start_time, $response, array_merge(
+                $base_context,
+                array(
+                    'outcome' => 'network_error',
+                )
+            ));
             return false;
         }
 
@@ -2272,6 +2543,19 @@ class Discord_Bot_JLG_API {
                 );
             }
             $this->log_debug('Discord API error (bot): HTTP ' . $response_code);
+            $event_context = array_merge(
+                $base_context,
+                array(
+                    'outcome'     => 'http_error',
+                    'status_code' => $response_code,
+                )
+            );
+
+            if (!empty($error_detail)) {
+                $event_context['error_detail'] = $error_detail;
+            }
+
+            $this->record_discord_http_event('bot', $start_time, $response, $event_context);
             return false;
         }
 
@@ -2295,6 +2579,13 @@ class Discord_Bot_JLG_API {
 
             $this->log_debug('Discord API error (bot): invalid JSON response (' . implode(', ', $error_context) . ')');
             $this->last_error = __('Réponse JSON invalide reçue depuis l\'API Discord (bot).', 'discord-bot-jlg');
+            $this->record_discord_http_event('bot', $start_time, $response, array_merge(
+                $base_context,
+                array(
+                    'outcome'    => 'invalid_json',
+                    'diagnostic' => $error_context,
+                )
+            ));
             return false;
         }
 
@@ -2319,6 +2610,13 @@ class Discord_Bot_JLG_API {
             ));
 
             $this->last_error = __('Données incomplètes reçues depuis l\'API Discord (bot).', 'discord-bot-jlg');
+            $this->record_discord_http_event('bot', $start_time, $response, array_merge(
+                $base_context,
+                array(
+                    'outcome'        => 'incomplete',
+                    'missing_fields' => $missing_parts,
+                )
+            ));
             return false;
         }
 
@@ -2377,7 +2675,7 @@ class Discord_Bot_JLG_API {
             }
         }
 
-        return array(
+        $stats = array(
             'online'                     => (int) $data['approximate_presence_count'],
             'total'                      => (int) $data['approximate_member_count'],
             'server_name'                => isset($data['name']) ? $data['name'] : '',
@@ -2393,6 +2691,35 @@ class Discord_Bot_JLG_API {
                 ? (int) $data['premium_subscription_count']
                 : 0,
         );
+
+        $event_context = array_merge(
+            $base_context,
+            array(
+                'outcome'                   => 'success',
+                'online'                    => (int) $data['approximate_presence_count'],
+                'total'                     => (int) $data['approximate_member_count'],
+                'approximate_presence_count'=> (int) $data['approximate_presence_count'],
+                'approximate_member_count'  => (int) $data['approximate_member_count'],
+                'has_total'                 => true,
+                'total_is_approximate'      => true,
+            )
+        );
+
+        if (!empty($presence_breakdown)) {
+            $event_context['presence_breakdown'] = $presence_breakdown;
+        }
+
+        if (isset($stats['premium_subscription_count'])) {
+            $event_context['premium_subscription_count'] = (int) $stats['premium_subscription_count'];
+        }
+
+        if ('' !== $server_avatar_url) {
+            $event_context['server_avatar_url'] = $server_avatar_url;
+        }
+
+        $this->record_discord_http_event('bot', $start_time, $response, $event_context);
+
+        return $stats;
     }
 
     private function build_guild_asset_url($type, $guild_id, $hash, $extension, $size = null) {
@@ -2731,6 +3058,10 @@ class Discord_Bot_JLG_API {
         if (!empty($signature_parts)) {
             $signature = implode('|', $signature_parts);
         }
+
+        $active_profile_key = ('' !== $profile_key) ? $profile_key : 'default';
+        $effective_options['__active_profile_key'] = $active_profile_key;
+        $effective_options['__request_signature'] = ('' !== $signature) ? $signature : 'default';
 
         return array(
             'options'   => $effective_options,

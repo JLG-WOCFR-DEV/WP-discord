@@ -7,6 +7,7 @@ class Discord_Bot_JLG_REST_Controller {
     const ROUTE_NAMESPACE = 'discord-bot-jlg/v1';
     const ROUTE_STATS = '/stats';
     const ROUTE_ANALYTICS = '/analytics';
+    const ROUTE_EVENTS = '/events';
     const ANALYTICS_CACHE_GROUP = 'discord_bot_jlg_rest';
 
     /**
@@ -19,11 +20,19 @@ class Discord_Bot_JLG_REST_Controller {
      */
     private $analytics;
 
-    public function __construct(Discord_Bot_JLG_API $api, $analytics = null) {
+    /**
+     * @var Discord_Bot_JLG_Event_Logger|null
+     */
+    private $event_logger;
+
+    public function __construct(Discord_Bot_JLG_API $api, $analytics = null, $event_logger = null) {
         $this->api = $api;
         $this->analytics = ($analytics instanceof Discord_Bot_JLG_Analytics)
             ? $analytics
             : $api->get_analytics_service();
+        $this->event_logger = ($event_logger instanceof Discord_Bot_JLG_Event_Logger)
+            ? $event_logger
+            : $api->get_event_logger();
 
         add_action('rest_api_init', array($this, 'register_routes'));
     }
@@ -79,6 +88,41 @@ class Discord_Bot_JLG_REST_Controller {
                         ),
                         'days' => array(
                             'description'       => __('Nombre de jours à agréger.', 'discord-bot-jlg'),
+                            'type'              => 'integer',
+                            'sanitize_callback' => 'absint',
+                        ),
+                    ),
+                ),
+            ),
+            true
+        );
+
+        register_rest_route(
+            self::ROUTE_NAMESPACE,
+            self::ROUTE_EVENTS,
+            array(
+                array(
+                    'methods'             => WP_REST_Server::READABLE,
+                    'callback'            => array($this, 'handle_get_events'),
+                    'permission_callback' => array($this, 'check_rest_permissions'),
+                    'args'                => array(
+                        'limit' => array(
+                            'description'       => __('Nombre maximum d\'événements à renvoyer.', 'discord-bot-jlg'),
+                            'type'              => 'integer',
+                            'sanitize_callback' => 'absint',
+                        ),
+                        'type' => array(
+                            'description'       => __('Filtre sur le type d\'événement (ex. discord_http).', 'discord-bot-jlg'),
+                            'type'              => 'string',
+                            'sanitize_callback' => 'sanitize_key',
+                        ),
+                        'after_id' => array(
+                            'description'       => __('Renvoie uniquement les événements avec un identifiant supérieur.', 'discord-bot-jlg'),
+                            'type'              => 'integer',
+                            'sanitize_callback' => 'absint',
+                        ),
+                        'after' => array(
+                            'description'       => __('Renvoie uniquement les événements postérieurs à ce timestamp (UTC).', 'discord-bot-jlg'),
                             'type'              => 'integer',
                             'sanitize_callback' => 'absint',
                         ),
@@ -207,6 +251,63 @@ class Discord_Bot_JLG_REST_Controller {
         $response = array(
             'success' => true,
             'data'    => $aggregates,
+        );
+
+        return rest_ensure_response(new WP_REST_Response($response, 200));
+    }
+
+    public function handle_get_events(WP_REST_Request $request) {
+        $event_logger = $this->event_logger instanceof Discord_Bot_JLG_Event_Logger
+            ? $this->event_logger
+            : $this->api->get_event_logger();
+
+        if (!($event_logger instanceof Discord_Bot_JLG_Event_Logger)) {
+            $response = array(
+                'success' => false,
+                'data'    => array(
+                    'message' => __('Journal des événements indisponible.', 'discord-bot-jlg'),
+                ),
+            );
+
+            return rest_ensure_response(new WP_REST_Response($response, 501));
+        }
+
+        $limit = (int) $request->get_param('limit');
+        if ($limit <= 0) {
+            $limit = 50;
+        }
+
+        $type = $request->get_param('type');
+        if (!is_string($type)) {
+            $type = '';
+        }
+
+        $after_id = (int) $request->get_param('after_id');
+        if ($after_id < 0) {
+            $after_id = 0;
+        }
+
+        $after = (int) $request->get_param('after');
+        if ($after < 0) {
+            $after = 0;
+        }
+
+        $events = $event_logger->get_events(
+            array(
+                'limit'    => $limit,
+                'type'     => $type,
+                'after_id' => $after_id,
+                'after'    => $after,
+            )
+        );
+
+        if (!is_array($events)) {
+            $events = array();
+        }
+
+        $response = array(
+            'success' => true,
+            'data'    => $events,
         );
 
         return rest_ensure_response(new WP_REST_Response($response, 200));

@@ -127,6 +127,7 @@ Un widget « Discord Bot - JLG » est disponible via le menu « Widgets ».
 
 ### API, analytics & supervision
 - Endpoints REST `discord-bot-jlg/v1/stats` et `discord-bot-jlg/v1/analytics` pour récupérer les compteurs en temps réel ou agrégés, protégés par la capacité `manage_options` ou une clé d’accès filtrable (`discord_bot_jlg_rest_access_key`).【F:discord-bot-jlg/inc/class-discord-rest.php†L23-L199】【F:discord-bot-jlg/inc/class-discord-rest.php†L201-L244】
+- Endpoint REST `discord-bot-jlg/v1/events` fournissant un journal structuré des appels Discord (durée, statut HTTP, quotas restants, diagnostics) afin d’alimenter des outils d’observabilité ou des alertes automatisées.【F:discord-bot-jlg/inc/class-discord-api.php†L1991-L2133】【F:discord-bot-jlg/inc/class-discord-rest.php†L23-L152】
 - Intégration WP-CLI avec commandes `wp discord-bot refresh-cache` et `wp discord-bot clear-cache` pour forcer une synchronisation ou purger les données sans passer par l’UI.【F:discord-bot-jlg/inc/class-discord-cli.php†L24-L81】
 - Test « Site Health » dédié indiquant l’état de la connexion Discord, les erreurs récentes et les prochaines tentatives de rafraîchissement.【F:discord-bot-jlg/inc/class-discord-site-health.php†L17-L105】
 - Chargement des traductions et assets spécifiques (bloc, scripts, styles) afin d’assurer une intégration native à l’écosystème WordPress.【F:discord-bot-jlg/discord-bot-jlg.php†L105-L180】【F:discord-bot-jlg/discord-bot-jlg.php†L226-L315】
