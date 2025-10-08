@@ -1720,11 +1720,28 @@ class Discord_Bot_JLG_Admin {
                         <?php esc_html_e('🔗 Discord Developer Portal', 'discord-bot-jlg'); ?>
                     </a>
                 </li>
-                <li>
-                    <a href="<?php echo esc_url(admin_url('widgets.php')); ?>" class="button" style="width: 100%;">
-                        <?php esc_html_e('📐 Gérer les Widgets', 'discord-bot-jlg'); ?>
-                    </a>
-                </li>
+                <?php
+                $is_block_theme = function_exists('wp_is_block_theme') && wp_is_block_theme();
+
+                if (!$is_block_theme) :
+                    ?>
+                    <li>
+                        <a href="<?php echo esc_url(admin_url('widgets.php')); ?>" class="button" style="width: 100%;">
+                            <?php esc_html_e('📐 Gérer les Widgets', 'discord-bot-jlg'); ?>
+                        </a>
+                    </li>
+                <?php else : ?>
+                    <li style="margin: 0;">
+                        <div style="background: #fff; border: 1px solid #c3e6cb; border-radius: 6px; padding: 12px;">
+                            <strong style="display: block; margin-bottom: 6px;">
+                                <?php esc_html_e('📐 Widgets classiques indisponibles', 'discord-bot-jlg'); ?>
+                            </strong>
+                            <span style="display: block;">
+                                <?php esc_html_e('Votre thème utilise l’éditeur de site basé sur les blocs. Ajoutez le bloc “Discord Stats” depuis l’éditeur de site ou utilisez le shortcode.', 'discord-bot-jlg'); ?>
+                            </span>
+                        </div>
+                    </li>
+                <?php endif; ?>
             </ul>
         </div>
         <?php
