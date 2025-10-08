@@ -66,6 +66,7 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
             'custom_css'     => '.existing { color: blue; }',
             'default_theme'  => 'dark',
             'default_refresh_interval' => 120,
+            'analytics_retention_days' => 120,
             'stat_bg_color'      => '#123456',
             'stat_text_color'    => 'rgba(255, 255, 255, 0.9)',
             'accent_color'       => '#654321',
@@ -149,6 +150,30 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
                 ),
                 array(
                     'cache_duration' => 450,
+                ),
+            ),
+            'analytics-retention-empty-fallback' => array(
+                array(
+                    'analytics_retention_days' => '',
+                ),
+                array(
+                    'analytics_retention_days' => 120,
+                ),
+            ),
+            'analytics-retention-capped' => array(
+                array(
+                    'analytics_retention_days' => 999,
+                ),
+                array(
+                    'analytics_retention_days' => 365,
+                ),
+            ),
+            'analytics-retention-zero-allowed' => array(
+                array(
+                    'analytics_retention_days' => '0',
+                ),
+                array(
+                    'analytics_retention_days' => 0,
                 ),
             ),
             'custom-css-media-query-preserved' => array(
@@ -550,6 +575,7 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
                 Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL,
                 min(3600, (int) $this->saved_options['default_refresh_interval'])
             ),
+            'analytics_retention_days' => max(0, (int) $this->saved_options['analytics_retention_days']),
             'stat_bg_color'      => '#123456',
             'stat_text_color'    => 'rgba(255, 255, 255, 0.9)',
             'accent_color'       => '#654321',
