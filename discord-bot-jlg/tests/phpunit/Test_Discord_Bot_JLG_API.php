@@ -950,6 +950,30 @@ class Test_Discord_Bot_JLG_API extends TestCase {
         );
     }
 
+    public function test_refresh_cache_via_cron_uses_dispatcher_when_available() {
+        $option_name = 'discord_server_stats_options';
+        $cache_key   = 'discord_server_stats_cache';
+
+        $api = new Recording_Discord_Bot_JLG_API($option_name, $cache_key, 60);
+
+        $dispatcher = new class {
+            public $calls = 0;
+            public $force_flags = array();
+
+            public function dispatch_refresh_jobs($force = false) {
+                $this->calls++;
+                $this->force_flags[] = $force;
+            }
+        };
+
+        $api->set_refresh_dispatcher($dispatcher);
+
+        $api->refresh_cache_via_cron();
+
+        $this->assertSame(1, $dispatcher->calls);
+        $this->assertEmpty($api->recorded_args);
+    }
+
     public function test_get_stats_uses_distinct_cache_key_for_server_override() {
         $option_name = 'discord_server_stats_options';
         $cache_key   = 'discord_server_stats_cache';
