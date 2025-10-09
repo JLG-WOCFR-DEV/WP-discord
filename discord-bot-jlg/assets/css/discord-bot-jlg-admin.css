@@ -25,6 +25,248 @@
     max-width: 100%;
 }
 
+.discord-setup-wizard {
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+}
+
+.discord-setup-steps-nav {
+    display: block;
+}
+
+.discord-setup-steps {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.discord-setup-step {
+    flex: 1 1 180px;
+    min-width: 160px;
+}
+
+.discord-setup-step__link {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-radius: 8px;
+    border: 1px solid var(--wp-admin-border-color, #c3c4c7);
+    background: #fff;
+    color: inherit;
+    text-decoration: none;
+    transition: background-color 0.2s ease, border-color 0.2s ease;
+    font-weight: 600;
+}
+
+.discord-setup-step.is-current .discord-setup-step__link {
+    background: var(--wp-admin-theme-color, #3858e9);
+    border-color: var(--wp-admin-theme-color, #3858e9);
+    color: #fff;
+}
+
+.discord-setup-step.is-complete .discord-setup-step__link {
+    border-color: var(--wp-admin-theme-color-darker-20, #2c5282);
+    background: var(--wp-admin-theme-color-lighter-30, #edf2ff);
+}
+
+.discord-setup-step.is-pending .discord-setup-step__link {
+    border-style: dashed;
+}
+
+.discord-setup-step__index {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 50%;
+    background: rgba(9, 30, 66, 0.08);
+    font-size: 14px;
+}
+
+.discord-setup-step.is-current .discord-setup-step__index,
+.discord-setup-step.is-complete .discord-setup-step__index {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.discord-setup-step__label {
+    flex: 1 1 auto;
+}
+
+.discord-setup-panel {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+}
+
+.discord-setup-notice {
+    margin: 0;
+}
+
+.discord-setup-intro {
+    font-size: 14px;
+    color: #3c434a;
+    margin: 0;
+}
+
+.discord-setup-card {
+    border: 1px solid var(--wp-admin-border-color, #c3c4c7);
+    border-radius: 8px;
+    padding: 16px;
+    background: #fff;
+}
+
+.discord-setup-test-form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.discord-profile-test-form {
+    display: none;
+}
+
+.button-block {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 100%;
+    text-align: center;
+}
+
+.discord-setup-guide {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.discord-setup-details {
+    border: 1px solid var(--wp-admin-border-color, #c3c4c7);
+    border-radius: 8px;
+    padding: 12px 16px;
+    background: #fff;
+}
+
+.discord-setup-details summary {
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.discord-preview-wrapper {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+.discord-preview-notice {
+    margin: 0;
+    background: #fff3cd;
+    border-left: 4px solid #e0a800;
+    padding: 12px 16px;
+    border-radius: 6px;
+}
+
+.discord-preview-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 16px;
+}
+
+.discord-preview-block {
+    border: 1px solid var(--wp-admin-border-color, #c3c4c7);
+    border-radius: 8px;
+    padding: 16px;
+    background: #fff;
+}
+
+.discord-preview-block h4 {
+    margin-top: 0;
+    margin-bottom: 12px;
+}
+
+.discord-preview-card__inner {
+    display: inline-block;
+}
+
+.discord-preview-card__inner.is-narrow {
+    max-width: 280px;
+}
+
+.discord-profiles-table td,
+.discord-profiles-table th {
+    vertical-align: top;
+}
+
+.discord-profiles-table .button.button-secondary {
+    margin-bottom: 6px;
+}
+
+.discord-profiles-table__placeholder {
+    min-width: 160px;
+}
+
+.discord-admin-card {
+    border-radius: 8px;
+    box-shadow: 0 1px 3px rgba(12, 18, 28, 0.08);
+}
+
+.discord-admin-card__title {
+    margin-top: 0;
+}
+
+.discord-admin-card__form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-top: 12px;
+}
+
+.discord-admin-list {
+    list-style: disc;
+    margin: 0 0 16px 20px;
+    padding: 0;
+}
+
+.discord-admin-list li {
+    margin-bottom: 6px;
+}
+
+.discord-quick-links {
+    list-style: none;
+    padding: 0;
+    margin: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.discord-quick-links__notice {
+    background: #f1f5f9;
+    border-radius: 6px;
+    padding: 12px 14px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 13px;
+}
+
+.discord-admin-footer-note {
+    margin-top: 32px;
+    padding: 16px;
+    text-align: center;
+    background: #f6f7f7;
+    border-radius: 8px;
+    font-size: 13px;
+    color: #50575e;
+}
+
 .discord-bot-nav-tab-wrapper {
     margin-top: 20px;
     margin-bottom: 0;
