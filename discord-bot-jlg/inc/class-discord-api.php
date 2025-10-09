@@ -211,6 +211,157 @@ class Discord_Bot_JLG_API {
         return $history;
     }
 
+    /**
+     * Fournit un instantané de santé pour l'administration.
+     *
+     * @param array $args Paramètres optionnels (events_limit).
+     *
+     * @return array
+     */
+    public function get_admin_health_snapshot($args = array()) {
+        $defaults = array(
+            'events_limit' => 6,
+        );
+
+        $args = wp_parse_args($args, $defaults);
+
+        $events_limit = max(1, (int) $args['events_limit']);
+
+        $snapshot = array(
+            'rate_limit'   => null,
+            'last_error'   => null,
+            'last_success' => null,
+            'retry_after'  => max(0, (int) $this->last_retry_after),
+            'fallback'     => $this->get_last_fallback_details(),
+            'events'       => array(),
+        );
+
+        $event_logger = $this->get_event_logger();
+
+        if (!($event_logger instanceof Discord_Bot_JLG_Event_Logger)) {
+            return $snapshot;
+        }
+
+        $raw_events = $event_logger->get_events(
+            array(
+                'limit' => min(100, max($events_limit * 3, $events_limit)),
+            )
+        );
+
+        if (!is_array($raw_events) || empty($raw_events)) {
+            return $snapshot;
+        }
+
+        foreach ($raw_events as $event) {
+            if (!is_array($event)) {
+                continue;
+            }
+
+            $event_type = isset($event['type']) ? sanitize_key($event['type']) : '';
+
+            if ('' === $event_type) {
+                continue;
+            }
+
+            $context   = isset($event['context']) && is_array($event['context']) ? $event['context'] : array();
+            $timestamp = isset($event['timestamp']) ? (int) $event['timestamp'] : 0;
+            if ($timestamp <= 0) {
+                $timestamp = (int) current_time('timestamp', true);
+            }
+
+            if (null === $snapshot['rate_limit'] && isset($context['rate_limit_limit'])) {
+                $snapshot['rate_limit'] = $this->extract_rate_limit_context($context, $timestamp);
+            }
+
+            $entry = $this->transform_event_to_status_history_entry($event_type, $event);
+
+            if (!empty($entry)) {
+                $snapshot['events'][] = $entry;
+            }
+
+            $outcome = isset($context['outcome']) ? sanitize_key($context['outcome']) : '';
+
+            if (null === $snapshot['last_success'] && 'success' === $outcome) {
+                $snapshot['last_success'] = array(
+                    'label'     => isset($entry['label']) ? $entry['label'] : '',
+                    'reason'    => isset($entry['reason']) ? $entry['reason'] : '',
+                    'timestamp' => $timestamp,
+                );
+            }
+
+            if (null === $snapshot['last_error'] && 'success' !== $outcome) {
+                $snapshot['last_error'] = array(
+                    'label'     => isset($entry['label']) ? $entry['label'] : '',
+                    'reason'    => isset($entry['reason']) ? $entry['reason'] : '',
+                    'timestamp' => $timestamp,
+                );
+            }
+
+            if (
+                count($snapshot['events']) >= $events_limit
+                && null !== $snapshot['rate_limit']
+                && null !== $snapshot['last_error']
+                && null !== $snapshot['last_success']
+            ) {
+                break;
+            }
+        }
+
+        if (count($snapshot['events']) > $events_limit) {
+            $snapshot['events'] = array_slice($snapshot['events'], 0, $events_limit);
+        }
+
+        return $snapshot;
+    }
+
+    /**
+     * Extrait les informations de rate limiting depuis un contexte d'événement.
+     *
+     * @param array $context   Contexte de l'événement.
+     * @param int   $timestamp Horodatage associé.
+     *
+     * @return array
+     */
+    private function extract_rate_limit_context(array $context, $timestamp) {
+        $limit     = isset($context['rate_limit_limit']) ? (int) $context['rate_limit_limit'] : null;
+        $remaining = isset($context['rate_limit_remaining']) ? (int) $context['rate_limit_remaining'] : null;
+        $reset     = 0.0;
+
+        if (isset($context['rate_limit_reset_after'])) {
+            $reset = (float) $context['rate_limit_reset_after'];
+        }
+
+        $bucket = isset($context['rate_limit_bucket']) ? sanitize_text_field($context['rate_limit_bucket']) : '';
+
+        $global_flag = false;
+        if (isset($context['rate_limit_global'])) {
+            $raw_global = $context['rate_limit_global'];
+            if (is_bool($raw_global)) {
+                $global_flag = $raw_global;
+            } elseif (is_numeric($raw_global)) {
+                $global_flag = ((int) $raw_global) > 0;
+            } elseif (is_string($raw_global)) {
+                $normalized = strtolower(trim($raw_global));
+                $global_flag = in_array($normalized, array('1', 'true', 'yes', 'on'), true);
+            }
+        }
+
+        $retry_after = null;
+        if (isset($context['retry_after'])) {
+            $retry_after = max(0, (int) round((float) $context['retry_after']));
+        }
+
+        return array(
+            'limit'       => $limit,
+            'remaining'   => $remaining,
+            'reset_after' => $reset,
+            'bucket'      => $bucket,
+            'global'      => $global_flag,
+            'retry_after' => $retry_after,
+            'timestamp'   => $timestamp,
+        );
+    }
+
     private function register_current_cache_key() {
         $this->remember_cache_key_for_registry($this->cache_key);
     }

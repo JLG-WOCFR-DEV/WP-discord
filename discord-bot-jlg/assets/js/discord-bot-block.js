@@ -123,6 +123,75 @@
         { label: __('Contour', 'discord-bot-jlg'), value: 'outline' }
     ];
 
+    var presetDefinitions = [
+        {
+            id: 'immersive-card',
+            label: __('Carte immersive', 'discord-bot-jlg'),
+            description: __('Avatar, statistiques complètes et bouton centré pour valoriser la communauté.', 'discord-bot-jlg'),
+            attributes: {
+                layout: 'horizontal',
+                theme: 'discord',
+                show_presence_breakdown: true,
+                show_server_avatar: true,
+                show_server_name: true,
+                show_premium_subscriptions: true,
+                show_title: true,
+                title: __('Notre communauté Discord', 'discord-bot-jlg'),
+                align: 'center',
+                compact: false,
+                cta_style: 'solid',
+                animated: true
+            }
+        },
+        {
+            id: 'esport-banner',
+            label: __('Bannière e-sport', 'discord-bot-jlg'),
+            description: __('Accent sur la présence en ligne et l’action immédiate, idéal pour les guildes.', 'discord-bot-jlg'),
+            attributes: {
+                layout: 'horizontal',
+                theme: 'radix',
+                show_presence_breakdown: true,
+                show_premium_subscriptions: true,
+                show_discord_icon: true,
+                discord_icon_position: 'left',
+                show_title: true,
+                title: __('Rejoignez l\'escouade', 'discord-bot-jlg'),
+                refresh: true,
+                refresh_interval: '45',
+                align: 'center',
+                compact: false,
+                cta_style: 'solid'
+            }
+        },
+        {
+            id: 'minimal-stack',
+            label: __('Pile minimaliste', 'discord-bot-jlg'),
+            description: __('Format compact vertical pour les colonnes et sidebars.', 'discord-bot-jlg'),
+            attributes: {
+                layout: 'vertical',
+                theme: 'minimal',
+                compact: true,
+                show_server_avatar: false,
+                show_server_name: false,
+                show_presence_breakdown: false,
+                show_premium_subscriptions: false,
+                show_title: false,
+                align: 'left',
+                show_discord_icon: false,
+                cta_style: 'outline'
+            }
+        }
+    ];
+
+    function applyPresetAttributes(setAttributes, attributes, preset) {
+        if (!preset || !preset.attributes) {
+            return;
+        }
+
+        var nextAttributes = Object.assign({}, attributes, preset.attributes);
+        setAttributes(nextAttributes);
+    }
+
     var blockConfig = window.discordBotJlgBlockConfig || {};
     var globalDefaults = blockConfig.defaults || {};
 
@@ -1747,6 +1816,63 @@
                 }
             }
 
+            var presetPanel = null;
+            if (Array.isArray(presetDefinitions) && presetDefinitions.length) {
+                var presetCardStyle = {
+                    border: '1px solid #e2e8f0',
+                    borderRadius: '8px',
+                    padding: '12px',
+                    background: '#f8fafc',
+                    marginBottom: '12px'
+                };
+                var presetButtonStyle = {
+                    marginTop: '8px'
+                };
+
+                var presetCards = presetDefinitions.map(function (preset, presetIndex) {
+                    return createElement(
+                        'div',
+                        {
+                            key: preset && preset.id ? preset.id : 'preset-' + presetIndex,
+                            style: presetCardStyle
+                        },
+                        createElement(
+                            'strong',
+                            null,
+                            preset && preset.label ? preset.label : ''
+                        ),
+                        preset && preset.description
+                            ? createElement(
+                                'p',
+                                { style: { margin: '6px 0', color: '#475569' } },
+                                preset.description
+                            )
+                            : null,
+                        createElement(
+                            Button,
+                            {
+                                isSecondary: true,
+                                style: presetButtonStyle,
+                                onClick: function () {
+                                    applyPresetAttributes(setAttributes, attributes, preset);
+                                }
+                            },
+                            __('Appliquer le preset', 'discord-bot-jlg')
+                        )
+                    );
+                });
+
+                presetPanel = createElement(
+                    PanelBody,
+                    { title: __('Presets express', 'discord-bot-jlg'), initialOpen: true },
+                    createElement(
+                        'div',
+                        { className: 'discord-bot-preset-options' },
+                        presetCards
+                    )
+                );
+            }
+
             return createElement(
                 Fragment,
                 null,
@@ -1754,6 +1880,7 @@
                 createElement(
                     InspectorControls,
                     null,
+                    presetPanel,
                     createElement(
                         PanelBody,
                         { title: __('Paramètres essentiels', 'discord-bot-jlg'), initialOpen: true },

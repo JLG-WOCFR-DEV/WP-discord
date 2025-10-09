@@ -211,20 +211,11 @@ class Discord_Bot_JLG_Admin {
             'discord_stats_display_section'
         );
 
-        add_settings_field(
-            'default_refresh_enabled',
-            __('Rafraîchissement auto par défaut', 'discord-bot-jlg'),
-            array($this, 'default_refresh_enabled_render'),
-            'discord_stats_settings',
-            'discord_stats_display_section'
-        );
-
-        add_settings_field(
-            'default_refresh_interval',
-            __('Intervalle d\'auto-rafraîchissement (secondes)', 'discord-bot-jlg'),
-            array($this, 'default_refresh_interval_render'),
-            'discord_stats_settings',
-            'discord_stats_display_section'
+        add_settings_section(
+            'discord_stats_cta_section',
+            esc_html__('Engagement & appels à l\'action', 'discord-bot-jlg'),
+            array($this, 'cta_section_callback'),
+            'discord_stats_settings'
         );
 
         add_settings_field(
@@ -232,7 +223,7 @@ class Discord_Bot_JLG_Admin {
             __('Titre du widget', 'discord-bot-jlg'),
             array($this, 'widget_title_render'),
             'discord_stats_settings',
-            'discord_stats_display_section'
+            'discord_stats_cta_section'
         );
 
         add_settings_field(
@@ -240,7 +231,7 @@ class Discord_Bot_JLG_Admin {
             __('URL d\'invitation Discord', 'discord-bot-jlg'),
             array($this, 'invite_url_render'),
             'discord_stats_settings',
-            'discord_stats_display_section'
+            'discord_stats_cta_section'
         );
 
         add_settings_field(
@@ -248,7 +239,30 @@ class Discord_Bot_JLG_Admin {
             __('Libellé du bouton d\'invitation', 'discord-bot-jlg'),
             array($this, 'invite_label_render'),
             'discord_stats_settings',
-            'discord_stats_display_section'
+            'discord_stats_cta_section'
+        );
+
+        add_settings_section(
+            'discord_stats_automation_section',
+            esc_html__('Automatisation & performance', 'discord-bot-jlg'),
+            array($this, 'automation_section_callback'),
+            'discord_stats_settings'
+        );
+
+        add_settings_field(
+            'default_refresh_enabled',
+            __('Rafraîchissement auto par défaut', 'discord-bot-jlg'),
+            array($this, 'default_refresh_enabled_render'),
+            'discord_stats_settings',
+            'discord_stats_automation_section'
+        );
+
+        add_settings_field(
+            'default_refresh_interval',
+            __('Intervalle d\'auto-rafraîchissement (secondes)', 'discord-bot-jlg'),
+            array($this, 'default_refresh_interval_render'),
+            'discord_stats_settings',
+            'discord_stats_automation_section'
         );
 
         add_settings_field(
@@ -256,7 +270,22 @@ class Discord_Bot_JLG_Admin {
             __('Durée du cache (secondes)', 'discord-bot-jlg'),
             array($this, 'cache_duration_render'),
             'discord_stats_settings',
-            'discord_stats_display_section'
+            'discord_stats_automation_section'
+        );
+
+        add_settings_field(
+            'analytics_retention_days',
+            __('Rétention des analytics (jours)', 'discord-bot-jlg'),
+            array($this, 'analytics_retention_render'),
+            'discord_stats_settings',
+            'discord_stats_automation_section'
+        );
+
+        add_settings_section(
+            'discord_stats_custom_css_section',
+            esc_html__('Personnalisation avancée', 'discord-bot-jlg'),
+            array($this, 'custom_css_section_callback'),
+            'discord_stats_settings'
         );
 
         add_settings_field(
@@ -264,7 +293,7 @@ class Discord_Bot_JLG_Admin {
             __('CSS personnalisé', 'discord-bot-jlg'),
             array($this, 'custom_css_render'),
             'discord_stats_settings',
-            'discord_stats_display_section'
+            'discord_stats_custom_css_section'
         );
     }
 
@@ -1070,6 +1099,36 @@ class Discord_Bot_JLG_Admin {
         printf('<p>%s</p>', esc_html__('Personnalisez l\'affichage des statistiques Discord.', 'discord-bot-jlg'));
     }
 
+    public function cta_section_callback() {
+        printf(
+            '<p>%s</p>',
+            esc_html__(
+                'Contrôlez les appels à l’action associés au bloc et au widget.',
+                'discord-bot-jlg'
+            )
+        );
+    }
+
+    public function automation_section_callback() {
+        printf(
+            '<p>%s</p>',
+            esc_html__(
+                'Définissez les cadences de rafraîchissement et la rétention des données.',
+                'discord-bot-jlg'
+            )
+        );
+    }
+
+    public function custom_css_section_callback() {
+        printf(
+            '<p>%s</p>',
+            esc_html__(
+                'Injectez un complément de styles pour harmoniser le rendu avec votre thème.',
+                'discord-bot-jlg'
+            )
+        );
+    }
+
     public function analytics_section_callback() {
         printf(
             '<p>%s</p>',
@@ -1609,16 +1668,21 @@ class Discord_Bot_JLG_Admin {
      * @return void
      */
     public function options_page() {
+        $tabs        = $this->get_admin_tabs();
+        $current_tab = $this->get_current_admin_tab($tabs);
+
         ?>
         <div class="wrap">
             <h1><?php esc_html_e('🎮 Discord Bot - JLG - Configuration', 'discord-bot-jlg'); ?></h1>
             <?php settings_errors('discord_stats_settings'); ?>
             <?php $this->handle_test_connection_request(); ?>
 
+            <?php $this->render_admin_tabs_navigation($tabs, $current_tab); ?>
+
             <div class="discord-bot-settings-layout">
                 <?php
-                $this->render_options_form();
-                $this->render_options_sidebar();
+                $this->render_options_main_content($current_tab, $tabs[$current_tab]);
+                $this->render_options_sidebar($current_tab, $tabs[$current_tab]);
                 ?>
             </div>
 
@@ -1653,26 +1717,374 @@ class Discord_Bot_JLG_Admin {
     }
 
     /**
-     * Affiche le formulaire principal des réglages.
+     * Retourne la configuration des onglets disponibles.
+     *
+     * @return array
      */
-    private function render_options_form() {
+    private function get_admin_tabs() {
+        $tabs = array(
+            'connection'   => array(
+                'label'          => __('Connexion', 'discord-bot-jlg'),
+                'icon'           => '🔌',
+                'sections'       => array(
+                    array(
+                        'id'           => 'discord_stats_api_section',
+                        'submit_label' => esc_html__('Enregistrer la configuration API', 'discord-bot-jlg'),
+                    ),
+                    array(
+                        'id'           => 'discord_stats_profiles_section',
+                        'submit_label' => esc_html__('Mettre à jour les profils', 'discord-bot-jlg'),
+                    ),
+                ),
+                'sidebar_panels' => array('connection_test', 'quick_links'),
+            ),
+            'appearance'   => array(
+                'label'          => __('Apparence', 'discord-bot-jlg'),
+                'icon'           => '🎨',
+                'sections'       => array(
+                    array(
+                        'id'           => 'discord_stats_display_section',
+                        'submit_label' => esc_html__('Mettre à jour l\'affichage', 'discord-bot-jlg'),
+                    ),
+                    array(
+                        'id'           => 'discord_stats_cta_section',
+                        'submit_label' => esc_html__('Mettre à jour l\'engagement', 'discord-bot-jlg'),
+                    ),
+                    array(
+                        'id'           => 'discord_stats_custom_css_section',
+                        'submit_label' => esc_html__('Enregistrer le CSS personnalisé', 'discord-bot-jlg'),
+                    ),
+                ),
+                'sidebar_panels' => array('appearance_shortcuts', 'quick_links'),
+            ),
+            'automation'   => array(
+                'label'          => __('Automatisation', 'discord-bot-jlg'),
+                'icon'           => '⚙️',
+                'sections'       => array(
+                    array(
+                        'id'           => 'discord_stats_automation_section',
+                        'submit_label' => esc_html__('Enregistrer les automatismes', 'discord-bot-jlg'),
+                    ),
+                ),
+                'sidebar_panels' => array('automation_tips', 'quick_links'),
+            ),
+            'monitoring'   => array(
+                'label'          => __('Surveillance', 'discord-bot-jlg'),
+                'icon'           => '📊',
+                'render_callback'=> array($this, 'render_monitoring_dashboard'),
+                'sidebar_panels' => array('monitoring_help'),
+            ),
+        );
+
+        /**
+         * Filtre la configuration des onglets de l'administration.
+         *
+         * @param array $tabs Onglets disponibles.
+         */
+        return apply_filters('discord_bot_jlg_admin_tabs', $tabs);
+    }
+
+    /**
+     * Détermine l'onglet en cours à partir de la requête.
+     *
+     * @param array $tabs Onglets disponibles.
+     *
+     * @return string
+     */
+    private function get_current_admin_tab(array $tabs) {
+        $default_tab = key($tabs);
+
+        if (!isset($_GET['tab'])) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Lecture seule.
+            return (string) $default_tab;
+        }
+
+        $requested = sanitize_key(wp_unslash($_GET['tab'])); // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- Lecture seule.
+
+        if (!isset($tabs[$requested])) {
+            return (string) $default_tab;
+        }
+
+        return (string) $requested;
+    }
+
+    /**
+     * Rend la navigation des onglets.
+     *
+     * @param array  $tabs        Liste des onglets.
+     * @param string $current_tab Onglet actif.
+     */
+    private function render_admin_tabs_navigation(array $tabs, $current_tab) {
+        if (empty($tabs)) {
+            return;
+        }
+
+        $base_url = admin_url('admin.php?page=discord-bot-jlg');
+
+        printf(
+            "<nav class=\"nav-tab-wrapper discord-bot-nav-tab-wrapper\" aria-label=\"%s\">",
+            esc_attr__('Navigation de Discord Bot', 'discord-bot-jlg')
+        );
+
+        foreach ($tabs as $tab_key => $tab) {
+            $tab_key   = sanitize_key($tab_key);
+            $label     = isset($tab['label']) ? $tab['label'] : '';
+            $icon      = isset($tab['icon']) ? $tab['icon'] : '';
+            $is_active = ($tab_key === $current_tab);
+            $classes   = 'nav-tab' . ($is_active ? ' nav-tab-active' : '');
+            $url       = add_query_arg('tab', $tab_key, $base_url);
+
+            printf(
+                "<a class=\"%1\$s\" href=\"%2\$s\" role=\"tab\" aria-selected=\"%3\$s\">",
+                esc_attr($classes),
+                esc_url($url),
+                $is_active ? 'true' : 'false'
+            );
+
+            if ('' !== $icon) {
+                printf(
+                    "<span class=\"discord-bot-tab-icon\" aria-hidden=\"true\">%s</span>",
+                    esc_html($icon)
+                );
+            }
+
+            printf("<span class=\"discord-bot-tab-label\">%s</span>", esc_html($label));
+            echo '</a>';
+        }
+
+        echo '</nav>';
+    }
+
+    /**
+     * Affiche le tableau de bord de surveillance.
+     */
+    private function render_monitoring_dashboard() {
+        $snapshot = $this->api->get_admin_health_snapshot(
+            array(
+                'events_limit' => 6,
+            )
+        );
+
+        $rate_limit   = isset($snapshot['rate_limit']) && is_array($snapshot['rate_limit']) ? $snapshot['rate_limit'] : array();
+        $last_error   = isset($snapshot['last_error']) && is_array($snapshot['last_error']) ? $snapshot['last_error'] : null;
+        $last_success = isset($snapshot['last_success']) && is_array($snapshot['last_success']) ? $snapshot['last_success'] : null;
+        $events       = isset($snapshot['events']) && is_array($snapshot['events']) ? $snapshot['events'] : array();
+        $fallback     = isset($snapshot['fallback']) && is_array($snapshot['fallback']) ? $snapshot['fallback'] : array();
+        $retry_after  = isset($snapshot['retry_after']) ? (int) $snapshot['retry_after'] : 0;
+
+        $now_gmt = current_time('timestamp', true);
+
+        $rate_limit_remaining = isset($rate_limit['remaining']) ? (int) $rate_limit['remaining'] : null;
+        $rate_limit_limit     = isset($rate_limit['limit']) ? (int) $rate_limit['limit'] : null;
+        $rate_limit_reset     = isset($rate_limit['reset_after']) ? (float) $rate_limit['reset_after'] : 0.0;
+        $rate_limit_timestamp = isset($rate_limit['timestamp']) ? (int) $rate_limit['timestamp'] : 0;
+        $rate_limit_retry     = isset($rate_limit['retry_after']) ? (int) $rate_limit['retry_after'] : null;
+
+        $fallback_next_retry = isset($fallback['next_retry']) ? (int) $fallback['next_retry'] : 0;
+        $fallback_reason     = isset($fallback['reason']) ? $fallback['reason'] : '';
+        $fallback_timestamp  = isset($fallback['timestamp']) ? (int) $fallback['timestamp'] : 0;
+
         ?>
-        <div class="discord-bot-settings-main">
+        <div class="discord-monitoring-grid">
+            <div class="discord-monitoring-card">
+                <h2><?php esc_html_e('📡 Limites API', 'discord-bot-jlg'); ?></h2>
+                <?php if ($rate_limit_limit || $rate_limit_remaining || $rate_limit_retry) : ?>
+                    <ul>
+                        <?php if (null !== $rate_limit_remaining) : ?>
+                            <li>
+                                <strong><?php esc_html_e('Requêtes restantes', 'discord-bot-jlg'); ?> :</strong>
+                                <?php echo esc_html(number_format_i18n($rate_limit_remaining)); ?>
+                                <?php if ($rate_limit_limit) : ?>
+                                    <span class="description">/ <?php echo esc_html(number_format_i18n($rate_limit_limit)); ?></span>
+                                <?php endif; ?>
+                            </li>
+                        <?php endif; ?>
+                        <?php if ($rate_limit_reset > 0) : ?>
+                            <li>
+                                <strong><?php esc_html_e('Réinitialisation estimée', 'discord-bot-jlg'); ?> :</strong>
+                                <?php
+                                $reset_seconds = (int) ceil($rate_limit_reset);
+                                echo esc_html(human_time_diff($now_gmt, $now_gmt + $reset_seconds));
+                                ?>
+                            </li>
+                        <?php endif; ?>
+                        <?php if (null !== $rate_limit_retry && $rate_limit_retry > 0) : ?>
+                            <li>
+                                <strong><?php esc_html_e('Prochain essai conseillé', 'discord-bot-jlg'); ?> :</strong>
+                                <?php echo esc_html(sprintf(_n('dans %s seconde', 'dans %s secondes', $rate_limit_retry, 'discord-bot-jlg'), number_format_i18n($rate_limit_retry))); ?>
+                            </li>
+                        <?php endif; ?>
+                    </ul>
+                    <?php if ($rate_limit_timestamp > 0) : ?>
+                        <p class="description">
+                            <?php
+                            printf(
+                                /* translators: %s: human readable time diff */
+                                esc_html__('Données relevées %s.', 'discord-bot-jlg'),
+                                esc_html(human_time_diff($rate_limit_timestamp, $now_gmt))
+                            );
+                            ?>
+                        </p>
+                    <?php endif; ?>
+                <?php else : ?>
+                    <p><?php esc_html_e('Aucun plafond récent communiqué par Discord.', 'discord-bot-jlg'); ?></p>
+                <?php endif; ?>
+            </div>
+
+            <div class="discord-monitoring-card">
+                <h2><?php esc_html_e('🛡️ Dernier incident', 'discord-bot-jlg'); ?></h2>
+                <?php if ($last_error) : ?>
+                    <p>
+                        <strong><?php echo esc_html($last_error['label']); ?></strong><br />
+                        <span class="description">
+                            <?php
+                            printf(
+                                /* translators: %s: human readable time diff */
+                                esc_html__('Il y a %s', 'discord-bot-jlg'),
+                                esc_html(human_time_diff($last_error['timestamp'], $now_gmt))
+                            );
+                            ?>
+                        </span>
+                    </p>
+                    <?php if (!empty($last_error['reason'])) : ?>
+                        <p class="discord-monitoring-card__reason"><?php echo esc_html($last_error['reason']); ?></p>
+                    <?php endif; ?>
+                <?php else : ?>
+                    <p><?php esc_html_e('Aucun incident récent détecté.', 'discord-bot-jlg'); ?></p>
+                <?php endif; ?>
+
+                <?php if ($last_success) : ?>
+                    <p class="discord-monitoring-card__success">
+                        <strong><?php esc_html_e('Dernier succès', 'discord-bot-jlg'); ?> :</strong>
+                        <?php echo esc_html($last_success['label']); ?>
+                        <span class="description">
+                            <?php
+                            printf(
+                                esc_html__('Il y a %s', 'discord-bot-jlg'),
+                                esc_html(human_time_diff($last_success['timestamp'], $now_gmt))
+                            );
+                            ?>
+                        </span>
+                    </p>
+                <?php endif; ?>
+            </div>
+
+            <div class="discord-monitoring-card">
+                <h2><?php esc_html_e('🔁 Mode secours', 'discord-bot-jlg'); ?></h2>
+                <?php if ($fallback_reason || $fallback_timestamp) : ?>
+                    <?php if ($fallback_reason) : ?>
+                        <p class="discord-monitoring-card__reason"><?php echo esc_html($fallback_reason); ?></p>
+                    <?php endif; ?>
+                    <?php if ($fallback_timestamp > 0) : ?>
+                        <p class="description">
+                            <?php
+                            printf(
+                                esc_html__('Dernier fallback il y a %s.', 'discord-bot-jlg'),
+                                esc_html(human_time_diff($fallback_timestamp, $now_gmt))
+                            );
+                            ?>
+                        </p>
+                    <?php endif; ?>
+                    <?php if ($fallback_next_retry > 0) : ?>
+                        <p>
+                            <strong><?php esc_html_e('Prochain essai forcé', 'discord-bot-jlg'); ?> :</strong>
+                            <?php echo esc_html(human_time_diff($now_gmt, $fallback_next_retry)); ?>
+                        </p>
+                    <?php endif; ?>
+                <?php else : ?>
+                    <p><?php esc_html_e('Aucun fallback enregistré récemment.', 'discord-bot-jlg'); ?></p>
+                <?php endif; ?>
+
+                <?php if ($retry_after > 0) : ?>
+                    <p class="description">
+                        <?php
+                        printf(
+                            esc_html__('Délai courant communiqué : %s s.', 'discord-bot-jlg'),
+                            esc_html(number_format_i18n($retry_after))
+                        );
+                        ?>
+                    </p>
+                <?php endif; ?>
+            </div>
+        </div>
+
+        <div class="discord-monitoring-history">
+            <h2><?php esc_html_e('🧾 Journal récent', 'discord-bot-jlg'); ?></h2>
+            <?php if (empty($events)) : ?>
+                <p><?php esc_html_e('Aucun événement à afficher pour le moment.', 'discord-bot-jlg'); ?></p>
+            <?php else : ?>
+                <ol class="discord-monitoring-history__list">
+                    <?php foreach ($events as $entry) :
+                        $entry_timestamp = isset($entry['timestamp']) ? (int) $entry['timestamp'] : 0;
+                        $entry_label     = isset($entry['label']) ? $entry['label'] : '';
+                        $entry_reason    = isset($entry['reason']) ? $entry['reason'] : '';
+                        ?>
+                        <li class="discord-monitoring-history__item">
+                            <div class="discord-monitoring-history__meta">
+                                <?php if ($entry_timestamp > 0) : ?>
+                                    <span class="discord-monitoring-history__time" aria-hidden="true">
+                                        <?php echo esc_html(human_time_diff($entry_timestamp, $now_gmt)); ?>
+                                    </span>
+                                    <span class="screen-reader-text">
+                                        <?php
+                                        printf(
+                                            esc_html__('Événement survenu il y a %s', 'discord-bot-jlg'),
+                                            esc_html(human_time_diff($entry_timestamp, $now_gmt))
+                                        );
+                                        ?>
+                                    </span>
+                                <?php endif; ?>
+                            </div>
+                            <div class="discord-monitoring-history__content">
+                                <span class="discord-monitoring-history__label"><?php echo esc_html($entry_label); ?></span>
+                                <?php if ('' !== trim($entry_reason)) : ?>
+                                    <span class="discord-monitoring-history__reason"><?php echo esc_html($entry_reason); ?></span>
+                                <?php endif; ?>
+                            </div>
+                        </li>
+                    <?php endforeach; ?>
+                </ol>
+            <?php endif; ?>
+        </div>
+        <?php
+    }
+
+    /**
+     * Affiche le contenu principal en fonction de l'onglet sélectionné.
+     *
+     * @param string $current_tab Onglet en cours.
+     * @param array  $tab_config  Configuration de l'onglet.
+     */
+    private function render_options_main_content($current_tab, array $tab_config) {
+        ?>
+        <div class="discord-bot-settings-main" aria-live="polite">
             <?php
-            $this->render_settings_section_form(
-                'discord_stats_api_section',
-                esc_html__('Enregistrer la configuration API', 'discord-bot-jlg')
-            );
+            if (isset($tab_config['render_callback']) && is_callable($tab_config['render_callback'])) {
+                call_user_func($tab_config['render_callback']);
+                return;
+            }
 
-            $this->render_settings_section_form(
-                'discord_stats_profiles_section',
-                esc_html__('Mettre à jour les profils', 'discord-bot-jlg')
-            );
+            if (empty($tab_config['sections']) || !is_array($tab_config['sections'])) {
+                echo '<p>' . esc_html__('Aucun réglage disponible pour cet onglet pour le moment.', 'discord-bot-jlg') . '</p>';
+                return;
+            }
 
-            $this->render_settings_section_form(
-                'discord_stats_display_section',
-                esc_html__('Mettre à jour les options d\'affichage', 'discord-bot-jlg')
-            );
+            foreach ($tab_config['sections'] as $section) {
+                if (is_string($section)) {
+                    $section = array(
+                        'id' => $section,
+                    );
+                }
+
+                if (empty($section['id'])) {
+                    continue;
+                }
+
+                $submit_label = isset($section['submit_label'])
+                    ? (string) $section['submit_label']
+                    : esc_html__('Enregistrer les modifications', 'discord-bot-jlg');
+
+                $this->render_settings_section_form($section['id'], $submit_label);
+            }
             ?>
         </div>
         <?php
@@ -1720,13 +2132,48 @@ class Discord_Bot_JLG_Admin {
 
     /**
      * Affiche la colonne latérale avec les actions rapides.
+     *
+     * @param string $current_tab Onglet actuel.
+     * @param array  $tab_config  Configuration de l'onglet.
      */
-    private function render_options_sidebar() {
+    private function render_options_sidebar($current_tab, array $tab_config) {
+        $panels = array();
+
+        if (!empty($tab_config['sidebar_panels']) && is_array($tab_config['sidebar_panels'])) {
+            $panels = array_map('sanitize_key', $tab_config['sidebar_panels']);
+        }
+
+        if (empty($panels)) {
+            // Par défaut, afficher les liens rapides pour conserver les repères utilisateurs.
+            $panels = array('quick_links');
+            if ('connection' === $current_tab) {
+                array_unshift($panels, 'connection_test');
+            }
+        }
+
         ?>
-        <div class="discord-bot-settings-sidebar">
+        <div class="discord-bot-settings-sidebar" aria-label="<?php esc_attr_e('Actions annexes', 'discord-bot-jlg'); ?>">
             <?php
-            $this->render_connection_test_panel();
-            $this->render_quick_links_panel();
+            foreach ($panels as $panel_id) {
+                switch ($panel_id) {
+                    case 'connection_test':
+                        $this->render_connection_test_panel();
+                        break;
+                    case 'appearance_shortcuts':
+                        $this->render_appearance_shortcuts_panel();
+                        break;
+                    case 'automation_tips':
+                        $this->render_automation_tips_panel();
+                        break;
+                    case 'monitoring_help':
+                        $this->render_monitoring_help_panel();
+                        break;
+                    case 'quick_links':
+                    default:
+                        $this->render_quick_links_panel();
+                        break;
+                }
+            }
             ?>
         </div>
         <?php
@@ -1792,6 +2239,63 @@ class Discord_Bot_JLG_Admin {
                     </li>
                 <?php endif; ?>
             </ul>
+        </div>
+        <?php
+    }
+
+    /**
+     * Affiche des raccourcis vers la documentation des presets.
+     */
+    private function render_appearance_shortcuts_panel() {
+        ?>
+        <div style="background: #eef2ff; padding: 20px; border-radius: 8px;">
+            <h3 style="margin-top: 0;"><?php esc_html_e('🎨 Presets express', 'discord-bot-jlg'); ?></h3>
+            <p style="margin-top: 0;">
+                <?php esc_html_e('Appliquez une base visuelle en un clic depuis Gutenberg, puis affinez les couleurs ici.', 'discord-bot-jlg'); ?>
+            </p>
+            <ul style="list-style: disc; margin: 0 0 0 18px;">
+                <li><?php esc_html_e('Carte immersive : statistiques complètes, avatar et bouton principal.', 'discord-bot-jlg'); ?></li>
+                <li><?php esc_html_e('Bannière e-sport : accent sur les présences et l’appel à l’action.', 'discord-bot-jlg'); ?></li>
+                <li><?php esc_html_e('Mode compact minimal : idéal pour les sidebars.', 'discord-bot-jlg'); ?></li>
+            </ul>
+            <p style="margin-bottom: 0;">
+                <a class="button button-secondary" href="<?php echo esc_url(admin_url('admin.php?page=discord-bot-demo')); ?>">
+                    <?php esc_html_e('Voir les aperçus', 'discord-bot-jlg'); ?>
+                </a>
+            </p>
+        </div>
+        <?php
+    }
+
+    /**
+     * Fournit des conseils sur l'automatisation.
+     */
+    private function render_automation_tips_panel() {
+        ?>
+        <div style="background: #f1f5f9; padding: 20px; border-radius: 8px;">
+            <h3 style="margin-top: 0;"><?php esc_html_e('⚙️ Bonnes pratiques', 'discord-bot-jlg'); ?></h3>
+            <ul style="list-style: disc; margin: 0 0 0 18px;">
+                <li><?php esc_html_e('Gardez un intervalle de rafraîchissement supérieur à 60 s pour éviter les limites Discord.', 'discord-bot-jlg'); ?></li>
+                <li><?php esc_html_e('Activez la rétention analytics pour alimenter les graphiques et les KPI.', 'discord-bot-jlg'); ?></li>
+                <li><?php esc_html_e('Les caches courts améliorent la réactivité, mais surveillez les erreurs dans l’onglet Surveillance.', 'discord-bot-jlg'); ?></li>
+            </ul>
+        </div>
+        <?php
+    }
+
+    /**
+     * Affiche une aide contextuelle pour le suivi en temps réel.
+     */
+    private function render_monitoring_help_panel() {
+        ?>
+        <div style="background: #ecfeff; padding: 20px; border-radius: 8px;">
+            <h3 style="margin-top: 0;"><?php esc_html_e('🛰️ Astuce surveillance', 'discord-bot-jlg'); ?></h3>
+            <p><?php esc_html_e('Le tableau de bord ci-contre agrège les derniers événements Discord et la prochaine fenêtre de réessai.', 'discord-bot-jlg'); ?></p>
+            <p style="margin-bottom: 0;">
+                <a class="button" href="<?php echo esc_url(rest_url('discord-bot-jlg/v1/events')); ?>" target="_blank" rel="noopener noreferrer">
+                    <?php esc_html_e('Exporter le journal complet', 'discord-bot-jlg'); ?>
+                </a>
+            </p>
         </div>
         <?php
     }
