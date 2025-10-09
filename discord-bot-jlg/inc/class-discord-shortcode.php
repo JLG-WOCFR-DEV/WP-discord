@@ -964,9 +964,22 @@ class Discord_Bot_JLG_Shortcode {
                             </a>
                         </div>
                         <div class="discord-status-history">
-                            <button type="button" class="discord-status-history__toggle" data-status-history-toggle disabled="disabled"><?php esc_html_e('Voir le journal', 'discord-bot-jlg'); ?></button>
+                            <button type="button"
+                                class="discord-status-history__toggle"
+                                data-status-history-toggle
+                                disabled="disabled"
+                                aria-controls="<?php echo esc_attr($status_history_id); ?>"
+                                aria-expanded="false"
+                                aria-disabled="true">
+                                <?php esc_html_e('Voir le journal', 'discord-bot-jlg'); ?>
+                            </button>
                             <p class="discord-status-history__empty" data-status-history-empty><?php esc_html_e('Aucun incident récent.', 'discord-bot-jlg'); ?></p>
-                            <ul class="discord-status-history__list" data-status-history id="<?php echo esc_attr($status_history_id); ?>" hidden></ul>
+                            <ul class="discord-status-history__list"
+                                data-status-history
+                                id="<?php echo esc_attr($status_history_id); ?>"
+                                role="log"
+                                aria-live="polite"
+                                hidden></ul>
                         </div>
                     </div>
                 </div>
