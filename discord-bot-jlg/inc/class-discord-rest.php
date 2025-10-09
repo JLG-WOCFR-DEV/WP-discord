@@ -26,6 +26,11 @@ class Discord_Bot_JLG_REST_Controller {
      */
     private $event_logger;
 
+    /**
+     * @var array|null
+     */
+    private $pending_csv_export;
+
     public function __construct(Discord_Bot_JLG_API $api, $analytics = null, $event_logger = null) {
         $this->api = $api;
         $this->analytics = ($analytics instanceof Discord_Bot_JLG_Analytics)
@@ -474,11 +479,49 @@ class Discord_Bot_JLG_REST_Controller {
         $csv = $this->convert_rows_to_csv($fields, $rows, $delimiter);
         $filename = $this->build_export_filename($request->get_param('filename'), $profile_key, 'csv');
 
-        $response = new WP_REST_Response($csv, 200);
+        $this->prepare_csv_stream_response($csv, $filename);
+
+        $response = new WP_REST_Response(null, 200);
         $response->header('Content-Type', 'text/csv; charset=utf-8');
         $response->header('Content-Disposition', 'attachment; filename="' . $filename . '"');
 
         return $response;
+    }
+
+    private function prepare_csv_stream_response($csv, $filename) {
+        $this->pending_csv_export = array(
+            'csv'      => $csv,
+            'filename' => $filename,
+        );
+
+        add_filter('rest_pre_serve_request', array($this, 'stream_csv_export'), 10, 4);
+    }
+
+    public function stream_csv_export($served, $result, $request, $server) {
+        if ($served || empty($this->pending_csv_export)) {
+            return $served;
+        }
+
+        if (!($request instanceof WP_REST_Request)) {
+            return $served;
+        }
+
+        $expected_route = '/' . self::ROUTE_NAMESPACE . self::ROUTE_ANALYTICS_EXPORT;
+        if ($expected_route !== $request->get_route()) {
+            return $served;
+        }
+
+        $payload = $this->pending_csv_export;
+        $this->pending_csv_export = null;
+
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename="' . $payload['filename'] . '"');
+
+        echo $payload['csv'];
+
+        remove_filter('rest_pre_serve_request', array($this, 'stream_csv_export'), 10);
+
+        return true;
     }
 
     private function get_analytics_cache_key($profile_key, $server_id, $days) {
