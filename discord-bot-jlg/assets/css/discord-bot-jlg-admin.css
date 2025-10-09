@@ -25,6 +25,106 @@
     max-width: 100%;
 }
 
+.discord-bot-nav-tab-wrapper {
+    margin-top: 20px;
+    margin-bottom: 0;
+}
+
+.discord-bot-nav-tab-wrapper .nav-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+}
+
+.discord-bot-nav-tab-wrapper .discord-bot-tab-icon {
+    font-size: 16px;
+    line-height: 1;
+}
+
+.discord-monitoring-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 20px;
+    margin-bottom: 30px;
+}
+
+.discord-monitoring-card {
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 6px 20px rgba(15, 23, 42, 0.08);
+    padding: 20px;
+}
+
+.discord-monitoring-card h2 {
+    margin-top: 0;
+    margin-bottom: 12px;
+    font-size: 18px;
+}
+
+.discord-monitoring-card ul {
+    margin: 0;
+    padding-left: 18px;
+}
+
+.discord-monitoring-card__reason {
+    margin: 8px 0;
+    font-weight: 500;
+    color: #1f2937;
+}
+
+.discord-monitoring-card__success {
+    margin-top: 12px;
+    font-size: 13px;
+    color: #0f766e;
+}
+
+.discord-monitoring-history {
+    background: #ffffff;
+    border-radius: 12px;
+    box-shadow: 0 6px 20px rgba(15, 23, 42, 0.06);
+    padding: 24px;
+}
+
+.discord-monitoring-history h2 {
+    margin-top: 0;
+}
+
+.discord-monitoring-history__list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.discord-monitoring-history__item {
+    display: flex;
+    gap: 16px;
+    padding: 12px 0;
+    border-bottom: 1px solid #e2e8f0;
+}
+
+.discord-monitoring-history__item:last-child {
+    border-bottom: none;
+}
+
+.discord-monitoring-history__time {
+    font-size: 12px;
+    color: #64748b;
+    min-width: 70px;
+}
+
+.discord-monitoring-history__label {
+    display: block;
+    font-weight: 600;
+    color: #0f172a;
+}
+
+.discord-monitoring-history__reason {
+    display: block;
+    font-size: 13px;
+    color: #475569;
+    margin-top: 2px;
+}
+
 .discord-analytics-panel {
     background: #fff;
     border-radius: 12px;
@@ -96,5 +196,9 @@
 
     .discord-analytics-panel__body {
         flex-direction: column;
+    }
+
+    .discord-monitoring-grid {
+        grid-template-columns: 1fr;
     }
 }
