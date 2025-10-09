@@ -141,6 +141,7 @@ require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-analytics.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-http.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-event-logger.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-options-repository.php';
+require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-alerts.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-api.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-job-queue.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-admin.php';
@@ -193,6 +194,7 @@ class DiscordServerStats {
     private $event_logger;
     private $options_repository;
     private $job_queue;
+    private $alerts;
 
     public function __construct() {
         $this->default_options = discord_bot_jlg_get_default_options();
@@ -213,9 +215,11 @@ class DiscordServerStats {
             $this->event_logger,
             $this->options_repository
         );
+        $this->alerts    = new Discord_Bot_JLG_Alerts($this->options_repository, $this->analytics, $this->event_logger);
         $this->job_queue = new Discord_Bot_JLG_Job_Queue($this->api, DISCORD_BOT_JLG_OPTION_NAME, $this->event_logger);
         $this->job_queue->register();
         $this->api->set_refresh_dispatcher($this->job_queue);
+        $this->api->set_alerts_service($this->alerts);
         $this->admin     = new Discord_Bot_JLG_Admin(DISCORD_BOT_JLG_OPTION_NAME, $this->api, $this->event_logger);
         $this->shortcode = new Discord_Bot_JLG_Shortcode(DISCORD_BOT_JLG_OPTION_NAME, $this->api);
         $this->widget    = new Discord_Bot_JLG_Widget();

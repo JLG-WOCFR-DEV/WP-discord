@@ -42,6 +42,7 @@ class Discord_Bot_JLG_API {
     private $runtime_fallback_retry_timestamp;
     private $analytics;
     private $event_logger;
+    private $alerts;
     private $runtime_status_history;
     private $refresh_dispatcher;
 
@@ -83,6 +84,7 @@ class Discord_Bot_JLG_API {
         $this->event_logger = ($event_logger instanceof Discord_Bot_JLG_Event_Logger)
             ? $event_logger
             : new Discord_Bot_JLG_Event_Logger();
+        $this->alerts = null;
         $this->runtime_status_history = array();
         $this->refresh_dispatcher = null;
     }
@@ -105,6 +107,16 @@ class Discord_Bot_JLG_API {
 
     public function get_event_logger() {
         return $this->event_logger;
+    }
+
+    public function set_alerts_service($alerts) {
+        if ($alerts instanceof Discord_Bot_JLG_Alerts) {
+            $this->alerts = $alerts;
+        }
+    }
+
+    public function get_alerts_service() {
+        return $this->alerts;
     }
 
     public function set_refresh_dispatcher($dispatcher) {
@@ -1961,6 +1973,10 @@ class Discord_Bot_JLG_API {
         }
 
         $this->analytics->log_snapshot($profile_key, $server_id, $stats);
+
+        if ($this->alerts instanceof Discord_Bot_JLG_Alerts) {
+            $this->alerts->maybe_dispatch_alert($profile_key, $server_id, $stats);
+        }
     }
 
     /**

@@ -8,6 +8,7 @@ class Discord_Bot_JLG_REST_Controller {
     const ROUTE_STATS = '/stats';
     const ROUTE_ANALYTICS = '/analytics';
     const ROUTE_EVENTS = '/events';
+    const ROUTE_ANALYTICS_EXPORT = '/analytics/export';
     const ANALYTICS_CACHE_GROUP = 'discord_bot_jlg_rest';
 
     /**
@@ -125,6 +126,56 @@ class Discord_Bot_JLG_REST_Controller {
                             'description'       => __('Renvoie uniquement les événements postérieurs à ce timestamp (UTC).', 'discord-bot-jlg'),
                             'type'              => 'integer',
                             'sanitize_callback' => 'absint',
+                        ),
+                    ),
+                ),
+            ),
+            true
+        );
+
+        register_rest_route(
+            self::ROUTE_NAMESPACE,
+            self::ROUTE_ANALYTICS_EXPORT,
+            array(
+                array(
+                    'methods'             => WP_REST_Server::READABLE,
+                    'callback'            => array($this, 'handle_export_analytics'),
+                    'permission_callback' => array($this, 'check_rest_permissions'),
+                    'args'                => array(
+                        'profile_key' => array(
+                            'description'       => __('Profil de serveur à exporter.', 'discord-bot-jlg'),
+                            'type'              => 'string',
+                            'sanitize_callback' => 'sanitize_key',
+                        ),
+                        'server_id' => array(
+                            'description'       => __('Identifiant du serveur Discord.', 'discord-bot-jlg'),
+                            'type'              => 'string',
+                            'sanitize_callback' => 'sanitize_text_field',
+                        ),
+                        'days' => array(
+                            'description'       => __('Nombre de jours inclus (maximum 30).', 'discord-bot-jlg'),
+                            'type'              => 'integer',
+                            'sanitize_callback' => 'absint',
+                        ),
+                        'format' => array(
+                            'description' => __('Format de sortie (csv ou json).', 'discord-bot-jlg'),
+                            'type'        => 'string',
+                        ),
+                        'fields' => array(
+                            'description' => __('Liste de colonnes à exporter (séparées par des virgules).', 'discord-bot-jlg'),
+                            'type'        => 'string',
+                        ),
+                        'delimiter' => array(
+                            'description' => __('Délimiteur CSV (comma, semicolon, tab).', 'discord-bot-jlg'),
+                            'type'        => 'string',
+                        ),
+                        'timezone' => array(
+                            'description' => __('Fuseau horaire utilisé pour les dates.', 'discord-bot-jlg'),
+                            'type'        => 'string',
+                        ),
+                        'filename' => array(
+                            'description' => __('Nom de fichier personnalisé.', 'discord-bot-jlg'),
+                            'type'        => 'string',
                         ),
                     ),
                 ),
@@ -328,6 +379,108 @@ class Discord_Bot_JLG_REST_Controller {
         return rest_ensure_response(new WP_REST_Response($response, 200));
     }
 
+    public function handle_export_analytics(WP_REST_Request $request) {
+        $analytics = $this->analytics instanceof Discord_Bot_JLG_Analytics
+            ? $this->analytics
+            : $this->api->get_analytics_service();
+
+        if (!($analytics instanceof Discord_Bot_JLG_Analytics)) {
+            return rest_ensure_response(
+                new WP_REST_Response(
+                    array(
+                        'success' => false,
+                        'data'    => array(
+                            'message' => __('Service d’analyse indisponible.', 'discord-bot-jlg'),
+                        ),
+                    ),
+                    501
+                )
+            );
+        }
+
+        $profile_key = sanitize_key($request->get_param('profile_key'));
+        if ('' === $profile_key) {
+            $profile_key = 'default';
+        }
+
+        $server_id = $request->get_param('server_id');
+        if (!is_string($server_id)) {
+            $server_id = '';
+        }
+        $server_id = preg_replace('/[^0-9]/', '', $server_id);
+
+        $days = (int) $request->get_param('days');
+        if ($days <= 0) {
+            $days = 7;
+        } elseif ($days > 30) {
+            $days = 30;
+        }
+
+        $format = strtolower((string) $request->get_param('format'));
+        if (!in_array($format, array('csv', 'json'), true)) {
+            $format = 'csv';
+        }
+
+        $fields    = $this->normalize_export_fields($request->get_param('fields'));
+        $delimiter = $this->normalize_export_delimiter($request->get_param('delimiter'));
+        $timezone_identifier = $this->normalize_export_timezone($request->get_param('timezone'));
+        $timezone = $this->create_timezone($timezone_identifier);
+
+        $aggregates = $analytics->get_aggregates(
+            array(
+                'profile_key' => $profile_key,
+                'server_id'   => $server_id,
+                'days'        => $days,
+            )
+        );
+
+        if (is_wp_error($aggregates)) {
+            return $aggregates;
+        }
+
+        if (!is_array($aggregates)) {
+            $aggregates = array();
+        }
+
+        $timeseries = isset($aggregates['timeseries']) && is_array($aggregates['timeseries'])
+            ? $aggregates['timeseries']
+            : array();
+
+        $rows = $this->map_timeseries_for_export($timeseries, $fields, $profile_key, $server_id, $timezone);
+
+        if ('json' === $format) {
+            $payload = array(
+                'success' => true,
+                'data'    => array(
+                    'profile_key' => $profile_key,
+                    'server_id'   => $server_id,
+                    'fields'      => $fields,
+                    'timezone'    => $timezone_identifier,
+                    'range'       => isset($aggregates['range']) ? $aggregates['range'] : array(),
+                    'averages'    => isset($aggregates['averages']) ? $aggregates['averages'] : array(),
+                    'timeseries'  => $rows,
+                ),
+            );
+
+            $response = new WP_REST_Response($payload, 200);
+            $response->header(
+                'Content-Disposition',
+                'attachment; filename="' . $this->build_export_filename($request->get_param('filename'), $profile_key, 'json') . '"'
+            );
+
+            return $response;
+        }
+
+        $csv = $this->convert_rows_to_csv($fields, $rows, $delimiter);
+        $filename = $this->build_export_filename($request->get_param('filename'), $profile_key, 'csv');
+
+        $response = new WP_REST_Response($csv, 200);
+        $response->header('Content-Type', 'text/csv; charset=utf-8');
+        $response->header('Content-Disposition', 'attachment; filename="' . $filename . '"');
+
+        return $response;
+    }
+
     private function get_analytics_cache_key($profile_key, $server_id, $days) {
         $parts = array(
             (string) $profile_key,
@@ -390,6 +543,261 @@ class Discord_Bot_JLG_REST_Controller {
         if (function_exists('set_transient')) {
             set_transient($cache_key, $aggregates, $ttl);
         }
+    }
+
+    private function normalize_export_fields($fields_param) {
+        $allowed = array('profile_key', 'server_id', 'timestamp', 'iso8601', 'date', 'time', 'online', 'presence', 'total', 'premium');
+        $default = array('profile_key', 'server_id', 'timestamp', 'iso8601', 'online', 'presence', 'total', 'premium');
+
+        if (empty($fields_param)) {
+            return $default;
+        }
+
+        if (is_string($fields_param)) {
+            $parts = preg_split('/[\s,]+/', $fields_param);
+        } elseif (is_array($fields_param)) {
+            $parts = $fields_param;
+        } else {
+            $parts = array();
+        }
+
+        if (!is_array($parts)) {
+            return $default;
+        }
+
+        $fields = array();
+
+        foreach ($parts as $part) {
+            if (!is_string($part)) {
+                continue;
+            }
+
+            $key = sanitize_key($part);
+            if ('' === $key) {
+                continue;
+            }
+
+            if (!in_array($key, $allowed, true)) {
+                continue;
+            }
+
+            $fields[] = $key;
+        }
+
+        $fields = array_values(array_unique($fields));
+
+        if (empty($fields)) {
+            return $default;
+        }
+
+        return $fields;
+    }
+
+    private function normalize_export_delimiter($delimiter) {
+        if (!is_string($delimiter)) {
+            return ',';
+        }
+
+        $normalized = strtolower(trim($delimiter));
+
+        switch ($normalized) {
+            case 'semicolon':
+            case ';':
+                return ';';
+            case 'tab':
+            case '\\t':
+                return "\t";
+            case 'pipe':
+            case '|':
+                return '|';
+            case 'comma':
+            case ',':
+            default:
+                return ',';
+        }
+    }
+
+    private function normalize_export_timezone($timezone_param) {
+        if (is_string($timezone_param)) {
+            $timezone_param = trim($timezone_param);
+        } else {
+            $timezone_param = '';
+        }
+
+        if ('' === $timezone_param && function_exists('wp_timezone_string')) {
+            $timezone_param = wp_timezone_string();
+        }
+
+        if ('' === $timezone_param) {
+            $timezone_param = 'UTC';
+        }
+
+        try {
+            new DateTimeZone($timezone_param);
+            return $timezone_param;
+        } catch (Exception $exception) {
+            return 'UTC';
+        }
+    }
+
+    private function create_timezone($identifier) {
+        try {
+            return new DateTimeZone($identifier);
+        } catch (Exception $exception) {
+            return new DateTimeZone('UTC');
+        }
+    }
+
+    private function map_timeseries_for_export($timeseries, array $fields, $profile_key, $server_id, DateTimeZone $timezone) {
+        $rows = array();
+        $date_format = get_option('date_format');
+        if (!is_string($date_format) || '' === $date_format) {
+            $date_format = 'Y-m-d';
+        }
+        $time_format = get_option('time_format');
+        if (!is_string($time_format) || '' === $time_format) {
+            $time_format = 'H:i';
+        }
+
+        foreach ($timeseries as $point) {
+            if (!is_array($point)) {
+                continue;
+            }
+
+            $timestamp = isset($point['timestamp']) ? (int) $point['timestamp'] : 0;
+            if ($timestamp <= 0) {
+                continue;
+            }
+
+            $date = new DateTime('@' . $timestamp);
+            $date->setTimezone($timezone);
+
+            $row = array();
+
+            foreach ($fields as $field) {
+                switch ($field) {
+                    case 'profile_key':
+                        $row[$field] = $profile_key;
+                        break;
+                    case 'server_id':
+                        $row[$field] = $server_id;
+                        break;
+                    case 'timestamp':
+                        $row[$field] = $timestamp;
+                        break;
+                    case 'iso8601':
+                        $row[$field] = $date->format(DateTimeInterface::ATOM);
+                        break;
+                    case 'date':
+                        if (function_exists('wp_date')) {
+                            $row[$field] = wp_date($date_format, $timestamp, $timezone);
+                        } else {
+                            $row[$field] = $date->format($date_format);
+                        }
+                        break;
+                    case 'time':
+                        if (function_exists('wp_date')) {
+                            $row[$field] = wp_date($time_format, $timestamp, $timezone);
+                        } else {
+                            $row[$field] = $date->format($time_format);
+                        }
+                        break;
+                    case 'online':
+                        $row[$field] = isset($point['online']) ? (int) $point['online'] : null;
+                        break;
+                    case 'presence':
+                        $row[$field] = isset($point['presence']) ? (int) $point['presence'] : null;
+                        break;
+                    case 'total':
+                        $row[$field] = isset($point['total']) ? (int) $point['total'] : null;
+                        break;
+                    case 'premium':
+                        $row[$field] = isset($point['premium']) && null !== $point['premium']
+                            ? (int) $point['premium']
+                            : null;
+                        break;
+                    default:
+                        $row[$field] = isset($point[$field]) ? $point[$field] : null;
+                }
+            }
+
+            $rows[] = $row;
+        }
+
+        return $rows;
+    }
+
+    private function convert_rows_to_csv(array $fields, array $rows, $delimiter) {
+        $handle = fopen('php://temp', 'r+');
+        if (false === $handle) {
+            return '';
+        }
+
+        fputcsv($handle, $fields, $delimiter);
+
+        foreach ($rows as $row) {
+            $line = array();
+            foreach ($fields as $field) {
+                $value = isset($row[$field]) ? $row[$field] : '';
+
+                if (is_bool($value)) {
+                    $value = $value ? '1' : '0';
+                } elseif (is_int($value) || is_float($value)) {
+                    $value = $value + 0;
+                } elseif (null === $value) {
+                    $value = '';
+                }
+
+                $line[] = $value;
+            }
+
+            fputcsv($handle, $line, $delimiter);
+        }
+
+        rewind($handle);
+        $csv = stream_get_contents($handle);
+        fclose($handle);
+
+        if (!is_string($csv)) {
+            return '';
+        }
+
+        return $csv;
+    }
+
+    private function build_export_filename($requested, $profile_key, $format) {
+        $extension = ('json' === $format) ? 'json' : 'csv';
+        $profile_slug = sanitize_key($profile_key);
+        if ('' === $profile_slug) {
+            $profile_slug = 'default';
+        }
+
+        $default = sprintf('discord-analytics-%s-%s.%s', $profile_slug, gmdate('Ymd-His'), $extension);
+
+        if (!is_string($requested)) {
+            return $default;
+        }
+
+        $requested = trim($requested);
+        if ('' === $requested) {
+            return $default;
+        }
+
+        $sanitized = preg_replace('/[^A-Za-z0-9_\-.]/', '-', $requested);
+        if (!is_string($sanitized) || '' === trim($sanitized, '-_.')) {
+            return $default;
+        }
+
+        $sanitized = trim($sanitized, '.');
+        if ('' === $sanitized) {
+            return $default;
+        }
+
+        if (!preg_match(sprintf('/\.%s$/i', preg_quote($extension, '/')), $sanitized)) {
+            $sanitized .= '.' . $extension;
+        }
+
+        return $sanitized;
     }
 
     public function check_rest_permissions(WP_REST_Request $request) {
