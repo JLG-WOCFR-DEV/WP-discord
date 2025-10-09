@@ -293,6 +293,53 @@ class Discord_Bot_JLG_Admin {
         );
 
         add_settings_section(
+            'discord_stats_alerts_section',
+            esc_html__('Centre d’alertes analytics', 'discord-bot-jlg'),
+            array($this, 'alerts_section_callback'),
+            'discord_stats_settings'
+        );
+
+        add_settings_field(
+            'analytics_alerts_enabled',
+            __('Activer les alertes', 'discord-bot-jlg'),
+            array($this, 'analytics_alerts_enabled_render'),
+            'discord_stats_settings',
+            'discord_stats_alerts_section'
+        );
+
+        add_settings_field(
+            'analytics_alert_drop_percent',
+            __('Seuil de baisse (%)', 'discord-bot-jlg'),
+            array($this, 'analytics_alert_drop_render'),
+            'discord_stats_settings',
+            'discord_stats_alerts_section'
+        );
+
+        add_settings_field(
+            'analytics_alert_recipients',
+            __('Destinataires e-mail', 'discord-bot-jlg'),
+            array($this, 'analytics_alert_recipients_render'),
+            'discord_stats_settings',
+            'discord_stats_alerts_section'
+        );
+
+        add_settings_field(
+            'analytics_alert_webhook',
+            __('Webhook Discord/Slack', 'discord-bot-jlg'),
+            array($this, 'analytics_alert_webhook_render'),
+            'discord_stats_settings',
+            'discord_stats_alerts_section'
+        );
+
+        add_settings_field(
+            'analytics_alert_cooldown',
+            __('Délai minimum entre alertes (minutes)', 'discord-bot-jlg'),
+            array($this, 'analytics_alert_cooldown_render'),
+            'discord_stats_settings',
+            'discord_stats_alerts_section'
+        );
+
+        add_settings_section(
             'discord_stats_custom_css_section',
             esc_html__('Personnalisation avancée', 'discord-bot-jlg'),
             array($this, 'custom_css_section_callback'),
@@ -375,6 +422,13 @@ class Discord_Bot_JLG_Admin {
             ? max(0, (int) $current_options['analytics_retention_days'])
             : $default_retention;
 
+        $default_alert_drop = class_exists('Discord_Bot_JLG_Alerts')
+            ? (int) Discord_Bot_JLG_Alerts::DEFAULT_DROP_PERCENT
+            : 35;
+        $default_alert_cooldown = class_exists('Discord_Bot_JLG_Alerts')
+            ? (int) Discord_Bot_JLG_Alerts::DEFAULT_COOLDOWN_MINUTES
+            : 60;
+
         $sanitized = array(
             'server_id'      => '',
             'bot_token'      => isset($current_options['bot_token']) ? $current_options['bot_token'] : '',
@@ -407,6 +461,21 @@ class Discord_Bot_JLG_Admin {
             'custom_css'     => '',
             'default_refresh_interval' => $current_refresh_interval,
             'analytics_retention_days' => $current_retention,
+            'analytics_alerts_enabled' => isset($current_options['analytics_alerts_enabled'])
+                ? (int) $current_options['analytics_alerts_enabled']
+                : 0,
+            'analytics_alert_drop_percent' => isset($current_options['analytics_alert_drop_percent'])
+                ? max(1, (int) $current_options['analytics_alert_drop_percent'])
+                : $default_alert_drop,
+            'analytics_alert_recipients' => isset($current_options['analytics_alert_recipients'])
+                ? $this->sanitize_alert_recipients_value($current_options['analytics_alert_recipients'])
+                : '',
+            'analytics_alert_webhook' => isset($current_options['analytics_alert_webhook'])
+                ? $this->sanitize_alert_webhook($current_options['analytics_alert_webhook'])
+                : '',
+            'analytics_alert_cooldown' => isset($current_options['analytics_alert_cooldown'])
+                ? max(5, (int) $current_options['analytics_alert_cooldown'])
+                : $default_alert_cooldown,
             'stat_bg_color'      => $existing_colors['stat_bg_color'],
             'stat_text_color'    => $existing_colors['stat_text_color'],
             'accent_color'       => $existing_colors['accent_color'],
@@ -541,6 +610,7 @@ class Discord_Bot_JLG_Admin {
         $sanitized['show_server_name']       = !empty($input['show_server_name']) ? 1 : 0;
         $sanitized['show_server_avatar']     = !empty($input['show_server_avatar']) ? 1 : 0;
         $sanitized['default_refresh_enabled'] = !empty($input['default_refresh_enabled']) ? 1 : 0;
+        $sanitized['analytics_alerts_enabled'] = !empty($input['analytics_alerts_enabled']) ? 1 : 0;
 
         if (isset($input['default_theme'])) {
             $raw_theme = is_string($input['default_theme'])
@@ -630,6 +700,88 @@ class Discord_Bot_JLG_Admin {
                 }
 
                 $sanitized['analytics_retention_days'] = $retention;
+            }
+        }
+
+        if (array_key_exists('analytics_alert_drop_percent', $input)) {
+            $raw_drop = is_string($input['analytics_alert_drop_percent'])
+                ? trim($input['analytics_alert_drop_percent'])
+                : $input['analytics_alert_drop_percent'];
+
+            if ('' === $raw_drop) {
+                $sanitized['analytics_alert_drop_percent'] = max(5, (int) $sanitized['analytics_alert_drop_percent']);
+            } else {
+                $drop = (float) $raw_drop;
+                if ($drop < 0) {
+                    $drop = $default_alert_drop;
+                }
+
+                $drop = (int) round($drop);
+                if ($drop < 5) {
+                    $drop = 5;
+                } elseif ($drop > 95) {
+                    $drop = 95;
+                }
+
+                $sanitized['analytics_alert_drop_percent'] = $drop;
+            }
+        }
+
+        if (array_key_exists('analytics_alert_recipients', $input)) {
+            $invalid_recipients = array();
+            $recipients_value   = $this->sanitize_alert_recipients_value($input['analytics_alert_recipients'], $invalid_recipients);
+            $sanitized['analytics_alert_recipients'] = $recipients_value;
+
+            if (!empty($invalid_recipients)) {
+                add_settings_error(
+                    'discord_stats_settings',
+                    'discord_bot_jlg_alert_invalid_emails',
+                    sprintf(
+                        /* translators: %s: list of invalid emails. */
+                        esc_html__('Les adresses suivantes sont invalides et ont été ignorées : %s', 'discord-bot-jlg'),
+                        esc_html(implode(', ', $invalid_recipients))
+                    ),
+                    'warning'
+                );
+            }
+        }
+
+        if (array_key_exists('analytics_alert_webhook', $input)) {
+            $is_valid_webhook = true;
+            $webhook_value    = $this->sanitize_alert_webhook($input['analytics_alert_webhook'], $is_valid_webhook);
+            $sanitized['analytics_alert_webhook'] = $webhook_value;
+
+            if (false === $is_valid_webhook && '' !== trim((string) $input['analytics_alert_webhook'])) {
+                add_settings_error(
+                    'discord_stats_settings',
+                    'discord_bot_jlg_alert_webhook_invalid',
+                    esc_html__('L’URL de webhook fournie est invalide (HTTPS requis).', 'discord-bot-jlg'),
+                    'warning'
+                );
+            }
+        }
+
+        if (array_key_exists('analytics_alert_cooldown', $input)) {
+            $raw_cooldown = is_string($input['analytics_alert_cooldown'])
+                ? trim($input['analytics_alert_cooldown'])
+                : $input['analytics_alert_cooldown'];
+
+            if ('' === $raw_cooldown) {
+                $sanitized['analytics_alert_cooldown'] = max(5, (int) $sanitized['analytics_alert_cooldown']);
+            } else {
+                $cooldown = absint($raw_cooldown);
+
+                if ($cooldown <= 0) {
+                    $cooldown = $default_alert_cooldown;
+                }
+
+                if ($cooldown < 5) {
+                    $cooldown = 5;
+                } elseif ($cooldown > 1440) {
+                    $cooldown = 1440;
+                }
+
+                $sanitized['analytics_alert_cooldown'] = $cooldown;
             }
         }
 
@@ -1060,6 +1212,86 @@ class Discord_Bot_JLG_Admin {
         }
 
         return $days;
+    }
+
+    private function sanitize_alert_recipients_value($raw_value, &$invalid = null) {
+        if (!is_array($invalid)) {
+            $invalid = array();
+        }
+
+        if (!is_string($raw_value)) {
+            return '';
+        }
+
+        $candidates = preg_split('/[\s,;]+/', $raw_value);
+        if (!is_array($candidates)) {
+            return '';
+        }
+
+        $valid = array();
+        $invalid_local = array();
+
+        foreach ($candidates as $candidate) {
+            $candidate = trim($candidate);
+
+            if ('' === $candidate) {
+                continue;
+            }
+
+            if (is_email($candidate)) {
+                $sanitized = sanitize_email($candidate);
+                if ('' !== $sanitized) {
+                    $valid[] = $sanitized;
+                }
+            } else {
+                $invalid_local[] = sanitize_text_field($candidate);
+            }
+        }
+
+        $invalid = $invalid_local;
+
+        if (empty($valid)) {
+            return '';
+        }
+
+        $valid = array_values(array_unique($valid));
+
+        return implode("\n", $valid);
+    }
+
+    private function sanitize_alert_webhook($value, &$is_valid = null) {
+        $is_valid = true;
+
+        if (!is_string($value)) {
+            return '';
+        }
+
+        $value = trim($value);
+        if ('' === $value) {
+            return '';
+        }
+
+        $sanitized = esc_url_raw($value);
+        if ('' === $sanitized) {
+            $is_valid = false;
+            return '';
+        }
+
+        if (function_exists('wp_http_validate_url')) {
+            $validated = wp_http_validate_url($sanitized);
+            if (false === $validated) {
+                $is_valid = false;
+                return '';
+            }
+            $sanitized = $validated;
+        }
+
+        if (0 !== strpos($sanitized, 'https://')) {
+            $is_valid = false;
+            return '';
+        }
+
+        return $sanitized;
     }
 
     private function sanitize_profile_server_id($value) {
@@ -1943,6 +2175,78 @@ class Discord_Bot_JLG_Admin {
                max="365"
                class="small-text" />
         <p class="description"><?php esc_html_e('Nombre de jours conservés (0 désactive la purge automatique).', 'discord-bot-jlg'); ?></p>
+        <?php
+    }
+
+    public function alerts_section_callback() {
+        ?>
+        <p>
+            <?php esc_html_e('Configurez les notifications “pro” déclenchées lorsque la présence chute anormalement. Les alertes se basent sur la moyenne des 7 derniers jours.', 'discord-bot-jlg'); ?>
+        </p>
+        <?php
+    }
+
+    public function analytics_alerts_enabled_render() {
+        $options = get_option($this->option_name);
+        $enabled = isset($options['analytics_alerts_enabled']) ? (int) $options['analytics_alerts_enabled'] : 0;
+        ?>
+        <label>
+            <input type="checkbox" name="<?php echo esc_attr($this->option_name); ?>[analytics_alerts_enabled]" value="1" <?php checked($enabled, 1); ?> />
+            <?php esc_html_e('Activer les alertes en cas de baisse marquée de l’activité.', 'discord-bot-jlg'); ?>
+        </label>
+        <p class="description"><?php esc_html_e('Analyse le dernier snapshot vs. la moyenne des 7 derniers jours (hors point courant).', 'discord-bot-jlg'); ?></p>
+        <?php
+    }
+
+    public function analytics_alert_drop_render() {
+        $options = get_option($this->option_name);
+        $value = isset($options['analytics_alert_drop_percent'])
+            ? max(5, (int) $options['analytics_alert_drop_percent'])
+            : 35;
+        ?>
+        <input type="number"
+               name="<?php echo esc_attr($this->option_name); ?>[analytics_alert_drop_percent]"
+               value="<?php echo esc_attr($value); ?>"
+               min="5"
+               max="95"
+               class="small-text" />
+        <p class="description"><?php esc_html_e('Pourcentage de baisse minimum avant d’envoyer une alerte (comparé à la moyenne précédente).', 'discord-bot-jlg'); ?></p>
+        <?php
+    }
+
+    public function analytics_alert_recipients_render() {
+        $options = get_option($this->option_name);
+        $value = isset($options['analytics_alert_recipients']) ? $options['analytics_alert_recipients'] : '';
+        ?>
+        <textarea name="<?php echo esc_attr($this->option_name); ?>[analytics_alert_recipients]" rows="3" cols="50" placeholder="ops@example.com&#10;marketing@example.com"><?php echo esc_textarea($value); ?></textarea>
+        <p class="description"><?php esc_html_e('Saisissez une adresse par ligne (ou séparées par des virgules).', 'discord-bot-jlg'); ?></p>
+        <?php
+    }
+
+    public function analytics_alert_webhook_render() {
+        $options = get_option($this->option_name);
+        $value = isset($options['analytics_alert_webhook']) ? esc_url($options['analytics_alert_webhook']) : '';
+        ?>
+        <input type="url"
+               name="<?php echo esc_attr($this->option_name); ?>[analytics_alert_webhook]"
+               value="<?php echo esc_attr($value); ?>"
+               class="regular-text"
+               placeholder="https://hooks.slack.com/..." />
+        <p class="description"><?php esc_html_e('Optionnel. Notification envoyée en JSON (HTTPS) pour Slack, Discord, etc.', 'discord-bot-jlg'); ?></p>
+        <?php
+    }
+
+    public function analytics_alert_cooldown_render() {
+        $options = get_option($this->option_name);
+        $value = isset($options['analytics_alert_cooldown']) ? max(5, (int) $options['analytics_alert_cooldown']) : 60;
+        ?>
+        <input type="number"
+               name="<?php echo esc_attr($this->option_name); ?>[analytics_alert_cooldown]"
+               value="<?php echo esc_attr($value); ?>"
+               min="5"
+               max="1440"
+               class="small-text" />
+        <p class="description"><?php esc_html_e('Temps minimal entre deux alertes pour le même profil (en minutes).', 'discord-bot-jlg'); ?></p>
         <?php
     }
 

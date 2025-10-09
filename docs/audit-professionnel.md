@@ -8,12 +8,12 @@
 ### Écarts vs. une app "pro"
 - Aucun paramètre n'autorise la segmentation des données (par canal, rôle, catégorie) ni l'affichage simultané de plusieurs serveurs dans un seul bloc, ce que proposent les offres SaaS avancées pour comparer des sous-communautés.【F:discord-bot-jlg/block/discord-stats/block.json†L1-L239】
 - L'éditeur ne prévoit pas de presets/variations packagées (templates, palettes, cartes alternatives) ni d'intégration directe avec les bibliothèques de couleurs/typos globales de WordPress, obligeant les utilisateurs à reconfigurer chaque instance manuellement.【F:discord-bot-jlg/block/discord-stats/block.json†L16-L39】【F:discord-bot-jlg/assets/js/discord-bot-block.js†L163-L227】
-- Le suivi analytics reste interne : aucune option d'export (CSV/JSON) ni de webhooks/notifications pour alerter en cas de chute d'activité n'est prévue malgré la collecte cron existante.【F:discord-bot-jlg/inc/class-discord-shortcode.php†L670-L715】【F:discord-bot-jlg/assets/js/discord-bot-jlg.js†L2600-L2688】
+- Les exports CSV/JSON et alertes existent désormais mais restent limités à un seuil global (pas de segmentation multi-profils ni de planification automatique).【F:discord-bot-jlg/inc/class-discord-rest.php†L236-L453】【F:discord-bot-jlg/inc/class-discord-alerts.php†L7-L255】
 
 ### Recommandations
 1. Introduire des "profils combinés" : permettre de sélectionner plusieurs serveurs ou de filtrer les jeux de données (rôles, canaux vocaux) via des attributs supplémentaires et un panneau multi-sélection dans l'éditeur.
 2. Fournir des variations prêtes à l'emploi (ex. "Carte minimaliste", "Badge e-sport", "Sidebar compacte") et connecter les contrôles de couleurs/typos aux presets du thème (`theme.json`).
-3. Ajouter un centre de notifications (e-mail, Discord webhook) et des exports programmables pour capitaliser sur la base analytics existante.
+3. Étendre le centre de notifications (fréquences, multi-profils) et planifier des exports automatiques pour capitaliser sur la base analytics existante.
 
 ## 2. UX / UI du composant public
 ### Forces actuelles
@@ -84,7 +84,7 @@ En priorisant ces évolutions, l'extension pourra rivaliser avec les solutions p
 | Horizon | Initiative | Résultat attendu | Références |
 | --- | --- | --- | --- |
 | Court terme | Modes presets & variations Gutenberg | Réduire le temps de configuration en exposant des templates prêts à l’emploi. | 【F:docs/audit-professionnel.md†L5-L41】【F:docs/presets-ui.md†L1-L112】 |
-| Court terme | Notifications & exports analytics | Prévenir les chutes d’activité via alertes et permettre les analyses externes. | 【F:docs/audit-professionnel.md†L42-L75】【F:docs/ux-ui-ameliorations-suite.md†L63-L108】 |
+| Court terme | Notifications & exports analytics | ✅ MVP livré (alertes e-mail/webhook + export CSV/JSON) — reste à automatiser la diffusion et la segmentation avancée. | 【F:docs/audit-professionnel.md†L42-L75】【F:docs/ux-ui-ameliorations-suite.md†L63-L108】 |
 | Moyen terme | Expérience multi-profils & comparatifs | Offrir un tableau de bord transverse pour plusieurs serveurs Discord. | 【F:docs/audit-professionnel.md†L10-L41】【F:docs/ux-ui-ameliorations-suite.md†L1-L42】 |
 | Moyen terme | Accessibilité avancée | Proposer un thème AAA, navigation clavier enrichie et exports accessibles. | 【F:docs/audit-professionnel.md†L76-L120】 |
 | Long terme | Gouvernance affinée & segmentation des accès | Introduire des rôles personnalisés, des clés API scoped et un audit trail des actions. | 【F:docs/comparaison-apps-pro.md†L34-L87】 |

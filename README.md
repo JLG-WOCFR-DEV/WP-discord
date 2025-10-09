@@ -18,6 +18,7 @@ Accédez à la page **Discord Bot** dans l’administration pour :
 - Définir la durée du cache des statistiques (minimum 60 secondes, alignées sur le cron de rafraîchissement) ;
 - Choisir les éléments affichés par défaut (nom/avatar du serveur, rafraîchissement automatique, thème) ;
 - Personnaliser les icônes et libellés proposés par défaut (cartes principales, répartition des présences, boosts) ;
+- Activer un centre d’alertes analytics (seuil de baisse, e-mails, webhook) ;
 - Ajouter du CSS personnalisé.
 
 > ℹ️ Les tableaux de bord d’analytics et l’API REST `discord-bot-jlg/v1/analytics` ne sont accessibles qu’aux utilisateurs connectés disposant de la capacité `manage_options` (ou via une clé API déclarée à l’aide du filtre `discord_bot_jlg_rest_access_key`).
@@ -128,6 +129,7 @@ Un widget « Discord Bot - JLG » est disponible via le menu « Widgets ».
 
 ### API, analytics & supervision
 - Endpoints REST `discord-bot-jlg/v1/stats` et `discord-bot-jlg/v1/analytics` pour récupérer les compteurs en temps réel ou agrégés, protégés par la capacité `manage_options` ou une clé d’accès filtrable (`discord_bot_jlg_rest_access_key`).【F:discord-bot-jlg/inc/class-discord-rest.php†L23-L199】【F:discord-bot-jlg/inc/class-discord-rest.php†L201-L244】
+- Endpoint REST `discord-bot-jlg/v1/analytics/export` pour télécharger les timeseries en CSV ou JSON (colonnes personnalisées, fuseau horaire, nom de fichier).【F:discord-bot-jlg/inc/class-discord-rest.php†L23-L244】【F:discord-bot-jlg/inc/class-discord-rest.php†L246-L453】
 - Endpoint REST `discord-bot-jlg/v1/events` fournissant un journal structuré des appels Discord (durée, statut HTTP, quotas restants, diagnostics) afin d’alimenter des outils d’observabilité ou des alertes automatisées.【F:discord-bot-jlg/inc/class-discord-api.php†L1991-L2133】【F:discord-bot-jlg/inc/class-discord-rest.php†L23-L152】
 - Intégration WP-CLI avec commandes `wp discord-bot refresh-cache` et `wp discord-bot clear-cache` pour forcer une synchronisation ou purger les données sans passer par l’UI.【F:discord-bot-jlg/inc/class-discord-cli.php†L24-L81】
 - Test « Site Health » dédié indiquant l’état de la connexion Discord, les erreurs récentes et les prochaines tentatives de rafraîchissement.【F:discord-bot-jlg/inc/class-discord-site-health.php†L17-L105】
