@@ -9,6 +9,8 @@ if (!defined('ABSPATH')) {
  */
 class Discord_Bot_JLG_Admin {
 
+    const SECRET_ROTATION_MAX_AGE_DAYS = 90;
+
     private $option_name;
     private $api;
     private $demo_page_hook_suffix;
@@ -33,6 +35,7 @@ class Discord_Bot_JLG_Admin {
             : $this->api->get_event_logger();
 
         add_action('admin_post_discord_bot_jlg_export_log', array($this, 'handle_monitoring_export'));
+        add_action('admin_notices', array($this, 'maybe_display_secret_rotation_notice'));
     }
 
     /**
@@ -375,6 +378,9 @@ class Discord_Bot_JLG_Admin {
         $sanitized = array(
             'server_id'      => '',
             'bot_token'      => isset($current_options['bot_token']) ? $current_options['bot_token'] : '',
+            'bot_token_rotated_at' => isset($current_options['bot_token_rotated_at'])
+                ? (int) $current_options['bot_token_rotated_at']
+                : 0,
             'server_profiles'=> isset($current_options['server_profiles']) && is_array($current_options['server_profiles'])
                 ? $current_options['server_profiles']
                 : array(),
@@ -473,12 +479,14 @@ class Discord_Bot_JLG_Admin {
         }
 
         $constant_overridden = (defined('DISCORD_BOT_JLG_TOKEN') && '' !== DISCORD_BOT_JLG_TOKEN);
+        $current_timestamp   = current_time('timestamp');
 
         if (!$constant_overridden) {
             $delete_requested = !empty($input['bot_token_delete']);
 
             if ($delete_requested) {
                 $sanitized['bot_token'] = '';
+                $sanitized['bot_token_rotated_at'] = 0;
             } elseif (array_key_exists('bot_token', $input)) {
                 $raw_token = trim((string) $input['bot_token']);
 
@@ -495,6 +503,7 @@ class Discord_Bot_JLG_Admin {
                         );
                     } else {
                         $sanitized['bot_token'] = $encrypted;
+                        $sanitized['bot_token_rotated_at'] = $current_timestamp;
                     }
                 }
             }
@@ -514,8 +523,13 @@ class Discord_Bot_JLG_Admin {
                     );
                 } else {
                     $sanitized['bot_token'] = $migrated;
+                    $sanitized['bot_token_rotated_at'] = $current_timestamp;
                 }
             }
+        }
+
+        if ('' === $sanitized['bot_token']) {
+            $sanitized['bot_token_rotated_at'] = 0;
         }
 
         $sanitized['demo_mode']              = !empty($input['demo_mode']) ? 1 : 0;
@@ -715,6 +729,7 @@ class Discord_Bot_JLG_Admin {
 
     private function sanitize_server_profiles($submitted_profiles, $new_profile_input, $existing_profiles) {
         $result = array();
+        $current_timestamp = current_time('timestamp');
 
         if (!is_array($submitted_profiles)) {
             $submitted_profiles = array();
@@ -757,12 +772,19 @@ class Discord_Bot_JLG_Admin {
                 $existing_token = isset($existing_profiles[$profile_key]['bot_token'])
                     ? (string) $existing_profiles[$profile_key]['bot_token']
                     : '';
+                $existing_rotation = isset($existing_profiles[$profile_key]['bot_token_rotated_at'])
+                    ? (int) $existing_profiles[$profile_key]['bot_token_rotated_at']
+                    : 0;
+            } else {
+                $existing_rotation = 0;
             }
 
-            $token_to_store = $existing_token;
+            $token_to_store    = $existing_token;
+            $rotation_to_store = $existing_rotation;
 
             if (!empty($profile_input['bot_token_delete'])) {
                 $token_to_store = '';
+                $rotation_to_store = 0;
             } elseif (array_key_exists('bot_token', $profile_input)) {
                 $raw_token = is_string($profile_input['bot_token'])
                     ? trim($profile_input['bot_token'])
@@ -781,6 +803,29 @@ class Discord_Bot_JLG_Admin {
                         );
                     } else {
                         $token_to_store = $encrypted;
+                        $rotation_to_store = $current_timestamp;
+                    }
+                }
+            }
+
+            if (
+                '' !== $token_to_store
+                && !discord_bot_jlg_is_encrypted_secret($token_to_store)
+            ) {
+                $migrated = discord_bot_jlg_encrypt_secret($token_to_store);
+
+                if (is_wp_error($migrated)) {
+                    add_settings_error(
+                        'discord_stats_settings',
+                        'discord_bot_jlg_profile_token_migration_' . $profile_key,
+                        $migrated->get_error_message(),
+                        'error'
+                    );
+                } else {
+                    $token_to_store = $migrated;
+
+                    if ($rotation_to_store <= 0) {
+                        $rotation_to_store = $current_timestamp;
                     }
                 }
             }
@@ -790,6 +835,7 @@ class Discord_Bot_JLG_Admin {
                 'label'     => $label,
                 'server_id' => $server_id,
                 'bot_token' => $token_to_store,
+                'bot_token_rotated_at' => $rotation_to_store,
             );
         }
 
@@ -829,7 +875,8 @@ class Discord_Bot_JLG_Admin {
                     ? $this->sanitize_profile_server_id($new_profile_input['server_id'])
                     : '';
 
-                $token_to_store = '';
+                $token_to_store    = '';
+                $rotation_to_store = 0;
                 if (!empty($new_profile_input['bot_token'])) {
                     $token_candidate = sanitize_text_field($new_profile_input['bot_token']);
                     $encrypted       = discord_bot_jlg_encrypt_secret($token_candidate);
@@ -842,7 +889,8 @@ class Discord_Bot_JLG_Admin {
                             'error'
                         );
                     } else {
-                        $token_to_store = $encrypted;
+                        $token_to_store    = $encrypted;
+                        $rotation_to_store = $current_timestamp;
                     }
                 }
 
@@ -851,11 +899,167 @@ class Discord_Bot_JLG_Admin {
                     'label'     => $label,
                     'server_id' => $server_id,
                     'bot_token' => $token_to_store,
+                    'bot_token_rotated_at' => $rotation_to_store,
                 );
             }
         }
 
         return $result;
+    }
+
+    public function maybe_display_secret_rotation_notice() {
+        if (!current_user_can('manage_options')) {
+            return;
+        }
+
+        if (!function_exists('get_current_screen')) {
+            return;
+        }
+
+        $screen = get_current_screen();
+
+        if (!$screen || empty($screen->id) || false === strpos((string) $screen->id, 'discord-bot')) {
+            return;
+        }
+
+        $options = get_option($this->option_name);
+
+        if (!is_array($options)) {
+            $options = array();
+        }
+
+        $tokens = $this->get_tokens_requiring_rotation($options);
+
+        if (empty($tokens)) {
+            return;
+        }
+
+        $threshold_days = $this->get_secret_rotation_threshold_days();
+        $date_format    = get_option('date_format');
+        $time_format    = get_option('time_format');
+
+        echo '<div class="notice notice-warning">';
+        echo '<p>';
+        printf(
+            /* translators: %d: rotation threshold in days. */
+            esc_html__('Rotation des tokens recommandée tous les %d jours.', 'discord-bot-jlg'),
+            (int) $threshold_days
+        );
+        echo '<br />';
+        esc_html_e('Les tokens listés ci-dessous dépassent ce délai. Réenregistrez un secret pour réinitialiser l’horodatage.', 'discord-bot-jlg');
+        echo '</p>';
+        echo '<ul>';
+
+        foreach ($tokens as $token) {
+            $label      = isset($token['label']) ? (string) $token['label'] : '';
+            $rotated_at = isset($token['rotated_at']) ? (int) $token['rotated_at'] : 0;
+
+            echo '<li>';
+
+            if ($rotated_at > 0) {
+                $formatted = date_i18n($date_format . ' ' . $time_format, $rotated_at);
+                printf(
+                    /* translators: 1: token label, 2: formatted datetime. */
+                    esc_html__('%1$s — dernière rotation le %2$s.', 'discord-bot-jlg'),
+                    esc_html($label),
+                    esc_html($formatted)
+                );
+            } else {
+                printf(
+                    /* translators: %s: token label. */
+                    esc_html__('%s — aucune date de rotation enregistrée.', 'discord-bot-jlg'),
+                    esc_html($label)
+                );
+            }
+
+            echo '</li>';
+        }
+
+        echo '</ul>';
+        echo '</div>';
+    }
+
+    private function get_tokens_requiring_rotation(array $options) {
+        $tokens            = array();
+        $now               = current_time('timestamp');
+        $threshold_seconds = $this->get_secret_rotation_threshold_days() * DAY_IN_SECONDS;
+        $constant_overridden = (defined('DISCORD_BOT_JLG_TOKEN') && '' !== DISCORD_BOT_JLG_TOKEN);
+
+        if (!$constant_overridden) {
+            $main_token = isset($options['bot_token']) ? (string) $options['bot_token'] : '';
+
+            if ('' !== $main_token) {
+                $rotated_at = isset($options['bot_token_rotated_at'])
+                    ? (int) $options['bot_token_rotated_at']
+                    : 0;
+
+                if ($rotated_at <= 0 || ($now - $rotated_at) >= $threshold_seconds) {
+                    $tokens[] = array(
+                        'label'      => __('Token principal', 'discord-bot-jlg'),
+                        'rotated_at' => $rotated_at,
+                    );
+                }
+            }
+        }
+
+        if (isset($options['server_profiles']) && is_array($options['server_profiles'])) {
+            foreach ($options['server_profiles'] as $profile_key => $profile) {
+                if (!is_array($profile)) {
+                    continue;
+                }
+
+                $token = isset($profile['bot_token']) ? (string) $profile['bot_token'] : '';
+
+                if ('' === $token) {
+                    continue;
+                }
+
+                $rotated_at = isset($profile['bot_token_rotated_at'])
+                    ? (int) $profile['bot_token_rotated_at']
+                    : 0;
+
+                if ($rotated_at > 0 && ($now - $rotated_at) < $threshold_seconds) {
+                    continue;
+                }
+
+                $label = '';
+
+                if (isset($profile['label']) && '' !== trim($profile['label'])) {
+                    $label = sanitize_text_field($profile['label']);
+                }
+
+                if ('' === $label) {
+                    $sanitized_key = sanitize_key($profile_key);
+
+                    if ('' === $sanitized_key) {
+                        $label = __('Profil sans nom', 'discord-bot-jlg');
+                    } else {
+                        $label = sprintf(
+                            /* translators: %s: profile key. */
+                            __('Profil %s', 'discord-bot-jlg'),
+                            $sanitized_key
+                        );
+                    }
+                }
+
+                $tokens[] = array(
+                    'label'      => $label,
+                    'rotated_at' => $rotated_at,
+                );
+            }
+        }
+
+        return $tokens;
+    }
+
+    private function get_secret_rotation_threshold_days() {
+        $days = (int) apply_filters('discord_bot_jlg_secret_rotation_max_age_days', self::SECRET_ROTATION_MAX_AGE_DAYS);
+
+        if ($days <= 0) {
+            return self::SECRET_ROTATION_MAX_AGE_DAYS;
+        }
+
+        return $days;
     }
 
     private function sanitize_profile_server_id($value) {
@@ -917,6 +1121,9 @@ class Discord_Bot_JLG_Admin {
                         $profile_label = isset($profile['label']) ? sanitize_text_field($profile['label']) : '';
                         $server_id     = isset($profile['server_id']) ? preg_replace('/[^0-9]/', '', (string) $profile['server_id']) : '';
                         $has_token     = !empty($profile['bot_token']);
+                        $rotation_timestamp = isset($profile['bot_token_rotated_at'])
+                            ? (int) $profile['bot_token_rotated_at']
+                            : 0;
                         ?>
                         <tr>
                             <td>
@@ -944,6 +1151,23 @@ class Discord_Bot_JLG_Admin {
                                 <?php if ($has_token) : ?>
                                 <p class="description" style="margin-top: -8px;">
                                     <?php esc_html_e('Un token est actuellement enregistré.', 'discord-bot-jlg'); ?>
+                                </p>
+                                <p class="description" style="margin-top: -12px;">
+                                    <?php
+                                    if ($rotation_timestamp > 0) {
+                                        $date_format = get_option('date_format');
+                                        $time_format = get_option('time_format');
+                                        $formatted   = date_i18n($date_format . ' ' . $time_format, $rotation_timestamp);
+
+                                        printf(
+                                            /* translators: %s: formatted date and time. */
+                                            esc_html__('Dernière rotation : %s.', 'discord-bot-jlg'),
+                                            esc_html($formatted)
+                                        );
+                                    } else {
+                                        esc_html_e('Date de rotation inconnue — réenregistrez un token pour l’horodater.', 'discord-bot-jlg');
+                                    }
+                                    ?>
                                 </p>
                                 <?php endif; ?>
                                 <label>
@@ -1201,6 +1425,9 @@ class Discord_Bot_JLG_Admin {
         $options             = get_option($this->option_name);
         $constant_overridden = (defined('DISCORD_BOT_JLG_TOKEN') && '' !== DISCORD_BOT_JLG_TOKEN);
         $stored_token        = isset($options['bot_token']) ? $options['bot_token'] : '';
+        $rotation_timestamp  = isset($options['bot_token_rotated_at'])
+            ? (int) $options['bot_token_rotated_at']
+            : 0;
         $is_encrypted_token  = discord_bot_jlg_is_encrypted_secret($stored_token);
         $decryption_error    = null;
 
@@ -1282,6 +1509,25 @@ class Discord_Bot_JLG_Admin {
             }
             ?>
         </p>
+        <?php if (!$constant_overridden && $has_saved_token) : ?>
+            <p class="description">
+                <?php
+                if ($rotation_timestamp > 0) {
+                    $date_format = get_option('date_format');
+                    $time_format = get_option('time_format');
+                    $formatted   = date_i18n($date_format . ' ' . $time_format, $rotation_timestamp);
+
+                    printf(
+                        /* translators: %s: formatted date and time. */
+                        esc_html__('Dernière rotation enregistrée le %s.', 'discord-bot-jlg'),
+                        esc_html($formatted)
+                    );
+                } else {
+                    esc_html_e('La date de rotation n’est pas connue. Réenregistrez un token pour consigner un nouvel horodatage.', 'discord-bot-jlg');
+                }
+                ?>
+            </p>
+        <?php endif; ?>
         <?php if (!$constant_overridden && $has_saved_token) : ?>
             <p>
                 <label for="<?php echo esc_attr($delete_input_id); ?>">

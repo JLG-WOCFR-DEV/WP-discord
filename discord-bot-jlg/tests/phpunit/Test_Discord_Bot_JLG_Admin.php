@@ -49,12 +49,20 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
      */
     protected $saved_options;
 
+    /**
+     * @var int
+     */
+    protected $rotation_timestamp;
+
     public function setUp(): void {
         parent::setUp();
+
+        $this->rotation_timestamp = current_time('timestamp') - (5 * DAY_IN_SECONDS);
 
         $this->saved_options = array(
             'server_id'      => '424242424242424242',
             'bot_token'      => 'stored-token',
+            'bot_token_rotated_at' => $this->rotation_timestamp,
             'demo_mode'      => 1,
             'show_online'    => 1,
             'show_total'     => 1,
@@ -287,7 +295,9 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
      * @dataProvider sanitize_options_data_provider
      */
     public function test_sanitize_options(array $input, array $expected_overrides) {
-        $result = $this->admin->sanitize_options($input);
+        $time_before = current_time('timestamp');
+        $result      = $this->admin->sanitize_options($input);
+        $time_after  = current_time('timestamp');
         $expected = array_merge($this->get_expected_defaults(), $expected_overrides);
 
         $result_token   = isset($result['bot_token']) ? $result['bot_token'] : '';
@@ -297,7 +307,29 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
             $expected_token = $expected_overrides['bot_token'];
         }
 
+        $result_rotation   = isset($result['bot_token_rotated_at']) ? (int) $result['bot_token_rotated_at'] : 0;
+        $expected_rotation = isset($expected['bot_token_rotated_at']) ? (int) $expected['bot_token_rotated_at'] : 0;
+
+        $should_update_rotation = (
+            array_key_exists('bot_token', $expected_overrides)
+            && '' !== $expected_overrides['bot_token']
+        );
+        $should_reset_rotation = (
+            array_key_exists('bot_token', $expected_overrides)
+            && '' === $expected_overrides['bot_token']
+        );
+
+        if ($should_update_rotation) {
+            $this->assertGreaterThanOrEqual($time_before, $result_rotation);
+            $this->assertLessThanOrEqual($time_after, $result_rotation);
+        } elseif ($should_reset_rotation) {
+            $this->assertSame(0, $result_rotation);
+        } else {
+            $this->assertSame($expected_rotation, $result_rotation);
+        }
+
         unset($expected['bot_token'], $result['bot_token']);
+        unset($expected['bot_token_rotated_at'], $result['bot_token_rotated_at']);
 
         $this->assertSame($expected, $result);
 
@@ -327,8 +359,10 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
         $expected = $this->get_expected_defaults();
 
         $this->assertSame($expected['bot_token'], $result['bot_token']);
+        $this->assertSame($expected['bot_token_rotated_at'], $result['bot_token_rotated_at']);
 
         unset($expected['bot_token'], $result['bot_token']);
+        unset($expected['bot_token_rotated_at'], $result['bot_token_rotated_at']);
 
         $this->assertSame($expected, $result);
     }
@@ -349,8 +383,10 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
 
         $this->assertFalse(is_wp_error($decrypted));
         $this->assertSame($this->saved_options['bot_token'], $decrypted);
+        $this->assertSame($this->rotation_timestamp, (int) $result['bot_token_rotated_at']);
 
         unset($expected['bot_token'], $result['bot_token']);
+        unset($expected['bot_token_rotated_at'], $result['bot_token_rotated_at']);
 
         $this->assertSame($expected, $result);
     }
@@ -365,8 +401,10 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
         $expected['bot_token'] = '';
 
         $this->assertSame('', $result['bot_token']);
+        $this->assertSame(0, $result['bot_token_rotated_at']);
 
         unset($expected['bot_token'], $result['bot_token']);
+        unset($expected['bot_token_rotated_at'], $result['bot_token_rotated_at']);
 
         $this->assertSame($expected, $result);
     }
@@ -379,6 +417,7 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
                 'label'     => 'Profil existant',
                 'server_id' => '111222333',
                 'bot_token' => discord_bot_jlg_encrypt_secret('profil-token'),
+                'bot_token_rotated_at' => $this->rotation_timestamp - DAY_IN_SECONDS,
             ),
         );
 
@@ -395,7 +434,9 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
             ),
         );
 
-        $result = $this->admin->sanitize_options($input);
+        $time_before = current_time('timestamp');
+        $result      = $this->admin->sanitize_options($input);
+        $time_after  = current_time('timestamp');
 
         $this->assertArrayHasKey('server_profiles', $result);
         $this->assertArrayHasKey('main', $result['server_profiles']);
@@ -410,6 +451,9 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
         $decrypted = discord_bot_jlg_decrypt_secret($profile['bot_token']);
         $this->assertFalse(is_wp_error($decrypted));
         $this->assertSame('nouveau-token', $decrypted);
+        $this->assertArrayHasKey('bot_token_rotated_at', $profile);
+        $this->assertGreaterThanOrEqual($time_before, (int) $profile['bot_token_rotated_at']);
+        $this->assertLessThanOrEqual($time_after, (int) $profile['bot_token_rotated_at']);
     }
 
     public function test_sanitize_options_adds_new_profile() {
@@ -421,7 +465,9 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
             ),
         );
 
-        $result = $this->admin->sanitize_options($input);
+        $time_before = current_time('timestamp');
+        $result      = $this->admin->sanitize_options($input);
+        $time_after  = current_time('timestamp');
 
         $this->assertArrayHasKey('server_profiles', $result);
         $this->assertNotEmpty($result['server_profiles']);
@@ -440,6 +486,9 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
         $decrypted = discord_bot_jlg_decrypt_secret($profile['bot_token']);
         $this->assertFalse(is_wp_error($decrypted));
         $this->assertSame('token-temporaire', $decrypted);
+        $this->assertArrayHasKey('bot_token_rotated_at', $profile);
+        $this->assertGreaterThanOrEqual($time_before, (int) $profile['bot_token_rotated_at']);
+        $this->assertLessThanOrEqual($time_after, (int) $profile['bot_token_rotated_at']);
     }
 
     public function test_fallback_notice_cleared_after_successful_refresh() {
@@ -576,6 +625,7 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
                 min(3600, (int) $this->saved_options['default_refresh_interval'])
             ),
             'analytics_retention_days' => max(0, (int) $this->saved_options['analytics_retention_days']),
+            'bot_token_rotated_at'    => $this->rotation_timestamp,
             'stat_bg_color'      => '#123456',
             'stat_text_color'    => 'rgba(255, 255, 255, 0.9)',
             'accent_color'       => '#654321',

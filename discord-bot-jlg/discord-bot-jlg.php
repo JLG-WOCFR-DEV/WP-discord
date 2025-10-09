@@ -44,6 +44,7 @@ if (!function_exists('discord_bot_jlg_get_default_options')) {
         return array(
             'server_id'      => '',
             'bot_token'      => '',
+            'bot_token_rotated_at' => 0,
             'server_profiles'=> array(),
             'demo_mode'      => false,
             'show_online'    => true,
