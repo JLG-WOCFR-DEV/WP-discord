@@ -40,6 +40,16 @@
     var STATUS_FORCE_SELECTOR = '[data-status-force-refresh]';
     var STATUS_LOG_LINK_SELECTOR = '[data-status-log-link]';
     var STATUS_STATE_KEY = '__discordStatusState';
+    var FOCUSABLE_ELEMENTS_SELECTOR = [
+        'a[href]:not([tabindex="-1"])',
+        'area[href]:not([tabindex="-1"])',
+        'button:not([disabled]):not([tabindex="-1"])',
+        'input:not([disabled]):not([type="hidden"]):not([tabindex="-1"])',
+        'select:not([disabled]):not([tabindex="-1"])',
+        'textarea:not([disabled]):not([tabindex="-1"])',
+        '[tabindex]:not([tabindex="-1"])',
+        '[contenteditable="true"]'
+    ].join(', ');
     var containerStateStore = (typeof WeakMap === 'function') ? new WeakMap() : null;
 
     function storeContainerState(container, state) {
@@ -360,7 +370,12 @@
                 nextTimestamp: null,
                 totalDuration: null,
                 isPaused: false,
-                historyExpanded: false
+                historyExpanded: false,
+                isOpen: false,
+                previousFocus: null,
+                panelKeydownHandler: null,
+                focusInHandler: null,
+                addedPanelTabIndex: false
             };
         }
 
@@ -394,6 +409,88 @@
         }
 
         return statusState.elements;
+    }
+
+    function isElementVisibleForFocus(element) {
+        if (!element) {
+            return false;
+        }
+
+        if (typeof element.hidden === 'boolean' && element.hidden) {
+            return false;
+        }
+
+        if (element.hasAttribute && element.hasAttribute('hidden')) {
+            return false;
+        }
+
+        if (element.getAttribute && element.getAttribute('aria-hidden') === 'true') {
+            return false;
+        }
+
+        var style = null;
+
+        if (typeof window !== 'undefined' && window.getComputedStyle) {
+            style = window.getComputedStyle(element);
+        }
+
+        if (style && (style.visibility === 'hidden' || style.display === 'none')) {
+            return false;
+        }
+
+        if (element.offsetParent === null && typeof element.getClientRects === 'function') {
+            var rects = element.getClientRects();
+
+            if (!rects || rects.length === 0) {
+                var nodeName = element.nodeName ? element.nodeName.toLowerCase() : '';
+
+                if ('body' !== nodeName) {
+                    return false;
+                }
+            }
+        }
+
+        return true;
+    }
+
+    function getFocusableElements(root) {
+        if (!root || !root.querySelectorAll) {
+            return [];
+        }
+
+        var candidates = root.querySelectorAll(FOCUSABLE_ELEMENTS_SELECTOR);
+
+        return Array.prototype.filter.call(candidates, function (element) {
+            if (!element) {
+                return false;
+            }
+
+            if (typeof element.disabled === 'boolean' && element.disabled) {
+                return false;
+            }
+
+            if (element.hasAttribute && element.hasAttribute('disabled')) {
+                return false;
+            }
+
+            if (element.getAttribute && element.getAttribute('aria-disabled') === 'true') {
+                return false;
+            }
+
+            return isElementVisibleForFocus(element);
+        });
+    }
+
+    function focusElement(element) {
+        if (!element || typeof element.focus !== 'function') {
+            return;
+        }
+
+        try {
+            element.focus({ preventScroll: true });
+        } catch (error) {
+            element.focus();
+        }
     }
 
     function updateCountdownDisplay(container, statusState, remainingSeconds) {
@@ -557,12 +654,16 @@
 
         if (!history.length) {
             elements.historyList.hidden = true;
+            elements.historyList.setAttribute('aria-hidden', 'true');
+            elements.historyList.removeAttribute('tabindex');
             elements.historyEmpty.textContent = getLocalizedString('statusHistoryEmpty', 'Aucun incident récent.');
             elements.historyEmpty.hidden = false;
 
             if (elements.historyToggle) {
                 elements.historyToggle.disabled = true;
+                elements.historyToggle.setAttribute('aria-disabled', 'true');
                 elements.historyToggle.textContent = getLocalizedString('statusHistoryShow', 'Voir le journal');
+                elements.historyToggle.setAttribute('aria-expanded', 'false');
             }
 
             return;
@@ -572,12 +673,16 @@
 
         if (elements.historyToggle) {
             elements.historyToggle.disabled = false;
+            elements.historyToggle.removeAttribute('aria-disabled');
             elements.historyToggle.textContent = statusState.historyExpanded
                 ? getLocalizedString('statusHistoryHide', 'Masquer le journal')
                 : getLocalizedString('statusHistoryShow', 'Voir le journal');
+            elements.historyToggle.setAttribute('aria-expanded', statusState.historyExpanded ? 'true' : 'false');
         }
 
         elements.historyList.hidden = !statusState.historyExpanded;
+        elements.historyList.setAttribute('aria-hidden', statusState.historyExpanded ? 'false' : 'true');
+        elements.historyList.tabIndex = -1;
 
         var fragment = document.createDocumentFragment();
 
@@ -588,6 +693,9 @@
 
             var item = document.createElement('li');
             item.className = 'discord-status-history__item';
+            item.setAttribute('data-status-history-entry', 'true');
+            item.setAttribute('role', 'listitem');
+            item.tabIndex = 0;
 
             var title = document.createElement('div');
             title.className = 'discord-status-history__item-title';
@@ -740,15 +848,100 @@
     function openStatusPanel(container, statusState) {
         var elements = getStatusElements(container, statusState);
 
-        if (!elements || !elements.panel) {
+        if (!elements || !elements.panel || statusState.isOpen) {
             return;
         }
 
+        var activeElement = (typeof document !== 'undefined') ? document.activeElement : null;
+
+        if (activeElement && activeElement !== document.body) {
+            statusState.previousFocus = activeElement;
+        } else {
+            statusState.previousFocus = null;
+        }
+
+        statusState.isOpen = true;
+
         elements.panel.hidden = false;
+        elements.panel.setAttribute('aria-modal', 'true');
 
         if (elements.toggle) {
             elements.toggle.setAttribute('aria-expanded', 'true');
         }
+
+        var focusableElements = getFocusableElements(elements.panel);
+        var initialFocus = focusableElements.length ? focusableElements[0] : null;
+
+        if (!initialFocus) {
+            if (!elements.panel.hasAttribute('tabindex')) {
+                elements.panel.setAttribute('tabindex', '-1');
+                statusState.addedPanelTabIndex = true;
+            }
+
+            initialFocus = elements.panel;
+        }
+
+        focusElement(initialFocus);
+
+        if (statusState.panelKeydownHandler) {
+            elements.panel.removeEventListener('keydown', statusState.panelKeydownHandler);
+        }
+
+        statusState.panelKeydownHandler = function (event) {
+            var key = event.key || event.keyCode;
+
+            if ('Escape' === key || 'Esc' === key || key === 27) {
+                event.preventDefault();
+                closeStatusPanel(container, statusState);
+                return;
+            }
+
+            if ('Tab' === key || key === 9) {
+                var focusable = getFocusableElements(elements.panel);
+
+                if (!focusable.length) {
+                    event.preventDefault();
+                    focusElement(elements.panel);
+                    return;
+                }
+
+                var first = focusable[0];
+                var last = focusable[focusable.length - 1];
+                var active = (typeof document !== 'undefined') ? document.activeElement : null;
+                var index = focusable.indexOf(active);
+
+                if (event.shiftKey) {
+                    if (index <= 0) {
+                        event.preventDefault();
+                        focusElement(last);
+                    }
+                } else if (index === -1 || index >= focusable.length - 1) {
+                    event.preventDefault();
+                    focusElement(first);
+                }
+            }
+        };
+
+        elements.panel.addEventListener('keydown', statusState.panelKeydownHandler);
+
+        if (statusState.focusInHandler) {
+            document.removeEventListener('focusin', statusState.focusInHandler, true);
+        }
+
+        statusState.focusInHandler = function (event) {
+            if (!statusState.isOpen) {
+                return;
+            }
+
+            if (!elements.panel.contains(event.target)) {
+                var focusable = getFocusableElements(elements.panel);
+                var target = focusable.length ? focusable[0] : elements.panel;
+
+                focusElement(target);
+            }
+        };
+
+        document.addEventListener('focusin', statusState.focusInHandler, true);
     }
 
     function closeStatusPanel(container, statusState) {
@@ -758,24 +951,56 @@
             return;
         }
 
+        if (statusState.panelKeydownHandler) {
+            elements.panel.removeEventListener('keydown', statusState.panelKeydownHandler);
+            statusState.panelKeydownHandler = null;
+        }
+
+        if (statusState.focusInHandler) {
+            document.removeEventListener('focusin', statusState.focusInHandler, true);
+            statusState.focusInHandler = null;
+        }
+
+        elements.panel.setAttribute('aria-modal', 'false');
         elements.panel.hidden = true;
+
+        if (statusState.addedPanelTabIndex) {
+            elements.panel.removeAttribute('tabindex');
+            statusState.addedPanelTabIndex = false;
+        }
 
         if (elements.toggle) {
             elements.toggle.setAttribute('aria-expanded', 'false');
         }
+
+        var rootElement = (typeof document !== 'undefined' && document.documentElement) ? document.documentElement : null;
+        var focusTarget = null;
+
+        if (statusState.isOpen) {
+            if (statusState.previousFocus && rootElement && rootElement.contains(statusState.previousFocus)) {
+                focusTarget = statusState.previousFocus;
+            } else if (elements.toggle) {
+                focusTarget = elements.toggle;
+            }
+        }
+
+        statusState.isOpen = false;
+        statusState.previousFocus = null;
+
+        if (focusTarget) {
+            focusElement(focusTarget);
+        }
     }
 
     function toggleStatusPanel(container, statusState) {
-        var elements = getStatusElements(container, statusState);
-
-        if (!elements || !elements.panel) {
+        if (!statusState) {
             return;
         }
 
-        if (elements.panel.hasAttribute('hidden')) {
-            openStatusPanel(container, statusState);
-        } else {
+        if (statusState.isOpen) {
             closeStatusPanel(container, statusState);
+        } else {
+            openStatusPanel(container, statusState);
         }
     }
 
@@ -823,6 +1048,24 @@
             elements.historyToggle.addEventListener('click', function () {
                 statusState.historyExpanded = !statusState.historyExpanded;
                 renderStatusHistory(container, statusState, locale);
+
+                if (statusState.historyExpanded) {
+                    window.setTimeout(function () {
+                        if (!elements.historyList) {
+                            return;
+                        }
+
+                        var firstEntry = elements.historyList.querySelector('[data-status-history-entry]');
+
+                        if (firstEntry) {
+                            focusElement(firstEntry);
+                        } else {
+                            focusElement(elements.historyList);
+                        }
+                    }, 0);
+                } else if (elements.historyToggle) {
+                    focusElement(elements.historyToggle);
+                }
             });
         }
 

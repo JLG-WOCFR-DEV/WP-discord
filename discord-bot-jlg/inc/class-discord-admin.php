@@ -12,6 +12,8 @@ class Discord_Bot_JLG_Admin {
     private $option_name;
     private $api;
     private $demo_page_hook_suffix;
+    private $forced_setup_step;
+    private $event_logger;
 
     /**
      * Initialise l'instance avec la clé d'option et le client API utilisé pour les vérifications.
@@ -21,10 +23,16 @@ class Discord_Bot_JLG_Admin {
      *
      * @return void
      */
-    public function __construct($option_name, Discord_Bot_JLG_API $api) {
+    public function __construct($option_name, Discord_Bot_JLG_API $api, $event_logger = null) {
         $this->option_name = $option_name;
         $this->api         = $api;
         $this->demo_page_hook_suffix = '';
+        $this->forced_setup_step    = '';
+        $this->event_logger = ($event_logger instanceof Discord_Bot_JLG_Event_Logger)
+            ? $event_logger
+            : $this->api->get_event_logger();
+
+        add_action('admin_post_discord_bot_jlg_export_log', array($this, 'handle_monitoring_export'));
     }
 
     /**
@@ -884,12 +892,13 @@ class Discord_Bot_JLG_Admin {
         }
 
         ?>
-        <table class="widefat striped">
+        <table class="widefat striped discord-profiles-table">
             <thead>
                 <tr>
                     <th scope="col"><?php esc_html_e('Profil', 'discord-bot-jlg'); ?></th>
                     <th scope="col"><?php esc_html_e('ID du serveur', 'discord-bot-jlg'); ?></th>
                     <th scope="col"><?php esc_html_e('Token du bot', 'discord-bot-jlg'); ?></th>
+                    <th scope="col"><?php esc_html_e('Vérification', 'discord-bot-jlg'); ?></th>
                     <th scope="col"><?php esc_html_e('Actions', 'discord-bot-jlg'); ?></th>
                 </tr>
             </thead>
@@ -943,6 +952,23 @@ class Discord_Bot_JLG_Admin {
                                 </label>
                             </td>
                             <td>
+                                <button type="submit"
+                                        class="button button-secondary"
+                                        form="discord-profile-test-form"
+                                        name="test_connection_profile"
+                                        value="<?php echo esc_attr($profile_key); ?>"
+                                        aria-label="<?php
+                                            printf(
+                                                /* translators: %s: profile label. */
+                                                esc_attr__('Tester la connexion pour le profil « %s »', 'discord-bot-jlg'),
+                                                esc_attr($profile_label ? $profile_label : $profile_key)
+                                            );
+                                        ?>">
+                                    <?php esc_html_e('Tester', 'discord-bot-jlg'); ?>
+                                </button>
+                                <p class="description"><?php esc_html_e('Utilise le serveur et le token enregistrés pour ce profil.', 'discord-bot-jlg'); ?></p>
+                            </td>
+                            <td>
                                 <label>
                                     <input type="checkbox" name="<?php echo esc_attr($this->option_name); ?>[server_profiles][<?php echo esc_attr($profile_key); ?>][delete]" value="1" />
                                     <?php esc_html_e('Supprimer ce profil', 'discord-bot-jlg'); ?>
@@ -952,7 +978,7 @@ class Discord_Bot_JLG_Admin {
                     <?php endforeach; ?>
                 <?php else : ?>
                     <tr>
-                        <td colspan="4">
+                        <td colspan="5">
                             <em><?php esc_html_e('Aucun profil enregistré pour le moment.', 'discord-bot-jlg'); ?></em>
                         </td>
                     </tr>
@@ -974,6 +1000,9 @@ class Discord_Bot_JLG_Admin {
                         <input type="text" class="regular-text" name="<?php echo esc_attr($this->option_name); ?>[new_profile][key]" placeholder="<?php esc_attr_e('Clé unique (optionnel)', 'discord-bot-jlg'); ?>" />
                         <p class="description"><?php esc_html_e('La clé est utilisée dans les shortcodes (ex. profil communautaire).', 'discord-bot-jlg'); ?></p>
                     </td>
+                    <td class="discord-profiles-table__placeholder">
+                        <p class="description"><?php esc_html_e('Sauvegardez avant de pouvoir tester ce profil.', 'discord-bot-jlg'); ?></p>
+                    </td>
                 </tr>
             </tfoot>
         </table>
@@ -987,12 +1016,18 @@ class Discord_Bot_JLG_Admin {
      */
     public function api_section_callback() {
         ?>
-        <div style="background: #f0f4ff; padding: 20px; border-radius: 8px; margin: 20px 0;">
-            <h3 style="margin-top: 0;"><?php esc_html_e('📚 Guide étape par étape', 'discord-bot-jlg'); ?></h3>
-            <?php
-            $this->render_api_steps();
-            $this->render_api_previews();
-            ?>
+        <div class="discord-setup-guide">
+            <div class="notice notice-info discord-setup-notice">
+                <p><?php esc_html_e('📚 Suivez les étapes ci-dessous pour connecter votre bot et valider les droits Discord.', 'discord-bot-jlg'); ?></p>
+            </div>
+            <details class="discord-setup-details">
+                <summary><?php esc_html_e('Afficher le guide détaillé', 'discord-bot-jlg'); ?></summary>
+                <?php $this->render_api_steps(); ?>
+            </details>
+            <details class="discord-setup-details">
+                <summary><?php esc_html_e('Voir des exemples de shortcode', 'discord-bot-jlg'); ?></summary>
+                <?php $this->render_api_previews(); ?>
+            </details>
         </div>
         <?php
     }
@@ -1010,7 +1045,7 @@ class Discord_Bot_JLG_Admin {
                     wp_kses_post(
                         /* translators: %1$s: URL to the Discord Developer Portal. */
                         __(
-                            'Rendez-vous sur <a href="%1$s" target="_blank" rel="noopener noreferrer" style="color: #5865F2;">Discord Developer Portal</a>',
+                            'Rendez-vous sur <a href="%1$s" target="_blank" rel="noopener noreferrer">Discord Developer Portal</a>',
                             'discord-bot-jlg'
                         )
                     ),
@@ -1067,25 +1102,28 @@ class Discord_Bot_JLG_Admin {
      */
     private function render_api_previews() {
         ?>
-        <div style="background: #fff3cd; padding: 10px; border-radius: 4px; margin-top: 15px;">
-            <?php echo wp_kses_post(__('<strong>💡 Conseil :</strong> Après avoir rempli les champs ci-dessous, utilisez le bouton "Tester la connexion" pour vérifier que tout fonctionne !', 'discord-bot-jlg')); ?>
-            <?php
-            $this->render_preview_block(
-                __('Avec logo Discord officiel :', 'discord-bot-jlg'),
-                '[discord_stats demo="true" show_discord_icon="true" discord_icon_position="left"]',
-                array(
-                    'container_style' => 'margin: 20px 0;',
-                )
-            );
+        <div class="discord-preview-wrapper">
+            <p class="discord-preview-notice"><?php echo wp_kses_post(__('<strong>💡 Conseil :</strong> Après avoir rempli les champs ci-dessous, utilisez le bouton « Tester la connexion » pour vérifier que tout fonctionne !', 'discord-bot-jlg')); ?></p>
+            <div class="discord-preview-list">
+                <?php
+                $this->render_preview_block(
+                    __('Avec logo Discord officiel :', 'discord-bot-jlg'),
+                    '[discord_stats demo="true" show_discord_icon="true" discord_icon_position="left"]',
+                    array(
+                        'container_class' => 'discord-preview-card',
+                    )
+                );
 
-            $this->render_preview_block(
-                __('Logo Discord centré en haut :', 'discord-bot-jlg'),
-                '[discord_stats demo="true" show_discord_icon="true" discord_icon_position="top" align="center" theme="dark"]',
-                array(
-                    'container_style' => 'margin: 20px 0;',
-                )
-            );
-            ?>
+                $this->render_preview_block(
+                    __('Logo Discord centré en haut :', 'discord-bot-jlg'),
+                    '[discord_stats demo="true" show_discord_icon="true" discord_icon_position="top" align="center" theme="dark"]',
+                    array(
+                        'container_class'     => 'discord-preview-card',
+                        'inner_wrapper_class' => 'discord-preview-card__inner is-narrow',
+                    )
+                );
+                ?>
+            </div>
         </div>
         <?php
     }
@@ -1695,10 +1733,13 @@ class Discord_Bot_JLG_Admin {
      * Traite la demande de test de connexion depuis la page d'options.
      */
     private function handle_test_connection_request() {
-        if (
-            !isset($_POST['test_connection'])
-            || !check_admin_referer('discord_test_connection', 'discord_test_connection_nonce')
-        ) {
+        $has_test_flag = isset($_POST['test_connection']) || isset($_POST['test_connection_profile']);
+
+        if (!$has_test_flag) {
+            return;
+        }
+
+        if (!isset($_POST['discord_test_connection_nonce']) || !check_admin_referer('discord_test_connection', 'discord_test_connection_nonce')) {
             return;
         }
 
@@ -1713,7 +1754,23 @@ class Discord_Bot_JLG_Admin {
             return;
         }
 
-        $this->test_discord_connection();
+        $profile_key = '';
+        if (isset($_POST['test_connection_profile'])) {
+            $profile_key = sanitize_key(wp_unslash($_POST['test_connection_profile']));
+        }
+
+        if (isset($_POST['current_setup_step'])) {
+            $requested_step = sanitize_key(wp_unslash($_POST['current_setup_step']));
+            if ('' !== $requested_step) {
+                $this->forced_setup_step = $requested_step;
+            }
+        }
+
+        if ('' !== $profile_key && 'default' !== $profile_key) {
+            $this->forced_setup_step = 'profiles';
+        }
+
+        $this->test_discord_connection($profile_key);
     }
 
     /**
@@ -1858,20 +1915,76 @@ class Discord_Bot_JLG_Admin {
      * Affiche le tableau de bord de surveillance.
      */
     private function render_monitoring_dashboard() {
+        $filters = $this->get_monitoring_filters();
+
         $snapshot = $this->api->get_admin_health_snapshot(
             array(
-                'events_limit' => 6,
+                'events_limit' => 12,
+                'event_type'   => $filters['type'],
+                'channel'      => $filters['channel'],
+                'profile_key'  => $filters['profile'],
+                'server_id'    => $filters['server_id'],
             )
         );
 
         $rate_limit   = isset($snapshot['rate_limit']) && is_array($snapshot['rate_limit']) ? $snapshot['rate_limit'] : array();
         $last_error   = isset($snapshot['last_error']) && is_array($snapshot['last_error']) ? $snapshot['last_error'] : null;
         $last_success = isset($snapshot['last_success']) && is_array($snapshot['last_success']) ? $snapshot['last_success'] : null;
-        $events       = isset($snapshot['events']) && is_array($snapshot['events']) ? $snapshot['events'] : array();
+        $timeline_entries = isset($snapshot['events']) && is_array($snapshot['events']) ? $snapshot['events'] : array();
         $fallback     = isset($snapshot['fallback']) && is_array($snapshot['fallback']) ? $snapshot['fallback'] : array();
         $retry_after  = isset($snapshot['retry_after']) ? (int) $snapshot['retry_after'] : 0;
 
         $now_gmt = current_time('timestamp', true);
+
+        $event_type_options = array(
+            ''                => __('Tous les types', 'discord-bot-jlg'),
+            'discord_http'     => __('Appels API Discord', 'discord-bot-jlg'),
+            'discord_connector'=> __('Tâches et connecteur', 'discord-bot-jlg'),
+        );
+
+        $channel_options = array(
+            ''       => __('Tous les canaux', 'discord-bot-jlg'),
+            'widget' => __('Widget', 'discord-bot-jlg'),
+            'bot'    => __('Bot', 'discord-bot-jlg'),
+            'queue'  => __('File', 'discord-bot-jlg'),
+            'cron'   => __('Cron', 'discord-bot-jlg'),
+            'rest'   => __('REST', 'discord-bot-jlg'),
+        );
+
+        $profile_options = array(
+            ''         => __('Tous les profils', 'discord-bot-jlg'),
+            'default'  => __('Profil principal', 'discord-bot-jlg'),
+        );
+
+        $configured_profiles = $this->api->get_server_profiles(false);
+        if (is_array($configured_profiles)) {
+            foreach ($configured_profiles as $profile) {
+                if (!is_array($profile)) {
+                    continue;
+                }
+
+                $profile_key = isset($profile['key']) ? sanitize_key($profile['key']) : '';
+                if ('' === $profile_key || isset($profile_options[$profile_key])) {
+                    continue;
+                }
+
+                $label = isset($profile['label']) ? sanitize_text_field($profile['label']) : $profile_key;
+                $profile_options[$profile_key] = $label;
+            }
+        }
+
+        $monitoring_base_url = add_query_arg(
+            array(
+                'page' => 'discord-bot-jlg',
+                'tab'  => 'monitoring',
+            ),
+            admin_url('admin.php')
+        );
+
+        $reset_filters_url = remove_query_arg(
+            array('log_type', 'log_channel', 'log_profile', 'log_server'),
+            $monitoring_base_url
+        );
 
         $rate_limit_remaining = isset($rate_limit['remaining']) ? (int) $rate_limit['remaining'] : null;
         $rate_limit_limit     = isset($rate_limit['limit']) ? (int) $rate_limit['limit'] : null;
@@ -2009,16 +2122,72 @@ class Discord_Bot_JLG_Admin {
 
         <div class="discord-monitoring-history">
             <h2><?php esc_html_e('🧾 Journal récent', 'discord-bot-jlg'); ?></h2>
-            <?php if (empty($events)) : ?>
+
+            <form method="get" class="discord-monitoring-history__filters" aria-label="<?php esc_attr_e('Filtres du journal de surveillance', 'discord-bot-jlg'); ?>">
+                <input type="hidden" name="page" value="discord-bot-jlg" />
+                <input type="hidden" name="tab" value="monitoring" />
+
+                <label for="discord-monitoring-filter-type" class="discord-monitoring-history__filter">
+                    <span class="discord-monitoring-history__filter-label"><?php esc_html_e('Type', 'discord-bot-jlg'); ?></span>
+                    <select id="discord-monitoring-filter-type" name="log_type">
+                        <?php foreach ($event_type_options as $value => $label) : ?>
+                            <option value="<?php echo esc_attr($value); ?>"<?php selected($filters['type'], $value); ?>><?php echo esc_html($label); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+
+                <label for="discord-monitoring-filter-channel" class="discord-monitoring-history__filter">
+                    <span class="discord-monitoring-history__filter-label"><?php esc_html_e('Canal', 'discord-bot-jlg'); ?></span>
+                    <select id="discord-monitoring-filter-channel" name="log_channel">
+                        <?php foreach ($channel_options as $value => $label) : ?>
+                            <option value="<?php echo esc_attr($value); ?>"<?php selected($filters['channel'], $value); ?>><?php echo esc_html($label); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+
+                <label for="discord-monitoring-filter-profile" class="discord-monitoring-history__filter">
+                    <span class="discord-monitoring-history__filter-label"><?php esc_html_e('Profil', 'discord-bot-jlg'); ?></span>
+                    <select id="discord-monitoring-filter-profile" name="log_profile">
+                        <?php foreach ($profile_options as $value => $label) : ?>
+                            <option value="<?php echo esc_attr($value); ?>"<?php selected($filters['profile'], $value); ?>><?php echo esc_html($label); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+
+                <label for="discord-monitoring-filter-server" class="discord-monitoring-history__filter">
+                    <span class="discord-monitoring-history__filter-label"><?php esc_html_e('Serveur', 'discord-bot-jlg'); ?></span>
+                    <input type="text" id="discord-monitoring-filter-server" name="log_server" value="<?php echo esc_attr($filters['server_id']); ?>" placeholder="123456789" />
+                </label>
+
+                <div class="discord-monitoring-history__filter-actions">
+                    <button type="submit" class="button button-secondary"><?php esc_html_e('Filtrer', 'discord-bot-jlg'); ?></button>
+                    <a class="button button-link" href="<?php echo esc_url($reset_filters_url); ?>"><?php esc_html_e('Réinitialiser', 'discord-bot-jlg'); ?></a>
+                </div>
+            </form>
+
+            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="discord-monitoring-history__export">
+                <?php wp_nonce_field('discord_bot_jlg_export_monitoring', '_discord_monitoring_nonce'); ?>
+                <input type="hidden" name="action" value="discord_bot_jlg_export_log" />
+                <input type="hidden" name="log_type" value="<?php echo esc_attr($filters['type']); ?>" />
+                <input type="hidden" name="log_channel" value="<?php echo esc_attr($filters['channel']); ?>" />
+                <input type="hidden" name="log_profile" value="<?php echo esc_attr($filters['profile']); ?>" />
+                <input type="hidden" name="log_server" value="<?php echo esc_attr($filters['server_id']); ?>" />
+                <button type="submit" class="button button-primary">
+                    <?php esc_html_e('Exporter en CSV', 'discord-bot-jlg'); ?>
+                </button>
+            </form>
+
+            <?php if (empty($timeline_entries)) : ?>
                 <p><?php esc_html_e('Aucun événement à afficher pour le moment.', 'discord-bot-jlg'); ?></p>
             <?php else : ?>
                 <ol class="discord-monitoring-history__list">
-                    <?php foreach ($events as $entry) :
+                    <?php foreach ($timeline_entries as $entry) :
                         $entry_timestamp = isset($entry['timestamp']) ? (int) $entry['timestamp'] : 0;
                         $entry_label     = isset($entry['label']) ? $entry['label'] : '';
                         $entry_reason    = isset($entry['reason']) ? $entry['reason'] : '';
+                        $entry_outcome   = isset($entry['outcome']) ? sanitize_html_class($entry['outcome']) : '';
                         ?>
-                        <li class="discord-monitoring-history__item">
+                        <li class="discord-monitoring-history__item<?php echo '' !== $entry_outcome ? ' discord-monitoring-history__item--' . esc_attr($entry_outcome) : ''; ?>">
                             <div class="discord-monitoring-history__meta">
                                 <?php if ($entry_timestamp > 0) : ?>
                                     <span class="discord-monitoring-history__time" aria-hidden="true">
@@ -2048,6 +2217,102 @@ class Discord_Bot_JLG_Admin {
         <?php
     }
 
+    public function handle_monitoring_export() {
+        if (!current_user_can('manage_options')) {
+            wp_die(__('Vous n’avez pas les droits suffisants pour exporter ce journal.', 'discord-bot-jlg'));
+        }
+
+        check_admin_referer('discord_bot_jlg_export_monitoring', '_discord_monitoring_nonce');
+
+        $filters = $this->get_monitoring_filters('post');
+
+        $entries = $this->api->get_monitoring_timeline(
+            array(
+                'limit'       => 100,
+                'event_type'  => $filters['type'],
+                'channel'     => $filters['channel'],
+                'profile_key' => $filters['profile'],
+                'server_id'   => $filters['server_id'],
+            )
+        );
+
+        $filename = 'discord-monitoring-log-' . gmdate('Ymd-His') . '.csv';
+
+        nocache_headers();
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename=' . $filename);
+
+        $output = fopen('php://output', 'w');
+        if (false === $output) {
+            wp_die(__('Impossible de générer le fichier CSV.', 'discord-bot-jlg'));
+        }
+
+        fputcsv($output, array(
+            __('Horodatage', 'discord-bot-jlg'),
+            __('Type', 'discord-bot-jlg'),
+            __('Canal', 'discord-bot-jlg'),
+            __('Profil', 'discord-bot-jlg'),
+            __('Résumé', 'discord-bot-jlg'),
+            __('Détails', 'discord-bot-jlg'),
+        ));
+
+        $channel_labels = array(
+            'widget' => __('Widget', 'discord-bot-jlg'),
+            'bot'    => __('Bot', 'discord-bot-jlg'),
+            'queue'  => __('File', 'discord-bot-jlg'),
+            'cron'   => __('Cron', 'discord-bot-jlg'),
+            'rest'   => __('REST', 'discord-bot-jlg'),
+        );
+
+        $type_labels = array(
+            'discord_http'      => __('API Discord', 'discord-bot-jlg'),
+            'discord_connector' => __('Connecteur', 'discord-bot-jlg'),
+        );
+
+        foreach ($entries as $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+
+            $timestamp = isset($entry['timestamp']) ? (int) $entry['timestamp'] : 0;
+            $type      = isset($entry['type']) ? sanitize_key($entry['type']) : '';
+            $channel   = isset($entry['channel']) ? sanitize_key($entry['channel']) : '';
+            $profile   = isset($entry['profile_key']) ? sanitize_key($entry['profile_key']) : '';
+            $label     = isset($entry['label']) ? $entry['label'] : '';
+            $reason    = isset($entry['reason']) ? $entry['reason'] : '';
+
+            $formatted_date = ($timestamp > 0)
+                ? get_date_from_gmt(gmdate('Y-m-d H:i:s', $timestamp), get_option('date_format') . ' ' . get_option('time_format'))
+                : '';
+
+            $type_label = isset($type_labels[$type]) ? $type_labels[$type] : $type;
+            $channel_label = isset($channel_labels[$channel]) ? $channel_labels[$channel] : $channel;
+
+            if ('' === $profile) {
+                $profile_label = __('Profil principal', 'discord-bot-jlg');
+            } elseif ('default' === $profile) {
+                $profile_label = __('Profil principal', 'discord-bot-jlg');
+            } else {
+                $profile_label = $profile;
+            }
+
+            fputcsv(
+                $output,
+                array(
+                    $formatted_date,
+                    $type_label,
+                    $channel_label,
+                    $profile_label,
+                    wp_strip_all_tags($label),
+                    wp_strip_all_tags($reason),
+                )
+            );
+        }
+
+        fclose($output);
+        exit;
+    }
+
     /**
      * Affiche le contenu principal en fonction de l'onglet sélectionné.
      *
@@ -2055,6 +2320,11 @@ class Discord_Bot_JLG_Admin {
      * @param array  $tab_config  Configuration de l'onglet.
      */
     private function render_options_main_content($current_tab, array $tab_config) {
+        if ('connection' === $current_tab) {
+            $this->render_connection_setup_wizard($tab_config);
+            return;
+        }
+
         ?>
         <div class="discord-bot-settings-main" aria-live="polite">
             <?php
@@ -2091,12 +2361,453 @@ class Discord_Bot_JLG_Admin {
     }
 
     /**
+     * Affiche l'assistant de configuration pour la connexion et les profils.
+     *
+     * @param array $tab_config Configuration de l'onglet courant.
+     */
+    private function render_connection_setup_wizard(array $tab_config) {
+        unset($tab_config);
+
+        $steps        = $this->get_connection_setup_steps();
+        $current_step = $this->get_current_setup_step($steps);
+        $completion   = $this->evaluate_setup_completion();
+        $states       = $this->build_setup_step_states($steps, $current_step, $completion);
+
+        ?>
+        <div class="discord-bot-settings-main" aria-live="polite">
+            <div class="discord-setup-wizard" data-current-step="<?php echo esc_attr($current_step); ?>">
+                <?php $this->render_setup_step_navigation($steps, $current_step, $states); ?>
+
+                <div class="discord-setup-panel">
+                    <?php $this->render_setup_step_notice($current_step, $states); ?>
+                    <?php $this->render_connection_step_content($current_step, $steps, $states); ?>
+                </div>
+            </div>
+        </div>
+        <?php
+    }
+
+    /**
+     * Retourne la configuration des étapes de l'assistant.
+     *
+     * @return array
+     */
+    private function get_connection_setup_steps() {
+        return array(
+            'connection' => array(
+                'label'       => __('Connexion', 'discord-bot-jlg'),
+                'description' => __('Renseignez l’identifiant du serveur et un token valide pour récupérer les statistiques.', 'discord-bot-jlg'),
+                'sections'    => array(
+                    array(
+                        'id'           => 'discord_stats_api_section',
+                        'submit_label' => esc_html__('Enregistrer la connexion', 'discord-bot-jlg'),
+                    ),
+                ),
+            ),
+            'profiles'   => array(
+                'label'       => __('Profils', 'discord-bot-jlg'),
+                'description' => __('Ajoutez des serveurs complémentaires et vérifiez individuellement leurs accès.', 'discord-bot-jlg'),
+                'sections'    => array(
+                    array(
+                        'id'           => 'discord_stats_profiles_section',
+                        'submit_label' => esc_html__('Mettre à jour les profils', 'discord-bot-jlg'),
+                    ),
+                ),
+            ),
+            'display'    => array(
+                'label'       => __('Affichage', 'discord-bot-jlg'),
+                'description' => __('Choisissez les blocs de statistiques et l’apparence proposée par défaut.', 'discord-bot-jlg'),
+                'sections'    => array(
+                    array(
+                        'id'           => 'discord_stats_display_section',
+                        'submit_label' => esc_html__('Enregistrer les options d’affichage', 'discord-bot-jlg'),
+                    ),
+                    array(
+                        'id'           => 'discord_stats_cta_section',
+                        'submit_label' => esc_html__('Enregistrer l’engagement', 'discord-bot-jlg'),
+                    ),
+                ),
+            ),
+        );
+    }
+
+    /**
+     * Détermine l'étape courante de l'assistant à partir de la requête.
+     *
+     * @param array $steps Étapes disponibles.
+     *
+     * @return string
+     */
+    private function get_current_setup_step(array $steps) {
+        $default_step = key($steps);
+        if (null === $default_step) {
+            return '';
+        }
+
+        if ('' !== $this->forced_setup_step && isset($steps[$this->forced_setup_step])) {
+            return $this->forced_setup_step;
+        }
+
+        $request_keys = array('setup-step', 'current_setup_step');
+
+        foreach ($request_keys as $request_key) {
+            if (!isset($_REQUEST[$request_key])) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+                continue;
+            }
+
+            $candidate = sanitize_key(wp_unslash($_REQUEST[$request_key])); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+            if (isset($steps[$candidate])) {
+                return $candidate;
+            }
+        }
+
+        return $default_step;
+    }
+
+    /**
+     * Évalue l'accomplissement de chaque étape en fonction des options enregistrées.
+     *
+     * @return array
+     */
+    private function evaluate_setup_completion() {
+        $options = get_option($this->option_name);
+        if (!is_array($options)) {
+            $options = array();
+        }
+
+        $has_server_id = !empty($options['server_id']);
+        $has_bot_token = !empty($options['bot_token']);
+
+        $profiles = array();
+        if (isset($options['server_profiles']) && is_array($options['server_profiles'])) {
+            foreach ($options['server_profiles'] as $profile) {
+                if (is_array($profile) && (!empty($profile['server_id']) || !empty($profile['bot_token']))) {
+                    $profiles[] = $profile;
+                }
+            }
+        }
+
+        $display_keys = array(
+            'show_online',
+            'show_total',
+            'show_presence_breakdown',
+            'show_approximate_member_count',
+            'show_premium_subscriptions',
+            'show_server_name',
+            'show_server_avatar',
+            'invite_url',
+            'invite_label',
+            'widget_title',
+            'custom_css',
+        );
+
+        $display_configured = false;
+        foreach ($display_keys as $display_key) {
+            if (!empty($options[$display_key])) {
+                $display_configured = true;
+                break;
+            }
+        }
+
+        if (!$display_configured && isset($options['default_theme']) && 'discord' !== $options['default_theme']) {
+            $display_configured = true;
+        }
+
+        return array(
+            'connection' => ($has_server_id || $has_bot_token),
+            'profiles'   => !empty($profiles),
+            'display'    => $display_configured,
+        );
+    }
+
+    /**
+     * Construit l'état d'affichage pour chaque étape.
+     *
+     * @param array  $steps        Étapes disponibles.
+     * @param string $current_step Étape active.
+     * @param array  $completion   Tableau des étapes complétées.
+     *
+     * @return array
+     */
+    private function build_setup_step_states(array $steps, $current_step, array $completion) {
+        $states       = array();
+        $before_state = true;
+
+        foreach ($steps as $key => $step) {
+            $state = 'upcoming';
+
+            if ($key === $current_step) {
+                $state        = 'current';
+                $before_state = false;
+            } elseif (!empty($completion[$key])) {
+                $state = 'complete';
+            } elseif ($before_state) {
+                $state = 'pending';
+            }
+
+            $states[$key] = array(
+                'state'       => $state,
+                'is_complete' => !empty($completion[$key]),
+            );
+        }
+
+        return $states;
+    }
+
+    /**
+     * Affiche la navigation des étapes.
+     *
+     * @param array  $steps        Étapes.
+     * @param string $current_step Étape active.
+     * @param array  $states       États calculés.
+     */
+    private function render_setup_step_navigation(array $steps, $current_step, array $states) {
+        ?>
+        <nav class="discord-setup-steps-nav" aria-label="<?php esc_attr_e('Assistant de configuration Discord', 'discord-bot-jlg'); ?>">
+            <ol class="discord-setup-steps">
+                <?php
+                $index = 1;
+                foreach ($steps as $key => $step) {
+                    $state    = isset($states[$key]['state']) ? $states[$key]['state'] : 'upcoming';
+                    $classes  = array('discord-setup-step', 'is-' . $state);
+                    $is_active = ($key === $current_step);
+
+                    if ($is_active) {
+                        $classes[] = 'is-active';
+                    }
+
+                    $url = add_query_arg(
+                        array(
+                            'setup-step' => $key,
+                        )
+                    );
+                    ?>
+                    <li class="<?php echo esc_attr(implode(' ', $classes)); ?>">
+                        <a class="discord-setup-step__link" href="<?php echo esc_url($url); ?>" aria-current="<?php echo $is_active ? 'step' : 'false'; ?>">
+                            <span class="discord-setup-step__index" aria-hidden="true">
+                                <?php if (!empty($states[$key]['is_complete'])) : ?>
+                                    <span class="dashicons dashicons-yes-alt"></span>
+                                <?php else : ?>
+                                    <?php echo esc_html($index); ?>
+                                <?php endif; ?>
+                            </span>
+                            <span class="discord-setup-step__label"><?php echo esc_html($step['label']); ?></span>
+                        </a>
+                    </li>
+                    <?php
+                    $index++;
+                }
+                ?>
+            </ol>
+        </nav>
+        <?php
+    }
+
+    /**
+     * Affiche le contenu principal de l'étape courante.
+     *
+     * @param string $current_step Étape active.
+     * @param array  $steps        Étapes disponibles.
+     * @param array  $states       États calculés.
+     */
+    private function render_connection_step_content($current_step, array $steps, array $states) {
+        if (!isset($steps[$current_step])) {
+            echo '<p>' . esc_html__('Étape inconnue.', 'discord-bot-jlg') . '</p>';
+            return;
+        }
+
+        $step_config = $steps[$current_step];
+
+        if (!empty($step_config['description'])) {
+            echo '<p class="discord-setup-intro">' . esc_html($step_config['description']) . '</p>';
+        }
+
+        if (!empty($step_config['sections']) && is_array($step_config['sections'])) {
+            foreach ($step_config['sections'] as $section) {
+                if (is_string($section)) {
+                    $section = array('id' => $section);
+                }
+
+                if (empty($section['id'])) {
+                    continue;
+                }
+
+                $submit_label = isset($section['submit_label'])
+                    ? (string) $section['submit_label']
+                    : esc_html__('Enregistrer les modifications', 'discord-bot-jlg');
+
+                $this->render_settings_section_form($section['id'], $submit_label, array('layout' => 'card'));
+            }
+        }
+
+        if ('connection' === $current_step) {
+            $this->render_default_connection_test_controls($current_step);
+        }
+
+        if ('profiles' === $current_step) {
+            $this->render_profile_test_form($current_step);
+        }
+    }
+
+    /**
+     * Affiche une notice contextuelle pour l'étape en cours.
+     *
+     * @param string $current_step Étape active.
+     * @param array  $states       États calculés.
+     */
+    private function render_setup_step_notice($current_step, array $states) {
+        $options = get_option($this->option_name);
+        if (!is_array($options)) {
+            $options = array();
+        }
+
+        $notice_type = 'info';
+        $message     = '';
+
+        switch ($current_step) {
+            case 'connection':
+                if (empty($options['server_id'])) {
+                    $notice_type = 'warning';
+                    $message     = esc_html__('Commencez par copier l’identifiant numérique de votre serveur Discord.', 'discord-bot-jlg');
+                } elseif (empty($options['bot_token'])) {
+                    $notice_type = 'info';
+                    $message     = esc_html__('Enregistrez un token bot ou créez un profil pour activer le test de connexion.', 'discord-bot-jlg');
+                } else {
+                    $message = esc_html__('Votre configuration principale est enregistrée. Lancez un test pour valider l’accès.', 'discord-bot-jlg');
+                }
+                break;
+            case 'profiles':
+                if (empty($states['profiles']['is_complete'])) {
+                    $notice_type = 'info';
+                    $message     = esc_html__('Ajoutez un profil par serveur et utilisez le bouton « Tester » pour vérifier chaque connexion.', 'discord-bot-jlg');
+                } else {
+                    $message = esc_html__('Testez vos profils enregistrés pour confirmer l’accès aux statistiques dédiées.', 'discord-bot-jlg');
+                }
+                break;
+            case 'display':
+                $notice_type = 'info';
+                $message     = esc_html__('Sélectionnez les blocs visibles par défaut et, si besoin, ajustez les libellés proposés dans le bloc et le widget.', 'discord-bot-jlg');
+                break;
+            default:
+                $message = '';
+        }
+
+        if ('' === $message) {
+            return;
+        }
+
+        printf(
+            '<div class="notice notice-%1$s discord-setup-notice"><p>%2$s</p></div>',
+            esc_attr($notice_type),
+            esc_html($message)
+        );
+    }
+
+    /**
+     * Rend le formulaire de test de connexion principal.
+     *
+     * @param string $current_step Étape active.
+     */
+    private function render_default_connection_test_controls($current_step) {
+        $options       = get_option($this->option_name);
+        $has_server_id = is_array($options) && !empty($options['server_id']);
+
+        $button_attributes = array(
+            'class' => 'button button-secondary button-block',
+        );
+
+        if (!$has_server_id) {
+            $button_attributes['disabled'] = 'disabled';
+        }
+
+        ?>
+        <div class="discord-setup-card">
+            <h3><?php esc_html_e('Tester la connexion principale', 'discord-bot-jlg'); ?></h3>
+            <form method="post" action="<?php echo esc_url(admin_url('admin.php?page=discord-bot-jlg')); ?>" class="discord-setup-test-form">
+                <input type="hidden" name="test_connection" value="1" />
+                <input type="hidden" name="test_connection_profile" value="default" />
+                <input type="hidden" name="current_setup_step" value="<?php echo esc_attr($current_step); ?>" />
+                <?php wp_nonce_field('discord_test_connection', 'discord_test_connection_nonce'); ?>
+                <?php submit_button(esc_html__('Tester la connexion', 'discord-bot-jlg'), 'secondary', 'discord_test_connection_default', false, $button_attributes); ?>
+            </form>
+            <?php if (!$has_server_id) : ?>
+                <p class="description"><?php esc_html_e('Enregistrez l’identifiant du serveur avant de lancer un test.', 'discord-bot-jlg'); ?></p>
+            <?php else : ?>
+                <p class="description"><?php esc_html_e('Le test utilise la configuration principale et contourne le cache pour un diagnostic instantané.', 'discord-bot-jlg'); ?></p>
+            <?php endif; ?>
+        </div>
+        <?php
+    }
+
+    /**
+     * Rend le formulaire partagé pour tester les profils enregistrés.
+     *
+     * @param string $current_step Étape active.
+     */
+    private function render_profile_test_form($current_step) {
+        ?>
+        <form id="discord-profile-test-form" class="discord-setup-test-form discord-profile-test-form" method="post" action="<?php echo esc_url(admin_url('admin.php?page=discord-bot-jlg')); ?>">
+            <input type="hidden" name="test_connection" value="1" />
+            <input type="hidden" name="current_setup_step" value="<?php echo esc_attr($current_step); ?>" />
+            <?php wp_nonce_field('discord_test_connection', 'discord_test_connection_nonce'); ?>
+        </form>
+        <?php
+    }
+
+    /**
+     * Recherche un profil serveur enregistré dans les options.
+     *
+     * @param string $profile_key Clé recherchée.
+     * @param array  $options     Options enregistrées.
+     *
+     * @return array|null
+     */
+    private function locate_server_profile($profile_key, array $options) {
+        if ('' === $profile_key) {
+            return null;
+        }
+
+        if (!isset($options['server_profiles']) || !is_array($options['server_profiles'])) {
+            return null;
+        }
+
+        foreach ($options['server_profiles'] as $stored_key => $profile) {
+            if (!is_array($profile)) {
+                continue;
+            }
+
+            $candidate_key = '';
+
+            if (isset($profile['key'])) {
+                $candidate_key = sanitize_key($profile['key']);
+            }
+
+            if ('' === $candidate_key) {
+                $candidate_key = sanitize_key($stored_key);
+            }
+
+            if ($candidate_key !== $profile_key) {
+                continue;
+            }
+
+            return array(
+                'key'       => $candidate_key,
+                'label'     => isset($profile['label']) ? sanitize_text_field($profile['label']) : '',
+                'server_id' => isset($profile['server_id']) ? preg_replace('/[^0-9]/', '', (string) $profile['server_id']) : '',
+                'bot_token' => isset($profile['bot_token']) ? $profile['bot_token'] : '',
+            );
+        }
+
+        return null;
+    }
+
+    /**
      * Affiche un formulaire autonome pour une section spécifique des réglages.
      *
      * @param string $section_id Identifiant de la section enregistrée via l'API des réglages.
      * @param string $submit_label Libellé du bouton de soumission.
      */
-    private function render_settings_section_form($section_id, $submit_label) {
+    private function render_settings_section_form($section_id, $submit_label, $args = array()) {
         $page = 'discord_stats_settings';
 
         global $wp_settings_sections, $wp_settings_fields;
@@ -2108,10 +2819,27 @@ class Discord_Bot_JLG_Admin {
             return;
         }
 
+        $defaults = array(
+            'layout' => 'default',
+        );
+
+        $args = wp_parse_args($args, $defaults);
+        $layout = in_array($args['layout'], array('default', 'card'), true) ? $args['layout'] : 'default';
+
+        $form_classes = array('discord-bot-settings-form');
+        if ('card' === $layout) {
+            $form_classes[] = 'discord-bot-settings-form--card';
+        }
+
         $section = $wp_settings_sections[$page][$section_id];
         ?>
-        <form action="options.php" method="post" class="discord-bot-settings-form">
+        <form action="options.php" method="post" class="<?php echo esc_attr(implode(' ', $form_classes)); ?>">
             <?php settings_fields($page); ?>
+
+            <?php if ('card' === $layout) : ?>
+                <div class="components-card discord-admin-card">
+                    <div class="components-card__body">
+            <?php endif; ?>
 
             <h2><?php echo esc_html($section['title']); ?></h2>
 
@@ -2125,7 +2853,17 @@ class Discord_Bot_JLG_Admin {
                 <?php do_settings_fields($page, $section_id); ?>
             </table>
 
+            <?php if ('card' === $layout) : ?>
+                    </div>
+                    <div class="components-card__body discord-admin-card__footer">
+            <?php endif; ?>
+
             <?php submit_button($submit_label); ?>
+
+            <?php if ('card' === $layout) : ?>
+                    </div>
+                </div>
+            <?php endif; ?>
         </form>
         <?php
     }
@@ -2184,16 +2922,16 @@ class Discord_Bot_JLG_Admin {
      */
     private function render_connection_test_panel() {
         ?>
-        <div style="background: #f8f9fa; padding: 20px; border-radius: 8px; margin-bottom: 20px;">
-            <h3 style="margin-top: 0;"><?php esc_html_e('🔧 Test de connexion', 'discord-bot-jlg'); ?></h3>
-            <p><?php esc_html_e('Vérifiez que votre configuration fonctionne :', 'discord-bot-jlg'); ?></p>
-            <form method="post" action="<?php echo esc_url(admin_url('admin.php?page=discord-bot-jlg')); ?>">
-                <input type="hidden" name="test_connection" value="1" />
-                <?php wp_nonce_field('discord_test_connection', 'discord_test_connection_nonce'); ?>
-                <p>
-                    <button type="submit" class="button button-secondary" style="width: 100%;"><?php esc_html_e('Tester la connexion', 'discord-bot-jlg'); ?></button>
-                </p>
-            </form>
+        <div class="components-card discord-admin-card">
+            <div class="components-card__body">
+                <h3 class="discord-admin-card__title"><?php esc_html_e('🔧 Test de connexion', 'discord-bot-jlg'); ?></h3>
+                <p><?php esc_html_e('Vérifiez que votre configuration fonctionne :', 'discord-bot-jlg'); ?></p>
+                <form method="post" action="<?php echo esc_url(admin_url('admin.php?page=discord-bot-jlg')); ?>" class="discord-admin-card__form">
+                    <input type="hidden" name="test_connection" value="1" />
+                    <?php wp_nonce_field('discord_test_connection', 'discord_test_connection_nonce'); ?>
+                    <?php submit_button(esc_html__('Tester la connexion', 'discord-bot-jlg'), 'secondary', 'discord_test_connection_sidebar', false, array('class' => 'button button-secondary button-block')); ?>
+                </form>
+            </div>
         </div>
         <?php
     }
@@ -2203,42 +2941,38 @@ class Discord_Bot_JLG_Admin {
      */
     private function render_quick_links_panel() {
         ?>
-        <div style="background: #e8f5e9; padding: 20px; border-radius: 8px;">
-            <h3 style="margin-top: 0;"><?php esc_html_e('🚀 Liens rapides', 'discord-bot-jlg'); ?></h3>
-            <ul style="list-style: none; padding: 0;">
-                <li style="margin-bottom: 10px;">
-                    <a href="<?php echo esc_url(admin_url('admin.php?page=discord-bot-demo')); ?>" class="button button-primary" style="width: 100%;">
-                        <?php esc_html_e('📖 Guide & Démo', 'discord-bot-jlg'); ?>
-                    </a>
-                </li>
-                <li style="margin-bottom: 10px;">
-                    <a href="https://discord.com/developers/applications" target="_blank" rel="noopener noreferrer" class="button" style="width: 100%;">
-                        <?php esc_html_e('🔗 Discord Developer Portal', 'discord-bot-jlg'); ?>
-                    </a>
-                </li>
-                <?php
-                $is_block_theme = function_exists('wp_is_block_theme') && wp_is_block_theme();
-
-                if (!$is_block_theme) :
-                    ?>
+        <div class="components-card discord-admin-card">
+            <div class="components-card__body">
+                <h3 class="discord-admin-card__title"><?php esc_html_e('🚀 Liens rapides', 'discord-bot-jlg'); ?></h3>
+                <ul class="discord-quick-links">
                     <li>
-                        <a href="<?php echo esc_url(admin_url('widgets.php')); ?>" class="button" style="width: 100%;">
-                            <?php esc_html_e('📐 Gérer les Widgets', 'discord-bot-jlg'); ?>
+                        <a href="<?php echo esc_url(admin_url('admin.php?page=discord-bot-demo')); ?>" class="button button-primary button-block">
+                            <?php esc_html_e('📖 Guide & Démo', 'discord-bot-jlg'); ?>
                         </a>
                     </li>
-                <?php else : ?>
-                    <li style="margin: 0;">
-                        <div style="background: #fff; border: 1px solid #c3e6cb; border-radius: 6px; padding: 12px;">
-                            <strong style="display: block; margin-bottom: 6px;">
-                                <?php esc_html_e('📐 Widgets classiques indisponibles', 'discord-bot-jlg'); ?>
-                            </strong>
-                            <span style="display: block;">
-                                <?php esc_html_e('Votre thème utilise l’éditeur de site basé sur les blocs. Ajoutez le bloc “Discord Stats” depuis l’éditeur de site ou utilisez le shortcode.', 'discord-bot-jlg'); ?>
-                            </span>
-                        </div>
+                    <li>
+                        <a href="https://discord.com/developers/applications" target="_blank" rel="noopener noreferrer" class="button button-secondary button-block">
+                            <?php esc_html_e('🔗 Discord Developer Portal', 'discord-bot-jlg'); ?>
+                        </a>
                     </li>
-                <?php endif; ?>
-            </ul>
+                    <?php
+                    $is_block_theme = function_exists('wp_is_block_theme') && wp_is_block_theme();
+
+                    if (!$is_block_theme) :
+                        ?>
+                        <li>
+                            <a href="<?php echo esc_url(admin_url('widgets.php')); ?>" class="button button-secondary button-block">
+                                <?php esc_html_e('📐 Gérer les Widgets', 'discord-bot-jlg'); ?>
+                            </a>
+                        </li>
+                    <?php else : ?>
+                        <li class="discord-quick-links__notice">
+                            <strong><?php esc_html_e('📐 Widgets classiques indisponibles', 'discord-bot-jlg'); ?></strong>
+                            <span><?php esc_html_e('Votre thème utilise l’éditeur de site basé sur les blocs. Ajoutez le bloc “Discord Stats” depuis l’éditeur de site ou utilisez le shortcode.', 'discord-bot-jlg'); ?></span>
+                        </li>
+                    <?php endif; ?>
+                </ul>
+            </div>
         </div>
         <?php
     }
@@ -2248,21 +2982,19 @@ class Discord_Bot_JLG_Admin {
      */
     private function render_appearance_shortcuts_panel() {
         ?>
-        <div style="background: #eef2ff; padding: 20px; border-radius: 8px;">
-            <h3 style="margin-top: 0;"><?php esc_html_e('🎨 Presets express', 'discord-bot-jlg'); ?></h3>
-            <p style="margin-top: 0;">
-                <?php esc_html_e('Appliquez une base visuelle en un clic depuis Gutenberg, puis affinez les couleurs ici.', 'discord-bot-jlg'); ?>
-            </p>
-            <ul style="list-style: disc; margin: 0 0 0 18px;">
-                <li><?php esc_html_e('Carte immersive : statistiques complètes, avatar et bouton principal.', 'discord-bot-jlg'); ?></li>
-                <li><?php esc_html_e('Bannière e-sport : accent sur les présences et l’appel à l’action.', 'discord-bot-jlg'); ?></li>
-                <li><?php esc_html_e('Mode compact minimal : idéal pour les sidebars.', 'discord-bot-jlg'); ?></li>
-            </ul>
-            <p style="margin-bottom: 0;">
+        <div class="components-card discord-admin-card">
+            <div class="components-card__body">
+                <h3 class="discord-admin-card__title"><?php esc_html_e('🎨 Presets express', 'discord-bot-jlg'); ?></h3>
+                <p><?php esc_html_e('Appliquez une base visuelle en un clic depuis Gutenberg, puis affinez les couleurs ici.', 'discord-bot-jlg'); ?></p>
+                <ul class="discord-admin-list">
+                    <li><?php esc_html_e('Carte immersive : statistiques complètes, avatar et bouton principal.', 'discord-bot-jlg'); ?></li>
+                    <li><?php esc_html_e('Bannière e-sport : accent sur les présences et l’appel à l’action.', 'discord-bot-jlg'); ?></li>
+                    <li><?php esc_html_e('Mode compact minimal : idéal pour les sidebars.', 'discord-bot-jlg'); ?></li>
+                </ul>
                 <a class="button button-secondary" href="<?php echo esc_url(admin_url('admin.php?page=discord-bot-demo')); ?>">
                     <?php esc_html_e('Voir les aperçus', 'discord-bot-jlg'); ?>
                 </a>
-            </p>
+            </div>
         </div>
         <?php
     }
@@ -2272,13 +3004,15 @@ class Discord_Bot_JLG_Admin {
      */
     private function render_automation_tips_panel() {
         ?>
-        <div style="background: #f1f5f9; padding: 20px; border-radius: 8px;">
-            <h3 style="margin-top: 0;"><?php esc_html_e('⚙️ Bonnes pratiques', 'discord-bot-jlg'); ?></h3>
-            <ul style="list-style: disc; margin: 0 0 0 18px;">
-                <li><?php esc_html_e('Gardez un intervalle de rafraîchissement supérieur à 60 s pour éviter les limites Discord.', 'discord-bot-jlg'); ?></li>
-                <li><?php esc_html_e('Activez la rétention analytics pour alimenter les graphiques et les KPI.', 'discord-bot-jlg'); ?></li>
-                <li><?php esc_html_e('Les caches courts améliorent la réactivité, mais surveillez les erreurs dans l’onglet Surveillance.', 'discord-bot-jlg'); ?></li>
-            </ul>
+        <div class="components-card discord-admin-card">
+            <div class="components-card__body">
+                <h3 class="discord-admin-card__title"><?php esc_html_e('⚙️ Bonnes pratiques', 'discord-bot-jlg'); ?></h3>
+                <ul class="discord-admin-list">
+                    <li><?php esc_html_e('Gardez un intervalle de rafraîchissement supérieur à 60 s pour éviter les limites Discord.', 'discord-bot-jlg'); ?></li>
+                    <li><?php esc_html_e('Activez la rétention analytics pour alimenter les graphiques et les KPI.', 'discord-bot-jlg'); ?></li>
+                    <li><?php esc_html_e('Les caches courts améliorent la réactivité, mais surveillez les erreurs dans l’onglet Surveillance.', 'discord-bot-jlg'); ?></li>
+                </ul>
+            </div>
         </div>
         <?php
     }
@@ -2288,14 +3022,14 @@ class Discord_Bot_JLG_Admin {
      */
     private function render_monitoring_help_panel() {
         ?>
-        <div style="background: #ecfeff; padding: 20px; border-radius: 8px;">
-            <h3 style="margin-top: 0;"><?php esc_html_e('🛰️ Astuce surveillance', 'discord-bot-jlg'); ?></h3>
-            <p><?php esc_html_e('Le tableau de bord ci-contre agrège les derniers événements Discord et la prochaine fenêtre de réessai.', 'discord-bot-jlg'); ?></p>
-            <p style="margin-bottom: 0;">
-                <a class="button" href="<?php echo esc_url(rest_url('discord-bot-jlg/v1/events')); ?>" target="_blank" rel="noopener noreferrer">
+        <div class="components-card discord-admin-card">
+            <div class="components-card__body">
+                <h3 class="discord-admin-card__title"><?php esc_html_e('🛰️ Astuce surveillance', 'discord-bot-jlg'); ?></h3>
+                <p><?php esc_html_e('Le tableau de bord ci-contre agrège les derniers événements Discord et la prochaine fenêtre de réessai.', 'discord-bot-jlg'); ?></p>
+                <a class="button button-secondary" href="<?php echo esc_url(rest_url('discord-bot-jlg/v1/events')); ?>" target="_blank" rel="noopener noreferrer">
                     <?php esc_html_e('Exporter le journal complet', 'discord-bot-jlg'); ?>
                 </a>
-            </p>
+            </div>
         </div>
         <?php
     }
@@ -2305,8 +3039,8 @@ class Discord_Bot_JLG_Admin {
      */
     private function render_admin_footer_note() {
         ?>
-        <div style="margin-top: 30px; padding: 15px; background: #f0f0f0; border-radius: 8px; text-align: center;">
-            <p style="margin: 0;">
+        <div class="discord-admin-footer-note">
+            <p>
                 <?php
                 $version_label = sprintf(
                     /* translators: %s: plugin version. */
@@ -2413,6 +3147,45 @@ class Discord_Bot_JLG_Admin {
             <p class="discord-analytics-panel__notice" data-role="analytics-notice"></p>
         </div>
         <?php
+    }
+
+    private function get_monitoring_filters($source = 'get') {
+        $filters = array(
+            'type'      => '',
+            'channel'   => '',
+            'profile'   => '',
+            'server_id' => '',
+        );
+
+        $input = ('post' === $source) ? $_POST : $_GET;
+
+        $mapping = array(
+            'log_type'    => 'type',
+            'log_channel' => 'channel',
+            'log_profile' => 'profile',
+            'log_server'  => 'server_id',
+        );
+
+        foreach ($mapping as $key => $target) {
+            if (!isset($input[$key])) {
+                continue;
+            }
+
+            $raw = wp_unslash($input[$key]);
+
+            switch ($target) {
+                case 'type':
+                case 'channel':
+                case 'profile':
+                    $filters[$target] = sanitize_key($raw);
+                    break;
+                case 'server_id':
+                    $filters[$target] = preg_replace('/[^0-9]/', '', (string) $raw);
+                    break;
+            }
+        }
+
+        return $filters;
     }
 
     /**
@@ -2670,6 +3443,8 @@ class Discord_Bot_JLG_Admin {
             return;
         }
 
+        wp_enqueue_style('wp-components');
+
         wp_enqueue_style(
             'discord-bot-jlg-admin',
             DISCORD_BOT_JLG_PLUGIN_URL . 'assets/css/discord-bot-jlg-admin.css',
@@ -2732,85 +3507,136 @@ class Discord_Bot_JLG_Admin {
      *
      * @return void
      */
-    public function test_discord_connection() {
+    public function test_discord_connection($profile_key = '') {
         $options = get_option($this->option_name);
         if (!is_array($options)) {
             $options = array();
         }
 
-        $fallback_details = $this->api->get_last_fallback_details();
+        $profile_key        = sanitize_key($profile_key);
+        $is_default_profile = ('' === $profile_key || 'default' === $profile_key);
 
-        if (
-            !empty($fallback_details)
-            && (empty($options['demo_mode']))
-        ) {
-            $timestamp = isset($fallback_details['timestamp']) ? (int) $fallback_details['timestamp'] : 0;
-            if ($timestamp <= 0) {
-                $timestamp = time();
-            }
+        if ('default' === $profile_key) {
+            $profile_key = '';
+        }
 
-            $date_format = get_option('date_format');
-            if (!is_string($date_format) || '' === trim($date_format)) {
-                $date_format = 'Y-m-d';
-            }
+        $profile_label = '';
 
-            $time_format = get_option('time_format');
-            if (!is_string($time_format) || '' === trim($time_format)) {
-                $time_format = 'H:i';
-            }
+        if (!$is_default_profile) {
+            $profile = $this->locate_server_profile($profile_key, $options);
 
-            $formatted_time = discord_bot_jlg_format_datetime($date_format . ' ' . $time_format, $timestamp);
-            $reason_text    = isset($fallback_details['reason']) ? trim((string) $fallback_details['reason']) : '';
-            $message_parts  = array();
-
-            $message_parts[] = sprintf(
-                /* translators: %s: formatted date and time. */
-                esc_html__('⚠️ Statistiques de secours utilisées depuis le %s.', 'discord-bot-jlg'),
-                esc_html($formatted_time)
-            );
-
-            if ('' !== $reason_text) {
-                $message_parts[] = sprintf(
-                    /* translators: %s: reason for the fallback. */
-                    esc_html__('Raison : %s.', 'discord-bot-jlg'),
-                    esc_html($reason_text)
+            if (null === $profile) {
+                printf(
+                    '<div class="notice notice-error"><p>%s</p></div>',
+                    sprintf(
+                        /* translators: %s: server profile key. */
+                        esc_html__('Profil « %s » introuvable. Enregistrez-le puis réessayez.', 'discord-bot-jlg'),
+                        esc_html($profile_key)
+                    )
                 );
+
+                return;
             }
 
-            $next_retry = isset($fallback_details['next_retry']) ? (int) $fallback_details['next_retry'] : 0;
-
-            if ($next_retry > 0) {
-                $seconds_until_retry = max(0, $next_retry - time());
-                $retry_time          = discord_bot_jlg_format_datetime($date_format . ' ' . $time_format, $next_retry);
-                $message_parts[]     = sprintf(
-                    /* translators: 1: seconds before retry, 2: formatted date and time. */
-                    esc_html__('Prochaine tentative dans %1$d secondes (vers %2$s).', 'discord-bot-jlg'),
-                    $seconds_until_retry,
-                    esc_html($retry_time)
-                );
-            } else {
-                $message_parts[] = esc_html__('Prochaine tentative dès que possible.', 'discord-bot-jlg');
+            if (!empty($profile['label'])) {
+                $profile_label = $profile['label'];
             }
+        }
 
-            printf(
-                '<div class="notice notice-warning"><p>%s</p></div>',
-                implode(' ', $message_parts)
+        $profile_prefix = '';
+        if (!$is_default_profile) {
+            $profile_prefix = sprintf(
+                /* translators: %s: server profile label. */
+                esc_html__('Profil « %s » — ', 'discord-bot-jlg'),
+                esc_html('' !== $profile_label ? $profile_label : $profile_key)
             );
         }
 
+        if ($is_default_profile) {
+            $fallback_details = $this->api->get_last_fallback_details();
+
+            if (
+                !empty($fallback_details)
+                && (empty($options['demo_mode']))
+            ) {
+                $timestamp = isset($fallback_details['timestamp']) ? (int) $fallback_details['timestamp'] : 0;
+                if ($timestamp <= 0) {
+                    $timestamp = time();
+                }
+
+                $date_format = get_option('date_format');
+                if (!is_string($date_format) || '' === trim($date_format)) {
+                    $date_format = 'Y-m-d';
+                }
+
+                $time_format = get_option('time_format');
+                if (!is_string($time_format) || '' === trim($time_format)) {
+                    $time_format = 'H:i';
+                }
+
+                $formatted_time = discord_bot_jlg_format_datetime($date_format . ' ' . $time_format, $timestamp);
+                $reason_text    = isset($fallback_details['reason']) ? trim((string) $fallback_details['reason']) : '';
+                $message_parts  = array();
+
+                $message_parts[] = sprintf(
+                    /* translators: %s: formatted date and time. */
+                    esc_html__('⚠️ Statistiques de secours utilisées depuis le %s.', 'discord-bot-jlg'),
+                    esc_html($formatted_time)
+                );
+
+                if ('' !== $reason_text) {
+                    $message_parts[] = sprintf(
+                        /* translators: %s: reason for the fallback. */
+                        esc_html__('Raison : %s.', 'discord-bot-jlg'),
+                        esc_html($reason_text)
+                    );
+                }
+
+                $next_retry = isset($fallback_details['next_retry']) ? (int) $fallback_details['next_retry'] : 0;
+
+                if ($next_retry > 0) {
+                    $seconds_until_retry = max(0, $next_retry - time());
+                    $retry_time          = discord_bot_jlg_format_datetime($date_format . ' ' . $time_format, $next_retry);
+                    $message_parts[]     = sprintf(
+                        /* translators: 1: seconds before retry, 2: formatted date and time. */
+                        esc_html__('Prochaine tentative dans %1$d secondes (vers %2$s).', 'discord-bot-jlg'),
+                        $seconds_until_retry,
+                        esc_html($retry_time)
+                    );
+                } else {
+                    $message_parts[] = esc_html__('Prochaine tentative dès que possible.', 'discord-bot-jlg');
+                }
+
+                printf(
+                    '<div class="notice notice-warning"><p>%s</p></div>',
+                    implode(' ', $message_parts)
+                );
+            }
+        }
+
         if (!empty($options['demo_mode'])) {
+            $message = esc_html__('🎨 Mode démonstration activé - Les données affichées sont fictives', 'discord-bot-jlg');
+
+            if ('' !== $profile_prefix) {
+                $message = $profile_prefix . $message;
+            }
+
             printf(
                 '<div class="notice notice-info"><p>%s</p></div>',
-                esc_html__('🎨 Mode démonstration activé - Les données affichées sont fictives', 'discord-bot-jlg')
+                $message
             );
             return;
         }
 
-        $stats = $this->api->get_stats(
-            array(
-                'bypass_cache' => true,
-            )
+        $args = array(
+            'bypass_cache' => true,
         );
+
+        if (!$is_default_profile) {
+            $args['profile_key'] = $profile_key;
+        }
+
+        $stats = $this->api->get_stats($args);
         $diagnostic = $this->api->get_last_error_message();
         $diagnostic_suffix = '';
 
@@ -2829,26 +3655,44 @@ class Discord_Bot_JLG_Admin {
                 $total_display = esc_html__('Total indisponible', 'discord-bot-jlg');
             }
 
+            $success_message = sprintf(
+                /* translators: 1: server name, 2: online members count, 3: total members count. */
+                esc_html__('✅ Connexion réussie ! Serveur : %1$s - %2$s en ligne / %3$s membres', 'discord-bot-jlg'),
+                esc_html($server_name),
+                esc_html(number_format_i18n($online_count)),
+                $total_display
+            );
+
+            if ('' !== $profile_prefix) {
+                $success_message = $profile_prefix . $success_message;
+            }
+
             printf(
                 '<div class="notice notice-success"><p>%s</p></div>',
-                sprintf(
-                    /* translators: 1: server name, 2: online members count, 3: total members count. */
-                    esc_html__('✅ Connexion réussie ! Serveur : %1$s - %2$s en ligne / %3$s membres', 'discord-bot-jlg'),
-                    esc_html($server_name),
-                    esc_html(number_format_i18n($online_count)),
-                    $total_display
-                )
+                $success_message
             );
         } elseif (is_array($stats) && !empty($stats['is_demo'])) {
+            $warning_message = esc_html__('⚠️ Pas de configuration Discord détectée. Mode démo actif.', 'discord-bot-jlg');
+
+            if ('' !== $profile_prefix) {
+                $warning_message = $profile_prefix . $warning_message;
+            }
+
             printf(
                 '<div class="notice notice-warning"><p>%s%s</p></div>',
-                esc_html__('⚠️ Pas de configuration Discord détectée. Mode démo actif.', 'discord-bot-jlg'),
+                $warning_message,
                 $diagnostic_suffix
             );
         } else {
+            $error_message = esc_html__('❌ Échec de la connexion. Vérifiez vos identifiants.', 'discord-bot-jlg');
+
+            if ('' !== $profile_prefix) {
+                $error_message = $profile_prefix . $error_message;
+            }
+
             printf(
                 '<div class="notice notice-error"><p>%s%s</p></div>',
-                esc_html__('❌ Échec de la connexion. Vérifiez vos identifiants.', 'discord-bot-jlg'),
+                $error_message,
                 $diagnostic_suffix
             );
         }
@@ -2863,17 +3707,61 @@ class Discord_Bot_JLG_Admin {
      * @param array  $options   Options d'affichage (style du conteneur, wrapper interne, etc.).
      */
     private function render_preview_block($title, $shortcode, array $options = array()) {
-        $container_style     = isset($options['container_style']) ? $options['container_style'] : '';
-        $inner_wrapper_style = isset($options['inner_wrapper_style']) ? $options['inner_wrapper_style'] : '';
+        $container_style      = isset($options['container_style']) ? $options['container_style'] : '';
+        $container_class      = isset($options['container_class']) ? (string) $options['container_class'] : '';
+        $inner_wrapper_style  = isset($options['inner_wrapper_style']) ? $options['inner_wrapper_style'] : '';
+        $inner_wrapper_class  = isset($options['inner_wrapper_class']) ? (string) $options['inner_wrapper_class'] : '';
+
+        $container_classes = array('discord-preview-block');
+        if ('' !== $container_class) {
+            $additional = preg_split('/\s+/', $container_class);
+            if (is_array($additional)) {
+                $container_classes = array_merge($container_classes, $additional);
+            } else {
+                $container_classes[] = $container_class;
+            }
+        }
+        $container_classes = array_unique(array_filter(array_map('trim', $container_classes)));
+
+        $container_attributes = '';
+
+        if (!empty($container_classes)) {
+            $container_attributes .= ' class="' . esc_attr(implode(' ', $container_classes)) . '"';
+        }
+
+        if ('' !== $container_style) {
+            $container_attributes .= ' style="' . esc_attr($container_style) . '"';
+        }
+
+        $inner_classes = array('discord-preview-card__inner');
+        if ('' !== $inner_wrapper_class) {
+            $inner_additional = preg_split('/\s+/', $inner_wrapper_class);
+            if (is_array($inner_additional)) {
+                $inner_classes = array_merge($inner_classes, $inner_additional);
+            } else {
+                $inner_classes[] = $inner_wrapper_class;
+            }
+        }
+        $inner_classes = array_unique(array_filter(array_map('trim', $inner_classes)));
+
         ?>
-        <div<?php if ($container_style) { echo ' style="' . esc_attr($container_style) . '"'; } ?>>
+        <div<?php echo $container_attributes; ?>>
             <h4><?php echo esc_html($title); ?></h4>
             <?php
-            if ($inner_wrapper_style) {
-                echo '<div style="' . esc_attr($inner_wrapper_style) . '">';
+            if ('' !== $inner_wrapper_style || count($inner_classes) > 1) {
+                $inner_attr = '';
+                if (!empty($inner_classes)) {
+                    $inner_attr .= ' class="' . esc_attr(implode(' ', $inner_classes)) . '"';
+                }
+                if ('' !== $inner_wrapper_style) {
+                    $inner_attr .= ' style="' . esc_attr($inner_wrapper_style) . '"';
+                }
+                echo '<div' . $inner_attr . '>';
             }
+
             echo $this->get_admin_shortcode_preview($shortcode);
-            if ($inner_wrapper_style) {
+
+            if ('' !== $inner_wrapper_style || count($inner_classes) > 1) {
                 echo '</div>';
             }
             ?>
