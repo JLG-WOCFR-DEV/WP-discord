@@ -78,6 +78,18 @@ if (!function_exists('wp_schedule_event')) {
     }
 }
 
+if (!function_exists('wp_strip_all_tags')) {
+    function wp_strip_all_tags($string, $remove_breaks = false) {
+        $string = strip_tags((string) $string);
+
+        if ($remove_breaks) {
+            $string = preg_replace('/[\r\n\t ]+/', ' ', $string);
+        }
+
+        return trim($string);
+    }
+}
+
 if (!function_exists('wp_clear_scheduled_hook')) {
     function wp_clear_scheduled_hook($hook) {
         if (!isset($GLOBALS['wp_test_scheduled_events']) || !is_array($GLOBALS['wp_test_scheduled_events'])) {

@@ -367,6 +367,56 @@
     margin-top: 2px;
 }
 
+.discord-monitoring-history__filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin-bottom: 16px;
+}
+
+.discord-monitoring-history__filter {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 160px;
+}
+
+.discord-monitoring-history__filter select,
+.discord-monitoring-history__filter input {
+    max-width: 220px;
+}
+
+.discord-monitoring-history__filter-actions {
+    display: flex;
+    align-items: flex-end;
+    gap: 8px;
+}
+
+.discord-monitoring-history__filter-actions .button-link {
+    padding: 0;
+    height: auto;
+    line-height: inherit;
+}
+
+.discord-monitoring-history__export {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 16px;
+}
+
+.discord-monitoring-history__item--error .discord-monitoring-history__label,
+.discord-monitoring-history__item--failure .discord-monitoring-history__label {
+    color: #b91c1c;
+}
+
+.discord-monitoring-history__item--retry .discord-monitoring-history__label {
+    color: #0f766e;
+}
+
+.discord-monitoring-history__item--skipped .discord-monitoring-history__label {
+    color: #475569;
+}
+
 .discord-analytics-panel {
     background: #fff;
     border-radius: 12px;

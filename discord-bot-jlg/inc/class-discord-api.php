@@ -43,6 +43,7 @@ class Discord_Bot_JLG_API {
     private $analytics;
     private $event_logger;
     private $runtime_status_history;
+    private $refresh_dispatcher;
 
     /**
      * Prépare le service d'accès aux statistiques avec les clés et durées nécessaires.
@@ -83,6 +84,7 @@ class Discord_Bot_JLG_API {
             ? $event_logger
             : new Discord_Bot_JLG_Event_Logger();
         $this->runtime_status_history = array();
+        $this->refresh_dispatcher = null;
     }
 
     public function set_analytics_service($analytics) {
@@ -103,6 +105,16 @@ class Discord_Bot_JLG_API {
 
     public function get_event_logger() {
         return $this->event_logger;
+    }
+
+    public function set_refresh_dispatcher($dispatcher) {
+        if (is_object($dispatcher) && method_exists($dispatcher, 'dispatch_refresh_jobs')) {
+            $this->refresh_dispatcher = $dispatcher;
+        }
+    }
+
+    public function get_refresh_dispatcher() {
+        return $this->refresh_dispatcher;
     }
 
     public function get_status_history($args = array()) {
@@ -221,6 +233,10 @@ class Discord_Bot_JLG_API {
     public function get_admin_health_snapshot($args = array()) {
         $defaults = array(
             'events_limit' => 6,
+            'event_type'   => '',
+            'channel'      => '',
+            'profile_key'  => '',
+            'server_id'    => '',
         );
 
         $args = wp_parse_args($args, $defaults);
@@ -307,11 +323,107 @@ class Discord_Bot_JLG_API {
             }
         }
 
-        if (count($snapshot['events']) > $events_limit) {
-            $snapshot['events'] = array_slice($snapshot['events'], 0, $events_limit);
-        }
+        $snapshot['events'] = $this->get_monitoring_timeline(
+            array(
+                'limit'       => $events_limit,
+                'event_type'  => isset($args['event_type']) ? $args['event_type'] : '',
+                'channel'     => isset($args['channel']) ? $args['channel'] : '',
+                'profile_key' => isset($args['profile_key']) ? $args['profile_key'] : '',
+                'server_id'   => isset($args['server_id']) ? $args['server_id'] : '',
+            )
+        );
 
         return $snapshot;
+    }
+
+    public function get_monitoring_timeline($args = array()) {
+        $defaults = array(
+            'limit'       => 20,
+            'event_type'  => '',
+            'channel'     => '',
+            'profile_key' => '',
+            'server_id'   => '',
+        );
+
+        $args = wp_parse_args($args, $defaults);
+
+        $limit = max(1, min(100, (int) $args['limit']));
+
+        $event_logger = $this->get_event_logger();
+
+        if (!($event_logger instanceof Discord_Bot_JLG_Event_Logger)) {
+            return array();
+        }
+
+        $raw_events = $event_logger->get_events(
+            array(
+                'limit' => min(200, max($limit * 4, $limit)),
+            )
+        );
+
+        if (!is_array($raw_events) || empty($raw_events)) {
+            return array();
+        }
+
+        $event_type_filter = sanitize_key($args['event_type']);
+        $channel_filter    = sanitize_key($args['channel']);
+        $profile_filter    = sanitize_key($args['profile_key']);
+        $server_filter     = $this->sanitize_server_id($args['server_id']);
+
+        $entries = array();
+
+        foreach ($raw_events as $event) {
+            if (!is_array($event)) {
+                continue;
+            }
+
+            $event_type = isset($event['type']) ? sanitize_key($event['type']) : '';
+
+            if ('' === $event_type) {
+                continue;
+            }
+
+            if ('' !== $event_type_filter && $event_type !== $event_type_filter) {
+                continue;
+            }
+
+            $context = isset($event['context']) && is_array($event['context']) ? $event['context'] : array();
+
+            $event_channel = isset($context['channel']) ? sanitize_key($context['channel']) : '';
+            if ('' !== $channel_filter && $event_channel !== $channel_filter) {
+                continue;
+            }
+
+            $event_profile = isset($context['profile_key']) ? sanitize_key($context['profile_key']) : '';
+            if ('' !== $profile_filter && $event_profile !== $profile_filter) {
+                continue;
+            }
+
+            $event_server = isset($context['server_id']) ? $this->sanitize_server_id($context['server_id']) : '';
+            if ('' !== $server_filter && $event_server !== $server_filter) {
+                continue;
+            }
+
+            $entry = $this->transform_event_to_status_history_entry($event_type, $event);
+
+            if (empty($entry)) {
+                continue;
+            }
+
+            $entry['channel'] = $event_channel;
+            $entry['outcome'] = isset($context['outcome']) ? sanitize_key($context['outcome']) : '';
+            $entry['profile_key'] = $event_profile;
+            $entry['server_id'] = $event_server;
+            $entry['context'] = $context;
+
+            $entries[] = $entry;
+
+            if (count($entries) >= $limit) {
+                break;
+            }
+        }
+
+        return $entries;
     }
 
     /**
@@ -839,18 +951,20 @@ class Discord_Bot_JLG_API {
         $bot_candidate    = $this->build_presence_breakdown_candidate($bot_stats);
 
         if ($widget_candidate && $bot_candidate) {
-            if ($bot_candidate['non_zero_statuses'] > $widget_candidate['non_zero_statuses']) {
-                $selection['source']    = 'bot';
-                $selection['breakdown'] = $bot_candidate['breakdown'];
-            } elseif (
-                $bot_candidate['non_zero_statuses'] === $widget_candidate['non_zero_statuses']
-                && $bot_candidate['total'] > $widget_candidate['total']
-            ) {
-                $selection['source']    = 'bot';
-                $selection['breakdown'] = $bot_candidate['breakdown'];
-            } else {
-                $selection['source']    = 'widget';
-                $selection['breakdown'] = $widget_candidate['breakdown'];
+            $selection['source']    = 'widget';
+            $selection['breakdown'] = $widget_candidate['breakdown'];
+
+            foreach ($bot_candidate['breakdown'] as $status => $count) {
+                $count = max(0, (int) $count);
+
+                if (!array_key_exists($status, $selection['breakdown'])) {
+                    $selection['breakdown'][$status] = $count;
+                    continue;
+                }
+
+                if ($count > 0) {
+                    $selection['breakdown'][$status] += $count;
+                }
             }
         } elseif ($widget_candidate) {
             $selection['source']    = 'widget';
@@ -927,6 +1041,34 @@ class Discord_Bot_JLG_API {
         }
 
         $this->log_snapshot($profile_key, $server_id, $stats);
+    }
+
+    private function get_widget_snapshot_transient_name($cache_key) {
+        return $cache_key . '_widget_snapshot';
+    }
+
+    private function store_widget_snapshot_payload($cache_key, array $stats, array $options) {
+        $payload = array(
+            'stats'     => $stats,
+            'timestamp' => time(),
+        );
+
+        $ttl = max($this->get_cache_duration($options), self::MIN_PUBLIC_REFRESH_INTERVAL);
+        set_transient($this->get_widget_snapshot_transient_name($cache_key), $payload, max(60, (int) $ttl));
+    }
+
+    private function get_widget_snapshot_payload($cache_key) {
+        $payload = get_transient($this->get_widget_snapshot_transient_name($cache_key));
+
+        if (!is_array($payload) || !isset($payload['stats'])) {
+            return null;
+        }
+
+        return $payload;
+    }
+
+    private function clear_widget_snapshot_payload($cache_key) {
+        delete_transient($this->get_widget_snapshot_transient_name($cache_key));
     }
 
     public function get_last_fallback_details() {
@@ -1451,12 +1593,227 @@ class Discord_Bot_JLG_API {
         wp_send_json_error($result['data'], $status);
     }
 
+    public function run_widget_refresh_job($profile_key = '', $job_context = array()) {
+        $job_context = is_array($job_context) ? $job_context : array();
+        $profile_key = sanitize_key($profile_key);
+
+        $args = array(
+            'profile_key'  => $profile_key,
+            'bypass_cache' => true,
+        );
+
+        if (isset($job_context['server_id'])) {
+            $args['server_id'] = $this->sanitize_server_id($job_context['server_id']);
+        }
+
+        $fetch_context = $this->prepare_fetch_context($args);
+        $options       = $fetch_context['options'];
+        $context       = $fetch_context['context'];
+
+        if (!empty($context['error'])) {
+            if ($context['error'] instanceof WP_Error) {
+                return $context['error'];
+            }
+
+            return new WP_Error(
+                'discord_bot_jlg_widget_refresh_error',
+                (string) $context['error']
+            );
+        }
+
+        if (empty($options['server_id'])) {
+            return new WP_Error(
+                'discord_bot_jlg_widget_refresh_missing_server',
+                __('Aucun identifiant de serveur Discord n’est associé à cette tâche.', 'discord-bot-jlg'),
+                array(
+                    'profile_key' => ('' !== $profile_key) ? $profile_key : 'default',
+                    'should_retry' => false,
+                )
+            );
+        }
+
+        $original_cache_key = $this->cache_key;
+        $this->cache_key     = $context['cache_key'];
+
+        try {
+            $widget_stats = $this->fetch_widget_stats($options);
+
+            if (!is_array($widget_stats)) {
+                $error_message = $this->get_last_error_message();
+
+                if ('' === $error_message) {
+                    $error_message = __('Impossible de récupérer les données du widget Discord.', 'discord-bot-jlg');
+                }
+
+                return new WP_Error(
+                    'discord_bot_jlg_widget_refresh_failed',
+                    $error_message,
+                    array(
+                        'profile_key' => ('' !== $profile_key) ? $profile_key : 'default',
+                        'retry_after' => max(0, (int) $this->last_retry_after),
+                    )
+                );
+            }
+
+            $this->store_widget_snapshot_payload($this->cache_key, $widget_stats, $options);
+
+            return array(
+                'channel'     => 'widget',
+                'profile_key' => ('' !== $profile_key) ? $profile_key : 'default',
+                'cache_key'   => $this->cache_key,
+                'stats'       => $widget_stats,
+            );
+        } finally {
+            $this->cache_key = $original_cache_key;
+        }
+    }
+
+    public function run_bot_refresh_job($profile_key = '', $job_context = array()) {
+        $job_context = is_array($job_context) ? $job_context : array();
+        $profile_key = sanitize_key($profile_key);
+
+        $args = array(
+            'profile_key'  => $profile_key,
+            'bypass_cache' => true,
+        );
+
+        if (isset($job_context['server_id'])) {
+            $args['server_id'] = $this->sanitize_server_id($job_context['server_id']);
+        }
+
+        $fetch_context = $this->prepare_fetch_context($args);
+        $options       = $fetch_context['options'];
+        $context       = $fetch_context['context'];
+
+        if (!empty($context['error'])) {
+            if ($context['error'] instanceof WP_Error) {
+                return $context['error'];
+            }
+
+            return new WP_Error(
+                'discord_bot_jlg_bot_refresh_error',
+                (string) $context['error']
+            );
+        }
+
+        if (empty($options['server_id'])) {
+            return new WP_Error(
+                'discord_bot_jlg_bot_refresh_missing_server',
+                __('Aucun identifiant de serveur Discord n’est associé à cette tâche.', 'discord-bot-jlg'),
+                array(
+                    'profile_key'  => ('' !== $profile_key) ? $profile_key : 'default',
+                    'should_retry' => false,
+                )
+            );
+        }
+
+        $active_profile_key = isset($options['__active_profile_key'])
+            ? sanitize_key($options['__active_profile_key'])
+            : (( '' !== $profile_key) ? $profile_key : 'default');
+
+        $original_cache_key = $this->cache_key;
+        $this->cache_key     = $context['cache_key'];
+
+        try {
+            $widget_snapshot = $this->get_widget_snapshot_payload($this->cache_key);
+            $widget_stats    = (is_array($widget_snapshot) && isset($widget_snapshot['stats']))
+                ? $widget_snapshot['stats']
+                : null;
+
+            if (!is_array($widget_stats)) {
+                $widget_stats = $this->fetch_widget_stats($options);
+            }
+
+            $bot_token = $this->get_bot_token($options);
+            if ('' === $bot_token) {
+                return new WP_Error(
+                    'discord_bot_jlg_bot_refresh_missing_token',
+                    __('Aucun jeton de bot n’est disponible pour cette tâche.', 'discord-bot-jlg'),
+                    array(
+                        'profile_key'  => $active_profile_key,
+                        'should_retry' => false,
+                    )
+                );
+            }
+
+            $bot_stats = $this->fetch_bot_stats($options);
+
+            if (!is_array($bot_stats)) {
+                $error_message = $this->get_last_error_message();
+
+                if ('' === $error_message) {
+                    $error_message = __('Impossible de récupérer les données détaillées du bot Discord.', 'discord-bot-jlg');
+                }
+
+                return new WP_Error(
+                    'discord_bot_jlg_bot_refresh_failed',
+                    $error_message,
+                    array(
+                        'profile_key'  => $active_profile_key,
+                        'retry_after'  => max(0, (int) $this->last_retry_after),
+                    )
+                );
+            }
+
+            $widget_incomplete = $this->stats_need_completion($widget_stats);
+            $stats = $this->merge_stats($widget_stats, $bot_stats, $widget_incomplete);
+
+            if (is_array($stats)) {
+                $stats = $this->normalize_stats($stats);
+            }
+
+            if (false === $this->has_usable_stats($stats)) {
+                $error_message = $this->get_last_error_message();
+
+                if ('' === $error_message) {
+                    $error_message = __('Les données combinées restent inexploitables.', 'discord-bot-jlg');
+                }
+
+                return new WP_Error(
+                    'discord_bot_jlg_bot_refresh_incomplete',
+                    $error_message,
+                    array(
+                        'profile_key'  => $active_profile_key,
+                        'retry_after'  => max(0, (int) $this->last_retry_after),
+                    )
+                );
+            }
+
+            $this->persist_successful_stats(
+                $stats,
+                $options,
+                $context,
+                array(
+                    'profile_key'  => $active_profile_key,
+                    'bypass_cache' => true,
+                )
+            );
+
+            $this->clear_widget_snapshot_payload($this->cache_key);
+
+            return array(
+                'channel'     => 'bot',
+                'profile_key' => $active_profile_key,
+                'cache_key'   => $this->cache_key,
+                'stats'       => $stats,
+            );
+        } finally {
+            $this->cache_key = $original_cache_key;
+        }
+    }
+
     /**
      * Rafraîchit silencieusement le cache via une tâche cron interne.
      *
      * @return void
      */
     public function refresh_cache_via_cron() {
+        if (is_object($this->refresh_dispatcher) && method_exists($this->refresh_dispatcher, 'dispatch_refresh_jobs')) {
+            $this->refresh_dispatcher->dispatch_refresh_jobs();
+
+            return;
+        }
+
         $options = $this->get_plugin_options(true);
 
         if (!empty($options['demo_mode'])) {
@@ -2656,6 +3013,8 @@ class Discord_Bot_JLG_API {
                 return __('Cron', 'discord-bot-jlg');
             case 'rest':
                 return __('REST', 'discord-bot-jlg');
+            case 'queue':
+                return __('File', 'discord-bot-jlg');
             default:
                 return '';
         }
@@ -2691,6 +3050,9 @@ class Discord_Bot_JLG_API {
                     return __('Succès', 'discord-bot-jlg');
                 case 'skipped':
                     return __('Action ignorée', 'discord-bot-jlg');
+                case 'retry':
+                    return __('Nouvelle tentative planifiée', 'discord-bot-jlg');
+                case 'error':
                 case 'failure':
                     return __('Échec', 'discord-bot-jlg');
                 default:
@@ -2703,6 +3065,25 @@ class Discord_Bot_JLG_API {
 
     private function build_status_history_reason(array $context) {
         $parts = array();
+
+        if (isset($context['job_type']) && '' !== trim((string) $context['job_type'])) {
+            $parts[] = sprintf(
+                /* translators: %s: job type. */
+                __('Tâche : %s', 'discord-bot-jlg'),
+                $this->get_job_type_label($context['job_type'])
+            );
+        }
+
+        if (isset($context['attempt']) && is_numeric($context['attempt'])) {
+            $attempt = (int) $context['attempt'];
+            if ($attempt > 0) {
+                $parts[] = sprintf(
+                    /* translators: %d: attempt number. */
+                    __('Tentative n°%d', 'discord-bot-jlg'),
+                    $attempt
+                );
+            }
+        }
 
         if (isset($context['reason']) && '' !== trim((string) $context['reason'])) {
             $parts[] = trim((string) $context['reason']);
@@ -2775,6 +3156,19 @@ class Discord_Bot_JLG_API {
         }
 
         return implode(' – ', $parts);
+    }
+
+    private function get_job_type_label($job_type) {
+        $job_type = sanitize_key($job_type);
+
+        switch ($job_type) {
+            case 'widget_refresh':
+                return __('Widget', 'discord-bot-jlg');
+            case 'bot_refresh':
+                return __('Bot', 'discord-bot-jlg');
+            default:
+                return $job_type;
+        }
     }
 
     private function calculate_duration_ms($start_time) {

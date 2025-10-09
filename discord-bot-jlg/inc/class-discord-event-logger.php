@@ -98,14 +98,16 @@ class Discord_Bot_JLG_Event_Logger {
             $limit = $this->max_entries;
         }
 
-        $type_filter = $this->sanitize_type($args['type']);
+        $raw_type_filter = isset($args['type']) ? $args['type'] : '';
+        $type_filter = $this->sanitize_type($raw_type_filter);
         $after_id = max(0, (int) $args['after_id']);
         $after_timestamp = max(0, (int) $args['after']);
 
         $state = $this->load_state();
         $events = isset($state['events']) && is_array($state['events']) ? $state['events'] : array();
 
-        if ('' !== $type_filter) {
+
+        if ('' !== trim((string) $raw_type_filter)) {
             $events = array_filter(
                 $events,
                 function ($event) use ($type_filter) {

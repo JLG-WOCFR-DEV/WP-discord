@@ -141,6 +141,7 @@ require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-http.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-event-logger.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-options-repository.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-api.php';
+require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-job-queue.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-admin.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-shortcode.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-widget.php';
@@ -190,6 +191,7 @@ class DiscordServerStats {
     private $analytics;
     private $event_logger;
     private $options_repository;
+    private $job_queue;
 
     public function __construct() {
         $this->default_options = discord_bot_jlg_get_default_options();
@@ -210,7 +212,10 @@ class DiscordServerStats {
             $this->event_logger,
             $this->options_repository
         );
-        $this->admin     = new Discord_Bot_JLG_Admin(DISCORD_BOT_JLG_OPTION_NAME, $this->api, $this->analytics);
+        $this->job_queue = new Discord_Bot_JLG_Job_Queue($this->api, DISCORD_BOT_JLG_OPTION_NAME, $this->event_logger);
+        $this->job_queue->register();
+        $this->api->set_refresh_dispatcher($this->job_queue);
+        $this->admin     = new Discord_Bot_JLG_Admin(DISCORD_BOT_JLG_OPTION_NAME, $this->api, $this->event_logger);
         $this->shortcode = new Discord_Bot_JLG_Shortcode(DISCORD_BOT_JLG_OPTION_NAME, $this->api);
         $this->widget    = new Discord_Bot_JLG_Widget();
         $this->site_health = new Discord_Bot_JLG_Site_Health($this->api);
@@ -236,7 +241,7 @@ class DiscordServerStats {
         add_action('wp_ajax_nopriv_refresh_discord_stats', array($this->api, 'ajax_refresh_stats'));
         add_action('update_option_' . DISCORD_BOT_JLG_OPTION_NAME, array($this, 'handle_settings_update'), 10, 2);
 
-        add_action(DISCORD_BOT_JLG_CRON_HOOK, array($this->api, 'refresh_cache_via_cron'));
+        add_action(DISCORD_BOT_JLG_CRON_HOOK, array($this->job_queue, 'dispatch_refresh_jobs'));
     }
 
     private function get_block_editor_config() {
@@ -413,11 +418,21 @@ class DiscordServerStats {
         }
 
         $this->reschedule_cron_event();
+
+        if ($this->job_queue instanceof Discord_Bot_JLG_Job_Queue) {
+            $this->job_queue->dispatch_refresh_jobs(true);
+        }
     }
 
     public function deactivate() {
         $this->api->clear_all_cached_data();
         wp_clear_scheduled_hook(DISCORD_BOT_JLG_CRON_HOOK);
+
+        if (function_exists('as_unschedule_all_actions')) {
+            as_unschedule_all_actions(Discord_Bot_JLG_Job_Queue::JOB_HOOK, array(), Discord_Bot_JLG_Job_Queue::ACTION_SCHEDULER_GROUP);
+        } else {
+            wp_clear_scheduled_hook(Discord_Bot_JLG_Job_Queue::JOB_HOOK);
+        }
     }
 
     /**
@@ -496,6 +511,10 @@ class DiscordServerStats {
                 $this->reschedule_cron_event($new_cache_duration);
             }
 
+            if ($this->job_queue instanceof Discord_Bot_JLG_Job_Queue) {
+                $this->job_queue->dispatch_refresh_jobs(true);
+            }
+
             return;
         }
 
@@ -506,6 +525,10 @@ class DiscordServerStats {
                 $this->reschedule_cron_event($new_cache_duration);
             }
 
+            if ($this->job_queue instanceof Discord_Bot_JLG_Job_Queue) {
+                $this->job_queue->dispatch_refresh_jobs(true);
+            }
+
             return;
         }
 
@@ -514,6 +537,10 @@ class DiscordServerStats {
         }
 
         $this->api->clear_cache();
+
+        if ($this->job_queue instanceof Discord_Bot_JLG_Job_Queue) {
+            $this->job_queue->dispatch_refresh_jobs(true);
+        }
     }
 }
 

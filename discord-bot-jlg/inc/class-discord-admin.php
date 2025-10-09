@@ -13,6 +13,7 @@ class Discord_Bot_JLG_Admin {
     private $api;
     private $demo_page_hook_suffix;
     private $forced_setup_step;
+    private $event_logger;
 
     /**
      * Initialise l'instance avec la clé d'option et le client API utilisé pour les vérifications.
@@ -22,11 +23,16 @@ class Discord_Bot_JLG_Admin {
      *
      * @return void
      */
-    public function __construct($option_name, Discord_Bot_JLG_API $api) {
+    public function __construct($option_name, Discord_Bot_JLG_API $api, $event_logger = null) {
         $this->option_name = $option_name;
         $this->api         = $api;
         $this->demo_page_hook_suffix = '';
         $this->forced_setup_step    = '';
+        $this->event_logger = ($event_logger instanceof Discord_Bot_JLG_Event_Logger)
+            ? $event_logger
+            : $this->api->get_event_logger();
+
+        add_action('admin_post_discord_bot_jlg_export_log', array($this, 'handle_monitoring_export'));
     }
 
     /**
@@ -1909,20 +1915,76 @@ class Discord_Bot_JLG_Admin {
      * Affiche le tableau de bord de surveillance.
      */
     private function render_monitoring_dashboard() {
+        $filters = $this->get_monitoring_filters();
+
         $snapshot = $this->api->get_admin_health_snapshot(
             array(
-                'events_limit' => 6,
+                'events_limit' => 12,
+                'event_type'   => $filters['type'],
+                'channel'      => $filters['channel'],
+                'profile_key'  => $filters['profile'],
+                'server_id'    => $filters['server_id'],
             )
         );
 
         $rate_limit   = isset($snapshot['rate_limit']) && is_array($snapshot['rate_limit']) ? $snapshot['rate_limit'] : array();
         $last_error   = isset($snapshot['last_error']) && is_array($snapshot['last_error']) ? $snapshot['last_error'] : null;
         $last_success = isset($snapshot['last_success']) && is_array($snapshot['last_success']) ? $snapshot['last_success'] : null;
-        $events       = isset($snapshot['events']) && is_array($snapshot['events']) ? $snapshot['events'] : array();
+        $timeline_entries = isset($snapshot['events']) && is_array($snapshot['events']) ? $snapshot['events'] : array();
         $fallback     = isset($snapshot['fallback']) && is_array($snapshot['fallback']) ? $snapshot['fallback'] : array();
         $retry_after  = isset($snapshot['retry_after']) ? (int) $snapshot['retry_after'] : 0;
 
         $now_gmt = current_time('timestamp', true);
+
+        $event_type_options = array(
+            ''                => __('Tous les types', 'discord-bot-jlg'),
+            'discord_http'     => __('Appels API Discord', 'discord-bot-jlg'),
+            'discord_connector'=> __('Tâches et connecteur', 'discord-bot-jlg'),
+        );
+
+        $channel_options = array(
+            ''       => __('Tous les canaux', 'discord-bot-jlg'),
+            'widget' => __('Widget', 'discord-bot-jlg'),
+            'bot'    => __('Bot', 'discord-bot-jlg'),
+            'queue'  => __('File', 'discord-bot-jlg'),
+            'cron'   => __('Cron', 'discord-bot-jlg'),
+            'rest'   => __('REST', 'discord-bot-jlg'),
+        );
+
+        $profile_options = array(
+            ''         => __('Tous les profils', 'discord-bot-jlg'),
+            'default'  => __('Profil principal', 'discord-bot-jlg'),
+        );
+
+        $configured_profiles = $this->api->get_server_profiles(false);
+        if (is_array($configured_profiles)) {
+            foreach ($configured_profiles as $profile) {
+                if (!is_array($profile)) {
+                    continue;
+                }
+
+                $profile_key = isset($profile['key']) ? sanitize_key($profile['key']) : '';
+                if ('' === $profile_key || isset($profile_options[$profile_key])) {
+                    continue;
+                }
+
+                $label = isset($profile['label']) ? sanitize_text_field($profile['label']) : $profile_key;
+                $profile_options[$profile_key] = $label;
+            }
+        }
+
+        $monitoring_base_url = add_query_arg(
+            array(
+                'page' => 'discord-bot-jlg',
+                'tab'  => 'monitoring',
+            ),
+            admin_url('admin.php')
+        );
+
+        $reset_filters_url = remove_query_arg(
+            array('log_type', 'log_channel', 'log_profile', 'log_server'),
+            $monitoring_base_url
+        );
 
         $rate_limit_remaining = isset($rate_limit['remaining']) ? (int) $rate_limit['remaining'] : null;
         $rate_limit_limit     = isset($rate_limit['limit']) ? (int) $rate_limit['limit'] : null;
@@ -2060,16 +2122,72 @@ class Discord_Bot_JLG_Admin {
 
         <div class="discord-monitoring-history">
             <h2><?php esc_html_e('🧾 Journal récent', 'discord-bot-jlg'); ?></h2>
-            <?php if (empty($events)) : ?>
+
+            <form method="get" class="discord-monitoring-history__filters" aria-label="<?php esc_attr_e('Filtres du journal de surveillance', 'discord-bot-jlg'); ?>">
+                <input type="hidden" name="page" value="discord-bot-jlg" />
+                <input type="hidden" name="tab" value="monitoring" />
+
+                <label for="discord-monitoring-filter-type" class="discord-monitoring-history__filter">
+                    <span class="discord-monitoring-history__filter-label"><?php esc_html_e('Type', 'discord-bot-jlg'); ?></span>
+                    <select id="discord-monitoring-filter-type" name="log_type">
+                        <?php foreach ($event_type_options as $value => $label) : ?>
+                            <option value="<?php echo esc_attr($value); ?>"<?php selected($filters['type'], $value); ?>><?php echo esc_html($label); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+
+                <label for="discord-monitoring-filter-channel" class="discord-monitoring-history__filter">
+                    <span class="discord-monitoring-history__filter-label"><?php esc_html_e('Canal', 'discord-bot-jlg'); ?></span>
+                    <select id="discord-monitoring-filter-channel" name="log_channel">
+                        <?php foreach ($channel_options as $value => $label) : ?>
+                            <option value="<?php echo esc_attr($value); ?>"<?php selected($filters['channel'], $value); ?>><?php echo esc_html($label); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+
+                <label for="discord-monitoring-filter-profile" class="discord-monitoring-history__filter">
+                    <span class="discord-monitoring-history__filter-label"><?php esc_html_e('Profil', 'discord-bot-jlg'); ?></span>
+                    <select id="discord-monitoring-filter-profile" name="log_profile">
+                        <?php foreach ($profile_options as $value => $label) : ?>
+                            <option value="<?php echo esc_attr($value); ?>"<?php selected($filters['profile'], $value); ?>><?php echo esc_html($label); ?></option>
+                        <?php endforeach; ?>
+                    </select>
+                </label>
+
+                <label for="discord-monitoring-filter-server" class="discord-monitoring-history__filter">
+                    <span class="discord-monitoring-history__filter-label"><?php esc_html_e('Serveur', 'discord-bot-jlg'); ?></span>
+                    <input type="text" id="discord-monitoring-filter-server" name="log_server" value="<?php echo esc_attr($filters['server_id']); ?>" placeholder="123456789" />
+                </label>
+
+                <div class="discord-monitoring-history__filter-actions">
+                    <button type="submit" class="button button-secondary"><?php esc_html_e('Filtrer', 'discord-bot-jlg'); ?></button>
+                    <a class="button button-link" href="<?php echo esc_url($reset_filters_url); ?>"><?php esc_html_e('Réinitialiser', 'discord-bot-jlg'); ?></a>
+                </div>
+            </form>
+
+            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="discord-monitoring-history__export">
+                <?php wp_nonce_field('discord_bot_jlg_export_monitoring', '_discord_monitoring_nonce'); ?>
+                <input type="hidden" name="action" value="discord_bot_jlg_export_log" />
+                <input type="hidden" name="log_type" value="<?php echo esc_attr($filters['type']); ?>" />
+                <input type="hidden" name="log_channel" value="<?php echo esc_attr($filters['channel']); ?>" />
+                <input type="hidden" name="log_profile" value="<?php echo esc_attr($filters['profile']); ?>" />
+                <input type="hidden" name="log_server" value="<?php echo esc_attr($filters['server_id']); ?>" />
+                <button type="submit" class="button button-primary">
+                    <?php esc_html_e('Exporter en CSV', 'discord-bot-jlg'); ?>
+                </button>
+            </form>
+
+            <?php if (empty($timeline_entries)) : ?>
                 <p><?php esc_html_e('Aucun événement à afficher pour le moment.', 'discord-bot-jlg'); ?></p>
             <?php else : ?>
                 <ol class="discord-monitoring-history__list">
-                    <?php foreach ($events as $entry) :
+                    <?php foreach ($timeline_entries as $entry) :
                         $entry_timestamp = isset($entry['timestamp']) ? (int) $entry['timestamp'] : 0;
                         $entry_label     = isset($entry['label']) ? $entry['label'] : '';
                         $entry_reason    = isset($entry['reason']) ? $entry['reason'] : '';
+                        $entry_outcome   = isset($entry['outcome']) ? sanitize_html_class($entry['outcome']) : '';
                         ?>
-                        <li class="discord-monitoring-history__item">
+                        <li class="discord-monitoring-history__item<?php echo '' !== $entry_outcome ? ' discord-monitoring-history__item--' . esc_attr($entry_outcome) : ''; ?>">
                             <div class="discord-monitoring-history__meta">
                                 <?php if ($entry_timestamp > 0) : ?>
                                     <span class="discord-monitoring-history__time" aria-hidden="true">
@@ -2097,6 +2215,102 @@ class Discord_Bot_JLG_Admin {
             <?php endif; ?>
         </div>
         <?php
+    }
+
+    public function handle_monitoring_export() {
+        if (!current_user_can('manage_options')) {
+            wp_die(__('Vous n’avez pas les droits suffisants pour exporter ce journal.', 'discord-bot-jlg'));
+        }
+
+        check_admin_referer('discord_bot_jlg_export_monitoring', '_discord_monitoring_nonce');
+
+        $filters = $this->get_monitoring_filters('post');
+
+        $entries = $this->api->get_monitoring_timeline(
+            array(
+                'limit'       => 100,
+                'event_type'  => $filters['type'],
+                'channel'     => $filters['channel'],
+                'profile_key' => $filters['profile'],
+                'server_id'   => $filters['server_id'],
+            )
+        );
+
+        $filename = 'discord-monitoring-log-' . gmdate('Ymd-His') . '.csv';
+
+        nocache_headers();
+        header('Content-Type: text/csv; charset=utf-8');
+        header('Content-Disposition: attachment; filename=' . $filename);
+
+        $output = fopen('php://output', 'w');
+        if (false === $output) {
+            wp_die(__('Impossible de générer le fichier CSV.', 'discord-bot-jlg'));
+        }
+
+        fputcsv($output, array(
+            __('Horodatage', 'discord-bot-jlg'),
+            __('Type', 'discord-bot-jlg'),
+            __('Canal', 'discord-bot-jlg'),
+            __('Profil', 'discord-bot-jlg'),
+            __('Résumé', 'discord-bot-jlg'),
+            __('Détails', 'discord-bot-jlg'),
+        ));
+
+        $channel_labels = array(
+            'widget' => __('Widget', 'discord-bot-jlg'),
+            'bot'    => __('Bot', 'discord-bot-jlg'),
+            'queue'  => __('File', 'discord-bot-jlg'),
+            'cron'   => __('Cron', 'discord-bot-jlg'),
+            'rest'   => __('REST', 'discord-bot-jlg'),
+        );
+
+        $type_labels = array(
+            'discord_http'      => __('API Discord', 'discord-bot-jlg'),
+            'discord_connector' => __('Connecteur', 'discord-bot-jlg'),
+        );
+
+        foreach ($entries as $entry) {
+            if (!is_array($entry)) {
+                continue;
+            }
+
+            $timestamp = isset($entry['timestamp']) ? (int) $entry['timestamp'] : 0;
+            $type      = isset($entry['type']) ? sanitize_key($entry['type']) : '';
+            $channel   = isset($entry['channel']) ? sanitize_key($entry['channel']) : '';
+            $profile   = isset($entry['profile_key']) ? sanitize_key($entry['profile_key']) : '';
+            $label     = isset($entry['label']) ? $entry['label'] : '';
+            $reason    = isset($entry['reason']) ? $entry['reason'] : '';
+
+            $formatted_date = ($timestamp > 0)
+                ? get_date_from_gmt(gmdate('Y-m-d H:i:s', $timestamp), get_option('date_format') . ' ' . get_option('time_format'))
+                : '';
+
+            $type_label = isset($type_labels[$type]) ? $type_labels[$type] : $type;
+            $channel_label = isset($channel_labels[$channel]) ? $channel_labels[$channel] : $channel;
+
+            if ('' === $profile) {
+                $profile_label = __('Profil principal', 'discord-bot-jlg');
+            } elseif ('default' === $profile) {
+                $profile_label = __('Profil principal', 'discord-bot-jlg');
+            } else {
+                $profile_label = $profile;
+            }
+
+            fputcsv(
+                $output,
+                array(
+                    $formatted_date,
+                    $type_label,
+                    $channel_label,
+                    $profile_label,
+                    wp_strip_all_tags($label),
+                    wp_strip_all_tags($reason),
+                )
+            );
+        }
+
+        fclose($output);
+        exit;
     }
 
     /**
@@ -2933,6 +3147,45 @@ class Discord_Bot_JLG_Admin {
             <p class="discord-analytics-panel__notice" data-role="analytics-notice"></p>
         </div>
         <?php
+    }
+
+    private function get_monitoring_filters($source = 'get') {
+        $filters = array(
+            'type'      => '',
+            'channel'   => '',
+            'profile'   => '',
+            'server_id' => '',
+        );
+
+        $input = ('post' === $source) ? $_POST : $_GET;
+
+        $mapping = array(
+            'log_type'    => 'type',
+            'log_channel' => 'channel',
+            'log_profile' => 'profile',
+            'log_server'  => 'server_id',
+        );
+
+        foreach ($mapping as $key => $target) {
+            if (!isset($input[$key])) {
+                continue;
+            }
+
+            $raw = wp_unslash($input[$key]);
+
+            switch ($target) {
+                case 'type':
+                case 'channel':
+                case 'profile':
+                    $filters[$target] = sanitize_key($raw);
+                    break;
+                case 'server_id':
+                    $filters[$target] = preg_replace('/[^0-9]/', '', (string) $raw);
+                    break;
+            }
+        }
+
+        return $filters;
     }
 
     /**
