@@ -199,6 +199,8 @@ class Discord_Bot_JLG_Shortcode {
                 'cta_new_tab'          => true,
                 'cta_tooltip'          => '',
                 'profile'              => '',
+                'profiles'             => array(),
+                'reference_profile'    => '',
                 'server_id'            => '',
                 'show_sparkline'       => false,
                 'sparkline_metric'     => 'online',
@@ -271,7 +273,33 @@ class Discord_Bot_JLG_Shortcode {
         }
 
         $profile_key        = $this->sanitize_profile_key($atts['profile']);
+        $selected_profiles  = $this->sanitize_profiles_attribute($atts['profiles']);
+        $reference_profile  = $this->sanitize_profile_key($atts['reference_profile']);
         $override_server_id = $this->sanitize_server_id_attribute($atts['server_id']);
+
+        $comparison_profiles = $selected_profiles;
+
+        if ('' !== $profile_key) {
+            array_unshift($comparison_profiles, $profile_key);
+        }
+
+        if (!empty($comparison_profiles)) {
+            $comparison_profiles = array_values(array_unique($comparison_profiles));
+        }
+
+        if ('' !== $reference_profile && in_array($reference_profile, $comparison_profiles, true)) {
+            $profile_key = $reference_profile;
+        } elseif ('' === $profile_key && !empty($comparison_profiles)) {
+            $profile_key = $comparison_profiles[0];
+        }
+
+        if (!in_array($profile_key, $comparison_profiles, true)) {
+            array_unshift($comparison_profiles, $profile_key);
+        }
+
+        if (count($comparison_profiles) > 4) {
+            $comparison_profiles = array_slice($comparison_profiles, 0, 4);
+        }
 
         $sparkline_metric_label_map = array(
             'online'   => isset($atts['label_online']) ? $atts['label_online'] : __('En ligne', 'discord-bot-jlg'),
@@ -302,6 +330,59 @@ class Discord_Bot_JLG_Shortcode {
                 esc_html__('Impossible de récupérer les stats Discord', 'discord-bot-jlg')
             );
         }
+
+        $comparison_stats_map = array(
+            $profile_key => $stats,
+        );
+
+        if (!empty($comparison_profiles)) {
+            foreach ($comparison_profiles as $comparison_profile) {
+                if (!is_string($comparison_profile)) {
+                    continue;
+                }
+
+                if ($comparison_profile === $profile_key) {
+                    continue;
+                }
+
+                if (isset($comparison_stats_map[$comparison_profile])) {
+                    continue;
+                }
+
+                $comparison_args = array();
+
+                if ('' !== $comparison_profile) {
+                    $comparison_args['profile_key'] = $comparison_profile;
+                }
+
+                $additional_stats = $this->api->get_stats($comparison_args);
+
+                if (!is_array($additional_stats)) {
+                    continue;
+                }
+
+                $comparison_stats_map[$comparison_profile] = $additional_stats;
+            }
+        }
+
+        $available_comparison_profiles = array();
+        foreach ($comparison_profiles as $comparison_profile) {
+            if (!is_string($comparison_profile)) {
+                continue;
+            }
+
+            if (!isset($comparison_stats_map[$comparison_profile])) {
+                continue;
+            }
+
+            $available_comparison_profiles[] = $comparison_profile;
+        }
+
+        if (empty($available_comparison_profiles)) {
+            $available_comparison_profiles = array($profile_key);
+        }
+
+        $comparison_profiles = $available_comparison_profiles;
 
         if (function_exists('wp_unique_id')) {
             $unique_id = wp_unique_id('discord-stats-');
@@ -799,6 +880,95 @@ class Discord_Bot_JLG_Shortcode {
             $status_meta_json = '{}';
         }
 
+        $comparison_entries = array();
+        $comparison_payload = array();
+        $comparison_payload_json = '';
+        $comparison_reference_label = '';
+        $comparison_reference_updated = '';
+        $comparison_metric_labels = array(
+            'online'   => isset($atts['label_online']) ? $atts['label_online'] : __('En ligne', 'discord-bot-jlg'),
+            'presence' => isset($atts['label_presence']) ? $atts['label_presence'] : __('Présence', 'discord-bot-jlg'),
+            'total'    => isset($atts['label_total']) ? $atts['label_total'] : __('Membres', 'discord-bot-jlg'),
+            'premium'  => isset($atts['label_premium']) ? $atts['label_premium'] : __('Boosts serveur', 'discord-bot-jlg'),
+        );
+        $comparison_presence_labels = array(
+            'online'    => isset($atts['label_presence_online']) ? $atts['label_presence_online'] : __('En ligne', 'discord-bot-jlg'),
+            'idle'      => isset($atts['label_presence_idle']) ? $atts['label_presence_idle'] : __('Inactif', 'discord-bot-jlg'),
+            'dnd'       => isset($atts['label_presence_dnd']) ? $atts['label_presence_dnd'] : __('Ne pas déranger', 'discord-bot-jlg'),
+            'offline'   => isset($atts['label_presence_offline']) ? $atts['label_presence_offline'] : __('Hors ligne', 'discord-bot-jlg'),
+            'streaming' => isset($atts['label_presence_streaming']) ? $atts['label_presence_streaming'] : __('En direct', 'discord-bot-jlg'),
+            'other'     => isset($atts['label_presence_other']) ? $atts['label_presence_other'] : __('Autres', 'discord-bot-jlg'),
+        );
+        $has_comparison = false;
+
+        if (isset($comparison_stats_map[$profile_key])) {
+            $profile_labels_map = $this->resolve_profile_labels($comparison_profiles);
+
+            if (!array_key_exists($profile_key, $profile_labels_map)) {
+                $profile_labels_map[$profile_key] = ('' !== $profile_key)
+                    ? $profile_key
+                    : __('Configuration globale', 'discord-bot-jlg');
+            }
+
+            $reference_metrics = $this->extract_comparison_metrics($comparison_stats_map[$profile_key]);
+
+            $comparison_entries[] = $this->build_comparison_entry(
+                $profile_key,
+                $comparison_stats_map[$profile_key],
+                $profile_labels_map,
+                $reference_metrics,
+                true,
+                $status_labels,
+                $status_descriptions,
+                $format_status_timestamp,
+                $no_data_label
+            );
+
+            foreach ($comparison_profiles as $comparison_profile) {
+                if ($comparison_profile === $profile_key) {
+                    continue;
+                }
+
+                if (!isset($comparison_stats_map[$comparison_profile])) {
+                    continue;
+                }
+
+                if (!array_key_exists($comparison_profile, $profile_labels_map)) {
+                    $profile_labels_map[$comparison_profile] = ('' !== $comparison_profile)
+                        ? $comparison_profile
+                        : __('Configuration globale', 'discord-bot-jlg');
+                }
+
+                $comparison_entries[] = $this->build_comparison_entry(
+                    $comparison_profile,
+                    $comparison_stats_map[$comparison_profile],
+                    $profile_labels_map,
+                    $reference_metrics,
+                    false,
+                    $status_labels,
+                    $status_descriptions,
+                    $format_status_timestamp,
+                    $no_data_label
+                );
+            }
+
+            if (count($comparison_entries) > 1) {
+                $has_comparison = true;
+                $comparison_payload = $this->build_comparison_payload($comparison_entries);
+                $comparison_reference_label = $comparison_entries[0]['label'];
+                $comparison_reference_updated = $comparison_entries[0]['formatted_last_updated'];
+                $container_classes[] = 'discord-has-comparison';
+            }
+        }
+
+        if ($has_comparison && !empty($comparison_payload)) {
+            $comparison_payload_json = wp_json_encode($comparison_payload);
+
+            if (false === $comparison_payload_json) {
+                $comparison_payload_json = '';
+            }
+        }
+
         $attributes = array(
             sprintf('id="%s"', esc_attr($unique_id)),
             sprintf('class="%s"', esc_attr(implode(' ', $container_classes))),
@@ -814,6 +984,10 @@ class Discord_Bot_JLG_Shortcode {
             sprintf('data-region-title-id="%s"', esc_attr($title_id)),
             sprintf('data-region-server-id="%s"', esc_attr($server_name_id)),
             sprintf('data-region-synthetic-id="%s"', esc_attr($region_synthetic_label_id)),
+            sprintf('data-label-online="%s"', esc_attr($atts['label_online'])),
+            sprintf('data-label-total="%s"', esc_attr($atts['label_total'])),
+            sprintf('data-label-presence="%s"', esc_attr($atts['label_presence'])),
+            sprintf('data-label-premium="%s"', esc_attr($atts['label_premium']))
         );
 
         if (!empty($region_label_ids)) {
@@ -884,6 +1058,15 @@ class Discord_Bot_JLG_Shortcode {
             $attributes[] = 'data-show-sparkline="true"';
             $attributes[] = sprintf('data-sparkline-metric="%s"', esc_attr($sparkline_metric));
             $attributes[] = sprintf('data-sparkline-days="%d"', (int) $sparkline_days);
+        }
+
+        if ($has_comparison) {
+            $attributes[] = sprintf('data-comparison-count="%d"', (int) count($comparison_entries));
+            $attributes[] = sprintf('data-comparison-reference="%s"', esc_attr($profile_key));
+
+            if ('' !== $comparison_payload_json) {
+                $attributes[] = sprintf('data-comparison-payload="%s"', esc_attr($comparison_payload_json));
+            }
         }
 
         $status_panel_id        = $unique_id . '-status-panel';
@@ -1146,6 +1329,34 @@ class Discord_Bot_JLG_Shortcode {
                     if ($presence_display_value < 0) {
                         $presence_display_value = 0;
                     }
+
+                    $presence_breakdown_data = array();
+                    foreach ($presence_counts_ordered as $status_key => $status_count) {
+                        $presence_breakdown_data[$status_key] = max(0, (int) $status_count);
+                    }
+
+                    $presence_breakdown_json = '';
+                    if (!empty($presence_breakdown_data)) {
+                        $presence_breakdown_encoded = wp_json_encode($presence_breakdown_data);
+                        if (false !== $presence_breakdown_encoded) {
+                            $presence_breakdown_json = $presence_breakdown_encoded;
+                        }
+                    }
+
+                    $presence_labels_export = array();
+                    foreach ($presence_label_map as $status_key => $status_label_value) {
+                        $presence_labels_export[$status_key] = (string) $status_label_value;
+                    }
+
+                    $presence_labels_json = '';
+                    if (!empty($presence_labels_export)) {
+                        $presence_labels_encoded = wp_json_encode($presence_labels_export);
+                        if (false !== $presence_labels_encoded) {
+                            $presence_labels_json = $presence_labels_encoded;
+                        }
+                    }
+
+                    $presence_total = max(0, (int) $presence_display_value);
                     ?>
                     <?php $presence_label_id = $unique_id . '-label-presence'; ?>
                     <div class="discord-stat discord-presence-breakdown"
@@ -1157,39 +1368,96 @@ class Discord_Bot_JLG_Shortcode {
                         data-label-offline="<?php echo esc_attr($presence_label_map['offline']); ?>"
                         data-label-streaming="<?php echo esc_attr($presence_label_map['streaming']); ?>"
                         data-label-other="<?php echo esc_attr($presence_label_map['other']); ?>"
+                        data-label-total="<?php echo esc_attr($atts['label_total']); ?>"
+                        data-label-online-metric="<?php echo esc_attr($atts['label_online']); ?>"
                         data-hide-labels="<?php echo esc_attr($hide_labels ? 'true' : 'false'); ?>"
-                        <?php if (null !== $presence_display_value) : ?>
-                        data-value="<?php echo esc_attr($presence_display_value); ?>"
+                        data-presence-total="<?php echo esc_attr($presence_total); ?>"
+                        <?php if ('' !== $presence_breakdown_json) : ?>
+                        data-presence-breakdown="<?php echo esc_attr($presence_breakdown_json); ?>"
+                        <?php endif; ?>
+                        <?php if ('' !== $presence_labels_json) : ?>
+                        data-presence-labels="<?php echo esc_attr($presence_labels_json); ?>"
                         <?php endif; ?>>
                         <?php if (!$hide_icons): ?>
                         <span class="discord-icon"><?php echo esc_html($atts['icon_presence']); ?></span>
                         <?php endif; ?>
                         <div class="discord-presence-content">
-                            <div class="discord-presence-summary">
+                            <div class="discord-presence-summary" data-role="discord-presence-summary">
                                 <span class="discord-number" role="status" aria-live="polite" aria-labelledby="<?php echo esc_attr($presence_label_id); ?>">
-                                    <span class="discord-number-value"><?php echo esc_html(number_format_i18n($presence_display_value)); ?></span>
+                                    <span class="discord-number-value" data-role="discord-presence-total"><?php echo esc_html(number_format_i18n($presence_total)); ?></span>
                                 </span>
                                 <span class="<?php echo esc_attr(implode(' ', $presence_label_classes)); ?>">
                                     <span class="discord-label-text" id="<?php echo esc_attr($presence_label_id); ?>"><?php echo esc_html($atts['label_presence']); ?></span>
                                 </span>
+                                <span class="discord-presence-summary__selection" data-role="discord-presence-selection" aria-live="polite">
+                                    <span class="discord-presence-summary__selection-value" data-role="discord-presence-selected-value"><?php echo esc_html(number_format_i18n($presence_total)); ?></span>
+                                    <span class="discord-presence-summary__selection-share" data-role="discord-presence-selected-share">100%</span>
+                                </span>
                             </div>
-                            <?php if (!empty($presence_counts_ordered)) : ?>
-                            <ul class="discord-presence-list">
-                                <?php foreach ($presence_counts_ordered as $presence_status => $presence_value) :
-                                    $status_label = isset($presence_label_map[$presence_status])
-                                        ? $presence_label_map[$presence_status]
-                                        : ucfirst($presence_status);
-                                ?>
-                                <li class="discord-presence-item discord-presence-<?php echo esc_attr($presence_status); ?>"
-                                    data-status="<?php echo esc_attr($presence_status); ?>"
-                                    data-label="<?php echo esc_attr($status_label); ?>">
-                                    <span class="discord-presence-dot" aria-hidden="true"></span>
-                                    <span class="discord-presence-item-label"><?php echo esc_html($status_label); ?></span>
-                                    <span class="discord-presence-item-value"><?php echo esc_html(number_format_i18n(max(0, (int) $presence_value))); ?></span>
-                                </li>
-                                <?php endforeach; ?>
-                            </ul>
-                            <?php endif; ?>
+                            <div class="discord-presence-explorer" data-role="discord-presence-explorer">
+                                <div class="discord-presence-explorer__toolbar">
+                                    <div class="discord-presence-explorer__chips" data-role="discord-presence-filters">
+                                        <button type="button" class="discord-presence-chip is-active" data-role="discord-presence-chip" data-status="all">
+                                            <span class="discord-presence-chip__label"><?php esc_html_e('Tous', 'discord-bot-jlg'); ?></span>
+                                            <span class="discord-presence-chip__value" data-role="discord-presence-chip-value"><?php echo esc_html(number_format_i18n($presence_total)); ?></span>
+                                        </button>
+                                        <?php foreach ($presence_counts_ordered as $presence_status => $presence_value) :
+                                            $status_label = isset($presence_label_map[$presence_status])
+                                                ? $presence_label_map[$presence_status]
+                                                : ucfirst($presence_status);
+                                        ?>
+                                        <button type="button" class="discord-presence-chip" data-role="discord-presence-chip" data-status="<?php echo esc_attr($presence_status); ?>" data-count="<?php echo esc_attr(max(0, (int) $presence_value)); ?>">
+                                            <span class="discord-presence-chip__label"><?php echo esc_html($status_label); ?></span>
+                                            <span class="discord-presence-chip__value" data-role="discord-presence-chip-value"><?php echo esc_html(number_format_i18n(max(0, (int) $presence_value))); ?></span>
+                                        </button>
+                                        <?php endforeach; ?>
+                                    </div>
+                                    <div class="discord-presence-explorer__meta" data-role="discord-presence-meta">
+                                        <span class="discord-presence-explorer__meta-label"><?php esc_html_e('Statuts sélectionnés', 'discord-bot-jlg'); ?></span>
+                                        <span class="discord-presence-explorer__meta-value" data-role="discord-presence-meta-value"><?php echo esc_html(number_format_i18n($presence_total)); ?></span>
+                                        <span class="discord-presence-explorer__meta-share" data-role="discord-presence-meta-share">100%</span>
+                                    </div>
+                                </div>
+                                <div class="discord-presence-explorer__panels">
+                                    <div class="discord-presence-explorer__panel discord-presence-explorer__panel--list">
+                                        <ul class="discord-presence-list" data-role="discord-presence-list">
+                                            <?php foreach ($presence_counts_ordered as $presence_status => $presence_value) :
+                                                $status_label = isset($presence_label_map[$presence_status])
+                                                    ? $presence_label_map[$presence_status]
+                                                    : ucfirst($presence_status);
+                                                $presence_value_sanitized = max(0, (int) $presence_value);
+                                                $presence_share = ($presence_total > 0)
+                                                    ? max(0, min(100, round(($presence_value_sanitized / $presence_total) * 100)))
+                                                    : 0;
+                                            ?>
+                                            <li class="discord-presence-item discord-presence-<?php echo esc_attr($presence_status); ?>"
+                                                data-status="<?php echo esc_attr($presence_status); ?>"
+                                                data-label="<?php echo esc_attr($status_label); ?>"
+                                                data-count="<?php echo esc_attr($presence_value_sanitized); ?>"
+                                                data-share="<?php echo esc_attr($presence_share); ?>">
+                                                <span class="discord-presence-dot" aria-hidden="true"></span>
+                                                <span class="discord-presence-item-label"><?php echo esc_html($status_label); ?></span>
+                                                <span class="discord-presence-item-value"><?php echo esc_html(number_format_i18n($presence_value_sanitized)); ?></span>
+                                                <span class="discord-presence-item-share"><?php printf(esc_html__('%d%%', 'discord-bot-jlg'), $presence_share); ?></span>
+                                            </li>
+                                            <?php endforeach; ?>
+                                        </ul>
+                                    </div>
+                                    <div class="discord-presence-explorer__panel discord-presence-explorer__panel--heatmap">
+                                        <div class="discord-presence-heatmap" data-role="discord-presence-heatmap">
+                                            <div class="discord-presence-heatmap__empty" data-role="discord-presence-heatmap-empty"><?php esc_html_e('En attente de données historiques…', 'discord-bot-jlg'); ?></div>
+                                        </div>
+                                    </div>
+                                    <div class="discord-presence-explorer__panel discord-presence-explorer__panel--timeline">
+                                        <div class="discord-presence-timeline" data-role="discord-presence-timeline">
+                                            <div class="discord-presence-timeline__toolbar" data-role="discord-presence-timeline-toolbar"></div>
+                                            <div class="discord-presence-timeline__body" data-role="discord-presence-timeline-body">
+                                                <div class="discord-presence-timeline__empty" data-role="discord-presence-timeline-empty"><?php esc_html_e('Les tendances seront affichées après la première synchronisation.', 'discord-bot-jlg'); ?></div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
                         </div>
                     </div>
                     <?php endif; ?>
@@ -1283,6 +1551,109 @@ class Discord_Bot_JLG_Shortcode {
                 <?php endif; ?>
             </div>
         </div>
+
+        <?php if ($has_comparison) : ?>
+        <div class="discord-comparison-summary" data-role="discord-comparison-summary">
+            <div class="discord-comparison-summary__header">
+                <span class="discord-comparison-summary__title"><?php esc_html_e('Comparaison multi-profils', 'discord-bot-jlg'); ?></span>
+                <button type="button" class="discord-comparison-summary__export" data-role="discord-comparison-export">
+                    <?php esc_html_e('Exporter la comparaison', 'discord-bot-jlg'); ?>
+                </button>
+            </div>
+            <div class="discord-comparison-summary__band">
+                <span class="discord-comparison-summary__reference"><?php printf(esc_html__('Référence : %s', 'discord-bot-jlg'), esc_html($comparison_reference_label)); ?></span>
+                <span class="discord-comparison-summary__timestamp"><?php printf(esc_html__('Dernière synchro : %s', 'discord-bot-jlg'), esc_html($comparison_reference_updated)); ?></span>
+            </div>
+        </div>
+        <div class="discord-comparison-grid" data-role="discord-comparison-grid" aria-label="<?php esc_attr_e('Comparaison multi-profils Discord', 'discord-bot-jlg'); ?>">
+            <?php foreach ($comparison_entries as $comparison_entry) :
+                $entry_metrics = isset($comparison_entry['metrics']) && is_array($comparison_entry['metrics'])
+                    ? $comparison_entry['metrics']
+                    : array();
+                $entry_deltas = isset($comparison_entry['deltas']) && is_array($comparison_entry['deltas'])
+                    ? $comparison_entry['deltas']
+                    : array();
+            ?>
+            <article class="discord-comparison-card<?php echo $comparison_entry['is_reference'] ? ' is-reference' : ''; ?>"
+                data-profile-key="<?php echo esc_attr($comparison_entry['profile']); ?>"
+                data-status-variant="<?php echo esc_attr($comparison_entry['status_variant']); ?>">
+                <header class="discord-comparison-card__header">
+                    <span class="discord-comparison-card__mode"><?php echo esc_html($comparison_entry['status_label']); ?></span>
+                    <h3 class="discord-comparison-card__title"><?php echo esc_html($comparison_entry['label']); ?></h3>
+                    <?php if ('' !== $comparison_entry['server_name']) : ?>
+                    <p class="discord-comparison-card__server"><?php echo esc_html($comparison_entry['server_name']); ?></p>
+                    <?php endif; ?>
+                </header>
+                <dl class="discord-comparison-card__metrics">
+                    <?php foreach ($comparison_metric_labels as $metric_key => $metric_label) :
+                        if (!isset($entry_metrics[$metric_key]) || null === $entry_metrics[$metric_key]) {
+                            continue;
+                        }
+
+                        $metric_value = (int) $entry_metrics[$metric_key];
+                        $metric_value_formatted = number_format_i18n($metric_value);
+                        $delta_value = isset($entry_deltas[$metric_key]) ? $entry_deltas[$metric_key] : null;
+                        $delta_class = 'is-neutral';
+                        $delta_text = esc_html__('—', 'discord-bot-jlg');
+
+                        if ($comparison_entry['is_reference']) {
+                            $delta_text = esc_html__('Référence', 'discord-bot-jlg');
+                            $delta_class = 'is-reference';
+                        } elseif (null !== $delta_value) {
+                            if ($delta_value > 0) {
+                                $delta_class = 'is-positive';
+                                $delta_text = '+' . number_format_i18n($delta_value);
+                            } elseif ($delta_value < 0) {
+                                $delta_class = 'is-negative';
+                                $delta_text = '−' . number_format_i18n(abs($delta_value));
+                            } else {
+                                $delta_class = 'is-neutral';
+                                $delta_text = esc_html__('Égal', 'discord-bot-jlg');
+                            }
+                        }
+                    ?>
+                    <div class="discord-comparison-card__metric discord-comparison-card__metric--<?php echo esc_attr($metric_key); ?>">
+                        <dt><?php echo esc_html($metric_label); ?></dt>
+                        <dd class="discord-comparison-card__metric-value"><?php echo esc_html($metric_value_formatted); ?></dd>
+                        <dd class="discord-comparison-card__metric-delta <?php echo esc_attr($delta_class); ?>"><?php echo esc_html($delta_text); ?></dd>
+                    </div>
+                    <?php endforeach; ?>
+                </dl>
+                <?php
+                $presence_breakdown = array();
+                if (isset($entry_metrics['presence_breakdown']) && is_array($entry_metrics['presence_breakdown'])) {
+                    $presence_breakdown = array_slice($entry_metrics['presence_breakdown'], 0, 4, true);
+                }
+                if (!empty($presence_breakdown)) :
+                    $presence_total = array_sum($entry_metrics['presence_breakdown']);
+                ?>
+                <ul class="discord-comparison-card__presence">
+                    <?php foreach ($presence_breakdown as $presence_status => $presence_value) :
+                        $presence_label = isset($comparison_presence_labels[$presence_status])
+                            ? $comparison_presence_labels[$presence_status]
+                            : ucfirst($presence_status);
+                        $presence_share = ($presence_total > 0)
+                            ? round(($presence_value / $presence_total) * 100)
+                            : 0;
+                    ?>
+                    <li class="discord-comparison-card__presence-item discord-comparison-card__presence-item--<?php echo esc_attr($presence_status); ?>">
+                        <span class="discord-comparison-card__presence-label"><?php echo esc_html($presence_label); ?></span>
+                        <span class="discord-comparison-card__presence-value"><?php echo esc_html(number_format_i18n($presence_value)); ?></span>
+                        <span class="discord-comparison-card__presence-share"><?php printf(esc_html__('%d%%', 'discord-bot-jlg'), $presence_share); ?></span>
+                    </li>
+                    <?php endforeach; ?>
+                </ul>
+                <?php endif; ?>
+                <footer class="discord-comparison-card__footer">
+                    <span class="discord-comparison-card__updated"><?php printf(esc_html__('Dernière synchro : %s', 'discord-bot-jlg'), esc_html($comparison_entry['formatted_last_updated'])); ?></span>
+                    <?php if ('' !== $comparison_entry['status_description']) : ?>
+                    <span class="discord-comparison-card__status-hint"><?php echo esc_html($comparison_entry['status_description']); ?></span>
+                    <?php endif; ?>
+                </footer>
+            </article>
+            <?php endforeach; ?>
+        </div>
+        <?php endif; ?>
 
         <?php if ('' !== $invite_url) :
             $invite_button_classes = array('discord-invite-button', 'wp-element-button');
@@ -1421,6 +1792,291 @@ class Discord_Bot_JLG_Shortcode {
         }
 
         return '';
+    }
+
+    private function sanitize_profiles_attribute($profiles) {
+        if (is_string($profiles)) {
+            $decoded = json_decode($profiles, true);
+
+            if (is_array($decoded)) {
+                $profiles = $decoded;
+            } else {
+                $profiles = array_map('trim', explode(',', $profiles));
+            }
+        }
+
+        if (!is_array($profiles)) {
+            return array();
+        }
+
+        $normalized = array();
+
+        foreach ($profiles as $value) {
+            if (is_string($value) || is_numeric($value)) {
+                $string_value = is_string($value) ? trim($value) : (string) $value;
+            } elseif (is_bool($value)) {
+                $string_value = $value ? '1' : '0';
+            } else {
+                continue;
+            }
+
+            if ('' === $string_value) {
+                $normalized[] = '';
+                continue;
+            }
+
+            $sanitized = sanitize_key($string_value);
+
+            if ('' === $sanitized) {
+                continue;
+            }
+
+            $normalized[] = $sanitized;
+        }
+
+        if (empty($normalized)) {
+            return array();
+        }
+
+        $normalized = array_values(array_unique($normalized));
+
+        if (count($normalized) > 4) {
+            $normalized = array_slice($normalized, 0, 4);
+        }
+
+        return $normalized;
+    }
+
+    private function resolve_profile_labels($profile_keys) {
+        if (!is_array($profile_keys) || empty($profile_keys)) {
+            return array();
+        }
+
+        $labels = array();
+        $profiles = $this->api->get_server_profiles(false);
+
+        if (!is_array($profiles)) {
+            $profiles = array();
+        }
+
+        foreach ($profile_keys as $profile_key) {
+            if (!is_string($profile_key)) {
+                continue;
+            }
+
+            if ('' === $profile_key) {
+                $labels[''] = __('Configuration globale', 'discord-bot-jlg');
+                continue;
+            }
+
+            if (isset($profiles[$profile_key]) && is_array($profiles[$profile_key])) {
+                $label = '';
+
+                if (isset($profiles[$profile_key]['label'])) {
+                    $label = sanitize_text_field($profiles[$profile_key]['label']);
+                }
+
+                if ('' === $label) {
+                    $label = $profile_key;
+                }
+
+                $labels[$profile_key] = $label;
+                continue;
+            }
+
+            $labels[$profile_key] = $profile_key;
+        }
+
+        return $labels;
+    }
+
+    private function determine_status_variant_from_stats($stats) {
+        $is_demo = !empty($stats['is_demo']);
+        $is_fallback_demo = !empty($stats['fallback_demo']);
+        $is_stale = !empty($stats['stale']);
+
+        if ($is_fallback_demo) {
+            return 'fallback';
+        }
+
+        if ($is_demo) {
+            return 'demo';
+        }
+
+        if ($is_stale) {
+            return 'cache';
+        }
+
+        return 'live';
+    }
+
+    private function extract_comparison_metrics($stats) {
+        $metrics = array(
+            'online'             => null,
+            'total'              => null,
+            'presence'           => null,
+            'premium'            => null,
+            'presence_breakdown' => array(),
+            'status_variant'     => 'unknown',
+            'last_updated'       => 0,
+        );
+
+        if (!is_array($stats)) {
+            return $metrics;
+        }
+
+        if (isset($stats['online']) && null !== $stats['online']) {
+            $metrics['online'] = max(0, (int) $stats['online']);
+        }
+
+        if (isset($stats['total']) && null !== $stats['total']) {
+            $metrics['total'] = max(0, (int) $stats['total']);
+        }
+
+        if (isset($stats['premium_subscription_count']) && null !== $stats['premium_subscription_count']) {
+            $metrics['premium'] = max(0, (int) $stats['premium_subscription_count']);
+        }
+
+        if (isset($stats['last_updated'])) {
+            $metrics['last_updated'] = (int) $stats['last_updated'];
+        }
+
+        $presence_counts = array();
+
+        if (!empty($stats['presence_count_by_status']) && is_array($stats['presence_count_by_status'])) {
+            foreach ($stats['presence_count_by_status'] as $status_key => $value) {
+                if (!is_scalar($value)) {
+                    continue;
+                }
+
+                $status_slug = sanitize_key($status_key);
+
+                if ('' === $status_slug) {
+                    continue;
+                }
+
+                $presence_counts[$status_slug] = max(0, (int) $value);
+            }
+        }
+
+        $preferred_order = array('online', 'idle', 'dnd', 'offline', 'streaming', 'other');
+        $ordered_breakdown = array();
+
+        foreach ($preferred_order as $preferred_status) {
+            if (array_key_exists($preferred_status, $presence_counts)) {
+                $ordered_breakdown[$preferred_status] = $presence_counts[$preferred_status];
+                unset($presence_counts[$preferred_status]);
+            }
+        }
+
+        if (!empty($presence_counts)) {
+            foreach ($presence_counts as $status_slug => $count) {
+                $ordered_breakdown[$status_slug] = $count;
+            }
+        }
+
+        $metrics['presence_breakdown'] = $ordered_breakdown;
+
+        if (isset($stats['approximate_presence_count']) && null !== $stats['approximate_presence_count']) {
+            $metrics['presence'] = max(0, (int) $stats['approximate_presence_count']);
+        } elseif (!empty($ordered_breakdown)) {
+            $metrics['presence'] = array_sum($ordered_breakdown);
+        } elseif (null !== $metrics['online']) {
+            $metrics['presence'] = $metrics['online'];
+        }
+
+        $metrics['status_variant'] = $this->determine_status_variant_from_stats($stats);
+
+        return $metrics;
+    }
+
+    private function compute_comparison_deltas($metrics, $reference_metrics) {
+        $keys = array('online', 'total', 'presence', 'premium');
+        $deltas = array();
+
+        foreach ($keys as $key) {
+            if (!isset($metrics[$key]) || null === $metrics[$key] || !isset($reference_metrics[$key]) || null === $reference_metrics[$key]) {
+                $deltas[$key] = null;
+                continue;
+            }
+
+            $deltas[$key] = (int) $metrics[$key] - (int) $reference_metrics[$key];
+        }
+
+        return $deltas;
+    }
+
+    private function build_comparison_entry($profile_key, array $stats, array $profile_labels, array $reference_metrics, $is_reference, array $status_labels, array $status_descriptions, $format_timestamp_callback, $no_data_label) {
+        $metrics = $this->extract_comparison_metrics($stats);
+        $deltas = $this->compute_comparison_deltas($metrics, $reference_metrics);
+
+        $label = isset($profile_labels[$profile_key]) ? $profile_labels[$profile_key] : '';
+
+        if ('' === $label) {
+            $label = ('' !== $profile_key) ? $profile_key : __('Configuration globale', 'discord-bot-jlg');
+        }
+
+        $status_variant = isset($metrics['status_variant']) ? $metrics['status_variant'] : 'unknown';
+        $status_label = isset($status_labels[$status_variant]) ? $status_labels[$status_variant] : $status_labels['unknown'];
+        $status_description = isset($status_descriptions[$status_variant]) ? $status_descriptions[$status_variant] : '';
+
+        $last_updated = isset($metrics['last_updated']) ? (int) $metrics['last_updated'] : 0;
+        $formatted_last_updated = '';
+
+        if (is_callable($format_timestamp_callback)) {
+            $formatted_last_updated = call_user_func($format_timestamp_callback, $last_updated);
+        }
+
+        if ('' === $formatted_last_updated) {
+            $formatted_last_updated = $no_data_label;
+        }
+
+        return array(
+            'profile'                => $profile_key,
+            'label'                  => $label,
+            'server_name'            => isset($stats['server_name']) ? trim((string) $stats['server_name']) : '',
+            'metrics'                => $metrics,
+            'deltas'                 => $deltas,
+            'is_reference'           => $is_reference,
+            'status_variant'         => $status_variant,
+            'status_label'           => $status_label,
+            'status_description'     => $status_description,
+            'last_updated'           => $last_updated,
+            'formatted_last_updated' => $formatted_last_updated,
+        );
+    }
+
+    private function build_comparison_payload($entries) {
+        if (!is_array($entries) || empty($entries)) {
+            return array();
+        }
+
+        $payload = array(
+            'reference' => array(),
+            'entries'   => array(),
+        );
+
+        $reference_entry = $entries[0];
+        $payload['reference'] = array(
+            'profile' => $reference_entry['profile'],
+            'label'   => $reference_entry['label'],
+            'metrics' => $reference_entry['metrics'],
+        );
+
+        foreach ($entries as $entry) {
+            $payload['entries'][] = array(
+                'profile'        => $entry['profile'],
+                'label'          => $entry['label'],
+                'server_name'    => $entry['server_name'],
+                'metrics'        => $entry['metrics'],
+                'deltas'         => $entry['deltas'],
+                'is_reference'   => $entry['is_reference'],
+                'status_variant' => $entry['status_variant'],
+                'status_label'   => $entry['status_label'],
+            );
+        }
+
+        return $payload;
     }
 
     private function enqueue_assets($options, $needs_script = false) {

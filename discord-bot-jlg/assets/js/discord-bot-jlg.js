@@ -40,6 +40,24 @@
     var STATUS_FORCE_SELECTOR = '[data-status-force-refresh]';
     var STATUS_LOG_LINK_SELECTOR = '[data-status-log-link]';
     var STATUS_STATE_KEY = '__discordStatusState';
+    var COMPARISON_EXPORT_SELECTOR = '[data-role="discord-comparison-export"]';
+    var PRESENCE_EXPLORER_SELECTOR = '[data-role="discord-presence-explorer"]';
+    var PRESENCE_FILTERS_SELECTOR = '[data-role="discord-presence-filters"]';
+    var PRESENCE_CHIP_SELECTOR = '[data-role="discord-presence-chip"]';
+    var PRESENCE_SELECTED_VALUE_SELECTOR = '[data-role="discord-presence-selected-value"]';
+    var PRESENCE_SELECTED_SHARE_SELECTOR = '[data-role="discord-presence-selected-share"]';
+    var PRESENCE_META_VALUE_SELECTOR = '[data-role="discord-presence-meta-value"]';
+    var PRESENCE_META_SHARE_SELECTOR = '[data-role="discord-presence-meta-share"]';
+    var PRESENCE_LIST_SELECTOR = '[data-role="discord-presence-list"]';
+    var PRESENCE_HEATMAP_SELECTOR = '[data-role="discord-presence-heatmap"]';
+    var PRESENCE_HEATMAP_EMPTY_SELECTOR = '[data-role="discord-presence-heatmap-empty"]';
+    var PRESENCE_TIMELINE_SELECTOR = '[data-role="discord-presence-timeline"]';
+    var PRESENCE_TIMELINE_TOOLBAR_SELECTOR = '[data-role="discord-presence-timeline-toolbar"]';
+    var PRESENCE_TIMELINE_BODY_SELECTOR = '[data-role="discord-presence-timeline-body"]';
+    var PRESENCE_TIMELINE_EMPTY_SELECTOR = '[data-role="discord-presence-timeline-empty"]';
+    var PRESENCE_TOTAL_SELECTOR = '[data-role="discord-presence-total"]';
+    var PRESENCE_DEFAULT_RANGE = 7;
+    var PRESENCE_DEFAULT_METRIC = 'presence';
     var FOCUSABLE_ELEMENTS_SELECTOR = [
         'a[href]:not([tabindex="-1"])',
         'area[href]:not([tabindex="-1"])',
@@ -2604,6 +2622,1294 @@
         }, 300);
     }
 
+    var presenceExplorerStateStore = (typeof WeakMap === 'function') ? new WeakMap() : null;
+    var PRESENCE_STATE_PROP = '__discordPresenceExplorerState';
+    var COMPARISON_EXPORT_PROP = '__discordComparisonExportInitialized';
+
+    function setPresenceExplorerState(card, state) {
+        if (!card) {
+            return;
+        }
+
+        if (presenceExplorerStateStore) {
+            presenceExplorerStateStore.set(card, state);
+            return;
+        }
+
+        card[PRESENCE_STATE_PROP] = state;
+    }
+
+    function getPresenceExplorerState(card) {
+        if (!card) {
+            return null;
+        }
+
+        if (presenceExplorerStateStore) {
+            return presenceExplorerStateStore.get(card) || null;
+        }
+
+        if (Object.prototype.hasOwnProperty.call(card, PRESENCE_STATE_PROP)) {
+            return card[PRESENCE_STATE_PROP];
+        }
+
+        return null;
+    }
+
+    function getPresenceFormatter(formatter) {
+        if (formatter && typeof formatter.format === 'function') {
+            return formatter;
+        }
+
+        return DEFAULT_NUMBER_FORMATTER;
+    }
+
+    function formatPresenceNumber(value, formatter) {
+        if (typeof value !== 'number' || !isFinite(value)) {
+            return '—';
+        }
+
+        var safeFormatter = getPresenceFormatter(formatter);
+
+        try {
+            return safeFormatter.format(Math.max(0, Math.round(value)));
+        } catch (error) {
+            return String(Math.max(0, Math.round(value)));
+        }
+    }
+
+    function parseJsonDatasetValue(element, property) {
+        if (!element || !element.dataset) {
+            return null;
+        }
+
+        if (!Object.prototype.hasOwnProperty.call(element.dataset, property)) {
+            return null;
+        }
+
+        var raw = element.dataset[property];
+
+        if (typeof raw !== 'string' || !raw) {
+            return null;
+        }
+
+        try {
+            return JSON.parse(raw);
+        } catch (error) {
+            return null;
+        }
+    }
+
+    function normalizePresenceBreakdown(source) {
+        if (!source || typeof source !== 'object') {
+            return {};
+        }
+
+        var normalized = {};
+        Object.keys(source).forEach(function (key) {
+            if (!Object.prototype.hasOwnProperty.call(source, key)) {
+                return;
+            }
+
+            var slug = key;
+            if (typeof slug === 'string') {
+                slug = slug.trim();
+            }
+
+            if (!slug) {
+                return;
+            }
+
+            var count = source[key];
+            if (typeof count !== 'number') {
+                count = parseInt(count, 10);
+            }
+
+            if (isNaN(count) || count < 0) {
+                count = 0;
+            }
+
+            normalized[slug] = count;
+        });
+
+        return normalized;
+    }
+
+    function computePresenceTotal(breakdown) {
+        if (!breakdown || typeof breakdown !== 'object') {
+            return 0;
+        }
+
+        var total = 0;
+        Object.keys(breakdown).forEach(function (key) {
+            var value = breakdown[key];
+            if (typeof value !== 'number') {
+                value = parseInt(value, 10);
+            }
+
+            if (!isNaN(value)) {
+                total += Math.max(0, value);
+            }
+        });
+
+        return total;
+    }
+
+    function parsePresenceBreakdownFromDataset(card) {
+        if (!card) {
+            return {};
+        }
+
+        var breakdown = parseJsonDatasetValue(card, 'presenceBreakdown');
+        if (breakdown) {
+            return normalizePresenceBreakdown(breakdown);
+        }
+
+        var listItems = card.querySelectorAll('.discord-presence-item');
+        if (!listItems.length) {
+            return {};
+        }
+
+        var extracted = {};
+        Array.prototype.forEach.call(listItems, function (item) {
+            var status = item.getAttribute('data-status') || '';
+            if (!status) {
+                return;
+            }
+
+            var rawValue = item.getAttribute('data-count');
+            if (rawValue === null) {
+                rawValue = item.getAttribute('data-value');
+            }
+
+            var count = parseInt(rawValue, 10);
+            if (isNaN(count) || count < 0) {
+                count = 0;
+            }
+
+            extracted[status] = count;
+        });
+
+        return normalizePresenceBreakdown(extracted);
+    }
+
+    function parsePresenceLabels(card) {
+        if (!card) {
+            return {};
+        }
+
+        var labels = parseJsonDatasetValue(card, 'presenceLabels');
+        if (labels && typeof labels === 'object') {
+            return labels;
+        }
+
+        var map = {};
+        var listItems = card.querySelectorAll('.discord-presence-item');
+        Array.prototype.forEach.call(listItems, function (item) {
+            var status = item.getAttribute('data-status');
+            var label = item.getAttribute('data-label');
+            if (status) {
+                map[status] = label || status;
+            }
+        });
+
+        return map;
+    }
+
+    function updatePresenceChipActiveState(state) {
+        if (!state || !state.chips) {
+            return;
+        }
+
+        var active = state.activeStatuses || ['all'];
+
+        state.chips.forEach(function (chip) {
+            if (!chip || !chip.element) {
+                return;
+            }
+
+            var isActive = active.indexOf('all') !== -1
+                ? chip.status === 'all'
+                : active.indexOf(chip.status) !== -1;
+
+            if (chip.element.classList && typeof chip.element.classList.toggle === 'function') {
+                chip.element.classList.toggle('is-active', isActive);
+            } else {
+                chip.element.setAttribute('data-active', isActive ? 'true' : 'false');
+            }
+        });
+    }
+
+    function updatePresenceChipValues(state) {
+        if (!state || !state.chips) {
+            return;
+        }
+
+        var formatter = state.formatter;
+        var breakdown = state.breakdown || {};
+
+        state.chips.forEach(function (chip) {
+            if (!chip || !chip.element) {
+                return;
+            }
+
+            var value = chip.status === 'all'
+                ? state.total
+                : breakdown[chip.status] || 0;
+
+            var valueElement = chip.element.querySelector('[data-role="discord-presence-chip-value"]');
+            if (valueElement) {
+                valueElement.textContent = formatPresenceNumber(value, formatter);
+            }
+
+            chip.element.setAttribute('data-count', String(Math.max(0, value || 0)));
+        });
+    }
+
+    function updatePresenceList(state) {
+        if (!state || !state.listElement) {
+            return;
+        }
+
+        var formatter = state.formatter;
+        var breakdown = state.breakdown || {};
+        var total = state.total || 0;
+        var items = state.listElement.querySelectorAll('.discord-presence-item');
+
+        Array.prototype.forEach.call(items, function (item) {
+            var status = item.getAttribute('data-status');
+            if (!status) {
+                return;
+            }
+
+            var count = breakdown[status] || 0;
+            var share = total > 0 ? Math.round((count / total) * 100) : 0;
+
+            item.setAttribute('data-count', String(Math.max(0, count)));
+            item.setAttribute('data-share', String(Math.max(0, share)));
+
+            var valueElement = item.querySelector('.discord-presence-item-value');
+            if (valueElement) {
+                valueElement.textContent = formatPresenceNumber(count, formatter);
+            }
+
+            var shareElement = item.querySelector('.discord-presence-item-share');
+            if (shareElement) {
+                shareElement.textContent = share + '%';
+            }
+        });
+    }
+
+    function applyPresenceExplorerFilters(state) {
+        if (!state) {
+            return;
+        }
+
+        var active = state.activeStatuses && state.activeStatuses.length
+            ? state.activeStatuses.slice()
+            : ['all'];
+
+        if (active.indexOf('all') !== -1 && active.length > 1) {
+            active = active.filter(function (status) {
+                return status !== 'all';
+            });
+        }
+
+        if (!active.length) {
+            active = ['all'];
+        }
+
+        state.activeStatuses = active;
+
+        var breakdown = state.breakdown || {};
+        var total = state.total || 0;
+        var selectedTotal;
+
+        if (active.indexOf('all') !== -1) {
+            selectedTotal = total;
+        } else {
+            selectedTotal = 0;
+            active.forEach(function (status) {
+                var value = breakdown[status];
+                if (typeof value !== 'number') {
+                    value = parseInt(value, 10);
+                }
+
+                if (!isNaN(value)) {
+                    selectedTotal += Math.max(0, value);
+                }
+            });
+        }
+
+        if (state.listElement) {
+            var items = state.listElement.querySelectorAll('.discord-presence-item');
+            Array.prototype.forEach.call(items, function (item) {
+                var status = item.getAttribute('data-status');
+                var shouldShow = active.indexOf('all') !== -1 || active.indexOf(status) !== -1;
+
+                if (shouldShow) {
+                    item.removeAttribute('hidden');
+                    item.setAttribute('data-visible', 'true');
+                } else {
+                    item.setAttribute('hidden', 'hidden');
+                    item.setAttribute('data-visible', 'false');
+                }
+            });
+        }
+
+        var formatter = state.formatter;
+        var formattedSelected = formatPresenceNumber(selectedTotal, formatter);
+        var share = total > 0 ? Math.round((selectedTotal / total) * 100) : 0;
+        var shareText = share + '%';
+
+        if (state.selectionValueElement) {
+            state.selectionValueElement.textContent = formattedSelected;
+        }
+
+        if (state.selectionShareElement) {
+            state.selectionShareElement.textContent = shareText;
+        }
+
+        if (state.metaValueElement) {
+            state.metaValueElement.textContent = formattedSelected;
+        }
+
+        if (state.metaShareElement) {
+            state.metaShareElement.textContent = shareText;
+        }
+    }
+
+    function formatHourLabel(hour, locale) {
+        var date;
+        try {
+            date = new Date(Date.UTC(2023, 0, 1, hour, 0, 0));
+        } catch (error) {
+            date = null;
+        }
+
+        if (!date || isNaN(date.getTime())) {
+            return hour + 'h';
+        }
+
+        try {
+            return date.toLocaleTimeString(locale || undefined, { hour: '2-digit', minute: '2-digit' });
+        } catch (error) {
+            return hour + 'h';
+        }
+    }
+
+    function getWeekdayLabels(locale) {
+        var labels = [];
+        var dayOrder = [1, 2, 3, 4, 5, 6, 0];
+
+        for (var i = 0; i < dayOrder.length; i++) {
+            var dayIndex = dayOrder[i];
+            var date;
+            try {
+                date = new Date(Date.UTC(2023, 0, 1 + dayIndex));
+            } catch (error) {
+                date = null;
+            }
+
+            var label;
+            if (!date || isNaN(date.getTime())) {
+                var fallback = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+                label = fallback[dayIndex] || 'Jour';
+            } else {
+                try {
+                    label = date.toLocaleDateString(locale || undefined, { weekday: 'short' });
+                } catch (error) {
+                    var fallbackLabels = ['Dim', 'Lun', 'Mar', 'Mer', 'Jeu', 'Ven', 'Sam'];
+                    label = fallbackLabels[dayIndex] || 'Jour';
+                }
+            }
+
+            labels.push(label);
+        }
+
+        return labels;
+    }
+
+    function buildHeatmapMatrix(timeseries, metric) {
+        var dayBuckets = {};
+        var maxValue = 0;
+
+        if (!Array.isArray(timeseries)) {
+            return { rows: [], max: maxValue };
+        }
+
+        for (var i = 0; i < timeseries.length; i++) {
+            var entry = timeseries[i];
+            if (!entry) {
+                continue;
+            }
+
+            var value = entry[metric];
+            if (typeof value !== 'number') {
+                value = parseInt(value, 10);
+            }
+
+            if (!isFinite(value) || value < 0) {
+                continue;
+            }
+
+            var timestamp = entry.timestamp;
+            if (typeof timestamp !== 'number') {
+                timestamp = parseInt(timestamp, 10);
+            }
+
+            if (!isFinite(timestamp)) {
+                continue;
+            }
+
+            var date;
+            try {
+                date = new Date(timestamp * 1000);
+            } catch (error) {
+                date = null;
+            }
+
+            if (!date || isNaN(date.getTime())) {
+                continue;
+            }
+
+            var day = date.getDay();
+            var hour = date.getHours();
+            var key = day + ':' + hour;
+
+            if (!dayBuckets[key]) {
+                dayBuckets[key] = { total: 0, count: 0 };
+            }
+
+            dayBuckets[key].total += value;
+            dayBuckets[key].count += 1;
+        }
+
+        var rows = [];
+        var dayOrder = [1, 2, 3, 4, 5, 6, 0];
+
+        for (var d = 0; d < dayOrder.length; d++) {
+            var dayIndex = dayOrder[d];
+            var cells = [];
+
+            for (var h = 0; h < 24; h++) {
+                var bucket = dayBuckets[dayIndex + ':' + h];
+                var average = null;
+
+                if (bucket && bucket.count > 0) {
+                    average = bucket.total / bucket.count;
+                    if (average > maxValue) {
+                        maxValue = average;
+                    }
+                }
+
+                cells.push({ hour: h, value: average });
+            }
+
+            rows.push({ day: dayIndex, cells: cells });
+        }
+
+        return {
+            rows: rows,
+            max: maxValue
+        };
+    }
+
+    function renderPresenceHeatmap(state, matrix, metric) {
+        if (!state || !state.heatmapElement) {
+            return;
+        }
+
+        var container = state.heatmapElement;
+        container.innerHTML = '';
+
+        var maxValue = matrix && typeof matrix.max === 'number' ? matrix.max : 0;
+        var rows = matrix && matrix.rows ? matrix.rows : [];
+        var labels = getWeekdayLabels(state.locale);
+
+        for (var i = 0; i < rows.length; i++) {
+            var row = rows[i];
+            var rowElement = document.createElement('div');
+            rowElement.className = 'discord-presence-heatmap__row';
+
+            var labelElement = document.createElement('span');
+            labelElement.className = 'discord-presence-heatmap__label';
+            labelElement.textContent = labels[i] || '';
+            rowElement.appendChild(labelElement);
+
+            var cellsWrapper = document.createElement('div');
+            cellsWrapper.className = 'discord-presence-heatmap__cells';
+
+            var cells = row && row.cells ? row.cells : [];
+            for (var j = 0; j < cells.length; j++) {
+                var cellData = cells[j];
+                var cell = document.createElement('span');
+                cell.className = 'discord-presence-heatmap__cell';
+
+                var value = cellData && typeof cellData.value === 'number' ? cellData.value : null;
+                var ratio = 0;
+
+                if (value !== null && isFinite(value) && maxValue > 0) {
+                    ratio = Math.min(1, Math.max(0, value / maxValue));
+                }
+
+                cell.setAttribute('data-hour', String(cellData.hour));
+                cell.setAttribute('data-value', value === null ? '' : String(Math.round(value)));
+                cell.setAttribute('data-intensity', ratio.toFixed(2));
+                cell.style.setProperty('--intensity', ratio.toFixed(3));
+
+                var tooltipValue = value === null ? '—' : formatPresenceNumber(value, state.formatter);
+                var hourLabel = formatHourLabel(cellData.hour, state.locale);
+                var dayLabel = labels[i] || '';
+                cell.setAttribute('title', dayLabel + ' ' + hourLabel + ' • ' + tooltipValue);
+
+                cellsWrapper.appendChild(cell);
+            }
+
+            rowElement.appendChild(cellsWrapper);
+            container.appendChild(rowElement);
+        }
+
+        if (container.dataset) {
+            container.dataset.metric = metric;
+        }
+    }
+
+    function aggregateTimeseriesByDay(timeseries, metric) {
+        var buckets = {};
+
+        if (!Array.isArray(timeseries)) {
+            return [];
+        }
+
+        timeseries.forEach(function (entry) {
+            if (!entry) {
+                return;
+            }
+
+            var timestamp = entry.timestamp;
+            if (typeof timestamp !== 'number') {
+                timestamp = parseInt(timestamp, 10);
+            }
+
+            if (!isFinite(timestamp)) {
+                return;
+            }
+
+            var date;
+            try {
+                date = new Date(timestamp * 1000);
+            } catch (error) {
+                date = null;
+            }
+
+            if (!date || isNaN(date.getTime())) {
+                return;
+            }
+
+            var dayKey = date.getFullYear() + '-' + (date.getMonth() + 1) + '-' + date.getDate();
+            if (!buckets[dayKey]) {
+                buckets[dayKey] = { total: 0, count: 0, timestamp: timestamp };
+            }
+
+            var value = entry[metric];
+            if (typeof value !== 'number') {
+                value = parseInt(value, 10);
+            }
+
+            if (!isNaN(value) && value >= 0) {
+                buckets[dayKey].total += value;
+                buckets[dayKey].count += 1;
+            }
+
+            if (timestamp > buckets[dayKey].timestamp) {
+                buckets[dayKey].timestamp = timestamp;
+            }
+        });
+
+        var aggregated = Object.keys(buckets).map(function (key) {
+            var bucket = buckets[key];
+            var average = bucket.count > 0 ? bucket.total / bucket.count : null;
+            if (average === null) {
+                return null;
+            }
+
+            return {
+                timestamp: bucket.timestamp,
+                value: average
+            };
+        }).filter(function (entry) { return !!entry; });
+
+        aggregated.sort(function (a, b) {
+            return a.timestamp - b.timestamp;
+        });
+
+        return aggregated;
+    }
+
+    function formatTimelineDate(timestamp, locale) {
+        if (typeof timestamp !== 'number' || !isFinite(timestamp)) {
+            return '';
+        }
+
+        var date;
+        try {
+            date = new Date(timestamp * 1000);
+        } catch (error) {
+            date = null;
+        }
+
+        if (!date || isNaN(date.getTime())) {
+            return '';
+        }
+
+        try {
+            return date.toLocaleDateString(locale || undefined, { month: 'short', day: 'numeric' });
+        } catch (error) {
+            return date.getDate() + '/' + (date.getMonth() + 1);
+        }
+    }
+
+    function renderPresenceTimeline(state, aggregated, metric) {
+        if (!state || !state.timelineBodyElement) {
+            return;
+        }
+
+        var container = state.timelineBodyElement;
+        container.innerHTML = '';
+
+        if (!aggregated || !aggregated.length) {
+            if (state.timelineEmptyElement) {
+                var emptyMessage = state.analyticsError
+                    ? getLocalizedString('presenceAnalyticsError', 'Données analytics indisponibles.')
+                    : (state.timelineEmptyDefaultText || getLocalizedString('presenceAnalyticsEmpty', 'Aucune donnée historique disponible pour le moment.'));
+                state.timelineEmptyElement.textContent = emptyMessage;
+                state.timelineEmptyElement.removeAttribute('hidden');
+            }
+            return;
+        }
+
+        if (state.timelineEmptyElement) {
+            state.timelineEmptyElement.setAttribute('hidden', 'hidden');
+        }
+
+        var maxValue = 0;
+        aggregated.forEach(function (entry) {
+            if (entry && typeof entry.value === 'number' && entry.value > maxValue) {
+                maxValue = entry.value;
+            }
+        });
+
+        if (maxValue <= 0) {
+            maxValue = 1;
+        }
+
+        var list = document.createElement('ol');
+        list.className = 'discord-presence-timeline__list';
+        var formatter = state.formatter;
+
+        for (var i = 0; i < aggregated.length; i++) {
+            var entry = aggregated[i];
+            var item = document.createElement('li');
+            item.className = 'discord-presence-timeline__item';
+
+            var label = document.createElement('span');
+            label.className = 'discord-presence-timeline__timestamp';
+            label.textContent = formatTimelineDate(entry.timestamp, state.locale);
+            item.appendChild(label);
+
+            var bar = document.createElement('div');
+            bar.className = 'discord-presence-timeline__bar';
+            var value = entry && typeof entry.value === 'number' ? entry.value : 0;
+            var ratio = value > 0 ? Math.min(1, value / maxValue) : 0;
+            bar.style.setProperty('--value', ratio.toFixed(3));
+            bar.setAttribute('aria-valuemin', '0');
+            bar.setAttribute('aria-valuemax', String(Math.round(maxValue)));
+            bar.setAttribute('aria-valuenow', String(Math.round(value)));
+            bar.setAttribute('role', 'img');
+            bar.setAttribute('title', formatPresenceNumber(value, formatter));
+
+            var barValue = document.createElement('span');
+            barValue.className = 'discord-presence-timeline__value';
+            barValue.textContent = formatPresenceNumber(value, formatter);
+            bar.appendChild(barValue);
+
+            item.appendChild(bar);
+            list.appendChild(item);
+        }
+
+        container.appendChild(list);
+
+        if (container.dataset) {
+            container.dataset.metric = metric;
+        }
+    }
+
+    function createPresenceMetricToolbar(state) {
+        if (!state || !state.timelineToolbarElement) {
+            return;
+        }
+
+        var toolbar = state.timelineToolbarElement;
+        toolbar.innerHTML = '';
+
+        var metrics = [
+            { key: 'presence', label: state.presenceLabel || getLocalizedString('presenceMetricPresence', 'Présence') },
+            { key: 'online', label: state.onlineLabel || getLocalizedString('presenceMetricOnline', 'En ligne') },
+            { key: 'total', label: state.totalLabel || getLocalizedString('presenceMetricTotal', 'Membres') }
+        ];
+
+        metrics.forEach(function (metric) {
+            var button = document.createElement('button');
+            button.type = 'button';
+            button.className = 'discord-presence-timeline__metric';
+            button.setAttribute('data-metric', metric.key);
+            button.textContent = metric.label || metric.key;
+            button.addEventListener('click', function () {
+                if (state.metric === metric.key) {
+                    return;
+                }
+
+                state.metric = metric.key;
+                updatePresenceMetricButtons(state);
+                renderPresenceExplorerAnalytics(state);
+            });
+
+            toolbar.appendChild(button);
+        });
+
+        updatePresenceMetricButtons(state);
+    }
+
+    function updatePresenceMetricButtons(state) {
+        if (!state || !state.timelineToolbarElement) {
+            return;
+        }
+
+        var buttons = state.timelineToolbarElement.querySelectorAll('.discord-presence-timeline__metric');
+        Array.prototype.forEach.call(buttons, function (button) {
+            var metric = button.getAttribute('data-metric');
+            var isActive = metric === state.metric;
+
+            if (button.classList && typeof button.classList.toggle === 'function') {
+                button.classList.toggle('is-active', isActive);
+            } else if (isActive) {
+                button.setAttribute('data-active', 'true');
+            } else {
+                button.removeAttribute('data-active');
+            }
+        });
+    }
+
+    function renderPresenceExplorerAnalytics(state) {
+        if (!state) {
+            return;
+        }
+
+        updatePresenceMetricButtons(state);
+
+        var heatmapEmpty = state.heatmapEmptyElement;
+        var timelineEmpty = state.timelineEmptyElement;
+
+        if (!state.analytics || !Array.isArray(state.analytics.timeseries) || !state.analytics.timeseries.length) {
+            if (heatmapEmpty) {
+                var heatmapMessage = state.analyticsError
+                    ? getLocalizedString('presenceAnalyticsError', 'Données analytics indisponibles.')
+                    : (state.heatmapEmptyDefaultText || getLocalizedString('presenceAnalyticsEmpty', 'En attente de données historiques…'));
+                heatmapEmpty.textContent = heatmapMessage;
+                heatmapEmpty.removeAttribute('hidden');
+            }
+
+            if (timelineEmpty) {
+                var timelineMessage = state.analyticsError
+                    ? getLocalizedString('presenceAnalyticsError', 'Données analytics indisponibles.')
+                    : (state.timelineEmptyDefaultText || getLocalizedString('presenceAnalyticsEmpty', 'Aucune donnée historique disponible pour le moment.'));
+                timelineEmpty.textContent = timelineMessage;
+                timelineEmpty.removeAttribute('hidden');
+            }
+
+            if (state.heatmapElement) {
+                state.heatmapElement.innerHTML = '';
+            }
+
+            if (state.timelineBodyElement) {
+                state.timelineBodyElement.innerHTML = '';
+            }
+
+            return;
+        }
+
+        if (heatmapEmpty) {
+            heatmapEmpty.setAttribute('hidden', 'hidden');
+        }
+
+        if (timelineEmpty) {
+            timelineEmpty.setAttribute('hidden', 'hidden');
+        }
+
+        var timeseries = state.analytics.timeseries.slice();
+        var metric = state.metric || PRESENCE_DEFAULT_METRIC;
+
+        var matrix = buildHeatmapMatrix(timeseries, metric);
+        renderPresenceHeatmap(state, matrix, metric);
+
+        var aggregated = aggregateTimeseriesByDay(timeseries, metric);
+        renderPresenceTimeline(state, aggregated, metric);
+    }
+
+    function loadPresenceExplorerAnalytics(state, forceRefresh) {
+        if (!state || !state.config || !state.config.analyticsRestUrl) {
+            return;
+        }
+
+        if (state.analyticsLoading) {
+            return;
+        }
+
+        if (!forceRefresh && state.analyticsLoaded) {
+            renderPresenceExplorerAnalytics(state);
+            return;
+        }
+
+        state.analyticsLoading = true;
+
+        var overrides = collectConnectionOverrides(state.container, state.config);
+        requestAnalyticsSnapshot(state.config, overrides, state.range, !!forceRefresh)
+            .then(function (data) {
+                state.analyticsLoading = false;
+                state.analyticsLoaded = true;
+                state.analyticsError = null;
+                state.analytics = data || {};
+                renderPresenceExplorerAnalytics(state);
+            })
+            .catch(function (error) {
+                state.analyticsLoading = false;
+                state.analyticsLoaded = false;
+                state.analyticsError = error;
+                state.analytics = null;
+                renderPresenceExplorerAnalytics(state);
+            });
+    }
+
+    function initializePresenceExplorer(container, config, formatter) {
+        if (!container) {
+            return;
+        }
+
+        var card = container.querySelector('[data-role="discord-presence-breakdown"]');
+        if (!card) {
+            return;
+        }
+
+        if (getPresenceExplorerState(card)) {
+            return;
+        }
+
+        var explorer = card.querySelector(PRESENCE_EXPLORER_SELECTOR);
+        if (!explorer) {
+            return;
+        }
+
+        var filters = explorer.querySelector(PRESENCE_FILTERS_SELECTOR);
+        var listElement = card.querySelector(PRESENCE_LIST_SELECTOR);
+        var heatmapElement = card.querySelector(PRESENCE_HEATMAP_SELECTOR);
+        var heatmapEmptyElement = card.querySelector(PRESENCE_HEATMAP_EMPTY_SELECTOR);
+        var timelineElement = card.querySelector(PRESENCE_TIMELINE_SELECTOR);
+        var timelineToolbarElement = card.querySelector(PRESENCE_TIMELINE_TOOLBAR_SELECTOR);
+        var timelineBodyElement = card.querySelector(PRESENCE_TIMELINE_BODY_SELECTOR);
+        var timelineEmptyElement = card.querySelector(PRESENCE_TIMELINE_EMPTY_SELECTOR);
+        var selectionValueElement = card.querySelector(PRESENCE_SELECTED_VALUE_SELECTOR);
+        var selectionShareElement = card.querySelector(PRESENCE_SELECTED_SHARE_SELECTOR);
+        var metaValueElement = card.querySelector(PRESENCE_META_VALUE_SELECTOR);
+        var metaShareElement = card.querySelector(PRESENCE_META_SHARE_SELECTOR);
+        var totalElement = card.querySelector(PRESENCE_TOTAL_SELECTOR);
+
+        var state = {
+            container: container,
+            card: card,
+            explorer: explorer,
+            config: config || {},
+            formatter: getPresenceFormatter(formatter),
+            locale: (config && config.locale) || (globalConfig && globalConfig.locale) || undefined,
+            filtersElement: filters,
+            listElement: listElement,
+            heatmapElement: heatmapElement,
+            heatmapEmptyElement: heatmapEmptyElement,
+            heatmapEmptyDefaultText: heatmapEmptyElement ? heatmapEmptyElement.textContent : '',
+            timelineElement: timelineElement,
+            timelineToolbarElement: timelineToolbarElement,
+            timelineBodyElement: timelineBodyElement,
+            timelineEmptyElement: timelineEmptyElement,
+            timelineEmptyDefaultText: timelineEmptyElement ? timelineEmptyElement.textContent : '',
+            selectionValueElement: selectionValueElement,
+            selectionShareElement: selectionShareElement,
+            metaValueElement: metaValueElement,
+            metaShareElement: metaShareElement,
+            totalElement: totalElement,
+            activeStatuses: ['all'],
+            breakdown: {},
+            total: 0,
+            metric: PRESENCE_DEFAULT_METRIC,
+            range: PRESENCE_DEFAULT_RANGE,
+            presenceLabel: card.dataset && card.dataset.labelPresence ? card.dataset.labelPresence : '',
+            onlineLabel: card.dataset && card.dataset.labelOnlineMetric ? card.dataset.labelOnlineMetric : '',
+            totalLabel: card.dataset && card.dataset.labelTotal ? card.dataset.labelTotal : '',
+            analyticsLoaded: false,
+            analyticsLoading: false,
+            analytics: null,
+            analyticsError: null
+        };
+
+        setPresenceExplorerState(card, state);
+
+        state.breakdown = parsePresenceBreakdownFromDataset(card);
+        state.labels = parsePresenceLabels(card);
+
+        var datasetTotal = card.dataset && card.dataset.presenceTotal
+            ? parseInt(card.dataset.presenceTotal, 10)
+            : null;
+        if (isNaN(datasetTotal) || datasetTotal < 0) {
+            datasetTotal = computePresenceTotal(state.breakdown);
+        }
+        state.total = datasetTotal;
+
+        if (state.totalElement) {
+            state.totalElement.textContent = formatPresenceNumber(state.total, state.formatter);
+        }
+
+        state.chips = [];
+        if (filters) {
+            var chipElements = filters.querySelectorAll(PRESENCE_CHIP_SELECTOR);
+            Array.prototype.forEach.call(chipElements, function (element) {
+                var status = element.getAttribute('data-status') || 'all';
+                state.chips.push({ element: element, status: status });
+                element.addEventListener('click', function () {
+                    var current = state.activeStatuses.slice();
+                    if (status === 'all') {
+                        current = ['all'];
+                    } else {
+                        var index = current.indexOf(status);
+                        if (index === -1) {
+                            current = current.filter(function (item) {
+                                return item !== 'all';
+                            });
+                            current.push(status);
+                        } else {
+                            current.splice(index, 1);
+                        }
+                    }
+
+                    if (!current.length) {
+                        current = ['all'];
+                    }
+
+                    state.activeStatuses = current;
+                    updatePresenceChipActiveState(state);
+                    applyPresenceExplorerFilters(state);
+                });
+            });
+        }
+
+        updatePresenceChipValues(state);
+        updatePresenceChipActiveState(state);
+        updatePresenceList(state);
+        applyPresenceExplorerFilters(state);
+        createPresenceMetricToolbar(state);
+
+        if (state.config && state.config.analyticsRestUrl) {
+            loadPresenceExplorerAnalytics(state, false);
+        }
+    }
+
+    function refreshPresenceExplorerBreakdown(container, breakdown, formatter) {
+        if (!container) {
+            return;
+        }
+
+        var card = container.querySelector('[data-role="discord-presence-breakdown"]');
+        if (!card) {
+            return;
+        }
+
+        var state = getPresenceExplorerState(card);
+        if (!state) {
+            initializePresenceExplorer(container, globalConfig, formatter);
+            state = getPresenceExplorerState(card);
+            if (!state) {
+                return;
+            }
+        }
+
+        if (formatter && typeof formatter.format === 'function') {
+            state.formatter = formatter;
+        }
+
+        var normalized = normalizePresenceBreakdown(breakdown);
+        if (!Object.keys(normalized).length) {
+            normalized = parsePresenceBreakdownFromDataset(card);
+        }
+
+        state.breakdown = normalized;
+
+        var datasetTotal = card.dataset && card.dataset.presenceTotal
+            ? parseInt(card.dataset.presenceTotal, 10)
+            : null;
+        if (isNaN(datasetTotal) || datasetTotal < 0) {
+            datasetTotal = computePresenceTotal(normalized);
+        }
+        state.total = datasetTotal;
+
+        if (state.totalElement) {
+            state.totalElement.textContent = formatPresenceNumber(state.total, state.formatter);
+        }
+
+        if (card.dataset) {
+            try {
+                card.dataset.presenceBreakdown = JSON.stringify(normalized);
+            } catch (error) {
+                card.dataset.presenceBreakdown = '';
+            }
+            card.dataset.presenceTotal = String(Math.max(0, state.total));
+        }
+
+        updatePresenceChipValues(state);
+        updatePresenceList(state);
+        updatePresenceChipActiveState(state);
+        applyPresenceExplorerFilters(state);
+    }
+
+    function parseComparisonPayload(container) {
+        if (!container || !container.dataset || !container.dataset.comparisonPayload) {
+            return null;
+        }
+
+        try {
+            return JSON.parse(container.dataset.comparisonPayload);
+        } catch (error) {
+            return null;
+        }
+    }
+
+    function formatComparisonMetric(value, formatter) {
+        if (typeof value !== 'number') {
+            value = parseInt(value, 10);
+        }
+
+        if (isNaN(value)) {
+            return '';
+        }
+
+        var safeFormatter = getPresenceFormatter(formatter);
+        try {
+            return safeFormatter.format(value);
+        } catch (error) {
+            return String(value);
+        }
+    }
+
+    function formatComparisonDelta(value, formatter) {
+        if (typeof value !== 'number') {
+            value = parseInt(value, 10);
+        }
+
+        if (isNaN(value)) {
+            return '';
+        }
+
+        if (value === 0) {
+            return '0';
+        }
+
+        var prefix = value > 0 ? '+' : '−';
+        return prefix + formatComparisonMetric(Math.abs(value), formatter);
+    }
+
+    function escapeCsvValue(value) {
+        if (value === null || typeof value === 'undefined') {
+            return '';
+        }
+
+        var stringValue = String(value);
+        if (stringValue.indexOf('"') !== -1) {
+            stringValue = stringValue.replace(/"/g, '""');
+        }
+
+        if (/[";\n]/.test(stringValue)) {
+            return '"' + stringValue + '"';
+        }
+
+        return stringValue;
+    }
+
+    function slugifyFilenameSegment(value) {
+        if (typeof value !== 'string') {
+            value = String(value || '');
+        }
+
+        var slug = value
+            .toLowerCase()
+            .replace(/[^a-z0-9]+/g, '-')
+            .replace(/^-+|-+$/g, '');
+
+        return slug || 'export';
+    }
+
+    function buildComparisonFilename(payload) {
+        var reference = payload && payload.reference ? payload.reference : {};
+        var label = reference.label || reference.profile || 'reference';
+        var now = new Date();
+        var iso = now.toISOString ? now.toISOString() : '';
+        var timestamp = iso ? iso.replace(/[:]/g, '-').replace(/\..+$/, '') : String(now.getTime());
+        return slugifyFilenameSegment(label) + '-' + timestamp + '.csv';
+    }
+
+    function buildComparisonCsv(payload, formatter, labels) {
+        if (!payload || !payload.entries || !payload.entries.length) {
+            return '';
+        }
+
+        var entries = payload.entries;
+        var labelMap = labels || {};
+        var headers = [
+            'Profil',
+            'Libellé',
+            'Serveur',
+            'Statut',
+            'Type',
+            labelMap.online || 'En ligne',
+            labelMap.presence || 'Présence',
+            labelMap.total || 'Membres',
+            labelMap.premium || 'Boosts',
+            'Δ ' + (labelMap.online || 'En ligne'),
+            'Δ ' + (labelMap.presence || 'Présence'),
+            'Δ ' + (labelMap.total || 'Membres'),
+            'Δ ' + (labelMap.premium || 'Boosts')
+        ];
+
+        var rows = [headers.map(escapeCsvValue).join(';')];
+
+        entries.forEach(function (entry) {
+            if (!entry) {
+                return;
+            }
+
+            var metrics = entry.metrics || {};
+            var deltas = entry.deltas || {};
+
+            rows.push([
+                entry.profile || '',
+                entry.label || '',
+                entry.server_name || '',
+                entry.status_label || '',
+                entry.is_reference ? 'Référence' : 'Comparé',
+                formatComparisonMetric(metrics.online, formatter),
+                formatComparisonMetric(metrics.presence, formatter),
+                formatComparisonMetric(metrics.total, formatter),
+                formatComparisonMetric(metrics.premium, formatter),
+                formatComparisonDelta(deltas.online, formatter),
+                formatComparisonDelta(deltas.presence, formatter),
+                formatComparisonDelta(deltas.total, formatter),
+                formatComparisonDelta(deltas.premium, formatter)
+            ].map(escapeCsvValue).join(';'));
+        });
+
+        return rows.join('\r\n');
+    }
+
+    function triggerDownload(content, filename, mimeType) {
+        if (typeof content !== 'string' || !content) {
+            return;
+        }
+
+        var blob;
+        try {
+            blob = new Blob([content], { type: mimeType || 'text/plain;charset=utf-8' });
+        } catch (error) {
+            return;
+        }
+
+        if (typeof navigator !== 'undefined' && navigator.msSaveOrOpenBlob) {
+            navigator.msSaveOrOpenBlob(blob, filename);
+            return;
+        }
+
+        var url = (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function')
+            ? URL.createObjectURL(blob)
+            : null;
+
+        if (!url) {
+            return;
+        }
+
+        var link = document.createElement('a');
+        link.href = url;
+        link.download = filename || 'export.csv';
+        document.body.appendChild(link);
+        link.click();
+        setTimeout(function () {
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+        }, 0);
+    }
+
+    function handleComparisonExport(container, button) {
+        var payload = parseComparisonPayload(container);
+        if (!payload || !payload.entries || !payload.entries.length) {
+            var emptyMessage = getLocalizedString('comparisonExportEmpty', 'Aucune donnée de comparaison à exporter.');
+            if (typeof window !== 'undefined' && typeof window.alert === 'function') {
+                window.alert(emptyMessage);
+            }
+            return;
+        }
+
+        var labels = {
+            online: container.dataset && container.dataset.labelOnline ? container.dataset.labelOnline : getLocalizedString('labelOnline', 'En ligne'),
+            presence: container.dataset && container.dataset.labelPresence ? container.dataset.labelPresence : getLocalizedString('labelPresence', 'Présence'),
+            total: container.dataset && container.dataset.labelTotal ? container.dataset.labelTotal : getLocalizedString('labelTotal', 'Membres'),
+            premium: container.dataset && container.dataset.labelPremium ? container.dataset.labelPremium : getLocalizedString('labelPremium', 'Boosts serveur')
+        };
+
+        var csv = buildComparisonCsv(payload, null, labels);
+        if (!csv) {
+            var errorMessage = getLocalizedString('comparisonExportError', 'Impossible de générer le fichier d\'export.');
+            if (typeof window !== 'undefined' && typeof window.alert === 'function') {
+                window.alert(errorMessage);
+            }
+            return;
+        }
+
+        var filename = buildComparisonFilename(payload);
+        triggerDownload(csv, filename, 'text/csv;charset=utf-8');
+    }
+
+    function initializeComparisonExport(container) {
+        if (!container) {
+            return;
+        }
+
+        var button = container.querySelector(COMPARISON_EXPORT_SELECTOR);
+        if (!button) {
+            return;
+        }
+
+        if (button.dataset && button.dataset.exportInitialized === 'true') {
+            return;
+        }
+
+        if (button.dataset) {
+            button.dataset.exportInitialized = 'true';
+        } else {
+            button[COMPARISON_EXPORT_PROP] = true;
+        }
+
+        button.addEventListener('click', function (event) {
+            if (event && typeof event.preventDefault === 'function') {
+                event.preventDefault();
+            }
+
+            handleComparisonExport(container, button);
+        });
+    }
+
     function updatePresenceBreakdown(container, payload, formatter) {
         if (!container) {
             return;
@@ -2691,6 +3997,20 @@
 
             if (card.dataset) {
                 card.dataset.value = presenceValue;
+
+                try {
+                    card.dataset.presenceBreakdown = JSON.stringify(normalizedBreakdown);
+                } catch (error) {
+                    card.dataset.presenceBreakdown = '';
+                }
+            }
+        } else if (card.dataset) {
+            delete card.dataset.value;
+
+            try {
+                card.dataset.presenceBreakdown = JSON.stringify(normalizedBreakdown);
+            } catch (error) {
+                card.dataset.presenceBreakdown = '';
             }
         }
 
@@ -2773,6 +4093,8 @@
 
             list.appendChild(fragment);
         }
+
+        refreshPresenceExplorerBreakdown(container, normalizedBreakdown, formatter);
 
         if (container.classList && typeof container.classList.toggle === 'function') {
             var hasPresenceData = !!(presenceValue !== null || (breakdownSource && Object.keys(breakdownSource).length));
@@ -3734,6 +5056,8 @@
             ensureStatusState(state);
             initializeStatusPanel(container, state, locale);
             pauseStatusCountdown(container, state);
+            initializePresenceExplorer(container, config, formatter);
+            initializeComparisonExport(container);
 
             state.forceRefresh = function () {
                 activateContainer(container);
@@ -3912,6 +5236,9 @@
         }
 
         Array.prototype.forEach.call(containers, function (container) {
+            initializePresenceExplorer(container, config, formatter);
+            initializeComparisonExport(container);
+
             var isForcedDemo = container.dataset.demo === 'true' && container.dataset.fallbackDemo !== 'true';
 
             if (isForcedDemo) {

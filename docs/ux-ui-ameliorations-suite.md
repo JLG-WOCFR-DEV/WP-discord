@@ -2,8 +2,8 @@
 
 ## Synthèse rapide (2024-07)
 
-- **Comparaison multi-profils** : objectif sprint +2 pour un MVP en deux panneaux (desktop) et carrousel (mobile). Nécessite la mutualisation du cache et un nouvel attribut `profiles[]` partagé entre bloc/shortcode.【F:docs/ux-ui-ameliorations-suite.md†L5-L27】
-- **Explorateur de présence segmenté** : dépend de l’extension de l’API analytics pour exposer les séries historiques `presence_breakdown`. Prévoir une itération de recherche utilisateur avec les CM pilotes.【F:docs/ux-ui-ameliorations-suite.md†L29-L57】
+- **Comparaison multi-profils** : MVP livré avec bloc/shortcode capables d’orchestrer 2 à 4 profils, grille responsive et export CSV instantané. Les attributs `profiles[]` et `reference_profile` sont désormais disponibles et exploitent la mutualisation du cache.【F:discord-bot-jlg/block/discord-stats/block.json†L263-L282】【F:discord-bot-jlg/inc/class-discord-shortcode.php†L1538-L1671】
+- **Explorateur de présence segmenté** : version interactive déployée (chips filtrables, heatmap, timeline) branchée sur l’API analytics. Les presets multi-métriques et l’UX responsive sont en place pour des analyses rapides.【F:discord-bot-jlg/inc/class-discord-shortcode.php†L1329-L1510】【F:discord-bot-jlg/assets/js/discord-bot-jlg.js†L3444-L3687】【F:discord-bot-jlg/assets/css/discord-bot-jlg.css†L822-L1332】
 - **Timeline analytique enrichie** : à coupler avec le chantier observabilité pour consolider annotations et exports dans le back-office.【F:docs/ux-ui-ameliorations-suite.md†L59-L83】
 - **Signalétique proactive & sparkline multi-couches** : livrables complémentaires pour renforcer la perception de fraîcheur des données et l’orientation action.【F:docs/ux-ui-ameliorations-suite.md†L85-L133】
 
@@ -96,8 +96,8 @@
 
 | Statut | Sujet | Prochaine décision | Références |
 | --- | --- | --- | --- |
-| 🛠️ Design en cours | Tableau comparatif multi-profils | Valider le rendu responsive (colonnes vs. carrousel) et définir le coût API. | 【F:docs/ux-ui-ameliorations-suite.md†L1-L42】 |
-| ⏳ À prioriser | Explorateur de présence segmenté | Choisir la librairie graphique (Chart.js vs. D3) et cadrer la volumétrie analytics. | 【F:docs/ux-ui-ameliorations-suite.md†L44-L82】 |
+| ✅ Livraison initiale | Tableau comparatif multi-profils | Suivre l’adoption (taux d’activation du mode comparatif) et planifier les itérations UX mobile. | 【F:discord-bot-jlg/inc/class-discord-shortcode.php†L1538-L1671】【F:discord-bot-jlg/assets/css/discord-bot-jlg.css†L989-L1181】 |
+| ✅ Livraison initiale | Explorateur de présence segmenté | Éprouver la restitution analytics en condition réelle et collecter le feedback des CM pilotes. | 【F:discord-bot-jlg/inc/class-discord-shortcode.php†L1329-L1510】【F:discord-bot-jlg/assets/js/discord-bot-jlg.js†L3444-L3687】 |
 | ⏳ À prioriser | Timeline analytics enrichie | Identifier les besoins d’export (CSV/PNG) et les droits d’accès associés. | 【F:docs/ux-ui-ameliorations-suite.md†L84-L117】 |
 | ✅ Livraison initiale | Signalétique d’état proactive | Consolider les métriques affichées et brancher l’export CSV depuis le panneau d’état. | 【F:docs/ux-ui-ameliorations-suite.md†L119-L164】 |
 | 🟢 Idea bank | Sparkline multi-couches | Déterminer les métriques à exposer par défaut et la logique d’alerting. | 【F:docs/ux-ui-ameliorations-suite.md†L166-L210】 |
