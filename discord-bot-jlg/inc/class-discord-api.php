@@ -12,6 +12,18 @@ if (!class_exists('Discord_Bot_JLG_Options_Repository')) {
     require_once __DIR__ . '/class-discord-options-repository.php';
 }
 
+if (!class_exists('Discord_Bot_JLG_Profile_Repository')) {
+    require_once __DIR__ . '/class-discord-profile-repository.php';
+}
+
+if (!class_exists('Discord_Bot_JLG_Cache_Gateway')) {
+    require_once __DIR__ . '/class-discord-cache-gateway.php';
+}
+
+if (!class_exists('Discord_Bot_JLG_Http_Connector')) {
+    require_once __DIR__ . '/class-discord-http-connector.php';
+}
+
 /**
  * Fournit les appels à l'API Discord ainsi que la gestion du cache et des données de démonstration.
  */
@@ -45,6 +57,10 @@ class Discord_Bot_JLG_API {
     private $alerts;
     private $runtime_status_history;
     private $refresh_dispatcher;
+    private $profile_repository;
+    private $cache_gateway;
+    private $http_connector;
+    private $logger;
 
     /**
      * Prépare le service d'accès aux statistiques avec les clés et durées nécessaires.
@@ -55,7 +71,7 @@ class Discord_Bot_JLG_API {
      *
      * @return void
      */
-    public function __construct($option_name, $cache_key, $default_cache_duration = 300, $http_client = null, $analytics = null, $event_logger = null, $options_repository = null) {
+    public function __construct($option_name, $cache_key, $default_cache_duration = 300, $http_client = null, $analytics = null, $event_logger = null, $options_repository = null, $profile_repository = null, $cache_gateway = null, $http_connector = null, $logger = null) {
         $this->option_name = $option_name;
         $this->base_cache_key = $cache_key;
         $this->cache_key = $cache_key;
@@ -87,6 +103,19 @@ class Discord_Bot_JLG_API {
         $this->alerts = null;
         $this->runtime_status_history = array();
         $this->refresh_dispatcher = null;
+        $this->profile_repository = ($profile_repository instanceof Discord_Bot_JLG_Profile_Repository)
+            ? $profile_repository
+            : new Discord_Bot_JLG_Profile_Repository();
+        $this->cache_gateway = ($cache_gateway instanceof Discord_Bot_JLG_Cache_Gateway)
+            ? $cache_gateway
+            : new Discord_Bot_JLG_Cache_Gateway();
+        if ($http_connector instanceof Discord_Bot_JLG_Http_Connector) {
+            $this->http_connector = $http_connector;
+        } else {
+            $this->http_connector = $this->create_http_connector();
+        }
+        $this->logger = null;
+        $this->set_logger($logger);
     }
 
     public function set_analytics_service($analytics) {
@@ -109,6 +138,26 @@ class Discord_Bot_JLG_API {
         return $this->event_logger;
     }
 
+    public function set_logger($logger) {
+        if (discord_bot_jlg_is_psr_logger($logger)) {
+            $this->logger = $logger;
+        } else {
+            $this->logger = null;
+        }
+
+        if ($this->http_connector instanceof Discord_Bot_JLG_Http_Connector) {
+            $this->http_connector->set_logger($this->logger);
+        }
+    }
+
+    public function get_logger() {
+        if (discord_bot_jlg_is_psr_logger($this->logger)) {
+            return $this->logger;
+        }
+
+        return null;
+    }
+
     public function set_alerts_service($alerts) {
         if ($alerts instanceof Discord_Bot_JLG_Alerts) {
             $this->alerts = $alerts;
@@ -127,6 +176,46 @@ class Discord_Bot_JLG_API {
 
     public function get_refresh_dispatcher() {
         return $this->refresh_dispatcher;
+    }
+
+    private function get_profile_repository() {
+        if (!($this->profile_repository instanceof Discord_Bot_JLG_Profile_Repository)) {
+            $this->profile_repository = new Discord_Bot_JLG_Profile_Repository();
+        }
+
+        return $this->profile_repository;
+    }
+
+    private function get_cache_gateway() {
+        if (!($this->cache_gateway instanceof Discord_Bot_JLG_Cache_Gateway)) {
+            $this->cache_gateway = new Discord_Bot_JLG_Cache_Gateway();
+        }
+
+        return $this->cache_gateway;
+    }
+
+    private function create_http_connector() {
+        $widget_fetcher = function ($options) {
+            return $this->fetch_widget_stats($options);
+        };
+
+        $bot_fetcher = function ($options) {
+            return $this->fetch_bot_stats($options);
+        };
+
+        return new Discord_Bot_JLG_Http_Connector($widget_fetcher, $bot_fetcher, $this->logger);
+    }
+
+    private function get_http_connector() {
+        if (!($this->http_connector instanceof Discord_Bot_JLG_Http_Connector)) {
+            $this->http_connector = $this->create_http_connector();
+        }
+
+        if ($this->http_connector instanceof Discord_Bot_JLG_Http_Connector) {
+            $this->http_connector->set_logger($this->logger);
+        }
+
+        return $this->http_connector;
     }
 
     public function get_status_history($args = array()) {
@@ -725,10 +814,12 @@ class Discord_Bot_JLG_API {
 
         $original_cache_key = $this->cache_key;
         $this->cache_key     = $context['cache_key'];
+        $cache_gateway       = $this->get_cache_gateway();
+        $http_connector      = $this->get_http_connector();
 
         try {
             if (false === $args['bypass_cache']) {
-                $cached_stats = get_transient($this->cache_key);
+                $cached_stats = $cache_gateway->get($this->cache_key);
                 if (false !== $cached_stats) {
                     return $this->remember_runtime_result($runtime_key, $cached_stats);
                 }
@@ -741,7 +832,7 @@ class Discord_Bot_JLG_API {
             }
 
             $stats        = false;
-            $widget_stats = $this->fetch_widget_stats($options);
+            $widget_stats = $http_connector->fetch_widget($options);
             $widget_incomplete = $this->stats_need_completion($widget_stats);
 
             $bot_stats  = false;
@@ -749,7 +840,9 @@ class Discord_Bot_JLG_API {
             $should_call_bot = (!empty($bot_token) && ($widget_incomplete || empty($widget_stats)));
 
             if ($should_call_bot) {
-                $bot_stats = $this->fetch_bot_stats($options);
+                $bot_stats = $http_connector->fetch_bot($options, true);
+            } else {
+                $http_connector->fetch_bot($options, false);
             }
 
             $stats = $this->merge_stats($widget_stats, $bot_stats, $widget_incomplete);
@@ -1032,7 +1125,7 @@ class Discord_Bot_JLG_API {
         $this->set_last_retry_after(0);
         $this->clear_api_retry_after_delay();
         $this->register_current_cache_key();
-        set_transient($this->cache_key, $stats, $this->get_cache_duration($options));
+        $this->get_cache_gateway()->set($this->cache_key, $stats, $this->get_cache_duration($options));
         $this->store_last_good_stats($stats);
         $this->clear_last_fallback_details();
 
@@ -1995,7 +2088,7 @@ class Discord_Bot_JLG_API {
         $original_cache_key = $this->cache_key;
         $this->cache_key     = $this->base_cache_key;
 
-        delete_transient($this->cache_key);
+        $this->get_cache_gateway()->delete($this->cache_key);
         delete_transient($this->cache_key . self::REFRESH_LOCK_SUFFIX);
         $this->clear_client_rate_limits();
         $this->reset_runtime_cache();
@@ -2032,7 +2125,7 @@ class Discord_Bot_JLG_API {
 
             $this->cache_key = $cache_key;
 
-            delete_transient($this->cache_key);
+            $this->get_cache_gateway()->delete($this->cache_key);
             delete_transient($this->cache_key . self::REFRESH_LOCK_SUFFIX);
             delete_transient($this->get_last_good_cache_key());
             delete_transient($this->get_fallback_retry_key());
@@ -2750,8 +2843,14 @@ class Discord_Bot_JLG_API {
         delete_transient($this->get_api_retry_after_key());
     }
 
-    private function log_debug($message) {
-        if ('' === trim((string) $message)) {
+    private function log_debug($message, array $context = array()) {
+        $trimmed_message = trim((string) $message);
+
+        if ('' === $trimmed_message) {
+            return;
+        }
+
+        if (discord_bot_jlg_logger_debug($this->logger, $trimmed_message, $context)) {
             return;
         }
 
@@ -2759,7 +2858,7 @@ class Discord_Bot_JLG_API {
             || (defined('WP_DEBUG_LOG') && WP_DEBUG_LOG);
 
         if ($debug_enabled) {
-            error_log('[discord-bot-jlg] ' . $message);
+            error_log('[discord-bot-jlg] ' . $trimmed_message);
         }
     }
 
@@ -3954,96 +4053,30 @@ class Discord_Bot_JLG_API {
     }
 
     private function resolve_connection_context($args, $options) {
-        $options = is_array($options) ? $options : array();
-        $effective_options = $options;
-        $signature_parts = array();
+        $repository = $this->get_profile_repository();
+        $context    = $repository->resolve_context($args, $options, $this->base_cache_key);
 
-        $args = is_array($args) ? $args : array();
-
-        $token_override_keys = array(
-            'bot_token',
-            'bot_token_override',
-            '__bot_token_override',
-            'botToken',
-            'botTokenOverride',
-        );
-
-        foreach ($token_override_keys as $token_key) {
-            if (array_key_exists($token_key, $args)) {
-                unset($args[$token_key]);
-            }
+        if (!is_array($context)) {
+            return array(
+                'options'   => is_array($options) ? $options : array(),
+                'cache_key' => $this->base_cache_key,
+                'signature' => 'default',
+            );
         }
 
-        $profile_key = isset($args['profile_key']) ? sanitize_key($args['profile_key']) : '';
-        $server_id_override = isset($args['server_id']) ? $this->sanitize_server_id($args['server_id']) : '';
-
-        if ('' !== $profile_key) {
-            $profile = $this->find_server_profile($profile_key, $options);
-
-            if (null === $profile) {
-                $signature = 'profile-missing:' . $profile_key;
-
-                return array(
-                    'options'   => $effective_options,
-                    'cache_key' => $this->build_cache_key_from_signature($signature),
-                    'signature' => $signature,
-                    'error'     => new WP_Error(
-                        'discord_bot_jlg_profile_not_found',
-                        sprintf(
-                            /* translators: %s: server profile key. */
-                            __('Le profil de serveur « %s » est introuvable.', 'discord-bot-jlg'),
-                            $profile_key
-                        )
-                    ),
-                );
-            }
-
-            if (!empty($profile['server_id'])) {
-                $effective_options['server_id'] = $this->sanitize_server_id($profile['server_id']);
-            }
-
-            if (isset($profile['bot_token']) && '' !== $profile['bot_token']) {
-                $effective_options['bot_token'] = $profile['bot_token'];
-                $effective_options['__bot_token_override'] = true;
-            }
-
-            $signature_parts[] = 'profile:' . $profile_key;
+        if (!isset($context['options']) || !is_array($context['options'])) {
+            $context['options'] = is_array($options) ? $options : array();
         }
 
-        if ('' !== $server_id_override) {
-            $effective_options['server_id'] = $server_id_override;
-            $signature_parts[] = 'server:' . $server_id_override;
+        if (!isset($context['cache_key']) || '' === (string) $context['cache_key']) {
+            $context['cache_key'] = $this->base_cache_key;
         }
 
-        if (!isset($effective_options['server_id'])) {
-            $effective_options['server_id'] = '';
-        } else {
-            $effective_options['server_id'] = $this->sanitize_server_id($effective_options['server_id']);
+        if (!isset($context['signature']) || '' === (string) $context['signature']) {
+            $context['signature'] = 'default';
         }
 
-        $signature = 'default';
-
-        if (!empty($signature_parts)) {
-            $signature = implode('|', $signature_parts);
-        }
-
-        $active_profile_key = ('' !== $profile_key) ? $profile_key : 'default';
-        $effective_options['__active_profile_key'] = $active_profile_key;
-        $effective_options['__request_signature'] = ('' !== $signature) ? $signature : 'default';
-
-        return array(
-            'options'   => $effective_options,
-            'cache_key' => $this->build_cache_key_from_signature($signature),
-            'signature' => $signature,
-        );
-    }
-
-    private function build_cache_key_from_signature($signature) {
-        if ('' === $signature || 'default' === $signature) {
-            return $this->base_cache_key;
-        }
-
-        return $this->base_cache_key . '_' . md5($signature);
+        return $context;
     }
 
     private function enrich_stats_with_status_meta($stats, $options, $cache_duration = null) {
@@ -4098,48 +4131,7 @@ class Discord_Bot_JLG_API {
     }
 
     private function sanitize_server_id($value) {
-        if (!is_string($value) && !is_numeric($value)) {
-            return '';
-        }
-
-        $value = preg_replace('/[^0-9]/', '', (string) $value);
-
-        return (string) $value;
-    }
-
-    private function find_server_profile($profile_key, $options) {
-        if (!is_array($options) || !isset($options['server_profiles']) || !is_array($options['server_profiles'])) {
-            return null;
-        }
-
-        foreach ($options['server_profiles'] as $stored_key => $profile) {
-            if (!is_array($profile)) {
-                continue;
-            }
-
-            $candidate_key = '';
-
-            if (isset($profile['key'])) {
-                $candidate_key = sanitize_key($profile['key']);
-            }
-
-            if ('' === $candidate_key) {
-                $candidate_key = sanitize_key($stored_key);
-            }
-
-            if ('' === $candidate_key || $candidate_key !== $profile_key) {
-                continue;
-            }
-
-            return array(
-                'key'       => $candidate_key,
-                'label'     => isset($profile['label']) ? sanitize_text_field($profile['label']) : '',
-                'server_id' => isset($profile['server_id']) ? $this->sanitize_server_id($profile['server_id']) : '',
-                'bot_token' => isset($profile['bot_token']) ? (string) $profile['bot_token'] : '',
-            );
-        }
-
-        return null;
+        return Discord_Bot_JLG_Profile_Repository::sanitize_server_id($value);
     }
 
     private function get_cache_duration($options) {
