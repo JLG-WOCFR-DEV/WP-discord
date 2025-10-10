@@ -37,16 +37,18 @@ class Discord_Bot_JLG_Job_Queue {
             return;
         }
 
+        $origin = $force ? 'manual' : 'cron';
+
         $jobs = array();
 
         $default_server_id = isset($options['server_id']) ? $this->sanitize_server_id($options['server_id']) : '';
         $default_has_token = !empty($options['bot_token']);
 
         if ('' !== $default_server_id) {
-            $jobs[] = $this->build_job_payload('widget_refresh', 'default', $default_server_id);
+            $jobs[] = $this->build_job_payload('widget_refresh', 'default', $default_server_id, $origin);
 
             if ($default_has_token) {
-                $jobs[] = $this->build_job_payload('bot_refresh', 'default', $default_server_id);
+                $jobs[] = $this->build_job_payload('bot_refresh', 'default', $default_server_id, $origin);
             }
         }
 
@@ -65,10 +67,10 @@ class Discord_Bot_JLG_Job_Queue {
                     continue;
                 }
 
-                $jobs[] = $this->build_job_payload('widget_refresh', $profile_key, $profile_server);
+                $jobs[] = $this->build_job_payload('widget_refresh', $profile_key, $profile_server, $origin);
 
                 if ('' !== $profile_token) {
-                    $jobs[] = $this->build_job_payload('bot_refresh', $profile_key, $profile_server);
+                    $jobs[] = $this->build_job_payload('bot_refresh', $profile_key, $profile_server, $origin);
                 }
             }
         }
@@ -90,6 +92,7 @@ class Discord_Bot_JLG_Job_Queue {
                 'profile_key' => 'default',
                 'server_id'   => '',
                 'attempt'     => 1,
+                'origin'      => 'cron',
             )
         );
 
@@ -131,24 +134,35 @@ class Discord_Bot_JLG_Job_Queue {
                     'error_message' => $error_message,
                 ));
 
+                $retry_scheduled = false;
+
                 if ($should_retry) {
-                    $this->schedule_retry($job, $result);
+                    $retry_scheduled = $this->schedule_retry($job, $result);
+                }
+
+                if (!$should_retry || !$retry_scheduled) {
+                    do_action('discord_bot_jlg_refresh_job_failed', $job, $error_message, $result);
                 }
 
                 return;
             }
 
             $this->log_job_event('success', $job, $start, is_array($result) ? $result : array());
+            do_action('discord_bot_jlg_refresh_job_succeeded', $job, $result);
         } catch (Exception $exception) {
             $error_message = $exception->getMessage();
             $this->log_job_event('error', $job, $start, array(
                 'error_message' => $error_message,
             ));
-            $this->schedule_retry($job);
+            $retry_scheduled = $this->schedule_retry($job);
+
+            if (!$retry_scheduled) {
+                do_action('discord_bot_jlg_refresh_job_failed', $job, $error_message, null);
+            }
         }
     }
 
-    private function build_job_payload($type, $profile_key, $server_id) {
+    private function build_job_payload($type, $profile_key, $server_id, $origin) {
         $signature = sprintf('%s:%s', $type, ('' !== $profile_key) ? $profile_key : 'default');
 
         return array(
@@ -157,6 +171,7 @@ class Discord_Bot_JLG_Job_Queue {
             'server_id'   => $server_id,
             'attempt'     => 1,
             'signature'   => $signature,
+            'origin'      => ('manual' === $origin) ? 'manual' : 'cron',
         );
     }
 
@@ -176,13 +191,13 @@ class Discord_Bot_JLG_Job_Queue {
 
     private function schedule_retry(array $job, $result = null) {
         if ($job['attempt'] >= $this->max_attempts) {
-            return;
+            return false;
         }
 
         if ($result instanceof WP_Error) {
             $data = $result->get_error_data();
             if (is_array($data) && array_key_exists('should_retry', $data) && false === $data['should_retry']) {
-                return;
+                return false;
             }
         }
 
@@ -195,6 +210,7 @@ class Discord_Bot_JLG_Job_Queue {
         ));
 
         $this->enqueue_job($job, $delay);
+        return true;
     }
 
     private function enqueue_job(array $job, $delay) {
@@ -266,6 +282,8 @@ class Discord_Bot_JLG_Job_Queue {
     }
 
     private function is_job_already_scheduled(array $job, $signature) {
+        $origin = isset($job['origin']) ? $job['origin'] : 'cron';
+
         for ($attempt = 1; $attempt <= $this->max_attempts; $attempt++) {
             $args = array(
                 'type'        => $job['type'],
@@ -273,6 +291,7 @@ class Discord_Bot_JLG_Job_Queue {
                 'server_id'   => $job['server_id'],
                 'attempt'     => $attempt,
                 'signature'   => $signature,
+                'origin'      => $origin,
             );
 
             if ($this->supports_action_scheduler()) {
@@ -292,11 +311,14 @@ class Discord_Bot_JLG_Job_Queue {
     }
 
     private function unschedule_existing_jobs(array $job, $signature) {
+        $origin = isset($job['origin']) ? $job['origin'] : 'cron';
+
         $base_args = array(
             'type'        => $job['type'],
             'profile_key' => $job['profile_key'],
             'server_id'   => $job['server_id'],
             'signature'   => $signature,
+            'origin'      => $origin,
         );
 
         if ($this->supports_action_scheduler()) {

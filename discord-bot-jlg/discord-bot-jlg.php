@@ -201,6 +201,7 @@ class DiscordServerStats {
     private $options_repository;
     private $job_queue;
     private $alerts;
+    private $cron_state_option = 'discord_bot_jlg_cron_state';
 
     public function __construct() {
         $this->default_options = discord_bot_jlg_get_default_options();
@@ -253,6 +254,9 @@ class DiscordServerStats {
         add_action('update_option_' . DISCORD_BOT_JLG_OPTION_NAME, array($this, 'handle_settings_update'), 10, 2);
 
         add_action(DISCORD_BOT_JLG_CRON_HOOK, array($this->job_queue, 'dispatch_refresh_jobs'));
+        add_action(DISCORD_BOT_JLG_CRON_HOOK, array($this, 'handle_cron_tick'), 100);
+        add_action('discord_bot_jlg_refresh_job_failed', array($this, 'handle_refresh_job_failure'), 10, 3);
+        add_action('discord_bot_jlg_refresh_job_succeeded', array($this, 'handle_refresh_job_success'), 10, 2);
     }
 
     private function get_block_editor_config() {
@@ -409,16 +413,160 @@ class DiscordServerStats {
      *
      * @return void
      */
-    private function reschedule_cron_event($interval = null) {
-        if (null === $interval) {
-            $interval = discord_bot_jlg_get_cron_interval();
-        } else {
-            $interval = $this->normalize_cache_duration($interval);
+    private function reschedule_cron_event($interval = null, array $context = array()) {
+        $base_interval = null === $interval
+            ? discord_bot_jlg_get_cron_interval()
+            : $this->normalize_cache_duration($interval);
+
+        $state = $this->get_cron_state();
+        if (!is_array($state)) {
+            $state = array();
         }
+
+        $now = time();
+        $outcome = isset($context['outcome']) ? $context['outcome'] : 'success';
+
+        if ('failure' === $outcome) {
+            $state['consecutive_failures'] = isset($state['consecutive_failures'])
+                ? (int) $state['consecutive_failures'] + 1
+                : 1;
+            $state['last_failure_at'] = $now;
+        } elseif ('success' === $outcome) {
+            $state['consecutive_failures'] = 0;
+            $state['last_success_at'] = $now;
+        } elseif (!isset($state['consecutive_failures'])) {
+            $state['consecutive_failures'] = 0;
+        }
+
+        $failure_count = (int) $state['consecutive_failures'];
+        $calculated_interval = $this->calculate_cron_interval($base_interval, $failure_count, $context);
+        $next_timestamp = $now + $calculated_interval;
+
+        $state['last_interval'] = $calculated_interval;
+        $state['next_run_at'] = $next_timestamp;
+        $state['last_outcome'] = $outcome;
+
+        $this->persist_cron_state($state);
 
         wp_clear_scheduled_hook(DISCORD_BOT_JLG_CRON_HOOK);
 
-        wp_schedule_event(time() + $interval, 'discord_bot_jlg_refresh', DISCORD_BOT_JLG_CRON_HOOK);
+        if (function_exists('wp_schedule_single_event')) {
+            wp_schedule_single_event($next_timestamp, DISCORD_BOT_JLG_CRON_HOOK);
+        } else {
+            wp_schedule_event($next_timestamp, 'discord_bot_jlg_refresh', DISCORD_BOT_JLG_CRON_HOOK);
+        }
+
+        if ($this->event_logger instanceof Discord_Bot_JLG_Event_Logger) {
+            $log_context = array(
+                'channel'       => 'scheduler',
+                'reason'        => isset($context['reason']) ? (string) $context['reason'] : 'cron_reschedule',
+                'outcome'       => $outcome,
+                'retry_count'   => $failure_count,
+                'interval'      => $calculated_interval,
+                'backoff_until' => $next_timestamp,
+            );
+
+            if (isset($context['error_message']) && '' !== trim((string) $context['error_message'])) {
+                $log_context['error_message'] = (string) $context['error_message'];
+            }
+
+            if (isset($context['job_type'])) {
+                $log_context['job_type'] = sanitize_key($context['job_type']);
+            }
+
+            if (isset($context['profile_key'])) {
+                $log_context['profile_key'] = sanitize_key($context['profile_key']);
+            }
+
+            $this->event_logger->log('discord_scheduler', $log_context);
+        }
+    }
+
+    public function handle_cron_tick() {
+        $this->reschedule_cron_event(null, array(
+            'reason'  => 'cron_tick',
+            'outcome' => 'neutral',
+        ));
+    }
+
+    public function handle_refresh_job_failure($job, $error_message = '', $result = null) {
+        if (!is_array($job)) {
+            return;
+        }
+
+        $origin = isset($job['origin']) ? $job['origin'] : 'cron';
+
+        if ('cron' !== $origin) {
+            return;
+        }
+
+        $context = array(
+            'reason'        => 'job_failure',
+            'outcome'       => 'failure',
+            'job_type'      => isset($job['type']) ? $job['type'] : '',
+            'profile_key'   => isset($job['profile_key']) ? $job['profile_key'] : '',
+            'error_message' => $error_message,
+        );
+
+        $this->reschedule_cron_event(null, $context);
+    }
+
+    public function handle_refresh_job_success($job, $result = null) {
+        if (!is_array($job)) {
+            return;
+        }
+
+        $origin = isset($job['origin']) ? $job['origin'] : 'cron';
+
+        if ('cron' !== $origin) {
+            return;
+        }
+
+        $state = $this->get_cron_state();
+        $failure_count = isset($state['consecutive_failures']) ? (int) $state['consecutive_failures'] : 0;
+
+        if ($failure_count <= 0) {
+            return;
+        }
+
+        $context = array(
+            'reason'      => 'job_recovery',
+            'outcome'     => 'success',
+            'job_type'    => isset($job['type']) ? $job['type'] : '',
+            'profile_key' => isset($job['profile_key']) ? $job['profile_key'] : '',
+        );
+
+        $this->reschedule_cron_event(null, $context);
+    }
+
+    private function calculate_cron_interval($base_interval, $failure_count, array $context = array()) {
+        $base_interval = max(60, (int) $base_interval);
+
+        if ($failure_count <= 0) {
+            return $base_interval;
+        }
+
+        $max_interval = apply_filters('discord_bot_jlg_cron_backoff_max_interval', 3600, $base_interval, $failure_count, $context);
+        $max_interval = max($base_interval, (int) $max_interval);
+
+        $interval = $base_interval * pow(2, min($failure_count, 6));
+        $interval = min($max_interval, max($base_interval, (int) $interval));
+
+        return $interval;
+    }
+
+    private function get_cron_state() {
+        $state = get_option($this->cron_state_option, array());
+
+        if (!is_array($state)) {
+            $state = array();
+        }
+
+        return $state;
+    }
+
+    private function persist_cron_state(array $state) {
+        update_option($this->cron_state_option, $state, false);
     }
 
     public function activate() {
@@ -430,7 +578,10 @@ class DiscordServerStats {
 
         Discord_Bot_JLG_Capabilities::ensure_roles_have_capabilities();
 
-        $this->reschedule_cron_event();
+        $this->reschedule_cron_event(null, array(
+            'reason'  => 'activation',
+            'outcome' => 'success',
+        ));
 
         if ($this->job_queue instanceof Discord_Bot_JLG_Job_Queue) {
             $this->job_queue->dispatch_refresh_jobs(true);
@@ -446,6 +597,8 @@ class DiscordServerStats {
         } else {
             wp_clear_scheduled_hook(Discord_Bot_JLG_Job_Queue::JOB_HOOK);
         }
+
+        delete_option($this->cron_state_option);
     }
 
     /**
@@ -521,7 +674,10 @@ class DiscordServerStats {
             $this->api->clear_all_cached_data();
 
             if ($cache_duration_changed) {
-                $this->reschedule_cron_event($new_cache_duration);
+                $this->reschedule_cron_event($new_cache_duration, array(
+                    'reason'  => 'settings_update',
+                    'outcome' => 'success',
+                ));
             }
 
             if ($this->job_queue instanceof Discord_Bot_JLG_Job_Queue) {
@@ -535,7 +691,10 @@ class DiscordServerStats {
             $this->api->clear_all_cached_data();
 
             if ($cache_duration_changed) {
-                $this->reschedule_cron_event($new_cache_duration);
+                $this->reschedule_cron_event($new_cache_duration, array(
+                    'reason'  => 'settings_update',
+                    'outcome' => 'success',
+                ));
             }
 
             if ($this->job_queue instanceof Discord_Bot_JLG_Job_Queue) {
@@ -546,7 +705,10 @@ class DiscordServerStats {
         }
 
         if ($cache_duration_changed) {
-            $this->reschedule_cron_event($new_cache_duration);
+            $this->reschedule_cron_event($new_cache_duration, array(
+                'reason'  => 'settings_update',
+                'outcome' => 'success',
+            ));
         }
 
         $this->api->clear_cache();
