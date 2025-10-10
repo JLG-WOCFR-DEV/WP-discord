@@ -71,6 +71,8 @@
     var ToolsPanelItem = components.__experimentalToolsPanelItem;
     var VStack = components.__experimentalVStack || components.VStack;
     var ToggleControl = components.ToggleControl;
+    var CheckboxControl = components.CheckboxControl;
+    var FormTokenField = components.FormTokenField || components.__experimentalFormTokenField;
     var TextControl = components.TextControl;
     var SelectControl = components.SelectControl;
     var RangeControl = components.RangeControl;
@@ -235,6 +237,34 @@
         value: ''
     });
 
+    var MAX_COMPARISON_PROFILES = 4;
+
+    function sanitizeProfileList(values) {
+        if (!Array.isArray(values)) {
+            return [];
+        }
+
+        var seen = {};
+        var normalized = [];
+
+        values.forEach(function (value) {
+            if (typeof value !== 'string') {
+                return;
+            }
+
+            var trimmed = value.trim();
+
+            if (!trimmed || Object.prototype.hasOwnProperty.call(seen, trimmed)) {
+                return;
+            }
+
+            seen[trimmed] = true;
+            normalized.push(trimmed);
+        });
+
+        return normalized;
+    }
+
     var defaultAttributes = {
         layout: 'horizontal',
         show_online: true,
@@ -294,6 +324,8 @@
         cta_new_tab: true,
         cta_tooltip: '',
         profile: '',
+        profiles: [],
+        reference_profile: '',
         server_id: '',
         bot_token: '',
         show_sparkline: false,
@@ -1252,19 +1284,148 @@
                 previewRenderer = defaultPreviewRenderer;
             }
 
+            var rawProfiles = Array.isArray(attributes.profiles) ? attributes.profiles : [];
+            var sanitizedInitialProfiles = sanitizeProfileList(rawProfiles);
+            var trimmedProfiles = sanitizedInitialProfiles.length > MAX_COMPARISON_PROFILES
+                ? sanitizedInitialProfiles.slice(0, MAX_COMPARISON_PROFILES)
+                : sanitizedInitialProfiles;
+
+            var requiresProfileSync = rawProfiles.length !== trimmedProfiles.length;
+            if (!requiresProfileSync) {
+                for (var profileIndex = 0; profileIndex < trimmedProfiles.length; profileIndex++) {
+                    if (rawProfiles[profileIndex] !== trimmedProfiles[profileIndex]) {
+                        requiresProfileSync = true;
+                        break;
+                    }
+                }
+            }
+
+            if (requiresProfileSync && typeof setAttributes === 'function') {
+                setAttributes({ profiles: trimmedProfiles });
+            }
+
+            var selectedProfiles = trimmedProfiles;
             var trimmedProfile = typeof attributes.profile === 'string'
                 ? attributes.profile.trim()
                 : '';
+            if (!trimmedProfile && selectedProfiles.length) {
+                trimmedProfile = selectedProfiles[0];
+            }
+            var referenceProfile = typeof attributes.reference_profile === 'string'
+                ? attributes.reference_profile.trim()
+                : '';
+            if (referenceProfile && selectedProfiles.indexOf(referenceProfile) === -1 && typeof setAttributes === 'function') {
+                setAttributes({ reference_profile: '' });
+                referenceProfile = '';
+            }
             var trimmedServerId = typeof attributes.server_id === 'string'
                 ? attributes.server_id.trim()
                 : '';
             var trimmedToken = typeof attributes.bot_token === 'string'
                 ? attributes.bot_token.trim()
                 : '';
-            var credentialsSignature = [trimmedProfile, trimmedServerId, trimmedToken].join('|');
-            var hasProfileCredentials = !!trimmedProfile;
+            var profileSignature = selectedProfiles.length ? selectedProfiles.join('|') : trimmedProfile;
+            var credentialsSignature = [profileSignature, trimmedServerId, trimmedToken].join('|');
+            var hasProfileCredentials = selectedProfiles.length > 0 || !!trimmedProfile;
             var hasManualCredentials = !!trimmedServerId && !!trimmedToken;
             var hasCredentials = hasProfileCredentials || hasManualCredentials;
+            var profileLabelMap = {};
+            profileOptions.forEach(function (option) {
+                if (!option || typeof option.value === 'undefined') {
+                    return;
+                }
+
+                var optionValue = typeof option.value === 'string' ? option.value : String(option.value);
+                profileLabelMap[optionValue] = option.label || optionValue;
+            });
+            var referenceOptions = [
+                {
+                    label: __('Automatique (premier profil)', 'discord-bot-jlg'),
+                    value: ''
+                }
+            ];
+            selectedProfiles.forEach(function (value) {
+                referenceOptions.push({
+                    label: profileLabelMap[value] || value || __('Configuration globale', 'discord-bot-jlg'),
+                    value: value
+                });
+            });
+            var profileCheckboxes = profileOptions.map(function (option, index) {
+                if (!option) {
+                    return null;
+                }
+
+                var optionValue = typeof option.value === 'string'
+                    ? option.value
+                    : (typeof option.value === 'undefined' || option.value === null)
+                        ? ''
+                        : String(option.value);
+                var isChecked = selectedProfiles.indexOf(optionValue) !== -1;
+                var disableAdditional = selectedProfiles.length >= MAX_COMPARISON_PROFILES && !isChecked;
+
+                return createElement(CheckboxControl, {
+                    key: 'comparison-profile-' + (optionValue ? optionValue : 'default-' + index),
+                    label: option.label,
+                    checked: isChecked,
+                    disabled: disableAdditional,
+                    onChange: function (checked) {
+                        var nextValues = selectedProfiles.slice();
+
+                        if (checked) {
+                            if (nextValues.indexOf(optionValue) === -1) {
+                                nextValues.push(optionValue);
+                            }
+                        } else {
+                            var idx = nextValues.indexOf(optionValue);
+                            if (idx !== -1) {
+                                nextValues.splice(idx, 1);
+                            }
+                        }
+
+                        handleProfilesChange(nextValues);
+                    }
+                });
+            }).filter(function (control) { return !!control; });
+            function handleProfilesChange(nextValues) {
+                var sanitized = sanitizeProfileList(nextValues);
+
+                if (profileOptions && profileOptions.length) {
+                    var allowed = {};
+
+                    profileOptions.forEach(function (option) {
+                        if (!option || typeof option.value === 'undefined') {
+                            return;
+                        }
+
+                        var optionValue = typeof option.value === 'string'
+                            ? option.value
+                            : String(option.value);
+
+                        allowed[optionValue] = true;
+                    });
+
+                    sanitized = sanitized.filter(function (value) {
+                        if (!value && Object.prototype.hasOwnProperty.call(allowed, '')) {
+                            return true;
+                        }
+
+                        return Object.prototype.hasOwnProperty.call(allowed, value);
+                    });
+                }
+
+                var update = { profiles: sanitized };
+
+                if (referenceProfile && sanitized.indexOf(referenceProfile) === -1) {
+                    update.reference_profile = '';
+                }
+
+                if (sanitized.length > MAX_COMPARISON_PROFILES) {
+                    sanitized = sanitized.slice(0, MAX_COMPARISON_PROFILES);
+                    update.profiles = sanitized;
+                }
+
+                setAttributes(update);
+            }
 
             if (hasUseEffect && typeof setPreviewRenderer === 'function') {
                 useEffect(function () {
@@ -2012,6 +2173,32 @@
                             onChange: updateAttribute(setAttributes, 'bot_token'),
                             help: __('Laisser vide pour conserver le token fourni par le profil ou la configuration globale.', 'discord-bot-jlg')
                         })
+                    ),
+                    createElement(
+                        PanelBody,
+                        { title: __('Comparaison multi-profils', 'discord-bot-jlg'), initialOpen: false },
+                        createElement(BaseControl, {
+                            label: __('Profils à comparer', 'discord-bot-jlg'),
+                            help: profileOptions.length > 1
+                                ? __('Sélectionnez jusqu’à quatre profils pour générer un tableau comparatif Live/Cache/Dégradé.', 'discord-bot-jlg')
+                                : __('Ajoutez des profils depuis l’administration du plugin pour activer la comparaison.', 'discord-bot-jlg')
+                        }, profileCheckboxes),
+                        selectedProfiles.length > 0 && createElement(SelectControl, {
+                            label: __('Profil de référence', 'discord-bot-jlg'),
+                            value: referenceProfile,
+                            options: referenceOptions,
+                            onChange: function (value) {
+                                setAttributes({ reference_profile: value });
+                            },
+                            help: __('Définit la base de calcul des deltas affichés dans le bandeau comparatif.', 'discord-bot-jlg')
+                        }),
+                        selectedProfiles.length > 1
+                            ? createElement('p', {
+                                className: 'components-base-control__help'
+                            }, __('Le rendu colonne/carrousel s’active automatiquement côté front lorsque deux profils ou plus sont sélectionnés.', 'discord-bot-jlg'))
+                            : createElement('p', {
+                                className: 'components-base-control__help'
+                            }, __('Sélectionnez au moins deux profils pour activer la comparaison multi-profils.', 'discord-bot-jlg'))
                     ),
                     createElement(
                         PanelBody,

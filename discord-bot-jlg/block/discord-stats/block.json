@@ -264,6 +264,17 @@
             "type": "string",
             "default": ""
         },
+        "profiles": {
+            "type": "array",
+            "items": {
+                "type": "string"
+            },
+            "default": []
+        },
+        "reference_profile": {
+            "type": "string",
+            "default": ""
+        },
         "server_id": {
             "type": "string",
             "default": ""
