@@ -148,6 +148,7 @@ require_once __DIR__ . '/../../inc/class-discord-analytics.php';
 require_once __DIR__ . '/../../inc/class-discord-http.php';
 require_once __DIR__ . '/../../inc/class-discord-event-logger.php';
 require_once __DIR__ . '/../../inc/class-discord-options-repository.php';
+require_once __DIR__ . '/../../inc/class-discord-capabilities.php';
 require_once __DIR__ . '/../../inc/class-discord-api.php';
 require_once __DIR__ . '/../../inc/class-discord-widget.php';
 require_once __DIR__ . '/../../inc/class-discord-shortcode.php';
@@ -730,6 +731,13 @@ function current_user_can($capability) {
             if (array_key_exists('*', $current_user_can)) {
                 return (bool) $current_user_can['*'];
             }
+
+            if (
+                'manage_options' !== $capability
+                && array_key_exists('manage_options', $current_user_can)
+            ) {
+                return (bool) $current_user_can['manage_options'];
+            }
         }
 
         if (is_bool($current_user_can)) {
@@ -765,10 +773,12 @@ if (!class_exists('WP_REST_Request')) {
     class WP_REST_Request {
         private $params = array();
         private $headers = array();
+        private $route = '';
 
         public function __construct($method = 'GET', $route = '') {
             $this->params  = array();
             $this->headers = array();
+            $this->route   = is_string($route) ? $route : '';
         }
 
         public function set_param($key, $value) {
@@ -799,6 +809,18 @@ if (!class_exists('WP_REST_Request')) {
             $normalized = strtolower($key);
 
             return isset($this->headers[$normalized]) ? $this->headers[$normalized] : '';
+        }
+
+        public function set_route($route) {
+            if (!is_string($route)) {
+                return;
+            }
+
+            $this->route = $route;
+        }
+
+        public function get_route() {
+            return $this->route;
         }
     }
 }

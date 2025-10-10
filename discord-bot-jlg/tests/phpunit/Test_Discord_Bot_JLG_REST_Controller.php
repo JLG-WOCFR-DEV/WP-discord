@@ -67,6 +67,19 @@ class Test_Discord_Bot_JLG_REST_Controller extends TestCase {
         $this->assertTrue($controller->check_rest_permissions($request));
     }
 
+    public function test_permission_callback_allows_custom_capability_without_manage_options() {
+        $GLOBALS['wp_test_current_user_can'] = array(
+            'manage_options'         => false,
+            'view_discord_analytics' => true,
+        );
+
+        $api        = new Stubbed_Discord_Bot_JLG_API_For_REST();
+        $controller = new Discord_Bot_JLG_REST_Controller($api, null);
+        $request    = new WP_REST_Request('GET', '/discord-bot-jlg/v1/analytics');
+
+        $this->assertTrue($controller->check_rest_permissions($request));
+    }
+
     public function test_permission_callback_rejects_when_user_lacks_capability() {
         $GLOBALS['wp_test_current_user_can'] = array('manage_options' => false);
 
