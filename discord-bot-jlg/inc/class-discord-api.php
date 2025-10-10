@@ -1379,7 +1379,7 @@ class Discord_Bot_JLG_API {
         if (
             true === $force_refresh
             && false === $is_public_request
-            && current_user_can('manage_options')
+            && Discord_Bot_JLG_Capabilities::current_user_can('manage_profiles')
         ) {
             $policy['bypass_cache'] = true;
             $policy['refresh_requires_remote_call'] = true;
@@ -1581,7 +1581,7 @@ class Discord_Bot_JLG_API {
             if (
                 true === $requested_force_refresh
                 && false === $is_public_request
-                && current_user_can('manage_options')
+                && Discord_Bot_JLG_Capabilities::current_user_can('manage_profiles')
             ) {
                 $force_refresh = true;
             }

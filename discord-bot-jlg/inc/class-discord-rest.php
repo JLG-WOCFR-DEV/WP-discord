@@ -801,7 +801,9 @@ class Discord_Bot_JLG_REST_Controller {
     }
 
     public function check_rest_permissions(WP_REST_Request $request) {
-        if (current_user_can('manage_options')) {
+        $required_action = $this->determine_required_capability_action($request);
+
+        if (Discord_Bot_JLG_Capabilities::current_user_can($required_action)) {
             return true;
         }
 
@@ -829,6 +831,41 @@ class Discord_Bot_JLG_REST_Controller {
             __('Vous devez être connecté avec les droits appropriés pour accéder à ces données.', 'discord-bot-jlg'),
             array('status' => 403)
         );
+    }
+
+    private function determine_required_capability_action(WP_REST_Request $request) {
+        $route = '';
+
+        if ($request instanceof WP_REST_Request) {
+            $route = $request->get_route();
+        }
+
+        if (!is_string($route)) {
+            $route = '';
+        }
+
+        if (false !== strpos($route, self::ROUTE_ANALYTICS_EXPORT)) {
+            return 'export_analytics';
+        }
+
+        if (false !== strpos($route, self::ROUTE_STATS)) {
+            $force_refresh = discord_bot_jlg_validate_bool($request->get_param('force_refresh'));
+
+            if ($force_refresh) {
+                return 'manage_profiles';
+            }
+
+            return 'view_analytics';
+        }
+
+        if (
+            false !== strpos($route, self::ROUTE_ANALYTICS)
+            || false !== strpos($route, self::ROUTE_EVENTS)
+        ) {
+            return 'view_analytics';
+        }
+
+        return 'view_analytics';
     }
 
     private function request_requires_cookie_nonce(WP_REST_Request $request) {

@@ -746,7 +746,7 @@ class Discord_Bot_JLG_Shortcode {
             $formatted_next_retry = $no_data_label;
         }
 
-        $can_force_refresh = current_user_can('manage_options');
+        $can_force_refresh = Discord_Bot_JLG_Capabilities::current_user_can('manage_profiles');
         $logs_url = $can_force_refresh ? admin_url('admin.php?page=discord-bot-jlg') : '';
 
         $status_meta = array(

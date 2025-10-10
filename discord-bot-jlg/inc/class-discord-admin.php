@@ -46,10 +46,12 @@ class Discord_Bot_JLG_Admin {
     public function add_admin_menu() {
         $discord_icon = 'data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZmlsbD0iI2E0YWFiOCIgZD0iTTIwLjMxNyA0LjM3YTE5LjggMTkuOCAwIDAwLTQuODg1LTEuNTE1LjA3NC4wNzQgMCAwMC0uMDc5LjAzN2MtLjIxLjM3NS0uNDQ0Ljg2NC0uNjA4IDEuMjVhMTguMjcgMTguMjcgMCAwMC01LjQ4NyAwYy0uMTY1LS4zOTctLjQwNC0uODg1LS42MTgtMS4yNWEuMDc3LjA3NyAwIDAwLS4wNzktLjAzN0ExOS43NCAxOS43NCAwIDAwMy42NzcgNC4zN2EuMDcuMDcgMCAwMC0uMDMyLjAyN0MuNTMzIDkuMDQ2LS4zMiAxMy41OC4wOTkgMTguMDU3YS4wOC4wOCAwIDAwLjAzMS4wNTdBMTkuOSAxOS45IDAgMDA2LjA3MyAyMWEuMDc4LjA3OCAwIDAwLjA4NC0uMDI4IDEzLjQgMTMuNCAwIDAwMS4xNTUtMi4xLjA3Ni4wNzYgMCAwMC0uMDQxLS4xMDYgMTMuMSAxMy4xIDAgMDEtMS44NzItLjg5Mi4wNzcuMDc3IDAgMDEtLjAwOC0uMTI4IDE0IDE0IDAgMDAuMzctLjI5Mi4wNzQuMDc0IDAgMDEuMDc3LS4wMWMzLjkyNyAxLjc5MyA4LjE4IDEuNzkzIDEyLjA2IDAgYS4wNzQuMDc0IDAgMDEuMDc4LjAwOS4xMTkuMDk5LjI0Ni4xOTguMzczLjI5MmEuMDc3LjA3NyAwIDAxLS4wMDYuMTI3IDEyLjMgMTIuMyAwIDAxLTEuODczLjg5Mi4wNzcuMDc3IDAgMDAtLjA0MS4xMDdjMy43NDQgMS40MDMgMS4xNTUgMi4xLS4wODQuMDI4YS4wNzguMDc4IDAgMDAxOS45MDItMS45MDMuMDc2LjA3NiAwIDAwLjAzLS4wNTdjLjUzNy00LjU4LS45MDQtOC41NTMtMy44MjMtMTIuMDU3YS4wNi4wNiAwIDAwLS4wMzEtLjAyOHpNOC4wMiAxNS4yNzhjLTEuMTgzIDAtMi4xNTctMS4wODUtMi4xNTctMi40MiAwLTEuMzMzLjk1Ni0yLjQxOSAyLjE1Ny0yLjQxOSAxLjIxIDAgMi4xNzYgMS4wOTYgMi4xNTcgMi40MiAwIDEuMzM0LS45NTYgMi40MTktMi4xNTcgMi40MTl6bTcuOTc1IDBjLTEuMTgzIDAtMi4xNTctMS4wODUtMi4xNTctMi40MiAwLTEuMzMzLjk1NS0yLjQxOSAyLjE1Ny0yLjQxOXMyLjE1NyAxLjA5NiAyLjE1NyAyLjQyYzAgMS4zMzQtLjk1NiAyLjQxOS0yLjE1NyAyLjQxOXoiLz48L3N2Zz4=';
 
+        $manage_settings_cap = Discord_Bot_JLG_Capabilities::get_capability('manage_settings');
+
         add_menu_page(
             __('Discord Bot - JLG', 'discord-bot-jlg'),
             __('Discord Bot', 'discord-bot-jlg'),
-            'manage_options',
+            $manage_settings_cap,
             'discord-bot-jlg',
             array($this, 'options_page'),
             $discord_icon,
@@ -60,7 +62,7 @@ class Discord_Bot_JLG_Admin {
             'discord-bot-jlg',
             __('Configuration', 'discord-bot-jlg'),
             __('Configuration', 'discord-bot-jlg'),
-            'manage_options',
+            $manage_settings_cap,
             'discord-bot-jlg',
             array($this, 'options_page')
         );
@@ -69,7 +71,7 @@ class Discord_Bot_JLG_Admin {
             'discord-bot-jlg',
             __('Guide & Démo', 'discord-bot-jlg'),
             __('Guide & Démo', 'discord-bot-jlg'),
-            'manage_options',
+            $manage_settings_cap,
             'discord-bot-demo',
             array($this, 'demo_page')
         );
@@ -1060,7 +1062,7 @@ class Discord_Bot_JLG_Admin {
     }
 
     public function maybe_display_secret_rotation_notice() {
-        if (!current_user_can('manage_options')) {
+        if (!Discord_Bot_JLG_Capabilities::current_user_can('manage_settings')) {
             return;
         }
 
@@ -2293,7 +2295,7 @@ class Discord_Bot_JLG_Admin {
             return;
         }
 
-        if (!current_user_can('manage_options')) {
+        if (!Discord_Bot_JLG_Capabilities::current_user_can('manage_profiles')) {
             add_settings_error(
                 'discord_stats_settings',
                 'discord_bot_jlg_access_denied',
@@ -2768,7 +2770,7 @@ class Discord_Bot_JLG_Admin {
     }
 
     public function handle_monitoring_export() {
-        if (!current_user_can('manage_options')) {
+        if (!Discord_Bot_JLG_Capabilities::current_user_can('export_analytics')) {
             wp_die(__('Vous n’avez pas les droits suffisants pour exporter ce journal.', 'discord-bot-jlg'));
         }
 

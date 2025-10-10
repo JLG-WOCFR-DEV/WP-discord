@@ -21,7 +21,7 @@ Accédez à la page **Discord Bot** dans l’administration pour :
 - Activer un centre d’alertes analytics (seuil de baisse, e-mails, webhook) ;
 - Ajouter du CSS personnalisé.
 
-> ℹ️ Les tableaux de bord d’analytics et l’API REST `discord-bot-jlg/v1/analytics` ne sont accessibles qu’aux utilisateurs connectés disposant de la capacité `manage_options` (ou via une clé API déclarée à l’aide du filtre `discord_bot_jlg_rest_access_key`).
+> ℹ️ Les tableaux de bord d’analytics et l’API REST `discord-bot-jlg/v1/analytics` ne sont accessibles qu’aux utilisateurs connectés disposant de la capacité `view_discord_analytics` (ou via une clé API déclarée à l’aide du filtre `discord_bot_jlg_rest_access_key`). Les administrateurs héritent automatiquement des nouvelles capacités professionnelles (`manage_discord_bot`, `manage_discord_profiles`, `view_discord_analytics`, `export_discord_analytics`).
 
 ### Définir le token via une constante
 
@@ -128,7 +128,7 @@ Un widget « Discord Bot - JLG » est disponible via le menu « Widgets ».
 - Le panneau d’état public agrège automatiquement les cinq derniers événements (succès API, erreurs HTTP, limites de taux) pour diagnostiquer les incidents sans quitter la page.【F:discord-bot-jlg/inc/class-discord-api.php†L1018-L1087】【F:discord-bot-jlg/inc/class-discord-shortcode.php†L678-L713】
 
 ### API, analytics & supervision
-- Endpoints REST `discord-bot-jlg/v1/stats` et `discord-bot-jlg/v1/analytics` pour récupérer les compteurs en temps réel ou agrégés, protégés par la capacité `manage_options` ou une clé d’accès filtrable (`discord_bot_jlg_rest_access_key`).【F:discord-bot-jlg/inc/class-discord-rest.php†L23-L199】【F:discord-bot-jlg/inc/class-discord-rest.php†L201-L244】
+- Endpoints REST `discord-bot-jlg/v1/stats` et `discord-bot-jlg/v1/analytics` pour récupérer les compteurs en temps réel ou agrégés, protégés par la capacité `view_discord_analytics` (et `export_discord_analytics` pour les exports) ou une clé d’accès filtrable (`discord_bot_jlg_rest_access_key`).【F:discord-bot-jlg/inc/class-discord-rest.php†L23-L199】【F:discord-bot-jlg/inc/class-discord-rest.php†L200-L337】
 - Endpoint REST `discord-bot-jlg/v1/analytics/export` pour télécharger les timeseries en CSV ou JSON (colonnes personnalisées, fuseau horaire, nom de fichier).【F:discord-bot-jlg/inc/class-discord-rest.php†L23-L244】【F:discord-bot-jlg/inc/class-discord-rest.php†L246-L453】
 - Endpoint REST `discord-bot-jlg/v1/events` fournissant un journal structuré des appels Discord (durée, statut HTTP, quotas restants, diagnostics) afin d’alimenter des outils d’observabilité ou des alertes automatisées.【F:discord-bot-jlg/inc/class-discord-api.php†L1991-L2133】【F:discord-bot-jlg/inc/class-discord-rest.php†L23-L152】
 - Intégration WP-CLI avec commandes `wp discord-bot refresh-cache` et `wp discord-bot clear-cache` pour forcer une synchronisation ou purger les données sans passer par l’UI.【F:discord-bot-jlg/inc/class-discord-cli.php†L24-L81】

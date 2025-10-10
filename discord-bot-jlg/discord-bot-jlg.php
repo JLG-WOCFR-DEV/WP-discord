@@ -141,6 +141,7 @@ require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-analytics.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-http.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-event-logger.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-options-repository.php';
+require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-capabilities.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-alerts.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-api.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-job-queue.php';
@@ -179,6 +180,8 @@ function discord_bot_jlg_load_textdomain() {
 }
 
 add_action('plugins_loaded', 'discord_bot_jlg_load_textdomain');
+
+add_action('init', array('Discord_Bot_JLG_Capabilities', 'ensure_roles_have_capabilities'));
 
 class DiscordServerStats {
 
@@ -421,6 +424,8 @@ class DiscordServerStats {
         if ($this->analytics instanceof Discord_Bot_JLG_Analytics) {
             $this->analytics->install();
         }
+
+        Discord_Bot_JLG_Capabilities::ensure_roles_have_capabilities();
 
         $this->reschedule_cron_event();
 
