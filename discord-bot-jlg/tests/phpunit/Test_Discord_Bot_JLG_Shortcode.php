@@ -137,6 +137,18 @@ class Test_Discord_Bot_JLG_Shortcode extends TestCase {
         $this->assertStringContainsString('max-width: clamp(200px, 50%, var(--max-width))', $html);
     }
 
+    public function test_render_shortcode_accepts_nested_calc_inside_width_functions() {
+        $shortcode = $this->get_shortcode_instance();
+
+        $html = $shortcode->render_shortcode(array(
+            'width' => 'clamp(240px, calc(50vw + 10px), 720px)',
+        ));
+
+        $this->assertStringContainsString('style="', $html);
+        $this->assertStringContainsString('width: 100%', $html);
+        $this->assertStringContainsString('max-width: clamp(240px, calc(50vw + 10px), 720px)', $html);
+    }
+
     public function test_render_shortcode_adds_max_width_and_fluid_width() {
         $shortcode = $this->get_shortcode_instance();
 

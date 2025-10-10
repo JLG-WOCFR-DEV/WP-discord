@@ -1772,14 +1772,15 @@ class Discord_Bot_JLG_Shortcode {
             return $lower_width;
         }
 
-        $calc_pattern = '/^calc\(\s*[0-9+\-*\/\.%\sA-Za-z()]+\)$/';
+        $calc_pattern = '/^calc\(\s*[0-9+*\/\.%,\sA-Za-z()\\-]+\)$/i';
         if (preg_match($calc_pattern, $width)) {
             return $width;
         }
 
         $numeric_pattern = '-?\d+(?:\.\d+)?(?:px|em|rem|%|vh|vw|vmin|vmax|ch|ex|cm|mm|in|pt|pc)?';
         $variable_pattern = 'var\(\s*--[A-Za-z0-9_-]+\s*\)';
-        $function_value_pattern = '(?:' . $numeric_pattern . '|' . $variable_pattern . ')';
+        $calc_value_pattern = 'calc\(\s*[0-9+*\/\.%,\sA-Za-z()\\-]+\)';
+        $function_value_pattern = '(?:' . $numeric_pattern . '|' . $variable_pattern . '|' . $calc_value_pattern . ')';
 
         $min_max_pattern = '/^(?:min|max)\(\s*' . $function_value_pattern . '(?:\s*,\s*' . $function_value_pattern . ')+\s*\)$/i';
         if (preg_match($min_max_pattern, $width)) {
