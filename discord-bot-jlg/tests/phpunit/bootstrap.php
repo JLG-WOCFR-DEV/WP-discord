@@ -146,6 +146,9 @@ if (!class_exists('WP_Widget')) {
 require_once __DIR__ . '/../../inc/helpers.php';
 require_once __DIR__ . '/../../inc/class-discord-analytics.php';
 require_once __DIR__ . '/../../inc/class-discord-http.php';
+require_once __DIR__ . '/../../inc/class-discord-cache-gateway.php';
+require_once __DIR__ . '/../../inc/class-discord-profile-repository.php';
+require_once __DIR__ . '/../../inc/class-discord-http-connector.php';
 require_once __DIR__ . '/../../inc/class-discord-event-logger.php';
 require_once __DIR__ . '/../../inc/class-discord-options-repository.php';
 require_once __DIR__ . '/../../inc/class-discord-capabilities.php';

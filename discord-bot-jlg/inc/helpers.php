@@ -532,3 +532,51 @@ if (!function_exists('discord_bot_jlg_sanitize_custom_css')) {
         return trim($css);
     }
 }
+
+if (!function_exists('discord_bot_jlg_is_psr_logger')) {
+    /**
+     * Vérifie si un objet implémente l'interface PSR-3 Logger.
+     *
+     * @param mixed $candidate Objet à tester.
+     *
+     * @return bool
+     */
+    function discord_bot_jlg_is_psr_logger($candidate) {
+        if (!is_object($candidate)) {
+            return false;
+        }
+
+        if (!interface_exists('Psr\\Log\\LoggerInterface')) {
+            return false;
+        }
+
+        return ($candidate instanceof Psr\Log\LoggerInterface);
+    }
+}
+
+if (!function_exists('discord_bot_jlg_logger_debug')) {
+    /**
+     * Tente de consigner un message via un logger PSR-3.
+     *
+     * @param mixed  $logger  Instance potentielle de logger PSR-3.
+     * @param string $message Message à journaliser.
+     * @param array  $context Contexte optionnel.
+     *
+     * @return bool True si le logger a été utilisé, false sinon.
+     */
+    function discord_bot_jlg_logger_debug($logger, $message, array $context = array()) {
+        if (!discord_bot_jlg_is_psr_logger($logger)) {
+            return false;
+        }
+
+        $trimmed_message = trim((string) $message);
+
+        if ('' === $trimmed_message) {
+            return false;
+        }
+
+        $logger->debug($trimmed_message, $context);
+
+        return true;
+    }
+}
