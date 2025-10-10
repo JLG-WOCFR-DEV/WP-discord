@@ -837,6 +837,7 @@ class Discord_Bot_JLG_API {
 
             $bot_stats  = false;
             $bot_token = $this->get_bot_token($options);
+            $options['__bot_token_override'] = $bot_token;
             $should_call_bot = (!empty($bot_token) && ($widget_incomplete || empty($widget_stats)));
 
             if ($should_call_bot) {
@@ -1830,6 +1831,7 @@ class Discord_Bot_JLG_API {
             }
 
             $bot_token = $this->get_bot_token($options);
+            $options['__bot_token_override'] = $bot_token;
             if ('' === $bot_token) {
                 return new WP_Error(
                     'discord_bot_jlg_bot_refresh_missing_token',
@@ -4020,10 +4022,18 @@ class Discord_Bot_JLG_API {
     }
 
     private function get_bot_token($options) {
-        $override_requested = (is_array($options) && !empty($options['__bot_token_override']));
+        $override_requested = (is_array($options) && array_key_exists('__bot_token_override', $options));
 
         if (!$override_requested && defined('DISCORD_BOT_JLG_TOKEN') && '' !== DISCORD_BOT_JLG_TOKEN) {
             return DISCORD_BOT_JLG_TOKEN;
+        }
+
+        if ($override_requested) {
+            $override_value = $options['__bot_token_override'];
+
+            if (is_string($override_value)) {
+                return $override_value;
+            }
         }
 
         if (!isset($options['bot_token']) || '' === $options['bot_token']) {
