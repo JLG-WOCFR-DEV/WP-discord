@@ -80,6 +80,27 @@ et une observabilité partagée entre les équipes techniques et métiers. Voici
 Avec ces évolutions, le connecteur gagnerait en robustesse, offrirait des garanties auditables et réduirait les interruptions
 perçues par les utilisateurs finaux, alignant le plugin sur les standards des solutions professionnelles.
 
+### Focus UX/UI, ergonomie et design
+
+Les solutions professionnelles de monitoring communautaire (Orbit, Common Room, Commsor) combinent une présentation soignée, une
+ergonomie pilotée par la donnée et des points d’action visibles. Pour refermer l’écart, trois chantiers structurants sont
+recommandés :
+
+1. **Guidage visuel et hiérarchisation des états** : afficher les statuts du connecteur directement dans le widget via un badge
+   de mode (Live/Cache/Dégradé) et un compteur de rafraîchissement, afin de reproduire la signalétique proactive observée sur
+   les dashboards pro.【F:docs/ux-ui-ameliorations-suite.md†L119-L164】 Couplée à un panneau latéral listant les dernières
+   synchronisations, cette approche offre une compréhension immédiate de la fiabilité perçue.
+2. **Comparaisons multi-profils accessibles** : proposer dans le bloc Gutenberg une sélection multi-profils avec rendu en colonnes
+   (desktop) et carrousel (mobile), permettant de benchmarker plusieurs serveurs depuis un même écran comme sur les suites
+   enterprise. Les visiteurs bénéficient d’un bandeau de synthèse des deltas et peuvent exporter la comparaison en un clic.【F:docs/ux-ui-ameliorations-suite.md†L5-L42】
+3. **Exploration interactive des données** : transformer les listes statiques en vues filtrables (chips de statuts, heatmap
+   hebdomadaire, timeline zoomable) pour rapprocher l’expérience des consoles analytics modernes et favoriser la prise de
+   décision. L’ajout d’annotations, de moyennes glissantes et de presets multi-métriques réduit le temps d’analyse pour les équipes
+   marketing/produit.【F:docs/ux-ui-ameliorations-suite.md†L44-L210】
+
+Au-delà de ces piliers, l’alignement UX passe par une refonte coordonnée du design system (tokens, composants) et par des tests
+utilisateurs courts afin de calibrer les motions et l’accessibilité dès les prototypes Figma.【F:docs/ux-ui-ameliorations-suite.md†L212-L244】
+
 ### Axes opérationnels complémentaires
 
 Les éditeurs SaaS matures se distinguent aussi par la qualité de leur outillage interne : pipelines de tests, packaging multi-langues et procédures de réversibilité. Le plugin dispose déjà d’une base de tests unitaires/JS et de hooks de cycle de vie, mais gagnerait à formaliser ces aspects.
