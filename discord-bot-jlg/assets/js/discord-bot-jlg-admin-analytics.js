@@ -25,6 +25,51 @@
     };
     var annotationMeta = {};
 
+    function installChromeRuntimeErrorGuard() {
+        if (!window || typeof window.addEventListener !== 'function') {
+            return;
+        }
+
+        if (window.__discordBotJlgChromeRuntimeGuardInstalled) {
+            return;
+        }
+
+        window.__discordBotJlgChromeRuntimeGuardInstalled = true;
+
+        window.addEventListener('unhandledrejection', function (event) {
+            if (!event || !event.reason) {
+                return;
+            }
+
+            var reason = event.reason;
+            var message = '';
+
+            if (typeof reason === 'string') {
+                message = reason;
+            } else if (reason && typeof reason.message === 'string') {
+                message = reason.message;
+            }
+
+            if (!message) {
+                return;
+            }
+
+            var asyncResponseFragment = 'A listener indicated an asynchronous response';
+            var messageChannelFragment = 'message channel closed before a response was received';
+
+            if (
+                message.indexOf(asyncResponseFragment) !== -1
+                && message.indexOf(messageChannelFragment) !== -1
+            ) {
+                event.preventDefault();
+
+                if (typeof console !== 'undefined' && typeof console.warn === 'function') {
+                    console.warn('Suppressed runtime messaging error from browser extension:', message);
+                }
+            }
+        });
+    }
+
     function ready(fn) {
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', fn);
@@ -758,6 +803,8 @@
     }
 
     function initializePanel() {
+        installChromeRuntimeErrorGuard();
+
         var panel = document.getElementById(config.containerId || 'discord-analytics-panel');
         if (!panel) {
             return;
