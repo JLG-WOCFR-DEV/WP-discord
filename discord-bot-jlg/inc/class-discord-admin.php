@@ -437,6 +437,12 @@ class Discord_Bot_JLG_Admin {
             'bot_token_rotated_at' => isset($current_options['bot_token_rotated_at'])
                 ? (int) $current_options['bot_token_rotated_at']
                 : 0,
+            'bot_token_expires_at' => isset($current_options['bot_token_expires_at'])
+                ? (int) $current_options['bot_token_expires_at']
+                : 0,
+            'bot_token_status' => isset($current_options['bot_token_status'])
+                ? sanitize_key($current_options['bot_token_status'])
+                : 'missing',
             'server_profiles'=> isset($current_options['server_profiles']) && is_array($current_options['server_profiles'])
                 ? $current_options['server_profiles']
                 : array(),
@@ -603,16 +609,32 @@ class Discord_Bot_JLG_Admin {
             $sanitized['bot_token_rotated_at'] = 0;
         }
 
-        $sanitized['demo_mode']              = !empty($input['demo_mode']) ? 1 : 0;
-        $sanitized['show_online']            = !empty($input['show_online']) ? 1 : 0;
-        $sanitized['show_total']             = !empty($input['show_total']) ? 1 : 0;
-        $sanitized['show_presence_breakdown'] = !empty($input['show_presence_breakdown']) ? 1 : 0;
-        $sanitized['show_approximate_member_count'] = !empty($input['show_approximate_member_count']) ? 1 : 0;
-        $sanitized['show_premium_subscriptions'] = !empty($input['show_premium_subscriptions']) ? 1 : 0;
-        $sanitized['show_server_name']       = !empty($input['show_server_name']) ? 1 : 0;
-        $sanitized['show_server_avatar']     = !empty($input['show_server_avatar']) ? 1 : 0;
-        $sanitized['default_refresh_enabled'] = !empty($input['default_refresh_enabled']) ? 1 : 0;
-        $sanitized['analytics_alerts_enabled'] = !empty($input['analytics_alerts_enabled']) ? 1 : 0;
+        $main_secret_metadata = $this->finalize_secret_metadata(
+            'default',
+            $sanitized['bot_token'],
+            $sanitized['bot_token_rotated_at'],
+            $current_timestamp,
+            __('configuration principale', 'discord-bot-jlg')
+        );
+        $sanitized['bot_token_expires_at'] = $main_secret_metadata['expires_at'];
+        $sanitized['bot_token_status'] = $main_secret_metadata['status'];
+
+        $boolean_fields = array(
+            'demo_mode',
+            'show_online',
+            'show_total',
+            'show_presence_breakdown',
+            'show_approximate_member_count',
+            'show_premium_subscriptions',
+            'show_server_name',
+            'show_server_avatar',
+            'default_refresh_enabled',
+            'analytics_alerts_enabled',
+        );
+
+        foreach ($boolean_fields as $boolean_field) {
+            $sanitized[$boolean_field] = !empty($input[$boolean_field]) ? 1 : 0;
+        }
 
         if (isset($input['default_theme'])) {
             $raw_theme = is_string($input['default_theme'])
@@ -984,12 +1006,22 @@ class Discord_Bot_JLG_Admin {
                 }
             }
 
+            $metadata = $this->finalize_secret_metadata(
+                'profile_' . $profile_key,
+                $token_to_store,
+                $rotation_to_store,
+                $current_timestamp,
+                ('' !== $label) ? $label : $profile_key
+            );
+
             $result[$profile_key] = array(
                 'key'       => $profile_key,
                 'label'     => $label,
                 'server_id' => $server_id,
                 'bot_token' => $token_to_store,
                 'bot_token_rotated_at' => $rotation_to_store,
+                'bot_token_expires_at' => $metadata['expires_at'],
+                'bot_token_status'     => $metadata['status'],
             );
         }
 
@@ -1048,17 +1080,138 @@ class Discord_Bot_JLG_Admin {
                     }
                 }
 
+                $metadata = $this->finalize_secret_metadata(
+                    'profile_' . $profile_key,
+                    $token_to_store,
+                    $rotation_to_store,
+                    $current_timestamp,
+                    ('' !== $label) ? $label : $profile_key
+                );
+
                 $result[$profile_key] = array(
                     'key'       => $profile_key,
                     'label'     => $label,
                     'server_id' => $server_id,
                     'bot_token' => $token_to_store,
                     'bot_token_rotated_at' => $rotation_to_store,
+                    'bot_token_expires_at' => $metadata['expires_at'],
+                    'bot_token_status'     => $metadata['status'],
                 );
             }
         }
 
         return $result;
+    }
+
+    private function finalize_secret_metadata($context_key, $token, $rotated_at, $current_timestamp, $label) {
+        $metadata = array(
+            'expires_at' => 0,
+            'status'     => 'missing',
+        );
+
+        $token = (string) $token;
+        $rotated_at = (int) $rotated_at;
+        $current_timestamp = (int) $current_timestamp;
+        $label = (string) $label;
+        $context_key = sanitize_key($context_key);
+
+        if ('' === $token) {
+            return $metadata;
+        }
+
+        if ('' === $label) {
+            $label = $context_key;
+        }
+
+        $max_age_days = (int) apply_filters(
+            'discord_bot_jlg_secret_rotation_max_age_days',
+            self::SECRET_ROTATION_MAX_AGE_DAYS,
+            $context_key,
+            $label
+        );
+
+        if ($max_age_days <= 0) {
+            $max_age_days = self::SECRET_ROTATION_MAX_AGE_DAYS;
+        }
+
+        if ($rotated_at <= 0) {
+            $metadata['status'] = 'unknown';
+
+            $this->add_secret_rotation_notice(
+                $context_key . '_rotation_unknown',
+                sprintf(
+                    __('Le jeton Discord pour « %s » doit être enregistré de nouveau afin de suivre sa rotation automatique.', 'discord-bot-jlg'),
+                    $label
+                ),
+                'warning'
+            );
+
+            return $metadata;
+        }
+
+        $expires_at = $rotated_at + ($max_age_days * DAY_IN_SECONDS);
+        $metadata['expires_at'] = $expires_at;
+        $metadata['status'] = ($current_timestamp >= $expires_at) ? 'expired' : 'active';
+
+        if ('expired' === $metadata['status']) {
+            $this->add_secret_rotation_notice(
+                $context_key . '_expired',
+                sprintf(
+                    /* translators: 1: profile label, 2: rotation window in days. */
+                    __('Le jeton Discord pour « %s » a expiré (rotation maximale %d jours). Veuillez le régénérer.', 'discord-bot-jlg'),
+                    $label,
+                    $max_age_days
+                ),
+                'error'
+            );
+        }
+
+        return $metadata;
+    }
+
+    private function add_secret_rotation_notice($slug_suffix, $message, $type = 'error') {
+        $slug_suffix = sanitize_key($slug_suffix);
+        $message = (string) $message;
+        $type = (string) $type;
+
+        if ('' === $slug_suffix || '' === $message) {
+            return;
+        }
+
+        add_settings_error(
+            'discord_stats_settings',
+            'discord_bot_jlg_secret_' . $slug_suffix,
+            esc_html($message),
+            $type
+        );
+    }
+
+    private function should_flag_secret_for_rotation($token, array $metadata, $rotated_at, $now, $threshold_seconds) {
+        $token = (string) $token;
+
+        if ('' === $token) {
+            return false;
+        }
+
+        $status = isset($metadata['status']) ? sanitize_key($metadata['status']) : '';
+
+        if ('expired' === $status || 'unknown' === $status) {
+            return true;
+        }
+
+        $expires_at = isset($metadata['expires_at']) ? (int) $metadata['expires_at'] : 0;
+
+        if ($expires_at > 0 && $expires_at <= $now) {
+            return true;
+        }
+
+        $rotated_at = (int) $rotated_at;
+
+        if ($rotated_at <= 0) {
+            return true;
+        }
+
+        return (($now - $rotated_at) >= $threshold_seconds);
     }
 
     public function maybe_display_secret_rotation_notice() {
@@ -1107,6 +1260,8 @@ class Discord_Bot_JLG_Admin {
         foreach ($tokens as $token) {
             $label      = isset($token['label']) ? (string) $token['label'] : '';
             $rotated_at = isset($token['rotated_at']) ? (int) $token['rotated_at'] : 0;
+            $expires_at = isset($token['expires_at']) ? (int) $token['expires_at'] : 0;
+            $status     = isset($token['status']) ? sanitize_key($token['status']) : '';
 
             echo '<li>';
 
@@ -1126,6 +1281,28 @@ class Discord_Bot_JLG_Admin {
                 );
             }
 
+            if ('expired' === $status) {
+                if ($expires_at > 0) {
+                    $expiry_formatted = date_i18n($date_format . ' ' . $time_format, $expires_at);
+                    printf(
+                        /* translators: %s: formatted datetime. */
+                        esc_html__(' (expiré le %s)', 'discord-bot-jlg'),
+                        esc_html($expiry_formatted)
+                    );
+                } else {
+                    echo esc_html__(' (expiré)', 'discord-bot-jlg');
+                }
+            } elseif ('unknown' === $status) {
+                echo esc_html__(' (rotation inconnue)', 'discord-bot-jlg');
+            } elseif ($expires_at > 0) {
+                $expiry_formatted = date_i18n($date_format . ' ' . $time_format, $expires_at);
+                printf(
+                    /* translators: %s: formatted datetime. */
+                    esc_html__(' (expiration prévue le %s)', 'discord-bot-jlg'),
+                    esc_html($expiry_formatted)
+                );
+            }
+
             echo '</li>';
         }
 
@@ -1141,18 +1318,21 @@ class Discord_Bot_JLG_Admin {
 
         if (!$constant_overridden) {
             $main_token = isset($options['bot_token']) ? (string) $options['bot_token'] : '';
+            $main_metadata = array(
+                'status'     => isset($options['bot_token_status']) ? $options['bot_token_status'] : '',
+                'expires_at' => isset($options['bot_token_expires_at']) ? (int) $options['bot_token_expires_at'] : 0,
+            );
+            $main_rotated_at = isset($options['bot_token_rotated_at'])
+                ? (int) $options['bot_token_rotated_at']
+                : 0;
 
-            if ('' !== $main_token) {
-                $rotated_at = isset($options['bot_token_rotated_at'])
-                    ? (int) $options['bot_token_rotated_at']
-                    : 0;
-
-                if ($rotated_at <= 0 || ($now - $rotated_at) >= $threshold_seconds) {
-                    $tokens[] = array(
-                        'label'      => __('Token principal', 'discord-bot-jlg'),
-                        'rotated_at' => $rotated_at,
-                    );
-                }
+            if ($this->should_flag_secret_for_rotation($main_token, $main_metadata, $main_rotated_at, $now, $threshold_seconds)) {
+                $tokens[] = array(
+                    'label'      => __('Token principal', 'discord-bot-jlg'),
+                    'rotated_at' => $main_rotated_at,
+                    'expires_at' => isset($main_metadata['expires_at']) ? (int) $main_metadata['expires_at'] : 0,
+                    'status'     => sanitize_key(isset($main_metadata['status']) ? $main_metadata['status'] : ''),
+                );
             }
         }
 
@@ -1168,11 +1348,16 @@ class Discord_Bot_JLG_Admin {
                     continue;
                 }
 
+                $profile_metadata = array(
+                    'status'     => isset($profile['bot_token_status']) ? $profile['bot_token_status'] : '',
+                    'expires_at' => isset($profile['bot_token_expires_at']) ? (int) $profile['bot_token_expires_at'] : 0,
+                );
+
                 $rotated_at = isset($profile['bot_token_rotated_at'])
                     ? (int) $profile['bot_token_rotated_at']
                     : 0;
 
-                if ($rotated_at > 0 && ($now - $rotated_at) < $threshold_seconds) {
+                if (!$this->should_flag_secret_for_rotation($token, $profile_metadata, $rotated_at, $now, $threshold_seconds)) {
                     continue;
                 }
 
@@ -1199,6 +1384,8 @@ class Discord_Bot_JLG_Admin {
                 $tokens[] = array(
                     'label'      => $label,
                     'rotated_at' => $rotated_at,
+                    'expires_at' => isset($profile_metadata['expires_at']) ? (int) $profile_metadata['expires_at'] : 0,
+                    'status'     => sanitize_key(isset($profile_metadata['status']) ? $profile_metadata['status'] : ''),
                 );
             }
         }

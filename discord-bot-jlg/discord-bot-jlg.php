@@ -147,6 +147,7 @@ require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-options-repository
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-capabilities.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-alerts.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-api.php';
+require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-stats-service.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-job-queue.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-admin.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-shortcode.php';
@@ -442,19 +443,58 @@ class DiscordServerStats {
         $calculated_interval = $this->calculate_cron_interval($base_interval, $failure_count, $context);
         $next_timestamp = $now + $calculated_interval;
 
+        $lock_snapshot = array();
+        if ($this->api instanceof Discord_Bot_JLG_API) {
+            $lock_snapshot = $this->api->get_refresh_lock_snapshot();
+
+            if (!empty($lock_snapshot['locked']) && isset($lock_snapshot['expires_at'])) {
+                $lock_expiration = (int) $lock_snapshot['expires_at'];
+
+                if ($lock_expiration > $now) {
+                    $next_timestamp = max($next_timestamp, $lock_expiration + 5);
+                }
+            }
+        }
+
+        $schedule_tolerance = (int) apply_filters('discord_bot_jlg_cron_schedule_tolerance', 5, $context);
+        if ($schedule_tolerance < 0) {
+            $schedule_tolerance = 0;
+        }
+
+        $existing_timestamp = wp_next_scheduled(DISCORD_BOT_JLG_CRON_HOOK);
+        $schedule_action = 'scheduled';
+
+        if (
+            $existing_timestamp
+            && $existing_timestamp >= $now
+            && abs($existing_timestamp - $next_timestamp) <= $schedule_tolerance
+        ) {
+            $next_timestamp = $existing_timestamp;
+            $schedule_action = 'kept';
+        } else {
+            wp_clear_scheduled_hook(DISCORD_BOT_JLG_CRON_HOOK);
+
+            if (function_exists('wp_schedule_single_event')) {
+                wp_schedule_single_event($next_timestamp, DISCORD_BOT_JLG_CRON_HOOK);
+            } else {
+                wp_schedule_event($next_timestamp, 'discord_bot_jlg_refresh', DISCORD_BOT_JLG_CRON_HOOK);
+            }
+
+            $schedule_action = 'rescheduled';
+        }
+
+        $schedule_action = sanitize_key($schedule_action);
+
         $state['last_interval'] = $calculated_interval;
         $state['next_run_at'] = $next_timestamp;
         $state['last_outcome'] = $outcome;
+        $state['schedule_action'] = $schedule_action;
+
+        if (!empty($lock_snapshot)) {
+            $state['last_lock_snapshot'] = $lock_snapshot;
+        }
 
         $this->persist_cron_state($state);
-
-        wp_clear_scheduled_hook(DISCORD_BOT_JLG_CRON_HOOK);
-
-        if (function_exists('wp_schedule_single_event')) {
-            wp_schedule_single_event($next_timestamp, DISCORD_BOT_JLG_CRON_HOOK);
-        } else {
-            wp_schedule_event($next_timestamp, 'discord_bot_jlg_refresh', DISCORD_BOT_JLG_CRON_HOOK);
-        }
 
         if ($this->event_logger instanceof Discord_Bot_JLG_Event_Logger) {
             $log_context = array(
@@ -464,6 +504,7 @@ class DiscordServerStats {
                 'retry_count'   => $failure_count,
                 'interval'      => $calculated_interval,
                 'backoff_until' => $next_timestamp,
+                'schedule_action' => $schedule_action,
             );
 
             if (isset($context['error_message']) && '' !== trim((string) $context['error_message'])) {
@@ -476,6 +517,17 @@ class DiscordServerStats {
 
             if (isset($context['profile_key'])) {
                 $log_context['profile_key'] = sanitize_key($context['profile_key']);
+            }
+
+            if (!empty($lock_snapshot)) {
+                $log_context['lock_detected'] = !empty($lock_snapshot['locked']);
+                if (isset($lock_snapshot['expires_at'])) {
+                    $log_context['lock_expires_at'] = (int) $lock_snapshot['expires_at'];
+                }
+            }
+
+            if ($existing_timestamp) {
+                $log_context['previous_run'] = (int) $existing_timestamp;
             }
 
             $this->event_logger->log('discord_scheduler', $log_context);
