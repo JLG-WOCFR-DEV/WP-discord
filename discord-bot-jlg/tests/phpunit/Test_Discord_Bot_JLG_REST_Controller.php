@@ -53,6 +53,7 @@ class Test_Discord_Bot_JLG_REST_Controller extends TestCase {
         $GLOBALS['wp_test_nonce_validations'] = array();
         $GLOBALS['wp_test_is_user_logged_in'] = false;
         $GLOBALS['wp_test_current_user_can']  = null;
+        $GLOBALS['wp_test_transients']        = array();
 
         parent::tearDown();
     }
@@ -210,5 +211,117 @@ class Test_Discord_Bot_JLG_REST_Controller extends TestCase {
         $payload = $response->get_data();
         $this->assertFalse($payload['success']);
         $this->assertArrayHasKey('message', $payload['data']);
+    }
+
+    public function test_export_analytics_uses_cached_payload_when_available() {
+        $api        = new Stubbed_Discord_Bot_JLG_API_For_REST();
+        $analytics  = new Stubbed_Discord_Bot_JLG_Analytics();
+        $controller = new Discord_Bot_JLG_REST_Controller($api, $analytics);
+
+        $profile_key = 'Guild_Key';
+        $server_id   = ' 123 456 789 ';
+        $days        = 12;
+
+        $reflection  = new ReflectionClass(Discord_Bot_JLG_REST_Controller::class);
+        $cache_method = $reflection->getMethod('get_analytics_cache_key');
+        $cache_method->setAccessible(true);
+
+        $sanitized_profile = sanitize_key($profile_key);
+        $sanitized_server  = preg_replace('/[^0-9]/', '', $server_id);
+        $cache_key         = $cache_method->invoke($controller, $sanitized_profile, $sanitized_server, $days);
+
+        $cached_payload = array(
+            'range'     => array('start' => 100, 'end' => 200),
+            'averages'  => array('online' => 5),
+            'timeseries'=> array(
+                array(
+                    'timestamp' => 123,
+                    'online'    => 4,
+                    'presence'  => 3,
+                    'total'     => 10,
+                    'premium'   => 2,
+                ),
+            ),
+        );
+
+        set_transient($cache_key, $cached_payload, 300);
+
+        $request = new WP_REST_Request('GET', '/discord-bot-jlg/v1/analytics/export');
+        $request->set_param('profile_key', $profile_key);
+        $request->set_param('server_id', $server_id);
+        $request->set_param('days', $days);
+        $request->set_param('format', 'json');
+
+        $response = $controller->handle_export_analytics($request);
+
+        $this->assertInstanceOf(WP_REST_Response::class, $response);
+        $this->assertSame(200, $response->get_status());
+        $this->assertSame(array(), $analytics->last_args);
+
+        $payload = $response->get_data();
+        $this->assertTrue($payload['success']);
+        $this->assertSame($cached_payload['range'], $payload['data']['range']);
+        $this->assertSame($cached_payload['averages'], $payload['data']['averages']);
+        $this->assertNotEmpty($payload['data']['timeseries']);
+
+        $first_row = $payload['data']['timeseries'][0];
+        $this->assertSame($sanitized_profile, $first_row['profile_key']);
+        $this->assertSame($sanitized_server, $first_row['server_id']);
+        $this->assertSame(123, $first_row['timestamp']);
+        $this->assertSame(4, $first_row['online']);
+        $this->assertSame(3, $first_row['presence']);
+        $this->assertSame(10, $first_row['total']);
+        $this->assertSame(2, $first_row['premium']);
+    }
+
+    public function test_export_analytics_stores_payload_in_cache_after_fetch() {
+        $api       = new Stubbed_Discord_Bot_JLG_API_For_REST();
+        $payload   = array(
+            'range'     => array('start' => 1, 'end' => 2),
+            'averages'  => array('online' => 8),
+            'timeseries'=> array(
+                array(
+                    'timestamp' => 1000,
+                    'online'    => 7,
+                ),
+            ),
+        );
+        $analytics = new Stubbed_Discord_Bot_JLG_Analytics($payload);
+
+        $controller = new Discord_Bot_JLG_REST_Controller($api, $analytics);
+
+        $profile_key = 'guild';
+        $server_id   = '999888777';
+        $days        = 7;
+
+        $reflection  = new ReflectionClass(Discord_Bot_JLG_REST_Controller::class);
+        $cache_method = $reflection->getMethod('get_analytics_cache_key');
+        $cache_method->setAccessible(true);
+        $cache_key   = $cache_method->invoke($controller, $profile_key, $server_id, $days);
+
+        delete_transient($cache_key);
+
+        $request = new WP_REST_Request('GET', '/discord-bot-jlg/v1/analytics/export');
+        $request->set_param('profile_key', $profile_key);
+        $request->set_param('server_id', $server_id);
+        $request->set_param('days', $days);
+        $request->set_param('format', 'csv');
+
+        $response = $controller->handle_export_analytics($request);
+
+        $this->assertInstanceOf(WP_REST_Response::class, $response);
+        $this->assertSame(200, $response->get_status());
+        $this->assertNotSame(array(), $analytics->last_args);
+        $this->assertSame($profile_key, $analytics->last_args['profile_key']);
+        $this->assertSame($server_id, $analytics->last_args['server_id']);
+        $this->assertSame($days, $analytics->last_args['days']);
+
+        $cached = get_transient($cache_key);
+        $this->assertSame($payload, $cached);
+
+        $entry = wp_test_get_transient_entry($cache_key);
+        $this->assertIsArray($entry);
+        $this->assertArrayHasKey('ttl', $entry);
+        $this->assertGreaterThan(0, $entry['ttl']);
     }
 }
