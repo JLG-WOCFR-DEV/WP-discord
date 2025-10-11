@@ -27,6 +27,9 @@ if (!class_exists('Discord_Bot_JLG_Http_Connector')) {
 if (!class_exists('Discord_Bot_JLG_Stats_Fetcher')) {
     require_once __DIR__ . '/class-discord-stats-fetcher.php';
 }
+if (!class_exists('Discord_Bot_JLG_Stats_Service')) {
+    require_once __DIR__ . '/class-discord-stats-service.php';
+}
 
 /**
  * Fournit les appels à l'API Discord ainsi que la gestion du cache et des données de démonstration.
@@ -66,6 +69,7 @@ class Discord_Bot_JLG_API {
     private $http_connector;
     private $logger;
     private $stats_fetcher;
+    private $stats_service;
 
     /**
      * Prépare le service d'accès aux statistiques avec les clés et durées nécessaires.
@@ -122,6 +126,7 @@ class Discord_Bot_JLG_API {
         $this->logger = null;
         $this->set_logger($logger);
         $this->stats_fetcher = null;
+        $this->stats_service = null;
     }
 
     public function set_analytics_service($analytics) {
@@ -237,6 +242,19 @@ class Discord_Bot_JLG_API {
         }
 
         return $this->stats_fetcher;
+    }
+
+    private function get_stats_service() {
+        if (!($this->stats_service instanceof Discord_Bot_JLG_Stats_Service)) {
+            $this->stats_service = new Discord_Bot_JLG_Stats_Service(
+                $this->get_cache_gateway(),
+                $this->get_stats_fetcher(),
+                $this->get_logger(),
+                $this->get_event_logger()
+            );
+        }
+
+        return $this->stats_service;
     }
 
     private function create_stats_fetcher(Discord_Bot_JLG_Http_Connector $http_connector) {
@@ -866,44 +884,45 @@ class Discord_Bot_JLG_API {
 
         $original_cache_key = $this->cache_key;
         $this->cache_key     = $context['cache_key'];
-        $cache_gateway       = $this->get_cache_gateway();
-        $stats_fetcher       = $this->get_stats_fetcher();
 
         try {
-            if (false === $args['bypass_cache']) {
-                $cached_stats = $cache_gateway->get($this->cache_key);
-                if (false !== $cached_stats) {
-                    return $this->remember_runtime_result($runtime_key, $cached_stats);
-                }
+            $service_result = $this->get_stats_service()->execute(array(
+                'cache_key'          => $this->cache_key,
+                'options'            => $options,
+                'context'            => $context,
+                'args'               => $args,
+                'bypass_cache'       => (bool) $args['bypass_cache'],
+                'fallback_provider'  => function ($force_fallback = true) {
+                    return $this->get_demo_stats((bool) $force_fallback);
+                },
+                'persist_success'    => function ($stats, $service_options, $service_context, $service_args) {
+                    $this->persist_successful_stats($stats, $service_options, $service_context, $service_args);
+                },
+                'persist_fallback'   => function ($stats, $service_options, $reason) {
+                    return $this->persist_fallback_stats($stats, $service_options, $reason);
+                },
+                'validate_stats'     => function ($stats) {
+                    return $this->has_usable_stats($stats);
+                },
+                'store_retry_after'  => function ($retry_after) {
+                    $this->store_api_retry_after_delay($retry_after);
+                },
+                'register_cache_key' => function () {
+                    $this->register_current_cache_key();
+                },
+                'read_retry_after'   => function () {
+                    return $this->last_retry_after;
+                },
+                'last_retry_after'   => $this->last_retry_after,
+            ));
+
+            $stats = isset($service_result['stats']) ? $service_result['stats'] : null;
+            $this->last_error = isset($service_result['error']) ? (string) $service_result['error'] : '';
+            $this->set_last_retry_after(isset($service_result['retry_after']) ? $service_result['retry_after'] : 0);
+
+            if (empty($this->last_error) && empty($stats) && !empty($service_result['fallback_used'])) {
+                $this->last_error = __('Impossible d\'obtenir des statistiques exploitables depuis Discord.', 'discord-bot-jlg');
             }
-
-            if (empty($options['server_id'])) {
-                $this->last_error = __('Aucun identifiant de serveur Discord n\'est configuré.', 'discord-bot-jlg');
-                $demo_stats = $this->persist_fallback_stats($this->get_demo_stats(true), $options, $this->last_error);
-                return $this->remember_runtime_result($runtime_key, $demo_stats);
-            }
-
-            $fetch_result = $stats_fetcher->fetch($options);
-
-            if (isset($fetch_result['options']) && is_array($fetch_result['options'])) {
-                $options = $fetch_result['options'];
-            }
-
-            $stats = isset($fetch_result['stats']) ? $fetch_result['stats'] : null;
-            $has_usable_stats = isset($fetch_result['has_usable_stats'])
-                ? (bool) $fetch_result['has_usable_stats']
-                : $this->has_usable_stats($stats);
-
-            if (false === $has_usable_stats) {
-                if (empty($this->last_error)) {
-                    $this->last_error = __('Impossible d\'obtenir des statistiques exploitables depuis Discord.', 'discord-bot-jlg');
-                }
-                $this->store_api_retry_after_delay($this->last_retry_after);
-                $demo_stats = $this->persist_fallback_stats($this->get_demo_stats(true), $options, $this->last_error);
-                return $this->remember_runtime_result($runtime_key, $demo_stats);
-            }
-
-            $this->persist_successful_stats($stats, $options, $context, $args);
 
             return $this->remember_runtime_result($runtime_key, $stats);
         } finally {
@@ -2769,6 +2788,50 @@ class Discord_Bot_JLG_API {
 
     private function get_api_retry_after_key() {
         return $this->cache_key . self::FALLBACK_RETRY_API_DELAY_SUFFIX;
+    }
+
+    public function get_refresh_lock_snapshot($cache_key = '') {
+        $normalized_key = (string) $cache_key;
+
+        if ('' === $normalized_key) {
+            $normalized_key = $this->cache_key;
+        }
+
+        if ('' === $normalized_key) {
+            $normalized_key = $this->base_cache_key;
+        }
+
+        $lock_key = $this->build_refresh_lock_key($normalized_key);
+        $raw_lock = get_transient($lock_key);
+
+        $snapshot = array(
+            'locked'     => false,
+            'locked_at'  => 0,
+            'expires_at' => 0,
+            'lock_key'   => $lock_key,
+        );
+
+        if (is_array($raw_lock)) {
+            $snapshot['locked_at'] = isset($raw_lock['locked_at']) ? (int) $raw_lock['locked_at'] : 0;
+            $snapshot['expires_at'] = isset($raw_lock['expires_at']) ? (int) $raw_lock['expires_at'] : 0;
+            $snapshot['locked'] = ($snapshot['expires_at'] > time());
+        } elseif (false !== $raw_lock) {
+            $snapshot['locked'] = true;
+            $snapshot['locked_at'] = time();
+            $snapshot['expires_at'] = $snapshot['locked_at'] + 30;
+        }
+
+        return $snapshot;
+    }
+
+    private function build_refresh_lock_key($cache_key) {
+        $normalized = (string) $cache_key;
+
+        if ('' === $normalized) {
+            $normalized = $this->base_cache_key;
+        }
+
+        return $normalized . self::REFRESH_LOCK_SUFFIX;
     }
 
     private function get_last_fallback_option_name() {
