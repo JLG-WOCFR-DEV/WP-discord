@@ -84,6 +84,114 @@
     var SparklineDaysControl = NumberControl || RangeControl || TextControl;
     var ServerSideRender = serverSideRender;
 
+    if (ToggleControl) {
+        (function () {
+            var OriginalToggleControl = ToggleControl;
+
+            ToggleControl = function ToggleControlWithNextProps(props) {
+                var mergedProps = {};
+
+                if (props) {
+                    for (var key in props) {
+                        if (Object.prototype.hasOwnProperty.call(props, key)) {
+                            mergedProps[key] = props[key];
+                        }
+                    }
+                }
+
+                if (!Object.prototype.hasOwnProperty.call(mergedProps, '__nextHasNoMarginBottom')) {
+                    mergedProps.__nextHasNoMarginBottom = true;
+                }
+
+                return createElement(OriginalToggleControl, mergedProps);
+            };
+        })();
+    }
+
+    if (SelectControl) {
+        (function () {
+            var OriginalSelectControl = SelectControl;
+
+            SelectControl = function SelectControlWithNextProps(props) {
+                var mergedProps = {};
+
+                if (props) {
+                    for (var key in props) {
+                        if (Object.prototype.hasOwnProperty.call(props, key)) {
+                            mergedProps[key] = props[key];
+                        }
+                    }
+                }
+
+                if (!Object.prototype.hasOwnProperty.call(mergedProps, '__nextHasNoMarginBottom')) {
+                    mergedProps.__nextHasNoMarginBottom = true;
+                }
+
+                if (!Object.prototype.hasOwnProperty.call(mergedProps, '__next40pxDefaultSize')) {
+                    mergedProps.__next40pxDefaultSize = true;
+                }
+
+                return createElement(OriginalSelectControl, mergedProps);
+            };
+        })();
+    }
+
+    if (TextControl) {
+        (function () {
+            var OriginalTextControl = TextControl;
+
+            TextControl = function TextControlWithNextProps(props) {
+                var mergedProps = {};
+
+                if (props) {
+                    for (var key in props) {
+                        if (Object.prototype.hasOwnProperty.call(props, key)) {
+                            mergedProps[key] = props[key];
+                        }
+                    }
+                }
+
+                if (!Object.prototype.hasOwnProperty.call(mergedProps, '__nextHasNoMarginBottom')) {
+                    mergedProps.__nextHasNoMarginBottom = true;
+                }
+
+                if (!Object.prototype.hasOwnProperty.call(mergedProps, '__next40pxDefaultSize')) {
+                    mergedProps.__next40pxDefaultSize = true;
+                }
+
+                return createElement(OriginalTextControl, mergedProps);
+            };
+        })();
+    }
+
+    if (NumberControl) {
+        (function () {
+            var OriginalNumberControl = NumberControl;
+
+            NumberControl = function NumberControlWithNextProps(props) {
+                var mergedProps = {};
+
+                if (props) {
+                    for (var key in props) {
+                        if (Object.prototype.hasOwnProperty.call(props, key)) {
+                            mergedProps[key] = props[key];
+                        }
+                    }
+                }
+
+                if (!Object.prototype.hasOwnProperty.call(mergedProps, '__nextHasNoMarginBottom')) {
+                    mergedProps.__nextHasNoMarginBottom = true;
+                }
+
+                if (!Object.prototype.hasOwnProperty.call(mergedProps, '__next40pxDefaultSize')) {
+                    mergedProps.__next40pxDefaultSize = true;
+                }
+
+                return createElement(OriginalNumberControl, mergedProps);
+            };
+        })();
+    }
+
     if (!registerBlockType || !InspectorControls) {
         return;
     }
