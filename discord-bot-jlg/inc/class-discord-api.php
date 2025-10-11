@@ -24,6 +24,10 @@ if (!class_exists('Discord_Bot_JLG_Http_Connector')) {
     require_once __DIR__ . '/class-discord-http-connector.php';
 }
 
+if (!class_exists('Discord_Bot_JLG_Stats_Fetcher')) {
+    require_once __DIR__ . '/class-discord-stats-fetcher.php';
+}
+
 /**
  * Fournit les appels à l'API Discord ainsi que la gestion du cache et des données de démonstration.
  */
@@ -61,6 +65,7 @@ class Discord_Bot_JLG_API {
     private $cache_gateway;
     private $http_connector;
     private $logger;
+    private $stats_fetcher;
 
     /**
      * Prépare le service d'accès aux statistiques avec les clés et durées nécessaires.
@@ -116,6 +121,7 @@ class Discord_Bot_JLG_API {
         }
         $this->logger = null;
         $this->set_logger($logger);
+        $this->stats_fetcher = null;
     }
 
     public function set_analytics_service($analytics) {
@@ -148,6 +154,7 @@ class Discord_Bot_JLG_API {
         if ($this->http_connector instanceof Discord_Bot_JLG_Http_Connector) {
             $this->http_connector->set_logger($this->logger);
         }
+
     }
 
     public function get_logger() {
@@ -216,6 +223,51 @@ class Discord_Bot_JLG_API {
         }
 
         return $this->http_connector;
+    }
+
+    public function set_stats_fetcher($stats_fetcher) {
+        if ($stats_fetcher instanceof Discord_Bot_JLG_Stats_Fetcher) {
+            $this->stats_fetcher = $stats_fetcher;
+        }
+    }
+
+    private function get_stats_fetcher() {
+        if (!($this->stats_fetcher instanceof Discord_Bot_JLG_Stats_Fetcher)) {
+            $this->stats_fetcher = $this->create_stats_fetcher($this->get_http_connector());
+        }
+
+        return $this->stats_fetcher;
+    }
+
+    private function create_stats_fetcher(Discord_Bot_JLG_Http_Connector $http_connector) {
+        $bot_token_provider = function ($options) {
+            return $this->get_bot_token($options);
+        };
+
+        $needs_completion_callback = function ($stats) {
+            return $this->stats_need_completion($stats);
+        };
+
+        $merge_callback = function ($widget_stats, $bot_stats, $widget_incomplete) {
+            return $this->merge_stats($widget_stats, $bot_stats, $widget_incomplete);
+        };
+
+        $normalize_callback = function ($stats) {
+            return $this->normalize_stats($stats);
+        };
+
+        $has_usable_callback = function ($stats) {
+            return $this->has_usable_stats($stats);
+        };
+
+        return new Discord_Bot_JLG_Stats_Fetcher(
+            $http_connector,
+            $bot_token_provider,
+            $needs_completion_callback,
+            $merge_callback,
+            $normalize_callback,
+            $has_usable_callback
+        );
     }
 
     public function get_status_history($args = array()) {
@@ -815,7 +867,7 @@ class Discord_Bot_JLG_API {
         $original_cache_key = $this->cache_key;
         $this->cache_key     = $context['cache_key'];
         $cache_gateway       = $this->get_cache_gateway();
-        $http_connector      = $this->get_http_connector();
+        $stats_fetcher       = $this->get_stats_fetcher();
 
         try {
             if (false === $args['bypass_cache']) {
@@ -831,28 +883,18 @@ class Discord_Bot_JLG_API {
                 return $this->remember_runtime_result($runtime_key, $demo_stats);
             }
 
-            $stats        = false;
-            $widget_stats = $http_connector->fetch_widget($options);
-            $widget_incomplete = $this->stats_need_completion($widget_stats);
+            $fetch_result = $stats_fetcher->fetch($options);
 
-            $bot_stats  = false;
-            $bot_token = $this->get_bot_token($options);
-            $options['__bot_token_override'] = $bot_token;
-            $should_call_bot = (!empty($bot_token) && ($widget_incomplete || empty($widget_stats)));
-
-            if ($should_call_bot) {
-                $bot_stats = $http_connector->fetch_bot($options, true);
-            } else {
-                $http_connector->fetch_bot($options, false);
+            if (isset($fetch_result['options']) && is_array($fetch_result['options'])) {
+                $options = $fetch_result['options'];
             }
 
-            $stats = $this->merge_stats($widget_stats, $bot_stats, $widget_incomplete);
+            $stats = isset($fetch_result['stats']) ? $fetch_result['stats'] : null;
+            $has_usable_stats = isset($fetch_result['has_usable_stats'])
+                ? (bool) $fetch_result['has_usable_stats']
+                : $this->has_usable_stats($stats);
 
-            if (is_array($stats)) {
-                $stats = $this->normalize_stats($stats);
-            }
-
-            if (false === $this->has_usable_stats($stats)) {
+            if (false === $has_usable_stats) {
                 if (empty($this->last_error)) {
                     $this->last_error = __('Impossible d\'obtenir des statistiques exploitables depuis Discord.', 'discord-bot-jlg');
                 }
@@ -1826,12 +1868,21 @@ class Discord_Bot_JLG_API {
                 ? $widget_snapshot['stats']
                 : null;
 
-            if (!is_array($widget_stats)) {
-                $widget_stats = $this->fetch_widget_stats($options);
+            $stats_fetcher = $this->get_stats_fetcher();
+
+            $fetch_options = $options;
+            if (is_array($widget_stats)) {
+                $fetch_options['__prefetched_widget_stats'] = $widget_stats;
+            }
+            $fetch_options['__force_bot_fetch'] = true;
+
+            $fetch_result = $stats_fetcher->fetch($fetch_options);
+
+            if (isset($fetch_result['options']) && is_array($fetch_result['options'])) {
+                $options = $fetch_result['options'];
             }
 
-            $bot_token = $this->get_bot_token($options);
-            $options['__bot_token_override'] = $bot_token;
+            $bot_token = isset($fetch_result['bot_token']) ? (string) $fetch_result['bot_token'] : '';
             if ('' === $bot_token) {
                 return new WP_Error(
                     'discord_bot_jlg_bot_refresh_missing_token',
@@ -1843,9 +1894,10 @@ class Discord_Bot_JLG_API {
                 );
             }
 
-            $bot_stats = $this->fetch_bot_stats($options);
+            $bot_called = !empty($fetch_result['bot_called']);
+            $bot_stats  = isset($fetch_result['bot_stats']) ? $fetch_result['bot_stats'] : null;
 
-            if (!is_array($bot_stats)) {
+            if (false === $bot_called || !is_array($bot_stats)) {
                 $error_message = $this->get_last_error_message();
 
                 if ('' === $error_message) {
@@ -1862,14 +1914,12 @@ class Discord_Bot_JLG_API {
                 );
             }
 
-            $widget_incomplete = $this->stats_need_completion($widget_stats);
-            $stats = $this->merge_stats($widget_stats, $bot_stats, $widget_incomplete);
+            $stats            = isset($fetch_result['stats']) ? $fetch_result['stats'] : null;
+            $has_usable_stats = isset($fetch_result['has_usable_stats'])
+                ? (bool) $fetch_result['has_usable_stats']
+                : $this->has_usable_stats($stats);
 
-            if (is_array($stats)) {
-                $stats = $this->normalize_stats($stats);
-            }
-
-            if (false === $this->has_usable_stats($stats)) {
+            if (false === $has_usable_stats || !is_array($stats)) {
                 $error_message = $this->get_last_error_message();
 
                 if ('' === $error_message) {
