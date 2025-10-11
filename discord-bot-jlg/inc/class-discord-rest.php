@@ -426,16 +426,29 @@ class Discord_Bot_JLG_REST_Controller {
         $timezone_identifier = $this->normalize_export_timezone($request->get_param('timezone'));
         $timezone = $this->create_timezone($timezone_identifier);
 
-        $aggregates = $analytics->get_aggregates(
-            array(
-                'profile_key' => $profile_key,
-                'server_id'   => $server_id,
-                'days'        => $days,
-            )
-        );
+        $cache_key = $this->get_analytics_cache_key($profile_key, $server_id, $days);
+        $cache_ttl = $this->get_analytics_cache_ttl($profile_key, $server_id, $days);
 
-        if (is_wp_error($aggregates)) {
-            return $aggregates;
+        $aggregates = $this->maybe_get_cached_analytics($cache_key, $cache_ttl);
+
+        if (null === $aggregates) {
+            $aggregates = $analytics->get_aggregates(
+                array(
+                    'profile_key' => $profile_key,
+                    'server_id'   => $server_id,
+                    'days'        => $days,
+                )
+            );
+
+            if (is_wp_error($aggregates)) {
+                return $aggregates;
+            }
+
+            if (!is_array($aggregates)) {
+                $aggregates = array();
+            }
+
+            $this->maybe_store_cached_analytics($cache_key, $aggregates, $cache_ttl);
         }
 
         if (!is_array($aggregates)) {
