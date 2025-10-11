@@ -4978,12 +4978,62 @@
         });
     }
 
+    function isSiteEditorPreview() {
+        if (typeof window === 'undefined') {
+            return false;
+        }
+
+        var frameElement = null;
+
+        try {
+            frameElement = window.frameElement || null;
+        } catch (error) {
+            frameElement = null;
+        }
+
+        if (frameElement) {
+            var frameId = frameElement.id || '';
+            if (frameId && frameId.indexOf('editor-canvas') !== -1) {
+                return true;
+            }
+
+            var frameClassList = frameElement.classList;
+            if (frameClassList && (frameClassList.contains('edit-site-iframe') || frameClassList.contains('is-site-editor'))) {
+                return true;
+            }
+
+            var frameName = frameElement.getAttribute ? frameElement.getAttribute('name') : null;
+            if (frameName && frameName.indexOf('site-editor') !== -1) {
+                return true;
+            }
+        }
+
+        var location = window.location || {};
+        var search = location.search || '';
+        var pathname = location.pathname || '';
+
+        if (typeof pathname === 'string' && pathname.indexOf('site-editor.php') !== -1) {
+            return true;
+        }
+
+        if (typeof search === 'string' && search.indexOf('canvas=edit-site%2F') !== -1) {
+            return true;
+        }
+
+        return false;
+    }
+
     function initializeDiscordBot() {
         var config = window.discordBotJlg || {};
         globalConfig = config;
         var missingFeatures = [];
 
         applyInitialOverlayClasses();
+
+        if (isSiteEditorPreview()) {
+            config.autoRefreshDisabled = true;
+            return;
+        }
 
         if (typeof window.fetch !== 'function') {
             missingFeatures.push('fetch');
