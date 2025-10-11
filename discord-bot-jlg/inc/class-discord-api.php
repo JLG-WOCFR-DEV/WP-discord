@@ -1868,12 +1868,21 @@ class Discord_Bot_JLG_API {
                 ? $widget_snapshot['stats']
                 : null;
 
-            if (!is_array($widget_stats)) {
-                $widget_stats = $this->fetch_widget_stats($options);
+            $stats_fetcher = $this->get_stats_fetcher();
+
+            $fetch_options = $options;
+            if (is_array($widget_stats)) {
+                $fetch_options['__prefetched_widget_stats'] = $widget_stats;
+            }
+            $fetch_options['__force_bot_fetch'] = true;
+
+            $fetch_result = $stats_fetcher->fetch($fetch_options);
+
+            if (isset($fetch_result['options']) && is_array($fetch_result['options'])) {
+                $options = $fetch_result['options'];
             }
 
-            $bot_token = $this->get_bot_token($options);
-            $options['__bot_token_override'] = $bot_token;
+            $bot_token = isset($fetch_result['bot_token']) ? (string) $fetch_result['bot_token'] : '';
             if ('' === $bot_token) {
                 return new WP_Error(
                     'discord_bot_jlg_bot_refresh_missing_token',
@@ -1885,9 +1894,10 @@ class Discord_Bot_JLG_API {
                 );
             }
 
-            $bot_stats = $this->fetch_bot_stats($options);
+            $bot_called = !empty($fetch_result['bot_called']);
+            $bot_stats  = isset($fetch_result['bot_stats']) ? $fetch_result['bot_stats'] : null;
 
-            if (!is_array($bot_stats)) {
+            if (false === $bot_called || !is_array($bot_stats)) {
                 $error_message = $this->get_last_error_message();
 
                 if ('' === $error_message) {
@@ -1904,14 +1914,12 @@ class Discord_Bot_JLG_API {
                 );
             }
 
-            $widget_incomplete = $this->stats_need_completion($widget_stats);
-            $stats = $this->merge_stats($widget_stats, $bot_stats, $widget_incomplete);
+            $stats            = isset($fetch_result['stats']) ? $fetch_result['stats'] : null;
+            $has_usable_stats = isset($fetch_result['has_usable_stats'])
+                ? (bool) $fetch_result['has_usable_stats']
+                : $this->has_usable_stats($stats);
 
-            if (is_array($stats)) {
-                $stats = $this->normalize_stats($stats);
-            }
-
-            if (false === $this->has_usable_stats($stats)) {
+            if (false === $has_usable_stats || !is_array($stats)) {
                 $error_message = $this->get_last_error_message();
 
                 if ('' === $error_message) {

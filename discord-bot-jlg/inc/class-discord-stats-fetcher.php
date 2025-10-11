@@ -82,14 +82,36 @@ class Discord_Bot_JLG_Stats_Fetcher {
     public function fetch(array $options) {
         $options = is_array($options) ? $options : array();
 
-        $widget_stats = $this->http_connector->fetch_widget($options);
+        $widget_stats = null;
+        $widget_from_prefetch = false;
+
+        if (array_key_exists('__prefetched_widget_stats', $options)) {
+            $prefetched = $options['__prefetched_widget_stats'];
+            unset($options['__prefetched_widget_stats']);
+
+            if (is_array($prefetched)) {
+                $widget_stats = $prefetched;
+                $widget_from_prefetch = true;
+            }
+        }
+
+        $force_bot_fetch = !empty($options['__force_bot_fetch']);
+        if (array_key_exists('__force_bot_fetch', $options)) {
+            unset($options['__force_bot_fetch']);
+        }
+
+        if (false === $widget_from_prefetch) {
+            $widget_stats = $this->http_connector->fetch_widget($options);
+        }
+
         $widget_incomplete = (bool) call_user_func($this->needs_completion_callback, $widget_stats);
 
         $bot_token = (string) call_user_func($this->bot_token_provider, $options);
         $options_with_token = $options;
         $options_with_token['__bot_token_override'] = $bot_token;
 
-        $should_fetch_bot = ('' !== $bot_token) && ($widget_incomplete || empty($widget_stats));
+        $should_fetch_bot = ('' !== $bot_token)
+            && ($force_bot_fetch || $widget_incomplete || empty($widget_stats));
         $bot_stats = null;
 
         if ($should_fetch_bot) {
