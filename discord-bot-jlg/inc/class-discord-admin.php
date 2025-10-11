@@ -1832,7 +1832,8 @@ class Discord_Bot_JLG_Admin {
         ?>
         <input type="text" name="<?php echo esc_attr($this->option_name); ?>[server_id]"
                value="<?php echo esc_attr(isset($options['server_id']) ? $options['server_id'] : ''); ?>"
-               class="regular-text" />
+               class="regular-text"
+               autocomplete="off" />
         <p class="description"><?php esc_html_e('L\'ID de votre serveur Discord', 'discord-bot-jlg'); ?></p>
         <?php
     }
@@ -2478,7 +2479,28 @@ class Discord_Bot_JLG_Admin {
             return;
         }
 
-        if (!isset($_POST['discord_test_connection_nonce']) || !check_admin_referer('discord_test_connection', 'discord_test_connection_nonce')) {
+        $nonce_fields = array(
+            'discord_test_connection_nonce_default',
+            'discord_test_connection_nonce_profile',
+            'discord_test_connection_nonce_sidebar',
+        );
+
+        $nonce_verified = false;
+
+        foreach ($nonce_fields as $nonce_field) {
+            if (!isset($_POST[$nonce_field])) {
+                continue;
+            }
+
+            if (!check_admin_referer('discord_test_connection', $nonce_field, false)) {
+                return;
+            }
+
+            $nonce_verified = true;
+            break;
+        }
+
+        if (!$nonce_verified) {
             return;
         }
 
@@ -3466,7 +3488,7 @@ class Discord_Bot_JLG_Admin {
                 <input type="hidden" name="test_connection" value="1" />
                 <input type="hidden" name="test_connection_profile" value="default" />
                 <input type="hidden" name="current_setup_step" value="<?php echo esc_attr($current_step); ?>" />
-                <?php wp_nonce_field('discord_test_connection', 'discord_test_connection_nonce'); ?>
+                <?php wp_nonce_field('discord_test_connection', 'discord_test_connection_nonce_default'); ?>
                 <?php submit_button(esc_html__('Tester la connexion', 'discord-bot-jlg'), 'secondary', 'discord_test_connection_default', false, $button_attributes); ?>
             </form>
             <?php if (!$has_server_id) : ?>
@@ -3488,7 +3510,7 @@ class Discord_Bot_JLG_Admin {
         <form id="discord-profile-test-form" class="discord-setup-test-form discord-profile-test-form" method="post" action="<?php echo esc_url(admin_url('admin.php?page=discord-bot-jlg')); ?>">
             <input type="hidden" name="test_connection" value="1" />
             <input type="hidden" name="current_setup_step" value="<?php echo esc_attr($current_step); ?>" />
-            <?php wp_nonce_field('discord_test_connection', 'discord_test_connection_nonce'); ?>
+            <?php wp_nonce_field('discord_test_connection', 'discord_test_connection_nonce_profile'); ?>
         </form>
         <?php
     }
@@ -3667,7 +3689,7 @@ class Discord_Bot_JLG_Admin {
                 <p><?php esc_html_e('Vérifiez que votre configuration fonctionne :', 'discord-bot-jlg'); ?></p>
                 <form method="post" action="<?php echo esc_url(admin_url('admin.php?page=discord-bot-jlg')); ?>" class="discord-admin-card__form">
                     <input type="hidden" name="test_connection" value="1" />
-                    <?php wp_nonce_field('discord_test_connection', 'discord_test_connection_nonce'); ?>
+                    <?php wp_nonce_field('discord_test_connection', 'discord_test_connection_nonce_sidebar'); ?>
                     <?php submit_button(esc_html__('Tester la connexion', 'discord-bot-jlg'), 'secondary', 'discord_test_connection_sidebar', false, array('class' => 'button button-secondary button-block')); ?>
                 </form>
             </div>
