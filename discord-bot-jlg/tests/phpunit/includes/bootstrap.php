@@ -6,8 +6,21 @@ if (!$_tests_dir) {
 }
 
 if (!file_exists($_tests_dir . '/includes/functions.php')) {
-    fwrite(STDERR, sprintf("Could not find WordPress test suite in %s.\n", $_tests_dir));
-    exit(1);
+    require_once dirname(__DIR__) . '/bootstrap.php';
+
+    if (!class_exists('WP_UnitTestCase')) {
+        class WP_UnitTestCase extends \PHPUnit\Framework\TestCase {
+            public function setUp(): void {
+                parent::setUp();
+            }
+
+            public function tearDown(): void {
+                parent::tearDown();
+            }
+        }
+    }
+
+    return;
 }
 
 require_once $_tests_dir . '/includes/functions.php';

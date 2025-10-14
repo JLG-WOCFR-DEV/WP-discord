@@ -153,6 +153,7 @@ require_once __DIR__ . '/../../inc/class-discord-event-logger.php';
 require_once __DIR__ . '/../../inc/class-discord-options-repository.php';
 require_once __DIR__ . '/../../inc/class-discord-capabilities.php';
 require_once __DIR__ . '/../../inc/class-discord-api.php';
+require_once __DIR__ . '/../../inc/class-discord-admin.php';
 require_once __DIR__ . '/../../inc/class-discord-widget.php';
 require_once __DIR__ . '/../../inc/class-discord-shortcode.php';
 require_once __DIR__ . '/../../inc/class-discord-site-health.php';
