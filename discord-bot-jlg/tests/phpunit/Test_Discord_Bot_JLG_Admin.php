@@ -93,7 +93,7 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
         $this->admin = new Discord_Bot_JLG_Admin(DISCORD_BOT_JLG_OPTION_NAME, $this->api, null);
     }
 
-    protected function tearDown(): void {
+    public function tearDown(): void {
         delete_option(DISCORD_BOT_JLG_OPTION_NAME);
 
         parent::tearDown();
