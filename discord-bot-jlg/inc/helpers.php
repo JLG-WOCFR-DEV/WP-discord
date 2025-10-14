@@ -11,6 +11,50 @@ if (!defined('DISCORD_BOT_JLG_SECRET_PREFIX')) {
     define('DISCORD_BOT_JLG_SECRET_PREFIX', 'dbjlg_enc_v2:');
 }
 
+if (!function_exists('absint')) {
+    /**
+     * Lightweight polyfill for WordPress absint().
+     *
+     * @param mixed $maybeint Value to sanitize.
+     *
+     * @return int Absolute integer value or 0 when conversion fails.
+     */
+    function absint($maybeint) {
+        return abs((int) $maybeint);
+    }
+}
+
+if (!function_exists('sanitize_hex_color')) {
+    /**
+     * Lightweight polyfill for WordPress sanitize_hex_color().
+     *
+     * @param string $color Possible hex color value.
+     *
+     * @return string|null Sanitized hex color or null when invalid.
+     */
+    function sanitize_hex_color($color) {
+        if (!is_string($color)) {
+            return null;
+        }
+
+        $color = trim($color);
+
+        if ('' === $color) {
+            return '';
+        }
+
+        if ('#' !== substr($color, 0, 1)) {
+            $color = '#' . $color;
+        }
+
+        if (preg_match('/^#([0-9a-fA-F]{3}|[0-9a-fA-F]{6})$/', $color, $matches)) {
+            return '#' . strtolower($matches[1]);
+        }
+
+        return null;
+    }
+}
+
 if (!function_exists('discord_bot_jlg_get_available_themes')) {
     /**
      * Returns the list of allowed themes for the public components.
