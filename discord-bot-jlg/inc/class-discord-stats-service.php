@@ -73,13 +73,6 @@ class Discord_Bot_JLG_Stats_Service {
 
         $config = array_merge($defaults, $payload);
 
-        $cache_key = (string) $config['cache_key'];
-        $options   = is_array($config['options']) ? $config['options'] : array();
-        $context   = is_array($config['context']) ? $config['context'] : array();
-
-        $profile_key = $this->resolve_profile_key($options, $context);
-        $server_id   = $this->resolve_server_id($options, $context);
-
         $result = array(
             'stats'          => null,
             'error'          => '',
@@ -90,6 +83,29 @@ class Discord_Bot_JLG_Stats_Service {
             'lock_acquired'  => false,
             'lock_released'  => false,
         );
+
+        $lock_key = '';
+        $lock_acquired = false;
+
+        try {
+            $result = $this->run_pipeline($config, $result, $lock_key, $lock_acquired);
+        } finally {
+            if (true === $lock_acquired && '' !== $lock_key) {
+                $this->release_lock($lock_key);
+                $result['lock_released'] = true;
+            }
+        }
+
+        return $result;
+    }
+
+    private function run_pipeline(array $config, array $result, &$lock_key, &$lock_acquired) {
+        $cache_key = (string) $config['cache_key'];
+        $options   = is_array($config['options']) ? $config['options'] : array();
+        $context   = is_array($config['context']) ? $config['context'] : array();
+
+        $profile_key = $this->resolve_profile_key($options, $context);
+        $server_id   = $this->resolve_server_id($options, $context);
 
         if (false === (bool) $config['bypass_cache']) {
             $cached_stats = $this->cache_gateway->get($cache_key);
@@ -211,11 +227,6 @@ class Discord_Bot_JLG_Stats_Service {
                 'exception' => get_class($exception),
             ));
             return $result;
-        } finally {
-            if (true === $lock_acquired && '' !== $lock_key) {
-                $this->release_lock($lock_key);
-                $result['lock_released'] = true;
-            }
         }
     }
 

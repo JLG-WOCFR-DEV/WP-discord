@@ -917,7 +917,18 @@ class Discord_Bot_JLG_API {
             ));
 
             $stats = isset($service_result['stats']) ? $service_result['stats'] : null;
-            $this->last_error = isset($service_result['error']) ? (string) $service_result['error'] : '';
+            $service_error = isset($service_result['error']) ? (string) $service_result['error'] : '';
+            $existing_error = $this->last_error;
+
+            if ('' !== $service_error) {
+                if ('' !== $existing_error && false === strpos($service_error, $existing_error)) {
+                    $service_error = trim($service_error . ' (' . $existing_error . ')');
+                }
+
+                $this->last_error = $service_error;
+            } else {
+                $this->last_error = $existing_error;
+            }
             $this->set_last_retry_after(isset($service_result['retry_after']) ? $service_result['retry_after'] : 0);
 
             if (empty($this->last_error) && empty($stats) && !empty($service_result['fallback_used'])) {
