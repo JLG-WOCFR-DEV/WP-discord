@@ -241,7 +241,7 @@ class Discord_Bot_JLG_Alerts {
             return __('Profil principal', 'discord-bot-jlg');
         }
 
-        $sanitized_key = sanitize_key($profile_key);
+        $sanitized_key = discord_bot_jlg_sanitize_profile_key($profile_key);
 
         if ('' === $sanitized_key) {
             return __('Profil Discord', 'discord-bot-jlg');

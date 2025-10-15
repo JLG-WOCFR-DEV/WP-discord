@@ -100,7 +100,7 @@ class Discord_Bot_JLG_Analytics {
     }
 
     public function log_snapshot($profile_key, $server_id, array $stats) {
-        $profile_key = sanitize_key($profile_key);
+        $profile_key = discord_bot_jlg_sanitize_profile_key($profile_key);
         if ('' === $profile_key) {
             $profile_key = 'default';
         }
@@ -179,14 +179,14 @@ class Discord_Bot_JLG_Analytics {
             $this->memory_storage = array_values(array_filter(
                 $this->memory_storage,
                 function ($entry) use ($cutoff_mysql) {
-                    return isset($entry['snapshot_time']) && $entry['snapshot_time'] >= $cutoff_mysql;
+                    return isset($entry['snapshot_time']) && $entry['snapshot_time'] > $cutoff_mysql;
                 }
             ));
             return $before - count($this->memory_storage);
         }
 
         $sql = $this->wpdb->prepare(
-            "DELETE FROM {$this->table_name} WHERE snapshot_time < %s",
+            "DELETE FROM {$this->table_name} WHERE snapshot_time <= %s",
             $cutoff_mysql
         );
 
@@ -206,7 +206,7 @@ class Discord_Bot_JLG_Analytics {
         );
 
         $args = wp_parse_args($args, $defaults);
-        $profile_key = sanitize_key($args['profile_key']);
+        $profile_key = discord_bot_jlg_sanitize_profile_key($args['profile_key']);
         $server_id   = preg_replace('/[^0-9]/', '', (string) $args['server_id']);
         $days        = max(1, (int) $args['days']);
         $limit       = max(1, (int) $args['limit']);
@@ -369,9 +369,9 @@ class Discord_Bot_JLG_Analytics {
         }
 
         $averages = array(
-            'online'   => $online_count > 0 ? $online_sum / $online_count : null,
-            'presence' => $presence_count > 0 ? $presence_sum / $presence_count : null,
-            'total'    => $total_count > 0 ? $total_sum / $total_count : null,
+            'online'   => $online_count > 0 ? $online_sum / (float) $online_count : null,
+            'presence' => $presence_count > 0 ? $presence_sum / (float) $presence_count : null,
+            'total'    => $total_count > 0 ? $total_sum / (float) $total_count : null,
         );
 
         $boost_trend = array(

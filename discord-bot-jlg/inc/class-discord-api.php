@@ -323,7 +323,7 @@ class Discord_Bot_JLG_API {
             $allowed_types = $defaults['types'];
         }
 
-        $profile_key = sanitize_key($args['profile_key']);
+        $profile_key = discord_bot_jlg_sanitize_profile_key($args['profile_key']);
         $server_id   = $this->sanitize_server_id($args['server_id']);
 
         $normalized_args = array(
@@ -365,7 +365,7 @@ class Discord_Bot_JLG_API {
             $context = isset($event['context']) && is_array($event['context']) ? $event['context'] : array();
 
             if ('' !== $profile_key && isset($context['profile_key'])) {
-                if (sanitize_key($context['profile_key']) !== $profile_key) {
+                if (discord_bot_jlg_sanitize_profile_key($context['profile_key']) !== $profile_key) {
                     continue;
                 }
             }
@@ -538,7 +538,7 @@ class Discord_Bot_JLG_API {
 
         $event_type_filter = sanitize_key($args['event_type']);
         $channel_filter    = sanitize_key($args['channel']);
-        $profile_filter    = sanitize_key($args['profile_key']);
+        $profile_filter    = discord_bot_jlg_sanitize_profile_key($args['profile_key']);
         $server_filter     = $this->sanitize_server_id($args['server_id']);
 
         $entries = array();
@@ -565,7 +565,7 @@ class Discord_Bot_JLG_API {
                 continue;
             }
 
-            $event_profile = isset($context['profile_key']) ? sanitize_key($context['profile_key']) : '';
+            $event_profile = isset($context['profile_key']) ? discord_bot_jlg_sanitize_profile_key($context['profile_key']) : '';
             if ('' !== $profile_filter && $event_profile !== $profile_filter) {
                 continue;
             }
@@ -767,11 +767,11 @@ class Discord_Bot_JLG_API {
                 $profile_key = '';
 
                 if (isset($profile['key'])) {
-                    $profile_key = sanitize_key($profile['key']);
+                    $profile_key = discord_bot_jlg_sanitize_profile_key($profile['key']);
                 }
 
                 if ('' === $profile_key) {
-                    $profile_key = sanitize_key($stored_key);
+                    $profile_key = discord_bot_jlg_sanitize_profile_key($stored_key);
                 }
 
                 if ('' === $profile_key) {
@@ -832,7 +832,7 @@ class Discord_Bot_JLG_API {
 
         $args['force_demo']   = discord_bot_jlg_validate_bool($args['force_demo']);
         $args['bypass_cache'] = discord_bot_jlg_validate_bool($args['bypass_cache']);
-        $args['profile_key']  = isset($args['profile_key']) ? sanitize_key($args['profile_key']) : '';
+        $args['profile_key']  = isset($args['profile_key']) ? discord_bot_jlg_sanitize_profile_key($args['profile_key']) : '';
         $args['server_id']    = isset($args['server_id']) ? $this->sanitize_server_id($args['server_id']) : '';
 
         if (true === $args['force_demo']) {
@@ -1269,6 +1269,11 @@ class Discord_Bot_JLG_API {
         );
 
         $next_retry = $this->get_next_fallback_retry_timestamp();
+
+        if ($next_retry <= 0 && isset($option['next_retry'])) {
+            $next_retry = (int) $option['next_retry'];
+        }
+
         $details['next_retry'] = ($next_retry > 0) ? $next_retry : 0;
 
         return $details;
@@ -1565,7 +1570,7 @@ class Discord_Bot_JLG_API {
         $args = wp_parse_args($request_args, $defaults);
 
         $is_public_request = !empty($args['is_public_request']);
-        $profile_key_override = isset($args['profile_key']) ? sanitize_key($args['profile_key']) : '';
+        $profile_key_override = isset($args['profile_key']) ? discord_bot_jlg_sanitize_profile_key($args['profile_key']) : '';
         $server_id_override   = isset($args['server_id']) ? $this->sanitize_server_id($args['server_id']) : '';
         $force_refresh        = discord_bot_jlg_validate_bool(isset($args['force_refresh']) ? $args['force_refresh'] : false);
 
@@ -1731,7 +1736,7 @@ class Discord_Bot_JLG_API {
 
         $profile_key_override = '';
         if (isset($_POST['profile_key'])) {
-            $profile_key_override = sanitize_key(wp_unslash($_POST['profile_key']));
+            $profile_key_override = discord_bot_jlg_sanitize_profile_key(wp_unslash($_POST['profile_key']));
         }
 
         $server_id_override = '';
@@ -1773,7 +1778,7 @@ class Discord_Bot_JLG_API {
 
     public function run_widget_refresh_job($profile_key = '', $job_context = array()) {
         $job_context = is_array($job_context) ? $job_context : array();
-        $profile_key = sanitize_key($profile_key);
+        $profile_key = discord_bot_jlg_sanitize_profile_key($profile_key);
 
         $args = array(
             'profile_key'  => $profile_key,
@@ -1848,7 +1853,7 @@ class Discord_Bot_JLG_API {
 
     public function run_bot_refresh_job($profile_key = '', $job_context = array()) {
         $job_context = is_array($job_context) ? $job_context : array();
-        $profile_key = sanitize_key($profile_key);
+        $profile_key = discord_bot_jlg_sanitize_profile_key($profile_key);
 
         $args = array(
             'profile_key'  => $profile_key,
@@ -1886,7 +1891,7 @@ class Discord_Bot_JLG_API {
         }
 
         $active_profile_key = isset($options['__active_profile_key'])
-            ? sanitize_key($options['__active_profile_key'])
+            ? discord_bot_jlg_sanitize_profile_key($options['__active_profile_key'])
             : (( '' !== $profile_key) ? $profile_key : 'default');
 
         $original_cache_key = $this->cache_key;
@@ -2057,7 +2062,9 @@ class Discord_Bot_JLG_API {
                 continue;
             }
 
-            $effective_profile_key = isset($profile['key']) ? sanitize_key($profile['key']) : sanitize_key($profile_key);
+            $effective_profile_key = isset($profile['key'])
+                ? discord_bot_jlg_sanitize_profile_key($profile['key'])
+                : discord_bot_jlg_sanitize_profile_key($profile_key);
 
             if ('' === $effective_profile_key) {
                 continue;
@@ -3035,12 +3042,12 @@ class Discord_Bot_JLG_API {
         $profile_key = 'default';
 
         if (isset($options['__active_profile_key'])) {
-            $candidate = sanitize_key($options['__active_profile_key']);
+            $candidate = discord_bot_jlg_sanitize_profile_key($options['__active_profile_key']);
             if ('' !== $candidate) {
                 $profile_key = $candidate;
             }
         } elseif (isset($options['profile_key'])) {
-            $candidate = sanitize_key($options['profile_key']);
+            $candidate = discord_bot_jlg_sanitize_profile_key($options['profile_key']);
             if ('' !== $candidate) {
                 $profile_key = $candidate;
             }
@@ -4220,7 +4227,7 @@ class Discord_Bot_JLG_API {
 
         $profile_key = 'default';
         if (isset($options['__active_profile_key'])) {
-            $candidate = sanitize_key($options['__active_profile_key']);
+            $candidate = discord_bot_jlg_sanitize_profile_key($options['__active_profile_key']);
             if ('' !== $candidate) {
                 $profile_key = $candidate;
             }

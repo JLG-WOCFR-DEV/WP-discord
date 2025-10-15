@@ -102,7 +102,7 @@ class Discord_Stats_Widget extends WP_Widget {
             $shortcode_atts['title'] = $card_title;
         }
 
-        $profile_key = isset($instance['profile_key']) ? sanitize_key($instance['profile_key']) : '';
+        $profile_key = isset($instance['profile_key']) ? discord_bot_jlg_sanitize_profile_key($instance['profile_key']) : '';
         if ('' !== $profile_key) {
             $shortcode_atts['profile'] = $profile_key;
         }
@@ -206,7 +206,7 @@ class Discord_Stats_Widget extends WP_Widget {
         $instance['show_card_title'] = !empty($new_instance['show_card_title']) ? 1 : 0;
         $instance['card_title']      = isset($new_instance['card_title']) ? sanitize_text_field($new_instance['card_title']) : '';
 
-        $profile_key = isset($new_instance['profile_key']) ? sanitize_key($new_instance['profile_key']) : '';
+        $profile_key = isset($new_instance['profile_key']) ? discord_bot_jlg_sanitize_profile_key($new_instance['profile_key']) : '';
         $instance['profile_key'] = $profile_key;
 
         $server_id_override = isset($new_instance['server_id_override'])
@@ -377,7 +377,9 @@ class Discord_Stats_Widget extends WP_Widget {
                     continue;
                 }
 
-                $profile_key = isset($profile['key']) ? sanitize_key($profile['key']) : sanitize_key($stored_key);
+                $profile_key = isset($profile['key'])
+                    ? discord_bot_jlg_sanitize_profile_key($profile['key'])
+                    : discord_bot_jlg_sanitize_profile_key($stored_key);
 
                 if ('' === $profile_key) {
                     continue;
