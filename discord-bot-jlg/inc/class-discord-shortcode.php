@@ -1372,6 +1372,18 @@ class Discord_Bot_JLG_Shortcode {
                         data-label-online-metric="<?php echo esc_attr($atts['label_online']); ?>"
                         data-hide-labels="<?php echo esc_attr($hide_labels ? 'true' : 'false'); ?>"
                         data-presence-total="<?php echo esc_attr($presence_total); ?>"
+                        data-label-heatmap-table="<?php echo esc_attr__(
+                            'Presence breakdown by day and hour',
+                            'discord-bot-jlg'
+                        ); ?>"
+                        data-label-heatmap-day="<?php echo esc_attr__(
+                            'Day',
+                            'discord-bot-jlg'
+                        ); ?>"
+                        data-label-heatmap-hour="<?php echo esc_attr__(
+                            'Hour',
+                            'discord-bot-jlg'
+                        ); ?>"
                         <?php if ('' !== $presence_breakdown_json) : ?>
                         data-presence-breakdown="<?php echo esc_attr($presence_breakdown_json); ?>"
                         <?php endif; ?>
@@ -1397,7 +1409,7 @@ class Discord_Bot_JLG_Shortcode {
                             <div class="discord-presence-explorer" data-role="discord-presence-explorer">
                                 <div class="discord-presence-explorer__toolbar">
                                     <div class="discord-presence-explorer__chips" data-role="discord-presence-filters">
-                                        <button type="button" class="discord-presence-chip is-active" data-role="discord-presence-chip" data-status="all">
+                                        <button type="button" class="discord-presence-chip is-active" data-role="discord-presence-chip" data-status="all" aria-pressed="true">
                                             <span class="discord-presence-chip__label"><?php esc_html_e('Tous', 'discord-bot-jlg'); ?></span>
                                             <span class="discord-presence-chip__value" data-role="discord-presence-chip-value"><?php echo esc_html(number_format_i18n($presence_total)); ?></span>
                                         </button>
@@ -1406,7 +1418,7 @@ class Discord_Bot_JLG_Shortcode {
                                                 ? $presence_label_map[$presence_status]
                                                 : ucfirst($presence_status);
                                         ?>
-                                        <button type="button" class="discord-presence-chip" data-role="discord-presence-chip" data-status="<?php echo esc_attr($presence_status); ?>" data-count="<?php echo esc_attr(max(0, (int) $presence_value)); ?>">
+                                        <button type="button" class="discord-presence-chip" data-role="discord-presence-chip" data-status="<?php echo esc_attr($presence_status); ?>" data-count="<?php echo esc_attr(max(0, (int) $presence_value)); ?>" aria-pressed="false">
                                             <span class="discord-presence-chip__label"><?php echo esc_html($status_label); ?></span>
                                             <span class="discord-presence-chip__value" data-role="discord-presence-chip-value"><?php echo esc_html(number_format_i18n(max(0, (int) $presence_value))); ?></span>
                                         </button>
@@ -1444,12 +1456,35 @@ class Discord_Bot_JLG_Shortcode {
                                         </ul>
                                     </div>
                                     <div class="discord-presence-explorer__panel discord-presence-explorer__panel--heatmap">
-                                        <div class="discord-presence-heatmap" data-role="discord-presence-heatmap">
+                                        <?php $heatmap_dom_id = $unique_id . '-presence-heatmap'; ?>
+                                        <div class="discord-presence-heatmap"
+                                            id="<?php echo esc_attr($heatmap_dom_id); ?>"
+                                            data-role="discord-presence-heatmap"
+                                            data-label-heatmap-summary="<?php echo esc_attr__(
+                                                'Carte de chaleur présentant la répartition de %s par jour et par heure. Consultez le tableau suivant pour les valeurs détaillées.',
+                                                'discord-bot-jlg'
+                                            ); ?>"
+                                            data-label-heatmap-summary-empty="<?php echo esc_attr__(
+                                                'Aucune donnée de présence n’est disponible pour générer la carte de chaleur pour le moment.',
+                                                'discord-bot-jlg'
+                                            ); ?>">
                                             <div class="discord-presence-heatmap__empty" data-role="discord-presence-heatmap-empty"><?php esc_html_e('En attente de données historiques…', 'discord-bot-jlg'); ?></div>
                                         </div>
                                     </div>
                                     <div class="discord-presence-explorer__panel discord-presence-explorer__panel--timeline">
-                                        <div class="discord-presence-timeline" data-role="discord-presence-timeline">
+                                        <div class="discord-presence-timeline" data-role="discord-presence-timeline"
+                                            data-label-timeline-table="<?php echo esc_attr__(
+                                                'Évolution de la présence sur la période',
+                                                'discord-bot-jlg'
+                                            ); ?>"
+                                            data-label-timeline-date="<?php echo esc_attr__(
+                                                'Date',
+                                                'discord-bot-jlg'
+                                            ); ?>"
+                                            data-label-timeline-value="<?php echo esc_attr__(
+                                                'Valeur moyenne',
+                                                'discord-bot-jlg'
+                                            ); ?>">
                                             <div class="discord-presence-timeline__toolbar" data-role="discord-presence-timeline-toolbar"></div>
                                             <div class="discord-presence-timeline__body" data-role="discord-presence-timeline-body">
                                                 <div class="discord-presence-timeline__empty" data-role="discord-presence-timeline-empty"><?php esc_html_e('Les tendances seront affichées après la première synchronisation.', 'discord-bot-jlg'); ?></div>
@@ -2207,6 +2242,26 @@ class Discord_Bot_JLG_Shortcode {
                 'statusHistoryHide'     => __('Masquer le journal', 'discord-bot-jlg'),
                 'statusBadgeAriaLabel'  => __('Statut des données Discord', 'discord-bot-jlg'),
                 'statusNoData'          => __('Non disponible', 'discord-bot-jlg'),
+                'presenceHeatmapTableCaption' => __('Répartition de la présence par jour et par heure', 'discord-bot-jlg'),
+                'presenceHeatmapDayLabel'     => __('Jour', 'discord-bot-jlg'),
+                'presenceHeatmapHourLabel'    => __('Heure', 'discord-bot-jlg'),
+                'presenceHeatmapSummary'      => __('Carte de chaleur présentant la répartition de %s par jour et par heure. Consultez le tableau suivant pour les valeurs détaillées.', 'discord-bot-jlg'),
+                'presenceHeatmapSummaryEmpty' => __('Aucune donnée de présence n’est disponible pour générer la carte de chaleur pour le moment.', 'discord-bot-jlg'),
+                'presenceAnalyticsError'      => __('Données analytics indisponibles.', 'discord-bot-jlg'),
+                'presenceAnalyticsEmpty'      => __('Aucune donnée historique disponible pour le moment.', 'discord-bot-jlg'),
+                'presenceTimelineTableCaption'=> __('Évolution de la présence sur la période', 'discord-bot-jlg'),
+                'presenceTimelineDateLabel'   => __('Date', 'discord-bot-jlg'),
+                'presenceTimelineValueLabel'  => __('Valeur moyenne', 'discord-bot-jlg'),
+                'presenceMetricPresence'      => __('Présence', 'discord-bot-jlg'),
+                'presenceMetricOnline'        => __('En ligne', 'discord-bot-jlg'),
+                'presenceMetricTotal'         => __('Membres', 'discord-bot-jlg'),
+                'comparisonExportEmpty'       => __('Aucune donnée de comparaison à exporter.', 'discord-bot-jlg'),
+                'labelOnline'                 => __('En ligne', 'discord-bot-jlg'),
+                'labelPresence'               => __('Présence', 'discord-bot-jlg'),
+                'labelTotal'                  => __('Membres', 'discord-bot-jlg'),
+                'labelPremium'                => __('Boosts serveur', 'discord-bot-jlg'),
+                'comparisonExportError'       => __('Impossible de générer le fichier d\'export.', 'discord-bot-jlg'),
+                'refreshingStatus'            => __('Actualisation…', 'discord-bot-jlg'),
             )
         );
 
