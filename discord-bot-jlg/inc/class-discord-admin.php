@@ -832,6 +832,61 @@ class Discord_Bot_JLG_Admin {
             $sanitized[$color_field] = $sanitized_color;
         }
 
+        $contrast_pairs = array(
+            array(
+                'foreground' => 'stat_text_color',
+                'background' => 'stat_bg_color',
+                'message'    => esc_html__(
+                    'The contrast between card text and background is below 4.5:1 (%s).',
+                    'discord-bot-jlg'
+                ),
+            ),
+            array(
+                'foreground' => 'accent_text_color',
+                'background' => 'accent_color',
+                'message'    => esc_html__(
+                    'The contrast between accent text and primary accent color is below 4.5:1 (%s).',
+                    'discord-bot-jlg'
+                ),
+            ),
+            array(
+                'foreground' => 'accent_text_color',
+                'background' => 'accent_color_alt',
+                'message'    => esc_html__(
+                    'The contrast between accent text and alternate accent color is below 4.5:1 (%s).',
+                    'discord-bot-jlg'
+                ),
+            ),
+        );
+
+        foreach ($contrast_pairs as $pair) {
+            $fg_color = isset($sanitized[$pair['foreground']]) ? $sanitized[$pair['foreground']] : '';
+            $bg_color = isset($sanitized[$pair['background']]) ? $sanitized[$pair['background']] : '';
+
+            if ('' === $fg_color || '' === $bg_color) {
+                continue;
+            }
+
+            $ratio = discord_bot_jlg_calculate_contrast_ratio($fg_color, $bg_color);
+
+            if (null === $ratio) {
+                continue;
+            }
+
+            if ($ratio < 4.5) {
+                $formatted_ratio = function_exists('number_format_i18n')
+                    ? number_format_i18n($ratio, 2)
+                    : number_format($ratio, 2);
+
+                add_settings_error(
+                    'discord_stats_settings',
+                    'discord_bot_jlg_contrast_' . $pair['foreground'] . '_' . $pair['background'],
+                    sprintf($pair['message'], $formatted_ratio),
+                    'warning'
+                );
+            }
+        }
+
         $text_fields = array(
             'default_icon_online',
             'default_icon_total',
