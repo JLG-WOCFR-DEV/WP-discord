@@ -2836,6 +2836,10 @@
             } else {
                 chip.element.setAttribute('data-active', isActive ? 'true' : 'false');
             }
+
+            if (typeof chip.element.setAttribute === 'function') {
+                chip.element.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+            }
         });
     }
 
@@ -3125,6 +3129,11 @@
         var maxValue = matrix && typeof matrix.max === 'number' ? matrix.max : 0;
         var rows = matrix && matrix.rows ? matrix.rows : [];
         var labels = getWeekdayLabels(state.locale);
+        var hours = [];
+
+        for (var hourIndex = 0; hourIndex < 24; hourIndex++) {
+            hours.push(hourIndex);
+        }
 
         for (var i = 0; i < rows.length; i++) {
             var row = rows[i];
@@ -3161,12 +3170,88 @@
                 var hourLabel = formatHourLabel(cellData.hour, state.locale);
                 var dayLabel = labels[i] || '';
                 cell.setAttribute('title', dayLabel + ' ' + hourLabel + ' • ' + tooltipValue);
+                cell.setAttribute('aria-label', dayLabel + ' ' + hourLabel + ' • ' + tooltipValue);
 
                 cellsWrapper.appendChild(cell);
             }
 
             rowElement.appendChild(cellsWrapper);
             container.appendChild(rowElement);
+        }
+
+        if (rows.length) {
+            var table = document.createElement('table');
+            table.className = 'discord-presence-heatmap__table screen-reader-text';
+            table.setAttribute('role', 'table');
+
+            var captionText = state.card && state.card.dataset && state.card.dataset.labelHeatmapTable
+                ? state.card.dataset.labelHeatmapTable
+                : getLocalizedString('presenceHeatmapTableCaption', 'Presence breakdown by day and hour');
+
+            var caption = document.createElement('caption');
+            caption.textContent = captionText;
+            table.appendChild(caption);
+
+            var dayHeaderText = state.card && state.card.dataset && state.card.dataset.labelHeatmapDay
+                ? state.card.dataset.labelHeatmapDay
+                : getLocalizedString('presenceHeatmapDayLabel', 'Day');
+
+            var hourHeaderText = state.card && state.card.dataset && state.card.dataset.labelHeatmapHour
+                ? state.card.dataset.labelHeatmapHour
+                : getLocalizedString('presenceHeatmapHourLabel', 'Hour');
+
+            var thead = document.createElement('thead');
+            var headerRow = document.createElement('tr');
+
+            var cornerHeader = document.createElement('th');
+            cornerHeader.scope = 'col';
+            cornerHeader.textContent = dayHeaderText;
+            headerRow.appendChild(cornerHeader);
+
+            hours.forEach(function (hour) {
+                var th = document.createElement('th');
+                th.scope = 'col';
+                th.textContent = formatHourLabel(hour, state.locale) || hourHeaderText + ' ' + hour;
+                headerRow.appendChild(th);
+            });
+
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+
+            var tbody = document.createElement('tbody');
+
+            for (var rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+                var matrixRow = rows[rowIndex];
+                var tr = document.createElement('tr');
+                var rowHeader = document.createElement('th');
+                rowHeader.scope = 'row';
+                rowHeader.textContent = labels[rowIndex] || dayHeaderText;
+                tr.appendChild(rowHeader);
+
+                for (var hourPosition = 0; hourPosition < hours.length; hourPosition++) {
+                    var hourValue = hours[hourPosition];
+                    var tableCellData = matrixRow && matrixRow.cells ? matrixRow.cells[hourValue] : null;
+                    var td = document.createElement('td');
+                    var numericValue = tableCellData && typeof tableCellData.value === 'number'
+                        ? tableCellData.value
+                        : null;
+
+                    td.textContent = numericValue === null
+                        ? '—'
+                        : formatPresenceNumber(numericValue, state.formatter);
+
+                    if (tableCellData) {
+                        td.setAttribute('data-hour', String(tableCellData.hour));
+                    }
+
+                    tr.appendChild(td);
+                }
+
+                tbody.appendChild(tr);
+            }
+
+            table.appendChild(tbody);
+            container.appendChild(table);
         }
 
         if (container.dataset) {
@@ -3277,6 +3362,13 @@
         var container = state.timelineBodyElement;
         container.innerHTML = '';
 
+        var captionText = state.timelineTableCaption
+            || getLocalizedString('presenceTimelineTableCaption', 'Presence trend over the selected period');
+        var dateHeaderText = state.timelineDateLabel
+            || getLocalizedString('presenceTimelineDateLabel', 'Date');
+        var valueHeaderText = state.timelineValueLabel
+            || getLocalizedString('presenceTimelineValueLabel', 'Average value');
+
         if (!aggregated || !aggregated.length) {
             if (state.timelineEmptyElement) {
                 var emptyMessage = state.analyticsError
@@ -3306,6 +3398,7 @@
         var list = document.createElement('ol');
         list.className = 'discord-presence-timeline__list';
         var formatter = state.formatter;
+        var tableRows = [];
 
         for (var i = 0; i < aggregated.length; i++) {
             var entry = aggregated[i];
@@ -3314,7 +3407,8 @@
 
             var label = document.createElement('span');
             label.className = 'discord-presence-timeline__timestamp';
-            label.textContent = formatTimelineDate(entry.timestamp, state.locale);
+            var formattedDate = formatTimelineDate(entry.timestamp, state.locale);
+            label.textContent = formattedDate;
             item.appendChild(label);
 
             var bar = document.createElement('div');
@@ -3326,18 +3420,83 @@
             bar.setAttribute('aria-valuemax', String(Math.round(maxValue)));
             bar.setAttribute('aria-valuenow', String(Math.round(value)));
             bar.setAttribute('role', 'img');
-            bar.setAttribute('title', formatPresenceNumber(value, formatter));
+            var formattedValue = formatPresenceNumber(value, formatter);
+            bar.setAttribute('title', formattedValue);
+            bar.setAttribute('aria-label', (formattedDate || dateHeaderText) + ' • ' + formattedValue);
 
             var barValue = document.createElement('span');
             barValue.className = 'discord-presence-timeline__value';
-            barValue.textContent = formatPresenceNumber(value, formatter);
+            barValue.textContent = formattedValue;
             bar.appendChild(barValue);
 
             item.appendChild(bar);
             list.appendChild(item);
+
+            tableRows.push({
+                timestamp: entry && typeof entry.timestamp === 'number' ? entry.timestamp : null,
+                date: formattedDate,
+                value: formattedValue,
+                numericValue: typeof value === 'number' ? value : null
+            });
         }
 
         container.appendChild(list);
+
+        var table = document.createElement('table');
+        table.className = 'discord-presence-timeline__table screen-reader-text';
+        table.setAttribute('role', 'table');
+
+        if (captionText) {
+            var caption = document.createElement('caption');
+            caption.textContent = captionText;
+            table.appendChild(caption);
+        }
+
+        var thead = document.createElement('thead');
+        var headerRow = document.createElement('tr');
+        var dateHeader = document.createElement('th');
+        dateHeader.scope = 'col';
+        dateHeader.textContent = dateHeaderText;
+        headerRow.appendChild(dateHeader);
+
+        var valueHeader = document.createElement('th');
+        valueHeader.scope = 'col';
+        valueHeader.textContent = valueHeaderText;
+        headerRow.appendChild(valueHeader);
+
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+
+        var tbody = document.createElement('tbody');
+
+        tableRows.forEach(function (row) {
+            var tr = document.createElement('tr');
+
+            var dateCell = document.createElement('th');
+            dateCell.scope = 'row';
+            dateCell.textContent = row.date || dateHeaderText;
+            if (row.timestamp !== null) {
+                dateCell.setAttribute('data-timestamp', String(row.timestamp));
+            }
+            tr.appendChild(dateCell);
+
+            var valueCell = document.createElement('td');
+            if (row.numericValue === null || isNaN(row.numericValue)) {
+                valueCell.textContent = '—';
+            } else {
+                valueCell.textContent = row.value;
+            }
+            tr.appendChild(valueCell);
+
+            tbody.appendChild(tr);
+        });
+
+        table.appendChild(tbody);
+        container.appendChild(table);
+
+        if (table.dataset) {
+            table.dataset.metric = metric;
+        }
 
         if (container.dataset) {
             container.dataset.metric = metric;
@@ -3540,6 +3699,15 @@
             timelineBodyElement: timelineBodyElement,
             timelineEmptyElement: timelineEmptyElement,
             timelineEmptyDefaultText: timelineEmptyElement ? timelineEmptyElement.textContent : '',
+            timelineTableCaption: timelineElement && timelineElement.dataset && timelineElement.dataset.labelTimelineTable
+                ? timelineElement.dataset.labelTimelineTable
+                : '',
+            timelineDateLabel: timelineElement && timelineElement.dataset && timelineElement.dataset.labelTimelineDate
+                ? timelineElement.dataset.labelTimelineDate
+                : '',
+            timelineValueLabel: timelineElement && timelineElement.dataset && timelineElement.dataset.labelTimelineValue
+                ? timelineElement.dataset.labelTimelineValue
+                : '',
             selectionValueElement: selectionValueElement,
             selectionShareElement: selectionShareElement,
             metaValueElement: metaValueElement,
