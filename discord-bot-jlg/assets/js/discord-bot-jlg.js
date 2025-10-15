@@ -41,6 +41,7 @@
     var STATUS_LOG_LINK_SELECTOR = '[data-status-log-link]';
     var STATUS_STATE_KEY = '__discordStatusState';
     var COMPARISON_EXPORT_SELECTOR = '[data-role="discord-comparison-export"]';
+    var COMPARISON_EXPORT_STATUS_SELECTOR = '[data-role="discord-comparison-export-status"]';
     var PRESENCE_EXPLORER_SELECTOR = '[data-role="discord-presence-explorer"]';
     var PRESENCE_FILTERS_SELECTOR = '[data-role="discord-presence-filters"]';
     var PRESENCE_CHIP_SELECTOR = '[data-role="discord-presence-chip"]';
@@ -2836,6 +2837,10 @@
             } else {
                 chip.element.setAttribute('data-active', isActive ? 'true' : 'false');
             }
+
+            if (typeof chip.element.setAttribute === 'function') {
+                chip.element.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+            }
         });
     }
 
@@ -3114,6 +3119,39 @@
         };
     }
 
+    function getPresenceMetricLabel(state, metric) {
+        if (!state) {
+            return metric;
+        }
+
+        switch (metric) {
+            case 'presence':
+                return state.presenceLabel || getLocalizedString('presenceMetricPresence', 'Présence');
+            case 'online':
+                return state.onlineLabel || getLocalizedString('presenceMetricOnline', 'En ligne');
+            case 'total':
+                return state.totalLabel || getLocalizedString('presenceMetricTotal', 'Membres');
+            default:
+                return metric;
+        }
+    }
+
+    function formatHeatmapSummary(template, metricLabel) {
+        if (typeof template !== 'string') {
+            return '';
+        }
+
+        if (template.indexOf('%s') !== -1) {
+            return template.replace('%s', metricLabel || '');
+        }
+
+        if (!metricLabel) {
+            return template;
+        }
+
+        return metricLabel + ' — ' + template;
+    }
+
     function renderPresenceHeatmap(state, matrix, metric) {
         if (!state || !state.heatmapElement) {
             return;
@@ -3122,9 +3160,69 @@
         var container = state.heatmapElement;
         container.innerHTML = '';
 
+        if (state.heatmapEmptyElement) {
+            state.heatmapEmptyElement.setAttribute('hidden', 'hidden');
+        }
+
         var maxValue = matrix && typeof matrix.max === 'number' ? matrix.max : 0;
         var rows = matrix && matrix.rows ? matrix.rows : [];
         var labels = getWeekdayLabels(state.locale);
+        var hours = [];
+
+        for (var hourIndex = 0; hourIndex < 24; hourIndex++) {
+            hours.push(hourIndex);
+        }
+
+        var summaryId = container.id ? container.id + '-summary' : '';
+        var summary = document.createElement('p');
+        summary.className = 'discord-presence-heatmap__summary screen-reader-text';
+        summary.setAttribute('data-role', 'discord-presence-heatmap-summary');
+        if (summaryId) {
+            summary.id = summaryId;
+        }
+
+        var summaryTemplate = container.dataset && container.dataset.labelHeatmapSummary
+            ? container.dataset.labelHeatmapSummary
+            : getLocalizedString(
+                'presenceHeatmapSummary',
+                'Carte de chaleur présentant la répartition de %s par jour et par heure. Consultez le tableau suivant pour les valeurs détaillées.'
+            );
+
+        var emptySummaryTemplate = container.dataset && container.dataset.labelHeatmapSummaryEmpty
+            ? container.dataset.labelHeatmapSummaryEmpty
+            : getLocalizedString(
+                'presenceHeatmapSummaryEmpty',
+                'Aucune donnée de présence n’est disponible pour générer la carte de chaleur pour le moment.'
+            );
+
+        var metricLabel = getPresenceMetricLabel(state, metric);
+        var hasRows = rows.length > 0;
+        summary.textContent = hasRows
+            ? formatHeatmapSummary(summaryTemplate, metricLabel)
+            : emptySummaryTemplate;
+
+        container.appendChild(summary);
+
+        if (!hasRows) {
+            if (state.heatmapEmptyElement) {
+                var placeholderMessage = state.analyticsError
+                    ? getLocalizedString('presenceAnalyticsError', 'Données analytics indisponibles.')
+                    : (state.heatmapEmptyDefaultText || getLocalizedString('presenceAnalyticsEmpty', 'En attente de données historiques…'));
+                state.heatmapEmptyElement.textContent = placeholderMessage;
+                state.heatmapEmptyElement.removeAttribute('hidden');
+                container.appendChild(state.heatmapEmptyElement);
+            }
+
+            if (summaryId) {
+                container.setAttribute('aria-describedby', summaryId);
+            } else {
+                container.removeAttribute('aria-describedby');
+            }
+
+            return;
+        }
+
+        var describedbyIds = summaryId ? [summaryId] : [];
 
         for (var i = 0; i < rows.length; i++) {
             var row = rows[i];
@@ -3161,12 +3259,100 @@
                 var hourLabel = formatHourLabel(cellData.hour, state.locale);
                 var dayLabel = labels[i] || '';
                 cell.setAttribute('title', dayLabel + ' ' + hourLabel + ' • ' + tooltipValue);
+                cell.setAttribute('aria-label', dayLabel + ' ' + hourLabel + ' • ' + tooltipValue);
 
                 cellsWrapper.appendChild(cell);
             }
 
             rowElement.appendChild(cellsWrapper);
             container.appendChild(rowElement);
+        }
+
+        if (rows.length) {
+            var table = document.createElement('table');
+            table.className = 'discord-presence-heatmap__table screen-reader-text';
+            table.setAttribute('role', 'table');
+
+            var captionText = state.card && state.card.dataset && state.card.dataset.labelHeatmapTable
+                ? state.card.dataset.labelHeatmapTable
+                : getLocalizedString('presenceHeatmapTableCaption', 'Presence breakdown by day and hour');
+
+            var caption = document.createElement('caption');
+            caption.textContent = captionText;
+            table.appendChild(caption);
+
+            var dayHeaderText = state.card && state.card.dataset && state.card.dataset.labelHeatmapDay
+                ? state.card.dataset.labelHeatmapDay
+                : getLocalizedString('presenceHeatmapDayLabel', 'Day');
+
+            var hourHeaderText = state.card && state.card.dataset && state.card.dataset.labelHeatmapHour
+                ? state.card.dataset.labelHeatmapHour
+                : getLocalizedString('presenceHeatmapHourLabel', 'Hour');
+
+            var thead = document.createElement('thead');
+            var headerRow = document.createElement('tr');
+
+            var cornerHeader = document.createElement('th');
+            cornerHeader.scope = 'col';
+            cornerHeader.textContent = dayHeaderText;
+            headerRow.appendChild(cornerHeader);
+
+            hours.forEach(function (hour) {
+                var th = document.createElement('th');
+                th.scope = 'col';
+                th.textContent = formatHourLabel(hour, state.locale) || hourHeaderText + ' ' + hour;
+                headerRow.appendChild(th);
+            });
+
+            thead.appendChild(headerRow);
+            table.appendChild(thead);
+
+            var tbody = document.createElement('tbody');
+
+            for (var rowIndex = 0; rowIndex < rows.length; rowIndex++) {
+                var matrixRow = rows[rowIndex];
+                var tr = document.createElement('tr');
+                var rowHeader = document.createElement('th');
+                rowHeader.scope = 'row';
+                rowHeader.textContent = labels[rowIndex] || dayHeaderText;
+                tr.appendChild(rowHeader);
+
+                for (var hourPosition = 0; hourPosition < hours.length; hourPosition++) {
+                    var hourValue = hours[hourPosition];
+                    var tableCellData = matrixRow && matrixRow.cells ? matrixRow.cells[hourValue] : null;
+                    var td = document.createElement('td');
+                    var numericValue = tableCellData && typeof tableCellData.value === 'number'
+                        ? tableCellData.value
+                        : null;
+
+                    td.textContent = numericValue === null
+                        ? '—'
+                        : formatPresenceNumber(numericValue, state.formatter);
+
+                    if (tableCellData) {
+                        td.setAttribute('data-hour', String(tableCellData.hour));
+                    }
+
+                    tr.appendChild(td);
+                }
+
+                tbody.appendChild(tr);
+            }
+
+            table.appendChild(tbody);
+            container.appendChild(table);
+
+            if (container.id) {
+                var tableId = container.id + '-table';
+                table.id = tableId;
+                describedbyIds.push(tableId);
+            }
+        }
+
+        if (describedbyIds.length) {
+            container.setAttribute('aria-describedby', describedbyIds.join(' '));
+        } else {
+            container.removeAttribute('aria-describedby');
         }
 
         if (container.dataset) {
@@ -3277,6 +3463,13 @@
         var container = state.timelineBodyElement;
         container.innerHTML = '';
 
+        var captionText = state.timelineTableCaption
+            || getLocalizedString('presenceTimelineTableCaption', 'Presence trend over the selected period');
+        var dateHeaderText = state.timelineDateLabel
+            || getLocalizedString('presenceTimelineDateLabel', 'Date');
+        var valueHeaderText = state.timelineValueLabel
+            || getLocalizedString('presenceTimelineValueLabel', 'Average value');
+
         if (!aggregated || !aggregated.length) {
             if (state.timelineEmptyElement) {
                 var emptyMessage = state.analyticsError
@@ -3306,6 +3499,7 @@
         var list = document.createElement('ol');
         list.className = 'discord-presence-timeline__list';
         var formatter = state.formatter;
+        var tableRows = [];
 
         for (var i = 0; i < aggregated.length; i++) {
             var entry = aggregated[i];
@@ -3314,7 +3508,8 @@
 
             var label = document.createElement('span');
             label.className = 'discord-presence-timeline__timestamp';
-            label.textContent = formatTimelineDate(entry.timestamp, state.locale);
+            var formattedDate = formatTimelineDate(entry.timestamp, state.locale);
+            label.textContent = formattedDate;
             item.appendChild(label);
 
             var bar = document.createElement('div');
@@ -3326,18 +3521,83 @@
             bar.setAttribute('aria-valuemax', String(Math.round(maxValue)));
             bar.setAttribute('aria-valuenow', String(Math.round(value)));
             bar.setAttribute('role', 'img');
-            bar.setAttribute('title', formatPresenceNumber(value, formatter));
+            var formattedValue = formatPresenceNumber(value, formatter);
+            bar.setAttribute('title', formattedValue);
+            bar.setAttribute('aria-label', (formattedDate || dateHeaderText) + ' • ' + formattedValue);
 
             var barValue = document.createElement('span');
             barValue.className = 'discord-presence-timeline__value';
-            barValue.textContent = formatPresenceNumber(value, formatter);
+            barValue.textContent = formattedValue;
             bar.appendChild(barValue);
 
             item.appendChild(bar);
             list.appendChild(item);
+
+            tableRows.push({
+                timestamp: entry && typeof entry.timestamp === 'number' ? entry.timestamp : null,
+                date: formattedDate,
+                value: formattedValue,
+                numericValue: typeof value === 'number' ? value : null
+            });
         }
 
         container.appendChild(list);
+
+        var table = document.createElement('table');
+        table.className = 'discord-presence-timeline__table screen-reader-text';
+        table.setAttribute('role', 'table');
+
+        if (captionText) {
+            var caption = document.createElement('caption');
+            caption.textContent = captionText;
+            table.appendChild(caption);
+        }
+
+        var thead = document.createElement('thead');
+        var headerRow = document.createElement('tr');
+        var dateHeader = document.createElement('th');
+        dateHeader.scope = 'col';
+        dateHeader.textContent = dateHeaderText;
+        headerRow.appendChild(dateHeader);
+
+        var valueHeader = document.createElement('th');
+        valueHeader.scope = 'col';
+        valueHeader.textContent = valueHeaderText;
+        headerRow.appendChild(valueHeader);
+
+        thead.appendChild(headerRow);
+        table.appendChild(thead);
+
+        var tbody = document.createElement('tbody');
+
+        tableRows.forEach(function (row) {
+            var tr = document.createElement('tr');
+
+            var dateCell = document.createElement('th');
+            dateCell.scope = 'row';
+            dateCell.textContent = row.date || dateHeaderText;
+            if (row.timestamp !== null) {
+                dateCell.setAttribute('data-timestamp', String(row.timestamp));
+            }
+            tr.appendChild(dateCell);
+
+            var valueCell = document.createElement('td');
+            if (row.numericValue === null || isNaN(row.numericValue)) {
+                valueCell.textContent = '—';
+            } else {
+                valueCell.textContent = row.value;
+            }
+            tr.appendChild(valueCell);
+
+            tbody.appendChild(tr);
+        });
+
+        table.appendChild(tbody);
+        container.appendChild(table);
+
+        if (table.dataset) {
+            table.dataset.metric = metric;
+        }
 
         if (container.dataset) {
             container.dataset.metric = metric;
@@ -3363,6 +3623,7 @@
             button.type = 'button';
             button.className = 'discord-presence-timeline__metric';
             button.setAttribute('data-metric', metric.key);
+            button.setAttribute('aria-pressed', 'false');
             button.textContent = metric.label || metric.key;
             button.addEventListener('click', function () {
                 if (state.metric === metric.key) {
@@ -3397,6 +3658,10 @@
             } else {
                 button.removeAttribute('data-active');
             }
+
+            if (typeof button.setAttribute === 'function') {
+                button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
+            }
         });
     }
 
@@ -3429,6 +3694,10 @@
 
             if (state.heatmapElement) {
                 state.heatmapElement.innerHTML = '';
+                if (heatmapEmpty) {
+                    state.heatmapElement.appendChild(heatmapEmpty);
+                }
+                state.heatmapElement.removeAttribute('aria-describedby');
             }
 
             if (state.timelineBodyElement) {
@@ -3540,6 +3809,15 @@
             timelineBodyElement: timelineBodyElement,
             timelineEmptyElement: timelineEmptyElement,
             timelineEmptyDefaultText: timelineEmptyElement ? timelineEmptyElement.textContent : '',
+            timelineTableCaption: timelineElement && timelineElement.dataset && timelineElement.dataset.labelTimelineTable
+                ? timelineElement.dataset.labelTimelineTable
+                : '',
+            timelineDateLabel: timelineElement && timelineElement.dataset && timelineElement.dataset.labelTimelineDate
+                ? timelineElement.dataset.labelTimelineDate
+                : '',
+            timelineValueLabel: timelineElement && timelineElement.dataset && timelineElement.dataset.labelTimelineValue
+                ? timelineElement.dataset.labelTimelineValue
+                : '',
             selectionValueElement: selectionValueElement,
             selectionShareElement: selectionShareElement,
             metaValueElement: metaValueElement,
@@ -3815,21 +4093,82 @@
         return rows.join('\r\n');
     }
 
+    function getComparisonStatusElement(container) {
+        if (!container) {
+            return null;
+        }
+
+        var status = container.querySelector(COMPARISON_EXPORT_STATUS_SELECTOR);
+
+        if (!status) {
+            return null;
+        }
+
+        if (!status.hasAttribute('role')) {
+            status.setAttribute('role', 'status');
+        }
+
+        if (!status.hasAttribute('aria-live')) {
+            status.setAttribute('aria-live', 'polite');
+        }
+
+        if (!status.hasAttribute('aria-atomic')) {
+            status.setAttribute('aria-atomic', 'true');
+        }
+
+        return status;
+    }
+
+    function announceComparisonStatus(container, message, politeness) {
+        var status = getComparisonStatusElement(container);
+        var text = message || '';
+
+        if (status) {
+            status.textContent = text;
+
+            if (text) {
+                status.removeAttribute('hidden');
+            } else {
+                status.setAttribute('hidden', 'hidden');
+            }
+        }
+
+        if (!text) {
+            return;
+        }
+
+        var politenessSetting = (politeness === 'assertive') ? 'assertive' : 'polite';
+
+        if (
+            typeof window !== 'undefined'
+            && window.wp
+            && window.wp.a11y
+            && typeof window.wp.a11y.speak === 'function'
+        ) {
+            window.wp.a11y.speak(text, politenessSetting);
+            return;
+        }
+
+        if (!status && typeof window !== 'undefined' && typeof window.alert === 'function') {
+            window.alert(text);
+        }
+    }
+
     function triggerDownload(content, filename, mimeType) {
         if (typeof content !== 'string' || !content) {
-            return;
+            return false;
         }
 
         var blob;
         try {
             blob = new Blob([content], { type: mimeType || 'text/plain;charset=utf-8' });
         } catch (error) {
-            return;
+            return false;
         }
 
         if (typeof navigator !== 'undefined' && navigator.msSaveOrOpenBlob) {
             navigator.msSaveOrOpenBlob(blob, filename);
-            return;
+            return true;
         }
 
         var url = (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function')
@@ -3837,7 +4176,7 @@
             : null;
 
         if (!url) {
-            return;
+            return false;
         }
 
         var link = document.createElement('a');
@@ -3849,15 +4188,18 @@
             document.body.removeChild(link);
             URL.revokeObjectURL(url);
         }, 0);
+
+        return true;
     }
 
     function handleComparisonExport(container, button) {
         var payload = parseComparisonPayload(container);
+
+        announceComparisonStatus(container, '', 'polite');
+
         if (!payload || !payload.entries || !payload.entries.length) {
             var emptyMessage = getLocalizedString('comparisonExportEmpty', 'Aucune donnée de comparaison à exporter.');
-            if (typeof window !== 'undefined' && typeof window.alert === 'function') {
-                window.alert(emptyMessage);
-            }
+            announceComparisonStatus(container, emptyMessage, 'assertive');
             return;
         }
 
@@ -3871,14 +4213,29 @@
         var csv = buildComparisonCsv(payload, null, labels);
         if (!csv) {
             var errorMessage = getLocalizedString('comparisonExportError', 'Impossible de générer le fichier d\'export.');
-            if (typeof window !== 'undefined' && typeof window.alert === 'function') {
-                window.alert(errorMessage);
-            }
+            announceComparisonStatus(container, errorMessage, 'assertive');
             return;
         }
 
         var filename = buildComparisonFilename(payload);
-        triggerDownload(csv, filename, 'text/csv;charset=utf-8');
+        var didStartDownload = triggerDownload(csv, filename, 'text/csv;charset=utf-8');
+
+        if (!didStartDownload) {
+            var downloadError = getLocalizedString('comparisonExportError', 'Impossible de générer le fichier d\'export.');
+            announceComparisonStatus(container, downloadError, 'assertive');
+            return;
+        }
+
+        var successTemplate = getLocalizedString('comparisonExportSuccess', 'Téléchargement du fichier d’export : %s.');
+        var successMessage;
+
+        if (successTemplate && successTemplate.indexOf('%s') !== -1) {
+            successMessage = successTemplate.replace('%s', filename);
+        } else {
+            successMessage = successTemplate ? (successTemplate + ' ' + filename) : filename;
+        }
+
+        announceComparisonStatus(container, successMessage, 'polite');
     }
 
     function initializeComparisonExport(container) {
