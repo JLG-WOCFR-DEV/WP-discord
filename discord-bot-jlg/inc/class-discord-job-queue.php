@@ -97,7 +97,7 @@ class Discord_Bot_JLG_Job_Queue {
         );
 
         $job['type'] = sanitize_key($job['type']);
-        $job['profile_key'] = sanitize_key($job['profile_key']);
+        $job['profile_key'] = discord_bot_jlg_sanitize_profile_key($job['profile_key']);
         $job['server_id'] = $this->sanitize_server_id($job['server_id']);
         $job['attempt'] = max(1, (int) $job['attempt']);
 

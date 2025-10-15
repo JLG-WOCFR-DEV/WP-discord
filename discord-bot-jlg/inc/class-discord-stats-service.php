@@ -232,15 +232,15 @@ class Discord_Bot_JLG_Stats_Service {
 
     private function resolve_profile_key($options, $context) {
         if (isset($options['__active_profile_key'])) {
-            return sanitize_key($options['__active_profile_key']);
+            return discord_bot_jlg_sanitize_profile_key($options['__active_profile_key']);
         }
 
         if (isset($context['profile_key'])) {
-            return sanitize_key($context['profile_key']);
+            return discord_bot_jlg_sanitize_profile_key($context['profile_key']);
         }
 
         if (isset($context['options']['__active_profile_key'])) {
-            return sanitize_key($context['options']['__active_profile_key']);
+            return discord_bot_jlg_sanitize_profile_key($context['options']['__active_profile_key']);
         }
 
         return 'default';
@@ -266,7 +266,7 @@ class Discord_Bot_JLG_Stats_Service {
         $context = array_merge(array(
             'channel'     => 'stats_pipeline',
             'stage'       => sanitize_key($stage),
-            'profile_key' => sanitize_key($profile_key),
+            'profile_key' => discord_bot_jlg_sanitize_profile_key($profile_key),
             'server_id'   => (string) $server_id,
         ), $extra);
 

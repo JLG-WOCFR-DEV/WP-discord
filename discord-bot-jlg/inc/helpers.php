@@ -55,6 +55,61 @@ if (!function_exists('sanitize_hex_color')) {
     }
 }
 
+if (!function_exists('add_settings_error')) {
+    /**
+     * Lightweight polyfill for WordPress add_settings_error().
+     *
+     * Stores the sanitized error in the global $settings_errors array so tests
+     * and calling code can inspect them when running outside of WordPress.
+     *
+     * @param string $setting Setting slug.
+     * @param string $code    Error code.
+     * @param string $message Error message.
+     * @param string $type    Error type. Defaults to 'error'.
+     */
+    function add_settings_error($setting, $code, $message, $type = 'error') {
+        if (!isset($GLOBALS['settings_errors']) || !is_array($GLOBALS['settings_errors'])) {
+            $GLOBALS['settings_errors'] = array();
+        }
+
+        $GLOBALS['settings_errors'][] = array(
+            'setting' => (string) $setting,
+            'code'    => (string) $code,
+            'message' => (string) $message,
+            'type'    => '' !== $type ? (string) $type : 'error',
+        );
+    }
+}
+
+if (!function_exists('esc_url_raw')) {
+    /**
+     * Lightweight polyfill for WordPress esc_url_raw().
+     *
+     * @param string $url URL to sanitize.
+     *
+     * @return string Sanitized URL or an empty string when invalid.
+     */
+    function esc_url_raw($url) {
+        if (!is_string($url)) {
+            return '';
+        }
+
+        $sanitized = trim($url);
+
+        if ('' === $sanitized) {
+            return '';
+        }
+
+        $sanitized = filter_var($sanitized, FILTER_SANITIZE_URL);
+
+        if (false === $sanitized) {
+            return '';
+        }
+
+        return preg_replace('/[\r\n\t\0\x0B]/', '', $sanitized);
+    }
+}
+
 if (!function_exists('discord_bot_jlg_get_available_themes')) {
     /**
      * Returns the list of allowed themes for the public components.
@@ -148,6 +203,30 @@ if (!function_exists('discord_bot_jlg_validate_bool')) {
         }
 
         return filter_var($value, FILTER_VALIDATE_BOOLEAN);
+    }
+}
+
+if (!function_exists('discord_bot_jlg_sanitize_profile_key')) {
+    /**
+     * Sanitizes a profile key while preserving dashes and underscores.
+     *
+     * @param mixed $key Raw profile key.
+     *
+     * @return string Sanitized profile key.
+     */
+    function discord_bot_jlg_sanitize_profile_key($key) {
+        if (!is_string($key)) {
+            if (is_scalar($key)) {
+                $key = (string) $key;
+            } else {
+                return '';
+            }
+        }
+
+        $key = strtolower($key);
+        $key = preg_replace('/[^a-z0-9_-]/', '', $key);
+
+        return $key;
     }
 }
 
@@ -656,6 +735,8 @@ if (!function_exists('discord_bot_jlg_decrypt_secret')) {
         $iv_length      = 16;
         $mac_length     = 32;
 
+        $plaintext = null;
+
         if ($decoded_length >= ($iv_length + $mac_length + 1)) {
             $iv                 = substr($decoded, 0, $iv_length);
             $ciphertext_and_mac = substr($decoded, $iv_length);
@@ -668,14 +749,9 @@ if (!function_exists('discord_bot_jlg_decrypt_secret')) {
                 if (hash_equals($expected, $mac)) {
                     $plaintext = openssl_decrypt($ciphertext, 'aes-256-cbc', $key_material, OPENSSL_RAW_DATA, $iv);
 
-                    if (false === $plaintext) {
-                        return new WP_Error(
-                            'discord_bot_jlg_decrypt_secret_failed',
-                            __('Le déchiffrement du token Discord a échoué.', 'discord-bot-jlg')
-                        );
+                    if (false !== $plaintext && '' !== $plaintext) {
+                        return $plaintext;
                     }
-
-                    return $plaintext;
                 }
             }
         }
