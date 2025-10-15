@@ -978,11 +978,11 @@ class Discord_Bot_JLG_Admin {
             $profile_key = '';
 
             if (isset($profile_input['key'])) {
-                $profile_key = sanitize_key($profile_input['key']);
+                $profile_key = discord_bot_jlg_sanitize_profile_key($profile_input['key']);
             }
 
             if ('' === $profile_key) {
-                $profile_key = sanitize_key($raw_key);
+                $profile_key = discord_bot_jlg_sanitize_profile_key($raw_key);
             }
 
             if ('' === $profile_key) {
@@ -1093,15 +1093,15 @@ class Discord_Bot_JLG_Admin {
         }
 
         if ($has_new_profile_data) {
-            $profile_key = isset($new_profile_input['key']) ? sanitize_key($new_profile_input['key']) : '';
+            $profile_key = isset($new_profile_input['key']) ? discord_bot_jlg_sanitize_profile_key($new_profile_input['key']) : '';
             $label       = isset($new_profile_input['label']) ? sanitize_text_field($new_profile_input['label']) : '';
 
             if ('' === $profile_key && '' !== $label) {
-                $profile_key = sanitize_key(sanitize_title($label));
+                $profile_key = discord_bot_jlg_sanitize_profile_key(sanitize_title($label));
             }
 
             if ('' === $profile_key) {
-                $profile_key = sanitize_key('profil_' . uniqid());
+                $profile_key = discord_bot_jlg_sanitize_profile_key('profil_' . uniqid());
             }
 
             if ('' === $profile_key || isset($result[$profile_key])) {
@@ -1423,7 +1423,7 @@ class Discord_Bot_JLG_Admin {
                 }
 
                 if ('' === $label) {
-                    $sanitized_key = sanitize_key($profile_key);
+                    $sanitized_key = discord_bot_jlg_sanitize_profile_key($profile_key);
 
                     if ('' === $sanitized_key) {
                         $label = __('Profil sans nom', 'discord-bot-jlg');
@@ -1589,7 +1589,9 @@ class Discord_Bot_JLG_Admin {
                             continue;
                         }
 
-                        $profile_key   = isset($profile['key']) ? sanitize_key($profile['key']) : sanitize_key($key);
+                        $profile_key   = isset($profile['key'])
+                            ? discord_bot_jlg_sanitize_profile_key($profile['key'])
+                            : discord_bot_jlg_sanitize_profile_key($key);
                         if ('' === $profile_key) {
                             continue;
                         }
@@ -2572,7 +2574,7 @@ class Discord_Bot_JLG_Admin {
 
         $profile_key = '';
         if (isset($_POST['test_connection_profile'])) {
-            $profile_key = sanitize_key(wp_unslash($_POST['test_connection_profile']));
+            $profile_key = discord_bot_jlg_sanitize_profile_key(wp_unslash($_POST['test_connection_profile']));
         }
 
         if (isset($_POST['current_setup_step'])) {
@@ -2779,7 +2781,7 @@ class Discord_Bot_JLG_Admin {
                     continue;
                 }
 
-                $profile_key = isset($profile['key']) ? sanitize_key($profile['key']) : '';
+                $profile_key = isset($profile['key']) ? discord_bot_jlg_sanitize_profile_key($profile['key']) : '';
                 if ('' === $profile_key || isset($profile_options[$profile_key])) {
                     continue;
                 }
@@ -3093,7 +3095,7 @@ class Discord_Bot_JLG_Admin {
             $timestamp = isset($entry['timestamp']) ? (int) $entry['timestamp'] : 0;
             $type      = isset($entry['type']) ? sanitize_key($entry['type']) : '';
             $channel   = isset($entry['channel']) ? sanitize_key($entry['channel']) : '';
-            $profile   = isset($entry['profile_key']) ? sanitize_key($entry['profile_key']) : '';
+            $profile   = isset($entry['profile_key']) ? discord_bot_jlg_sanitize_profile_key($entry['profile_key']) : '';
             $label     = isset($entry['label']) ? $entry['label'] : '';
             $reason    = isset($entry['reason']) ? $entry['reason'] : '';
 
@@ -3595,11 +3597,11 @@ class Discord_Bot_JLG_Admin {
             $candidate_key = '';
 
             if (isset($profile['key'])) {
-                $candidate_key = sanitize_key($profile['key']);
+                $candidate_key = discord_bot_jlg_sanitize_profile_key($profile['key']);
             }
 
             if ('' === $candidate_key) {
-                $candidate_key = sanitize_key($stored_key);
+                $candidate_key = discord_bot_jlg_sanitize_profile_key($stored_key);
             }
 
             if ($candidate_key !== $profile_key) {
@@ -4329,7 +4331,7 @@ class Discord_Bot_JLG_Admin {
             $options = array();
         }
 
-        $profile_key        = sanitize_key($profile_key);
+        $profile_key        = discord_bot_jlg_sanitize_profile_key($profile_key);
         $is_default_profile = ('' === $profile_key || 'default' === $profile_key);
 
         if ('default' === $profile_key) {
