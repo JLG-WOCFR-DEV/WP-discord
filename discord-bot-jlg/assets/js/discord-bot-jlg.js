@@ -41,6 +41,7 @@
     var STATUS_LOG_LINK_SELECTOR = '[data-status-log-link]';
     var STATUS_STATE_KEY = '__discordStatusState';
     var COMPARISON_EXPORT_SELECTOR = '[data-role="discord-comparison-export"]';
+    var COMPARISON_EXPORT_STATUS_SELECTOR = '[data-role="discord-comparison-export-status"]';
     var PRESENCE_EXPLORER_SELECTOR = '[data-role="discord-presence-explorer"]';
     var PRESENCE_FILTERS_SELECTOR = '[data-role="discord-presence-filters"]';
     var PRESENCE_CHIP_SELECTOR = '[data-role="discord-presence-chip"]';
@@ -4092,21 +4093,82 @@
         return rows.join('\r\n');
     }
 
+    function getComparisonStatusElement(container) {
+        if (!container) {
+            return null;
+        }
+
+        var status = container.querySelector(COMPARISON_EXPORT_STATUS_SELECTOR);
+
+        if (!status) {
+            return null;
+        }
+
+        if (!status.hasAttribute('role')) {
+            status.setAttribute('role', 'status');
+        }
+
+        if (!status.hasAttribute('aria-live')) {
+            status.setAttribute('aria-live', 'polite');
+        }
+
+        if (!status.hasAttribute('aria-atomic')) {
+            status.setAttribute('aria-atomic', 'true');
+        }
+
+        return status;
+    }
+
+    function announceComparisonStatus(container, message, politeness) {
+        var status = getComparisonStatusElement(container);
+        var text = message || '';
+
+        if (status) {
+            status.textContent = text;
+
+            if (text) {
+                status.removeAttribute('hidden');
+            } else {
+                status.setAttribute('hidden', 'hidden');
+            }
+        }
+
+        if (!text) {
+            return;
+        }
+
+        var politenessSetting = (politeness === 'assertive') ? 'assertive' : 'polite';
+
+        if (
+            typeof window !== 'undefined'
+            && window.wp
+            && window.wp.a11y
+            && typeof window.wp.a11y.speak === 'function'
+        ) {
+            window.wp.a11y.speak(text, politenessSetting);
+            return;
+        }
+
+        if (!status && typeof window !== 'undefined' && typeof window.alert === 'function') {
+            window.alert(text);
+        }
+    }
+
     function triggerDownload(content, filename, mimeType) {
         if (typeof content !== 'string' || !content) {
-            return;
+            return false;
         }
 
         var blob;
         try {
             blob = new Blob([content], { type: mimeType || 'text/plain;charset=utf-8' });
         } catch (error) {
-            return;
+            return false;
         }
 
         if (typeof navigator !== 'undefined' && navigator.msSaveOrOpenBlob) {
             navigator.msSaveOrOpenBlob(blob, filename);
-            return;
+            return true;
         }
 
         var url = (typeof URL !== 'undefined' && typeof URL.createObjectURL === 'function')
@@ -4114,7 +4176,7 @@
             : null;
 
         if (!url) {
-            return;
+            return false;
         }
 
         var link = document.createElement('a');
@@ -4126,15 +4188,18 @@
             document.body.removeChild(link);
             URL.revokeObjectURL(url);
         }, 0);
+
+        return true;
     }
 
     function handleComparisonExport(container, button) {
         var payload = parseComparisonPayload(container);
+
+        announceComparisonStatus(container, '', 'polite');
+
         if (!payload || !payload.entries || !payload.entries.length) {
             var emptyMessage = getLocalizedString('comparisonExportEmpty', 'Aucune donnée de comparaison à exporter.');
-            if (typeof window !== 'undefined' && typeof window.alert === 'function') {
-                window.alert(emptyMessage);
-            }
+            announceComparisonStatus(container, emptyMessage, 'assertive');
             return;
         }
 
@@ -4148,14 +4213,29 @@
         var csv = buildComparisonCsv(payload, null, labels);
         if (!csv) {
             var errorMessage = getLocalizedString('comparisonExportError', 'Impossible de générer le fichier d\'export.');
-            if (typeof window !== 'undefined' && typeof window.alert === 'function') {
-                window.alert(errorMessage);
-            }
+            announceComparisonStatus(container, errorMessage, 'assertive');
             return;
         }
 
         var filename = buildComparisonFilename(payload);
-        triggerDownload(csv, filename, 'text/csv;charset=utf-8');
+        var didStartDownload = triggerDownload(csv, filename, 'text/csv;charset=utf-8');
+
+        if (!didStartDownload) {
+            var downloadError = getLocalizedString('comparisonExportError', 'Impossible de générer le fichier d\'export.');
+            announceComparisonStatus(container, downloadError, 'assertive');
+            return;
+        }
+
+        var successTemplate = getLocalizedString('comparisonExportSuccess', 'Téléchargement du fichier d’export : %s.');
+        var successMessage;
+
+        if (successTemplate && successTemplate.indexOf('%s') !== -1) {
+            successMessage = successTemplate.replace('%s', filename);
+        } else {
+            successMessage = successTemplate ? (successTemplate + ' ' + filename) : filename;
+        }
+
+        announceComparisonStatus(container, successMessage, 'polite');
     }
 
     function initializeComparisonExport(container) {

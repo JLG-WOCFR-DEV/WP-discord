@@ -1595,6 +1595,7 @@ class Discord_Bot_JLG_Shortcode {
                     <?php esc_html_e('Exporter la comparaison', 'discord-bot-jlg'); ?>
                 </button>
             </div>
+            <p class="discord-comparison-summary__status" data-role="discord-comparison-export-status" role="status" aria-live="polite" aria-atomic="true" hidden></p>
             <div class="discord-comparison-summary__band">
                 <span class="discord-comparison-summary__reference"><?php printf(esc_html__('Référence : %s', 'discord-bot-jlg'), esc_html($comparison_reference_label)); ?></span>
                 <span class="discord-comparison-summary__timestamp"><?php printf(esc_html__('Dernière synchro : %s', 'discord-bot-jlg'), esc_html($comparison_reference_updated)); ?></span>
@@ -2261,6 +2262,7 @@ class Discord_Bot_JLG_Shortcode {
                 'labelTotal'                  => __('Membres', 'discord-bot-jlg'),
                 'labelPremium'                => __('Boosts serveur', 'discord-bot-jlg'),
                 'comparisonExportError'       => __('Impossible de générer le fichier d\'export.', 'discord-bot-jlg'),
+                'comparisonExportSuccess'     => __('Téléchargement du fichier d’export : %s.', 'discord-bot-jlg'),
                 'refreshingStatus'            => __('Actualisation…', 'discord-bot-jlg'),
             )
         );
