@@ -222,6 +222,188 @@ if (!function_exists('discord_bot_jlg_sanitize_color')) {
         }
 
         return '';
+}
+}
+
+if (!function_exists('discord_bot_jlg_parse_color_components')) {
+    /**
+     * Converts a color string into RGBA components.
+     *
+     * @param string $color Color string (HEX, RGB or RGBA).
+     *
+     * @return array|null Associative array with r, g, b (0-255) and a (0-1) or null on failure.
+     */
+    function discord_bot_jlg_parse_color_components($color) {
+        if (!is_string($color)) {
+            return null;
+        }
+
+        $color = trim($color);
+
+        if ('' === $color) {
+            return null;
+        }
+
+        if ('#' === substr($color, 0, 1)) {
+            $hex = substr($color, 1);
+            $length = strlen($hex);
+
+            if (3 === $length || 4 === $length) {
+                $r = hexdec(str_repeat($hex[0], 2));
+                $g = hexdec(str_repeat($hex[1], 2));
+                $b = hexdec(str_repeat($hex[2], 2));
+                $a = 1;
+
+                if (4 === $length) {
+                    $a = hexdec(str_repeat($hex[3], 2)) / 255;
+                }
+
+                return array('r' => $r, 'g' => $g, 'b' => $b, 'a' => max(0, min(1, $a)));
+            }
+
+            if (6 === $length || 8 === $length) {
+                $r = hexdec(substr($hex, 0, 2));
+                $g = hexdec(substr($hex, 2, 2));
+                $b = hexdec(substr($hex, 4, 2));
+                $a = 1;
+
+                if (8 === $length) {
+                    $a = hexdec(substr($hex, 6, 2)) / 255;
+                }
+
+                return array('r' => $r, 'g' => $g, 'b' => $b, 'a' => max(0, min(1, $a)));
+            }
+
+            return null;
+        }
+
+        if (preg_match('/^rgba?\(\s*([0-9]{1,3})\s*,\s*([0-9]{1,3})\s*,\s*([0-9]{1,3})(?:\s*,\s*([0-9]*\.?[0-9]+))?\s*\)$/i', $color, $matches)) {
+            $r = min(255, (int) $matches[1]);
+            $g = min(255, (int) $matches[2]);
+            $b = min(255, (int) $matches[3]);
+            $a = isset($matches[4]) ? max(0, min(1, (float) $matches[4])) : 1;
+
+            return array('r' => $r, 'g' => $g, 'b' => $b, 'a' => $a);
+        }
+
+        return null;
+    }
+}
+
+if (!function_exists('discord_bot_jlg_alpha_composite')) {
+    /**
+     * Composites a semi-transparent color over an opaque background.
+     *
+     * @param array $foreground Top color with r, g, b, a keys.
+     * @param array $background Background color with r, g, b, a keys (alpha defaults to 1).
+     *
+     * @return array Resulting opaque color with r, g, b, a.
+     */
+    function discord_bot_jlg_alpha_composite(array $foreground, array $background) {
+        $fg_alpha = isset($foreground['a']) ? (float) $foreground['a'] : 1;
+        $bg_alpha = isset($background['a']) ? (float) $background['a'] : 1;
+
+        $fg_alpha = max(0, min(1, $fg_alpha));
+        $bg_alpha = max(0, min(1, $bg_alpha));
+
+        $out_alpha = $fg_alpha + $bg_alpha * (1 - $fg_alpha);
+        if ($out_alpha <= 0) {
+            $out_alpha = 1;
+        }
+
+        $compose_channel = static function ($fg, $bg) use ($fg_alpha, $bg_alpha, $out_alpha) {
+            $value = ($fg * $fg_alpha) + ($bg * $bg_alpha * (1 - $fg_alpha));
+
+            return max(0, min(255, round($value / $out_alpha)));
+        };
+
+        return array(
+            'r' => $compose_channel(isset($foreground['r']) ? (int) $foreground['r'] : 0, isset($background['r']) ? (int) $background['r'] : 0),
+            'g' => $compose_channel(isset($foreground['g']) ? (int) $foreground['g'] : 0, isset($background['g']) ? (int) $background['g'] : 0),
+            'b' => $compose_channel(isset($foreground['b']) ? (int) $foreground['b'] : 0, isset($background['b']) ? (int) $background['b'] : 0),
+            'a' => $out_alpha,
+        );
+    }
+}
+
+if (!function_exists('discord_bot_jlg_calculate_relative_luminance')) {
+    /**
+     * Calculates the relative luminance for a given color.
+     *
+     * @param array $color Color array with r, g, b keys.
+     *
+     * @return float|null Relative luminance value or null on failure.
+     */
+    function discord_bot_jlg_calculate_relative_luminance(array $color) {
+        if (!isset($color['r'], $color['g'], $color['b'])) {
+            return null;
+        }
+
+        $normalize_channel = static function ($value) {
+            $channel = max(0, min(255, (int) $value)) / 255;
+
+            if ($channel <= 0.03928) {
+                return $channel / 12.92;
+            }
+
+            return pow(($channel + 0.055) / 1.055, 2.4);
+        };
+
+        $r = $normalize_channel($color['r']);
+        $g = $normalize_channel($color['g']);
+        $b = $normalize_channel($color['b']);
+
+        return (0.2126 * $r) + (0.7152 * $g) + (0.0722 * $b);
+    }
+}
+
+if (!function_exists('discord_bot_jlg_calculate_contrast_ratio')) {
+    /**
+     * Calculates the contrast ratio between two colors according to WCAG.
+     *
+     * @param string $foreground Foreground color string.
+     * @param string $background Background color string.
+     *
+     * @return float|null Contrast ratio or null when colors are invalid.
+     */
+    function discord_bot_jlg_calculate_contrast_ratio($foreground, $background) {
+        $fg_components = discord_bot_jlg_parse_color_components($foreground);
+        $bg_components = discord_bot_jlg_parse_color_components($background);
+
+        if (!$fg_components || !$bg_components) {
+            return null;
+        }
+
+        if ($bg_components['a'] < 1) {
+            $bg_components = discord_bot_jlg_alpha_composite($bg_components, array(
+                'r' => 255,
+                'g' => 255,
+                'b' => 255,
+                'a' => 1,
+            ));
+            $bg_components['a'] = 1;
+        }
+
+        if ($fg_components['a'] < 1) {
+            $fg_components = discord_bot_jlg_alpha_composite($fg_components, $bg_components);
+            $fg_components['a'] = 1;
+        }
+
+        $l1 = discord_bot_jlg_calculate_relative_luminance($fg_components);
+        $l2 = discord_bot_jlg_calculate_relative_luminance($bg_components);
+
+        if (null === $l1 || null === $l2) {
+            return null;
+        }
+
+        $lighter = max($l1, $l2);
+        $darker = min($l1, $l2);
+
+        if ($darker < 0 && $lighter < 0) {
+            return null;
+        }
+
+        return ($lighter + 0.05) / ($darker + 0.05);
     }
 }
 
