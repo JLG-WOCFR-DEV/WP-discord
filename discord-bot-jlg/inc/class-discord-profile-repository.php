@@ -39,7 +39,7 @@ class Discord_Bot_JLG_Profile_Repository {
             }
         }
 
-        $profile_key        = isset($args['profile_key']) ? sanitize_key($args['profile_key']) : '';
+        $profile_key        = isset($args['profile_key']) ? discord_bot_jlg_sanitize_profile_key($args['profile_key']) : '';
         $server_id_override = isset($args['server_id']) ? self::sanitize_server_id($args['server_id']) : '';
 
         if ('' !== $profile_key) {
@@ -124,11 +124,11 @@ class Discord_Bot_JLG_Profile_Repository {
             $candidate_key = '';
 
             if (isset($profile['key'])) {
-                $candidate_key = sanitize_key($profile['key']);
+                $candidate_key = discord_bot_jlg_sanitize_profile_key($profile['key']);
             }
 
             if ('' === $candidate_key) {
-                $candidate_key = sanitize_key($stored_key);
+                $candidate_key = discord_bot_jlg_sanitize_profile_key($stored_key);
             }
 
             if ('' === $candidate_key || $candidate_key !== $profile_key) {

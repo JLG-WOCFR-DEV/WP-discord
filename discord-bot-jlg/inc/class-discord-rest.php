@@ -28,7 +28,7 @@ class Discord_Bot_JLG_REST_Controller {
 
     public function __construct(Discord_Bot_JLG_API $api, $analytics = null, $event_logger = null) {
         $this->api = $api;
-        $this->analytics = ($analytics instanceof Discord_Bot_JLG_Analytics)
+        $this->analytics = (is_object($analytics) && method_exists($analytics, 'get_aggregates'))
             ? $analytics
             : $api->get_analytics_service();
         $this->event_logger = ($event_logger instanceof Discord_Bot_JLG_Event_Logger)
@@ -51,7 +51,7 @@ class Discord_Bot_JLG_REST_Controller {
                         'profile_key' => array(
                             'description'       => __('Profil de serveur à utiliser.', 'discord-bot-jlg'),
                             'type'              => 'string',
-                            'sanitize_callback' => 'sanitize_key',
+                            'sanitize_callback' => 'discord_bot_jlg_sanitize_profile_key',
                         ),
                         'server_id' => array(
                             'description'       => __('Identifiant du serveur Discord.', 'discord-bot-jlg'),
@@ -80,7 +80,7 @@ class Discord_Bot_JLG_REST_Controller {
                         'profile_key' => array(
                             'description'       => __('Profil de serveur à analyser.', 'discord-bot-jlg'),
                             'type'              => 'string',
-                            'sanitize_callback' => 'sanitize_key',
+                            'sanitize_callback' => 'discord_bot_jlg_sanitize_profile_key',
                         ),
                         'server_id' => array(
                             'description'       => __('Identifiant du serveur Discord.', 'discord-bot-jlg'),
@@ -145,7 +145,7 @@ class Discord_Bot_JLG_REST_Controller {
                         'profile_key' => array(
                             'description'       => __('Profil de serveur à exporter.', 'discord-bot-jlg'),
                             'type'              => 'string',
-                            'sanitize_callback' => 'sanitize_key',
+                            'sanitize_callback' => 'discord_bot_jlg_sanitize_profile_key',
                         ),
                         'server_id' => array(
                             'description'       => __('Identifiant du serveur Discord.', 'discord-bot-jlg'),
@@ -213,7 +213,7 @@ class Discord_Bot_JLG_REST_Controller {
         if (!is_string($profile_key)) {
             $profile_key = '';
         }
-        $profile_key = sanitize_key($profile_key);
+        $profile_key = discord_bot_jlg_sanitize_profile_key($profile_key);
 
         $server_id = $request->get_param('server_id');
         if (!is_string($server_id)) {
@@ -241,11 +241,11 @@ class Discord_Bot_JLG_REST_Controller {
     }
 
     public function handle_get_analytics(WP_REST_Request $request) {
-        $analytics = $this->analytics instanceof Discord_Bot_JLG_Analytics
+        $analytics = (is_object($this->analytics) && method_exists($this->analytics, 'get_aggregates'))
             ? $this->analytics
             : $this->api->get_analytics_service();
 
-        if (!($analytics instanceof Discord_Bot_JLG_Analytics)) {
+        if (!is_object($analytics) || !method_exists($analytics, 'get_aggregates')) {
             $response = array(
                 'success' => false,
                 'data'    => array(
@@ -260,7 +260,7 @@ class Discord_Bot_JLG_REST_Controller {
         if (!is_string($profile_key)) {
             $profile_key = '';
         }
-        $profile_key = sanitize_key($profile_key);
+        $profile_key = discord_bot_jlg_sanitize_profile_key($profile_key);
 
         if ('' === $profile_key) {
             $profile_key = 'default';
@@ -380,11 +380,11 @@ class Discord_Bot_JLG_REST_Controller {
     }
 
     public function handle_export_analytics(WP_REST_Request $request) {
-        $analytics = $this->analytics instanceof Discord_Bot_JLG_Analytics
+        $analytics = (is_object($this->analytics) && method_exists($this->analytics, 'get_aggregates'))
             ? $this->analytics
             : $this->api->get_analytics_service();
 
-        if (!($analytics instanceof Discord_Bot_JLG_Analytics)) {
+        if (!is_object($analytics) || !method_exists($analytics, 'get_aggregates')) {
             return rest_ensure_response(
                 new WP_REST_Response(
                     array(
@@ -398,7 +398,7 @@ class Discord_Bot_JLG_REST_Controller {
             );
         }
 
-        $profile_key = sanitize_key($request->get_param('profile_key'));
+        $profile_key = discord_bot_jlg_sanitize_profile_key($request->get_param('profile_key'));
         if ('' === $profile_key) {
             $profile_key = 'default';
         }
@@ -780,7 +780,7 @@ class Discord_Bot_JLG_REST_Controller {
 
     private function build_export_filename($requested, $profile_key, $format) {
         $extension = ('json' === $format) ? 'json' : 'csv';
-        $profile_slug = sanitize_key($profile_key);
+        $profile_slug = discord_bot_jlg_sanitize_profile_key($profile_key);
         if ('' === $profile_slug) {
             $profile_slug = 'default';
         }
@@ -886,7 +886,11 @@ class Discord_Bot_JLG_REST_Controller {
             return false;
         }
 
-        return $this->request_has_logged_in_cookie();
+        if ($this->request_has_logged_in_cookie()) {
+            return true;
+        }
+
+        return is_user_logged_in();
     }
 
     private function request_uses_authorization_header(WP_REST_Request $request) {

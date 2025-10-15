@@ -146,7 +146,7 @@ class Discord_Bot_JLG_Http_Connector {
         $profile_key = 'default';
 
         if (isset($options['__active_profile_key'])) {
-            $candidate = sanitize_key($options['__active_profile_key']);
+            $candidate = discord_bot_jlg_sanitize_profile_key($options['__active_profile_key']);
             if ('' !== $candidate) {
                 $profile_key = $candidate;
             }
