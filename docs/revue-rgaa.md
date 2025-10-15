@@ -13,7 +13,7 @@
 
 ## Correctifs implémentés (ordre de priorité)
 1. **État accessible des filtres de présence** : chaque puce met désormais à jour <code>aria-pressed</code> côté front lors de la bascule et le balisage initial reflète l'état courant, ce qui rend la sélection multi-critères lisible par les aides techniques (critère 7.3).【F:discord-bot-jlg/inc/class-discord-shortcode.php†L1397-L1425】【F:discord-bot-jlg/assets/js/discord-bot-jlg.js†L2818-L2852】
-2. **Heatmap vocalisée** : la carte thermique expose un tableau masqué contenant toutes les valeurs jour/heure, tandis que chaque cellule dispose d'un <code>aria-label</code> détaillé pour combler l'absence de survol, répondant aux critères 3.2 et 8.9.【F:discord-bot-jlg/assets/js/discord-bot-jlg.js†L3128-L3307】
+2. **Heatmap vocalisée** : la carte thermique expose un tableau masqué contenant toutes les valeurs jour/heure, fournit un résumé hors écran lié via <code>aria-describedby</code> et chaque cellule dispose d'un <code>aria-label</code> détaillé pour combler l'absence de survol, répondant aux critères 3.2 et 8.9.【F:discord-bot-jlg/inc/class-discord-shortcode.php†L1402-L1420】【F:discord-bot-jlg/assets/js/discord-bot-jlg.js†L3093-L3322】
 3. **Garde-fous sur le contraste** : la sauvegarde des couleurs en administration calcule le ratio WCAG et affiche un avertissement lorsque la combinaison choisie descend sous 4,5:1, aidant au respect des règles 3.2 et 3.3 du RGAA.【F:discord-bot-jlg/inc/class-discord-admin.php†L835-L886】【F:discord-bot-jlg/inc/helpers.php†L360-L469】
 
 ## Points de vigilance RGAA

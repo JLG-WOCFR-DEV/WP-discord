@@ -1456,7 +1456,18 @@ class Discord_Bot_JLG_Shortcode {
                                         </ul>
                                     </div>
                                     <div class="discord-presence-explorer__panel discord-presence-explorer__panel--heatmap">
-                                        <div class="discord-presence-heatmap" data-role="discord-presence-heatmap">
+                                        <?php $heatmap_dom_id = $unique_id . '-presence-heatmap'; ?>
+                                        <div class="discord-presence-heatmap"
+                                            id="<?php echo esc_attr($heatmap_dom_id); ?>"
+                                            data-role="discord-presence-heatmap"
+                                            data-label-heatmap-summary="<?php echo esc_attr__(
+                                                'Carte de chaleur présentant la répartition de %s par jour et par heure. Consultez le tableau suivant pour les valeurs détaillées.',
+                                                'discord-bot-jlg'
+                                            ); ?>"
+                                            data-label-heatmap-summary-empty="<?php echo esc_attr__(
+                                                'Aucune donnée de présence n’est disponible pour générer la carte de chaleur pour le moment.',
+                                                'discord-bot-jlg'
+                                            ); ?>">
                                             <div class="discord-presence-heatmap__empty" data-role="discord-presence-heatmap-empty"><?php esc_html_e('En attente de données historiques…', 'discord-bot-jlg'); ?></div>
                                         </div>
                                     </div>
@@ -2234,6 +2245,8 @@ class Discord_Bot_JLG_Shortcode {
                 'presenceHeatmapTableCaption' => __('Répartition de la présence par jour et par heure', 'discord-bot-jlg'),
                 'presenceHeatmapDayLabel'     => __('Jour', 'discord-bot-jlg'),
                 'presenceHeatmapHourLabel'    => __('Heure', 'discord-bot-jlg'),
+                'presenceHeatmapSummary'      => __('Carte de chaleur présentant la répartition de %s par jour et par heure. Consultez le tableau suivant pour les valeurs détaillées.', 'discord-bot-jlg'),
+                'presenceHeatmapSummaryEmpty' => __('Aucune donnée de présence n’est disponible pour générer la carte de chaleur pour le moment.', 'discord-bot-jlg'),
                 'presenceAnalyticsError'      => __('Données analytics indisponibles.', 'discord-bot-jlg'),
                 'presenceAnalyticsEmpty'      => __('Aucune donnée historique disponible pour le moment.', 'discord-bot-jlg'),
                 'presenceTimelineTableCaption'=> __('Évolution de la présence sur la période', 'discord-bot-jlg'),

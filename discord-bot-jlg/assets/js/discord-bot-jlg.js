@@ -3118,6 +3118,39 @@
         };
     }
 
+    function getPresenceMetricLabel(state, metric) {
+        if (!state) {
+            return metric;
+        }
+
+        switch (metric) {
+            case 'presence':
+                return state.presenceLabel || getLocalizedString('presenceMetricPresence', 'Présence');
+            case 'online':
+                return state.onlineLabel || getLocalizedString('presenceMetricOnline', 'En ligne');
+            case 'total':
+                return state.totalLabel || getLocalizedString('presenceMetricTotal', 'Membres');
+            default:
+                return metric;
+        }
+    }
+
+    function formatHeatmapSummary(template, metricLabel) {
+        if (typeof template !== 'string') {
+            return '';
+        }
+
+        if (template.indexOf('%s') !== -1) {
+            return template.replace('%s', metricLabel || '');
+        }
+
+        if (!metricLabel) {
+            return template;
+        }
+
+        return metricLabel + ' — ' + template;
+    }
+
     function renderPresenceHeatmap(state, matrix, metric) {
         if (!state || !state.heatmapElement) {
             return;
@@ -3125,6 +3158,10 @@
 
         var container = state.heatmapElement;
         container.innerHTML = '';
+
+        if (state.heatmapEmptyElement) {
+            state.heatmapEmptyElement.setAttribute('hidden', 'hidden');
+        }
 
         var maxValue = matrix && typeof matrix.max === 'number' ? matrix.max : 0;
         var rows = matrix && matrix.rows ? matrix.rows : [];
@@ -3134,6 +3171,57 @@
         for (var hourIndex = 0; hourIndex < 24; hourIndex++) {
             hours.push(hourIndex);
         }
+
+        var summaryId = container.id ? container.id + '-summary' : '';
+        var summary = document.createElement('p');
+        summary.className = 'discord-presence-heatmap__summary screen-reader-text';
+        summary.setAttribute('data-role', 'discord-presence-heatmap-summary');
+        if (summaryId) {
+            summary.id = summaryId;
+        }
+
+        var summaryTemplate = container.dataset && container.dataset.labelHeatmapSummary
+            ? container.dataset.labelHeatmapSummary
+            : getLocalizedString(
+                'presenceHeatmapSummary',
+                'Carte de chaleur présentant la répartition de %s par jour et par heure. Consultez le tableau suivant pour les valeurs détaillées.'
+            );
+
+        var emptySummaryTemplate = container.dataset && container.dataset.labelHeatmapSummaryEmpty
+            ? container.dataset.labelHeatmapSummaryEmpty
+            : getLocalizedString(
+                'presenceHeatmapSummaryEmpty',
+                'Aucune donnée de présence n’est disponible pour générer la carte de chaleur pour le moment.'
+            );
+
+        var metricLabel = getPresenceMetricLabel(state, metric);
+        var hasRows = rows.length > 0;
+        summary.textContent = hasRows
+            ? formatHeatmapSummary(summaryTemplate, metricLabel)
+            : emptySummaryTemplate;
+
+        container.appendChild(summary);
+
+        if (!hasRows) {
+            if (state.heatmapEmptyElement) {
+                var placeholderMessage = state.analyticsError
+                    ? getLocalizedString('presenceAnalyticsError', 'Données analytics indisponibles.')
+                    : (state.heatmapEmptyDefaultText || getLocalizedString('presenceAnalyticsEmpty', 'En attente de données historiques…'));
+                state.heatmapEmptyElement.textContent = placeholderMessage;
+                state.heatmapEmptyElement.removeAttribute('hidden');
+                container.appendChild(state.heatmapEmptyElement);
+            }
+
+            if (summaryId) {
+                container.setAttribute('aria-describedby', summaryId);
+            } else {
+                container.removeAttribute('aria-describedby');
+            }
+
+            return;
+        }
+
+        var describedbyIds = summaryId ? [summaryId] : [];
 
         for (var i = 0; i < rows.length; i++) {
             var row = rows[i];
@@ -3252,6 +3340,18 @@
 
             table.appendChild(tbody);
             container.appendChild(table);
+
+            if (container.id) {
+                var tableId = container.id + '-table';
+                table.id = tableId;
+                describedbyIds.push(tableId);
+            }
+        }
+
+        if (describedbyIds.length) {
+            container.setAttribute('aria-describedby', describedbyIds.join(' '));
+        } else {
+            container.removeAttribute('aria-describedby');
         }
 
         if (container.dataset) {
@@ -3593,6 +3693,10 @@
 
             if (state.heatmapElement) {
                 state.heatmapElement.innerHTML = '';
+                if (heatmapEmpty) {
+                    state.heatmapElement.appendChild(heatmapEmpty);
+                }
+                state.heatmapElement.removeAttribute('aria-describedby');
             }
 
             if (state.timelineBodyElement) {
