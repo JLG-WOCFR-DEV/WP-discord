@@ -46,6 +46,10 @@ class Discord_Bot_JLG_API {
     const FALLBACK_RETRY_API_DELAY_SUFFIX = '_fallback_retry_after_delay';
     const LAST_FALLBACK_OPTION = 'discord_bot_jlg_last_fallback';
     const CACHE_REGISTRY_PREFIX = 'discord_bot_jlg_cache_registry_';
+    const CONNECTOR_STATE_OPTION = 'discord_bot_jlg_connector_state';
+    const CONNECTOR_STATE_MAX_AGE = 86400;
+    const CONNECTOR_BACKOFF_BASE = 5;
+    const CONNECTOR_BACKOFF_MAX = 900;
 
     private $option_name;
     private $cache_key;
@@ -70,6 +74,8 @@ class Discord_Bot_JLG_API {
     private $logger;
     private $stats_fetcher;
     private $stats_service;
+    private $connector_state_registry;
+    private $connector_state_dirty;
 
     /**
      * Prépare le service d'accès aux statistiques avec les clés et durées nécessaires.
@@ -127,6 +133,8 @@ class Discord_Bot_JLG_API {
         $this->set_logger($logger);
         $this->stats_fetcher = null;
         $this->stats_service = null;
+        $this->connector_state_registry = null;
+        $this->connector_state_dirty = false;
     }
 
     public function set_analytics_service($analytics) {
@@ -3194,6 +3202,348 @@ class Discord_Bot_JLG_API {
         $this->event_logger->log('discord_connector', $event_context);
     }
 
+    private function begin_connector_attempt($channel, array $options) {
+        $channel = $this->normalize_connector_channel($channel);
+        $profile_key = $this->resolve_profile_key_from_options($options);
+        $state = $this->get_connector_state_entry($profile_key, $channel);
+        $now = $this->get_current_timestamp();
+        $open_until = isset($state['open_until']) ? (int) $state['open_until'] : 0;
+        $attempts = isset($state['attempts']) ? (int) $state['attempts'] : 0;
+        $log_context = array(
+            'attempt'              => $attempts + 1,
+            'consecutive_failures' => isset($state['failures']) ? (int) $state['failures'] : 0,
+        );
+
+        if ($open_until > 0) {
+            $log_context['circuit_open_until'] = $open_until;
+        }
+
+        if ($open_until > $now) {
+            $retry_after = $open_until - $now;
+            if ($retry_after < 1) {
+                $retry_after = 1;
+            }
+
+            $log_context['next_retry_after'] = $retry_after;
+            $updated_state = $this->register_connector_attempt($profile_key, $channel, false);
+
+            return array(
+                'short_circuit' => true,
+                'retry_after'   => $retry_after,
+                'profile_key'   => $profile_key,
+                'state'         => $updated_state,
+                'log_context'   => $log_context,
+            );
+        }
+
+        $updated_state = $this->register_connector_attempt($profile_key, $channel, true);
+
+        return array(
+            'short_circuit' => false,
+            'profile_key'   => $profile_key,
+            'state'         => $updated_state,
+            'log_context'   => $log_context,
+        );
+    }
+
+    private function finalize_connector_attempt($channel, array $options, $response, array $context = array()) {
+        $channel = $this->normalize_connector_channel($channel);
+        $profile_key = $this->resolve_profile_key_from_options($options);
+        $outcome = isset($context['outcome']) ? sanitize_key($context['outcome']) : '';
+
+        if ('short_circuit' === $outcome) {
+            return;
+        }
+
+        $retry_after = 0;
+        if (isset($context['retry_after'])) {
+            $retry_after = max($retry_after, (int) $context['retry_after']);
+        }
+
+        if ($response instanceof WP_Error) {
+            $error_data = $response->get_error_data();
+            if (is_array($error_data) && isset($error_data['retry_after'])) {
+                $retry_after = max($retry_after, (int) $error_data['retry_after']);
+            }
+
+            if ('success' === $outcome) {
+                $this->register_connector_success($profile_key, $channel);
+
+                return;
+            }
+
+            $this->register_connector_failure($profile_key, $channel, $retry_after, 0, $response->get_error_code());
+
+            return;
+        }
+
+        $status_code = 0;
+        if (is_array($response)) {
+            $status_code = (int) wp_remote_retrieve_response_code($response);
+            $retry_after = max($retry_after, $this->extract_retry_after_seconds($response));
+        }
+
+        if ('success' === $outcome || ('' === $outcome && $status_code >= 200 && $status_code < 300)) {
+            $this->register_connector_success($profile_key, $channel);
+
+            return;
+        }
+
+        $error_code = 'http_error';
+
+        switch ($outcome) {
+            case 'network_error':
+                $error_code = 'network_error';
+                break;
+            case 'invalid_json':
+                $error_code = 'invalid_json';
+                break;
+            case 'incomplete':
+                $error_code = 'incomplete';
+                break;
+            default:
+                if (429 === $status_code) {
+                    $error_code = 'rate_limited';
+                } elseif ($status_code >= 500) {
+                    $error_code = 'server_error';
+                } elseif ($status_code >= 400 && 0 === strpos($error_code, 'http')) {
+                    $error_code = 'client_error';
+                }
+                break;
+        }
+
+        $this->register_connector_failure($profile_key, $channel, $retry_after, $status_code, $error_code);
+    }
+
+    private function register_connector_attempt($profile_key, $channel, $network_call) {
+        $profile_key = $this->normalize_connector_profile_key($profile_key);
+        $channel = $this->normalize_connector_channel($channel);
+        $state = $this->get_connector_state_entry($profile_key, $channel);
+        $attempts = isset($state['attempts']) ? (int) $state['attempts'] : 0;
+        $attempts++;
+
+        $state['attempts'] = $attempts;
+        $state['last_attempt_at'] = $this->get_current_timestamp();
+        $state['last_attempt_was_network'] = (bool) $network_call;
+
+        $this->set_connector_state_entry($profile_key, $channel, $state);
+
+        return $state;
+    }
+
+    private function register_connector_failure($profile_key, $channel, $retry_after, $status_code = 0, $error_code = '') {
+        $profile_key = $this->normalize_connector_profile_key($profile_key);
+        $channel = $this->normalize_connector_channel($channel);
+        $state = $this->get_connector_state_entry($profile_key, $channel);
+        $failures = isset($state['failures']) ? (int) $state['failures'] : 0;
+        $failures++;
+
+        $base = (int) apply_filters('discord_bot_jlg_connector_backoff_base', self::CONNECTOR_BACKOFF_BASE, $profile_key, $channel, $status_code, $error_code, $failures);
+        if ($base <= 0) {
+            $base = self::CONNECTOR_BACKOFF_BASE;
+        }
+
+        $max_backoff = (int) apply_filters('discord_bot_jlg_connector_backoff_max', self::CONNECTOR_BACKOFF_MAX, $profile_key, $channel, $status_code, $error_code, $failures);
+        if ($max_backoff <= 0) {
+            $max_backoff = self::CONNECTOR_BACKOFF_MAX;
+        }
+
+        $exponent = max(0, min($failures - 1, 8));
+        $backoff = (int) round($base * pow(2, $exponent));
+
+        if ($retry_after > 0) {
+            $backoff = max($backoff, (int) $retry_after);
+        }
+
+        if ($backoff <= 0) {
+            $backoff = $base;
+        }
+
+        if ($backoff > $max_backoff) {
+            $backoff = $max_backoff;
+        }
+
+        $now = $this->get_current_timestamp();
+
+        $state['failures'] = $failures;
+        $state['open_until'] = $now + $backoff;
+        $state['last_retry_after'] = $backoff;
+        $state['last_status_code'] = (int) $status_code;
+        $state['last_error_code'] = sanitize_key($error_code);
+        $state['updated_at'] = $now;
+
+        $this->set_connector_state_entry($profile_key, $channel, $state);
+        $this->set_last_retry_after($backoff);
+    }
+
+    private function register_connector_success($profile_key, $channel) {
+        $profile_key = $this->normalize_connector_profile_key($profile_key);
+        $channel = $this->normalize_connector_channel($channel);
+        $state = $this->get_connector_state_entry($profile_key, $channel);
+
+        $state['failures'] = 0;
+        $state['open_until'] = 0;
+        $state['last_retry_after'] = 0;
+        $state['last_status_code'] = 200;
+        $state['last_error_code'] = '';
+        $state['updated_at'] = $this->get_current_timestamp();
+
+        $this->set_connector_state_entry($profile_key, $channel, $state);
+        $this->set_last_retry_after(0);
+    }
+
+    private function ensure_connector_state_registry() {
+        if (is_array($this->connector_state_registry)) {
+            return;
+        }
+
+        $stored = get_option(self::CONNECTOR_STATE_OPTION);
+        if (!is_array($stored)) {
+            $stored = array();
+        }
+
+        $now = $this->get_current_timestamp();
+        $normalized = array();
+        $pruned = false;
+
+        foreach ($stored as $key => $entry) {
+            if (!is_array($entry)) {
+                $pruned = true;
+                continue;
+            }
+
+            $updated_at = isset($entry['updated_at']) ? (int) $entry['updated_at'] : 0;
+            if ($updated_at > 0 && ($now - $updated_at) > self::CONNECTOR_STATE_MAX_AGE) {
+                $pruned = true;
+                continue;
+            }
+
+            $normalized[$key] = $this->sanitize_connector_state_entry($entry);
+        }
+
+        $this->connector_state_registry = $normalized;
+        $this->connector_state_dirty = false;
+
+        if ($pruned) {
+            $this->persist_connector_state();
+        }
+    }
+
+    private function sanitize_connector_state_entry(array $entry) {
+        $profile_key = $this->normalize_connector_profile_key(isset($entry['profile_key']) ? $entry['profile_key'] : '');
+        $channel = $this->normalize_connector_channel(isset($entry['channel']) ? $entry['channel'] : '');
+
+        return array(
+            'profile_key'             => $profile_key,
+            'channel'                 => $channel,
+            'failures'                => isset($entry['failures']) ? max(0, (int) $entry['failures']) : 0,
+            'open_until'              => isset($entry['open_until']) ? max(0, (int) $entry['open_until']) : 0,
+            'last_retry_after'        => isset($entry['last_retry_after']) ? max(0, (int) $entry['last_retry_after']) : 0,
+            'last_status_code'        => isset($entry['last_status_code']) ? (int) $entry['last_status_code'] : 0,
+            'last_error_code'         => isset($entry['last_error_code']) ? sanitize_key($entry['last_error_code']) : '',
+            'attempts'                => isset($entry['attempts']) ? max(0, (int) $entry['attempts']) : 0,
+            'updated_at'              => isset($entry['updated_at']) ? max(0, (int) $entry['updated_at']) : 0,
+            'last_attempt_at'         => isset($entry['last_attempt_at']) ? max(0, (int) $entry['last_attempt_at']) : 0,
+            'last_attempt_was_network'=> !empty($entry['last_attempt_was_network']),
+        );
+    }
+
+    private function get_connector_state_key($profile_key, $channel) {
+        $profile_key = $this->normalize_connector_profile_key($profile_key);
+        $channel = $this->normalize_connector_channel($channel);
+
+        return $profile_key . ':' . $channel;
+    }
+
+    private function normalize_connector_profile_key($profile_key) {
+        $normalized = discord_bot_jlg_sanitize_profile_key($profile_key);
+
+        if ('' === $normalized) {
+            $normalized = 'default';
+        }
+
+        return $normalized;
+    }
+
+    private function normalize_connector_channel($channel) {
+        $normalized = sanitize_key($channel);
+
+        if ('' === $normalized) {
+            $normalized = 'widget';
+        }
+
+        return $normalized;
+    }
+
+    private function get_connector_state_entry($profile_key, $channel) {
+        $this->ensure_connector_state_registry();
+        $key = $this->get_connector_state_key($profile_key, $channel);
+
+        if (!isset($this->connector_state_registry[$key])) {
+            $this->connector_state_registry[$key] = array(
+                'profile_key'             => $this->normalize_connector_profile_key($profile_key),
+                'channel'                 => $this->normalize_connector_channel($channel),
+                'failures'                => 0,
+                'open_until'              => 0,
+                'last_retry_after'        => 0,
+                'last_status_code'        => 0,
+                'last_error_code'         => '',
+                'attempts'                => 0,
+                'updated_at'              => 0,
+                'last_attempt_at'         => 0,
+                'last_attempt_was_network'=> false,
+            );
+        }
+
+        return $this->connector_state_registry[$key];
+    }
+
+    private function set_connector_state_entry($profile_key, $channel, array $entry) {
+        $this->ensure_connector_state_registry();
+        $profile_key = $this->normalize_connector_profile_key($profile_key);
+        $channel = $this->normalize_connector_channel($channel);
+        $entry['profile_key'] = $profile_key;
+        $entry['channel'] = $channel;
+        if (!isset($entry['updated_at']) || (int) $entry['updated_at'] <= 0) {
+            $entry['updated_at'] = $this->get_current_timestamp();
+        }
+
+        $this->connector_state_registry[$this->get_connector_state_key($profile_key, $channel)] = $this->sanitize_connector_state_entry($entry);
+        $this->persist_connector_state();
+    }
+
+    private function persist_connector_state() {
+        if (!is_array($this->connector_state_registry)) {
+            update_option(self::CONNECTOR_STATE_OPTION, array(), 'no');
+
+            return;
+        }
+
+        update_option(self::CONNECTOR_STATE_OPTION, $this->connector_state_registry, 'no');
+        $this->connector_state_dirty = false;
+    }
+
+    private function get_connector_channel_label($channel) {
+        $channel = $this->normalize_connector_channel($channel);
+
+        if ('bot' === $channel) {
+            return __('bot', 'discord-bot-jlg');
+        }
+
+        return __('widget', 'discord-bot-jlg');
+    }
+
+    private function format_circuit_open_error_message($channel, $retry_after) {
+        $retry_after = max(0, (int) $retry_after);
+
+        return sprintf(
+            /* translators: 1: connector channel label, 2: retry delay in seconds. */
+            __('Le connecteur Discord (%1$s) est temporairement suspendu. Nouvel essai dans %2$d s.', 'discord-bot-jlg'),
+            $this->get_connector_channel_label($channel),
+            $retry_after
+        );
+    }
+
     private function transform_event_to_status_history_entry($event_type, array $event) {
         $timestamp = isset($event['timestamp']) ? (int) $event['timestamp'] : 0;
         if ($timestamp <= 0) {
@@ -3433,6 +3783,36 @@ class Discord_Bot_JLG_API {
         return (int) round($duration * 1000);
     }
 
+    private function get_current_timestamp() {
+        if (function_exists('current_time')) {
+            return (int) current_time('timestamp', true);
+        }
+
+        return time();
+    }
+
+    private function resolve_profile_key_from_options($options) {
+        if (!is_array($options)) {
+            return 'default';
+        }
+
+        if (isset($options['__active_profile_key'])) {
+            $candidate = discord_bot_jlg_sanitize_profile_key($options['__active_profile_key']);
+            if ('' !== $candidate) {
+                return $candidate;
+            }
+        }
+
+        if (isset($options['profile_key'])) {
+            $candidate = discord_bot_jlg_sanitize_profile_key($options['profile_key']);
+            if ('' !== $candidate) {
+                return $candidate;
+            }
+        }
+
+        return 'default';
+    }
+
     private function get_first_header_value($response, $header_name) {
         if (!is_array($response)) {
             return '';
@@ -3473,6 +3853,50 @@ class Discord_Bot_JLG_API {
         $widget_url = 'https://discord.com/api/guilds/' . $options['server_id'] . '/widget.json';
         $base_context = $this->build_event_base_context($options);
         $start_time = microtime(true);
+        $attempt = $this->begin_connector_attempt('widget', $options);
+        $event_context_base = $base_context;
+
+        if (isset($attempt['log_context']) && is_array($attempt['log_context'])) {
+            $event_context_base = array_merge($event_context_base, $attempt['log_context']);
+        }
+
+        if (!empty($attempt['short_circuit'])) {
+            $retry_after = isset($attempt['retry_after']) ? (int) $attempt['retry_after'] : 0;
+            $this->last_error = $this->format_circuit_open_error_message('widget', $retry_after);
+            $this->set_last_retry_after($retry_after);
+
+            $error = new WP_Error(
+                'discord_bot_jlg_circuit_open',
+                $this->last_error,
+                array('retry_after' => $retry_after)
+            );
+
+            $event_context = array_merge(
+                $event_context_base,
+                array(
+                    'outcome'     => 'short_circuit',
+                    'reason'      => 'circuit_open',
+                    'retry_after' => $retry_after,
+                )
+            );
+
+            $this->record_discord_http_event('widget', $start_time, $error, $event_context);
+
+            $this->log_connector_event('widget', array_merge(
+                $base_context,
+                array(
+                    'outcome'              => 'short_circuit',
+                    'reason'               => 'circuit_open',
+                    'retry_after'          => $retry_after,
+                    'attempt'              => isset($attempt['log_context']['attempt']) ? (int) $attempt['log_context']['attempt'] : 1,
+                    'consecutive_failures' => isset($attempt['log_context']['consecutive_failures'])
+                        ? (int) $attempt['log_context']['consecutive_failures']
+                        : 0,
+                )
+            ));
+
+            return false;
+        }
 
         $response = $this->http_client->get(
             $widget_url,
@@ -3489,12 +3913,15 @@ class Discord_Bot_JLG_API {
                 $response->get_error_message()
             );
             $this->log_debug('Discord API error (widget): ' . $response->get_error_message());
-            $this->record_discord_http_event('widget', $start_time, $response, array_merge(
-                $base_context,
+            $event_context = array_merge(
+                $event_context_base,
                 array(
                     'outcome' => 'network_error',
                 )
-            ));
+            );
+            $this->record_discord_http_event('widget', $start_time, $response, $event_context);
+            $this->finalize_connector_attempt('widget', $options, $response, $event_context);
+
             return false;
         }
 
@@ -3519,7 +3946,7 @@ class Discord_Bot_JLG_API {
             }
             $this->log_debug('Discord API error (widget): HTTP ' . $response_code);
             $event_context = array_merge(
-                $base_context,
+                $event_context_base,
                 array(
                     'outcome'      => 'http_error',
                     'status_code'  => $response_code,
@@ -3531,6 +3958,8 @@ class Discord_Bot_JLG_API {
             }
 
             $this->record_discord_http_event('widget', $start_time, $response, $event_context);
+            $this->finalize_connector_attempt('widget', $options, $response, $event_context);
+
             return false;
         }
 
@@ -3554,13 +3983,16 @@ class Discord_Bot_JLG_API {
 
             $this->log_debug('Discord API error (widget): invalid JSON response (' . implode(', ', $error_context) . ')');
             $this->last_error = __('Réponse JSON invalide reçue depuis le widget Discord.', 'discord-bot-jlg');
-            $this->record_discord_http_event('widget', $start_time, $response, array_merge(
-                $base_context,
+            $event_context = array_merge(
+                $event_context_base,
                 array(
                     'outcome'    => 'invalid_json',
                     'diagnostic' => $error_context,
                 )
-            ));
+            );
+            $this->record_discord_http_event('widget', $start_time, $response, $event_context);
+            $this->finalize_connector_attempt('widget', $options, $response, $event_context);
+
             return false;
         }
 
@@ -3607,13 +4039,16 @@ class Discord_Bot_JLG_API {
                 implode(', ', $missing_parts),
                 $this->get_debug_body_preview($body)
             ));
-            $this->record_discord_http_event('widget', $start_time, $response, array_merge(
-                $base_context,
+            $event_context = array_merge(
+                $event_context_base,
                 array(
                     'outcome'        => 'incomplete',
                     'missing_fields' => $missing_parts,
                 )
-            ));
+            );
+            $this->record_discord_http_event('widget', $start_time, $response, $event_context);
+            $this->finalize_connector_attempt('widget', $options, $response, $event_context);
+
             return false;
         }
 
@@ -3648,7 +4083,7 @@ class Discord_Bot_JLG_API {
         }
 
         $event_context = array_merge(
-            $base_context,
+            $event_context_base,
             array(
                 'outcome'               => 'success',
                 'online'                => $online,
@@ -3674,6 +4109,7 @@ class Discord_Bot_JLG_API {
         }
 
         $this->record_discord_http_event('widget', $start_time, $response, $event_context);
+        $this->finalize_connector_attempt('widget', $options, $response, $event_context);
 
         return $stats;
     }
@@ -3695,6 +4131,50 @@ class Discord_Bot_JLG_API {
 
         $api_url = 'https://discord.com/api/v10/guilds/' . $options['server_id'] . '?with_counts=true';
         $start_time = microtime(true);
+        $attempt = $this->begin_connector_attempt('bot', $options);
+        $event_context_base = $base_context;
+
+        if (isset($attempt['log_context']) && is_array($attempt['log_context'])) {
+            $event_context_base = array_merge($event_context_base, $attempt['log_context']);
+        }
+
+        if (!empty($attempt['short_circuit'])) {
+            $retry_after = isset($attempt['retry_after']) ? (int) $attempt['retry_after'] : 0;
+            $this->last_error = $this->format_circuit_open_error_message('bot', $retry_after);
+            $this->set_last_retry_after($retry_after);
+
+            $error = new WP_Error(
+                'discord_bot_jlg_circuit_open',
+                $this->last_error,
+                array('retry_after' => $retry_after)
+            );
+
+            $event_context = array_merge(
+                $event_context_base,
+                array(
+                    'outcome'     => 'short_circuit',
+                    'reason'      => 'circuit_open',
+                    'retry_after' => $retry_after,
+                )
+            );
+
+            $this->record_discord_http_event('bot', $start_time, $error, $event_context);
+
+            $this->log_connector_event('bot', array_merge(
+                $base_context,
+                array(
+                    'outcome'              => 'short_circuit',
+                    'reason'               => 'circuit_open',
+                    'retry_after'          => $retry_after,
+                    'attempt'              => isset($attempt['log_context']['attempt']) ? (int) $attempt['log_context']['attempt'] : 1,
+                    'consecutive_failures' => isset($attempt['log_context']['consecutive_failures'])
+                        ? (int) $attempt['log_context']['consecutive_failures']
+                        : 0,
+                )
+            ));
+
+            return false;
+        }
 
         $response = $this->http_client->get(
             $api_url,
@@ -3714,12 +4194,15 @@ class Discord_Bot_JLG_API {
                 $response->get_error_message()
             );
             $this->log_debug('Discord API error (bot): ' . $response->get_error_message());
-            $this->record_discord_http_event('bot', $start_time, $response, array_merge(
-                $base_context,
+            $event_context = array_merge(
+                $event_context_base,
                 array(
                     'outcome' => 'network_error',
                 )
-            ));
+            );
+            $this->record_discord_http_event('bot', $start_time, $response, $event_context);
+            $this->finalize_connector_attempt('bot', $options, $response, $event_context);
+
             return false;
         }
 
@@ -3744,7 +4227,7 @@ class Discord_Bot_JLG_API {
             }
             $this->log_debug('Discord API error (bot): HTTP ' . $response_code);
             $event_context = array_merge(
-                $base_context,
+                $event_context_base,
                 array(
                     'outcome'     => 'http_error',
                     'status_code' => $response_code,
@@ -3756,6 +4239,8 @@ class Discord_Bot_JLG_API {
             }
 
             $this->record_discord_http_event('bot', $start_time, $response, $event_context);
+            $this->finalize_connector_attempt('bot', $options, $response, $event_context);
+
             return false;
         }
 
@@ -3779,13 +4264,16 @@ class Discord_Bot_JLG_API {
 
             $this->log_debug('Discord API error (bot): invalid JSON response (' . implode(', ', $error_context) . ')');
             $this->last_error = __('Réponse JSON invalide reçue depuis l\'API Discord (bot).', 'discord-bot-jlg');
-            $this->record_discord_http_event('bot', $start_time, $response, array_merge(
-                $base_context,
+            $event_context = array_merge(
+                $event_context_base,
                 array(
                     'outcome'    => 'invalid_json',
                     'diagnostic' => $error_context,
                 )
-            ));
+            );
+            $this->record_discord_http_event('bot', $start_time, $response, $event_context);
+            $this->finalize_connector_attempt('bot', $options, $response, $event_context);
+
             return false;
         }
 
@@ -3810,13 +4298,16 @@ class Discord_Bot_JLG_API {
             ));
 
             $this->last_error = __('Données incomplètes reçues depuis l\'API Discord (bot).', 'discord-bot-jlg');
-            $this->record_discord_http_event('bot', $start_time, $response, array_merge(
-                $base_context,
+            $event_context = array_merge(
+                $event_context_base,
                 array(
                     'outcome'        => 'incomplete',
                     'missing_fields' => $missing_parts,
                 )
-            ));
+            );
+            $this->record_discord_http_event('bot', $start_time, $response, $event_context);
+            $this->finalize_connector_attempt('bot', $options, $response, $event_context);
+
             return false;
         }
 
@@ -3893,7 +4384,7 @@ class Discord_Bot_JLG_API {
         );
 
         $event_context = array_merge(
-            $base_context,
+            $event_context_base,
             array(
                 'outcome'                   => 'success',
                 'online'                    => (int) $data['approximate_presence_count'],
@@ -3918,6 +4409,7 @@ class Discord_Bot_JLG_API {
         }
 
         $this->record_discord_http_event('bot', $start_time, $response, $event_context);
+        $this->finalize_connector_attempt('bot', $options, $response, $event_context);
 
         return $stats;
     }
