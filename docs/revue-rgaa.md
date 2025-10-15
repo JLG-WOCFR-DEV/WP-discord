@@ -11,15 +11,14 @@
 - La feuille de style prévoit un comportement adapté aux préférences « réduction des animations », limitant les effets pour les personnes sensibles au mouvement (critère 13.8).【F:discord-bot-jlg/assets/css/discord-bot-jlg.css†L421-L429】
 - L'infrastructure de tests (Jest) couvre les scénarios critiques de rafraîchissement, ce qui facilite le débogage et la non-régression des comportements asynchrones.【4e37e4†L1-L74】
 
-## Points de vigilance RGAA
-1. **Boutons filtres de présence sans état accessible** : les puces interactives du module « Présence » changent d'état visuel via la classe <code>is-active</code> mais ne publient aucun attribut ARIA (tel que <code>aria-pressed</code>) pour informer les technologies d'assistance de la sélection multi-critères. Cela entre en conflit avec le critère 7.3 du RGAA sur l'indication de l'état des contrôles.【F:discord-bot-jlg/inc/class-discord-shortcode.php†L1397-L1413】【F:discord-bot-jlg/assets/js/discord-bot-jlg.js†L2818-L2865】
-2. **Cartes thermiques basées sur des tooltips <code>title</code>** : la visualisation horaire repose sur des cellules dont la valeur est uniquement exposée via l'attribut <code>title</code>. Or ce dernier n'est pas restitué de manière fiable par les lecteurs d'écran, ce qui limite l'accès aux données (critères 3.2 et 8.9). Il est recommandé d'ajouter un texte visible ou un contenu ARIA (par exemple via <code>aria-label</code> ou un tableau récapitulatif).【F:discord-bot-jlg/assets/js/discord-bot-jlg.js†L3117-L3165】
-3. **Personnalisation des couleurs sans garde-fous** : les options et attributs du shortcode permettent d'injecter n'importe quelle couleur dans les variables CSS, sans vérification du contraste. Fournir un avertissement en back-office ou calculer la luminance permettrait d'éviter des violations des critères 3.2 et 3.3 lorsque l'utilisateur choisit une combinaison peu lisible.【F:discord-bot-jlg/inc/class-discord-shortcode.php†L587-L622】
+## Correctifs implémentés (ordre de priorité)
+1. **État accessible des filtres de présence** : chaque puce met désormais à jour <code>aria-pressed</code> côté front lors de la bascule et le balisage initial reflète l'état courant, ce qui rend la sélection multi-critères lisible par les aides techniques (critère 7.3).【F:discord-bot-jlg/inc/class-discord-shortcode.php†L1397-L1425】【F:discord-bot-jlg/assets/js/discord-bot-jlg.js†L2818-L2852】
+2. **Heatmap vocalisée** : la carte thermique expose un tableau masqué contenant toutes les valeurs jour/heure, tandis que chaque cellule dispose d'un <code>aria-label</code> détaillé pour combler l'absence de survol, répondant aux critères 3.2 et 8.9.【F:discord-bot-jlg/assets/js/discord-bot-jlg.js†L3128-L3307】
+3. **Garde-fous sur le contraste** : la sauvegarde des couleurs en administration calcule le ratio WCAG et affiche un avertissement lorsque la combinaison choisie descend sous 4,5:1, aidant au respect des règles 3.2 et 3.3 du RGAA.【F:discord-bot-jlg/inc/class-discord-admin.php†L835-L886】【F:discord-bot-jlg/inc/helpers.php†L360-L469】
 
-## Recommandations de débogage / amélioration
-- Ajouter la mise à jour d'un attribut <code>aria-pressed</code> (ou utiliser des cases à cocher) sur les boutons de filtre de présence lors de la bascule afin de rendre l'état sélectionné explicite pour les lecteurs d'écran.【F:discord-bot-jlg/assets/js/discord-bot-jlg.js†L3581-L3608】
-- Compléter la heatmap par un tableau textuel (ou au minimum un <code>aria-label</code> détaillé) afin que les informations restent accessibles lorsque le survol n'est pas possible (clavier, mobile, lecteurs d'écran).【F:discord-bot-jlg/assets/js/discord-bot-jlg.js†L3117-L3165】
-- Intégrer un contrôle de contraste ou un message d'avertissement lors de la sauvegarde des options de couleur pour aider les utilisateurs à respecter les seuils RGAA (rapport de contraste ≥ 4,5:1).【F:discord-bot-jlg/inc/class-discord-shortcode.php†L593-L622】
+## Points de vigilance RGAA
+- Conserver un suivi des nouvelles chaînes localisées introduites pour la timeline et la heatmap afin d'assurer leurs traductions dans les futurs packs linguistiques.【F:discord-bot-jlg/inc/class-discord-shortcode.php†L2178-L2237】
+- Vérifier régulièrement le contraste des palettes personnalisées lorsque de nouveaux thèmes sont ajoutés, le contrôle actuel alertant mais ne corrigeant pas automatiquement les couleurs non conformes.【F:discord-bot-jlg/inc/class-discord-admin.php†L835-L886】
 
 ## Tests effectués
 - <code>npm test</code> (Jest) — OK.【4e37e4†L1-L74】

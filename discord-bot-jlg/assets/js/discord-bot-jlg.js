@@ -3522,6 +3522,7 @@
             button.type = 'button';
             button.className = 'discord-presence-timeline__metric';
             button.setAttribute('data-metric', metric.key);
+            button.setAttribute('aria-pressed', 'false');
             button.textContent = metric.label || metric.key;
             button.addEventListener('click', function () {
                 if (state.metric === metric.key) {
@@ -3555,6 +3556,10 @@
                 button.setAttribute('data-active', 'true');
             } else {
                 button.removeAttribute('data-active');
+            }
+
+            if (typeof button.setAttribute === 'function') {
+                button.setAttribute('aria-pressed', isActive ? 'true' : 'false');
             }
         });
     }
