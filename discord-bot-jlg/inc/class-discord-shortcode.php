@@ -1468,7 +1468,11 @@ class Discord_Bot_JLG_Shortcode {
                                                 'Aucune donnée de présence n’est disponible pour générer la carte de chaleur pour le moment.',
                                                 'discord-bot-jlg'
                                             ); ?>">
-                                            <div class="discord-presence-heatmap__empty" data-role="discord-presence-heatmap-empty"><?php esc_html_e('En attente de données historiques…', 'discord-bot-jlg'); ?></div>
+                                            <div class="discord-presence-heatmap__empty"
+                                                data-role="discord-presence-heatmap-empty"
+                                                role="status"
+                                                aria-live="polite"
+                                                aria-atomic="true"><?php esc_html_e('En attente de données historiques…', 'discord-bot-jlg'); ?></div>
                                         </div>
                                     </div>
                                     <div class="discord-presence-explorer__panel discord-presence-explorer__panel--timeline">
@@ -1487,7 +1491,11 @@ class Discord_Bot_JLG_Shortcode {
                                             ); ?>">
                                             <div class="discord-presence-timeline__toolbar" data-role="discord-presence-timeline-toolbar"></div>
                                             <div class="discord-presence-timeline__body" data-role="discord-presence-timeline-body">
-                                                <div class="discord-presence-timeline__empty" data-role="discord-presence-timeline-empty"><?php esc_html_e('Les tendances seront affichées après la première synchronisation.', 'discord-bot-jlg'); ?></div>
+                                                <div class="discord-presence-timeline__empty"
+                                                    data-role="discord-presence-timeline-empty"
+                                                    role="status"
+                                                    aria-live="polite"
+                                                    aria-atomic="true"><?php esc_html_e('Les tendances seront affichées après la première synchronisation.', 'discord-bot-jlg'); ?></div>
                                             </div>
                                         </div>
                                     </div>

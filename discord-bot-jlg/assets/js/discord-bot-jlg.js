@@ -3665,6 +3665,31 @@
         });
     }
 
+    function setPresenceAnalyticsBusy(state, busy) {
+        if (!state) {
+            return;
+        }
+
+        var targets = [
+            state.heatmapElement,
+            state.timelineElement,
+            state.timelineBodyElement,
+            state.timelineToolbarElement
+        ];
+
+        Array.prototype.forEach.call(targets, function (element) {
+            if (!element || typeof element.setAttribute !== 'function') {
+                return;
+            }
+
+            if (busy) {
+                element.setAttribute('aria-busy', 'true');
+            } else if (typeof element.removeAttribute === 'function') {
+                element.removeAttribute('aria-busy');
+            }
+        });
+    }
+
     function renderPresenceExplorerAnalytics(state) {
         if (!state) {
             return;
@@ -3704,6 +3729,7 @@
                 state.timelineBodyElement.innerHTML = '';
             }
 
+            setPresenceAnalyticsBusy(state, false);
             return;
         }
 
@@ -3723,6 +3749,8 @@
 
         var aggregated = aggregateTimeseriesByDay(timeseries, metric);
         renderPresenceTimeline(state, aggregated, metric);
+
+        setPresenceAnalyticsBusy(state, false);
     }
 
     function loadPresenceExplorerAnalytics(state, forceRefresh) {
@@ -3731,15 +3759,18 @@
         }
 
         if (state.analyticsLoading) {
+            setPresenceAnalyticsBusy(state, true);
             return;
         }
 
         if (!forceRefresh && state.analyticsLoaded) {
+            setPresenceAnalyticsBusy(state, false);
             renderPresenceExplorerAnalytics(state);
             return;
         }
 
         state.analyticsLoading = true;
+        setPresenceAnalyticsBusy(state, true);
 
         var overrides = collectConnectionOverrides(state.container, state.config);
         requestAnalyticsSnapshot(state.config, overrides, state.range, !!forceRefresh)
@@ -3749,6 +3780,7 @@
                 state.analyticsError = null;
                 state.analytics = data || {};
                 renderPresenceExplorerAnalytics(state);
+                setPresenceAnalyticsBusy(state, false);
             })
             .catch(function (error) {
                 state.analyticsLoading = false;
@@ -3756,6 +3788,7 @@
                 state.analyticsError = error;
                 state.analytics = null;
                 renderPresenceExplorerAnalytics(state);
+                setPresenceAnalyticsBusy(state, false);
             });
     }
 
