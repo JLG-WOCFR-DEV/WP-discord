@@ -95,6 +95,7 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
 
     public function tearDown(): void {
         delete_option(DISCORD_BOT_JLG_OPTION_NAME);
+        delete_option(Discord_Bot_JLG_API::LAST_FALLBACK_OPTION);
         delete_transient(DISCORD_BOT_JLG_CACHE_KEY . Discord_Bot_JLG_API::FALLBACK_RETRY_SUFFIX);
 
         parent::tearDown();
