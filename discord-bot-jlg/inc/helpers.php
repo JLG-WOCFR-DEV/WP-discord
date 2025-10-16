@@ -240,8 +240,17 @@ if (!function_exists('discord_bot_jlg_sanitize_profile_key')) {
             return '';
         }
 
-        $key = preg_replace('/[\s]+/', '-', $key);
-        $key = preg_replace('/[^a-z0-9_-]/', '', $key);
+        // Collapse whitespace to a single underscore so custom labels keep their intent.
+        $key = preg_replace('/[\s]+/', '_', $key);
+
+        if (function_exists('sanitize_key')) {
+            $key = sanitize_key($key);
+        } else {
+            $key = preg_replace('/[^a-z0-9_-]/', '', $key);
+        }
+
+        // Normalize repeated separators so generated slugs remain compact.
+        $key = preg_replace('/_+/', '_', $key);
         $key = preg_replace('/-+/', '-', $key);
 
         return $key;
