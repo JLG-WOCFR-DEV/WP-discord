@@ -3405,7 +3405,11 @@ class Discord_Bot_JLG_API {
         $backoff = (int) round($base * pow(2, $exponent));
 
         if ($retry_after > 0) {
-            $backoff = max($backoff, (int) $retry_after);
+            $retry_after_seconds = (int) ceil((float) $retry_after);
+
+            if ($retry_after_seconds > 0) {
+                $backoff = $retry_after_seconds;
+            }
         }
 
         if ($backoff <= 0) {
