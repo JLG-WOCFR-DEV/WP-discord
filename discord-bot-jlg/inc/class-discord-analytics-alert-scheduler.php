@@ -3,7 +3,19 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-class Discord_Bot_JLG_Analytics_Alert_Scheduler {
+interface Discord_Bot_JLG_Analytics_Alert_Scheduler_Interface {
+    /**
+     * Schedule an analytics alert for later dispatch.
+     *
+     * @param array $payload Payload describing the alert to dispatch.
+     * @param int   $delay   Optional delay (in seconds) before dispatching the alert.
+     *
+     * @return bool True when the alert has been successfully scheduled.
+     */
+    public function schedule(array $payload, $delay = 0);
+}
+
+class Discord_Bot_JLG_Analytics_Alert_Scheduler implements Discord_Bot_JLG_Analytics_Alert_Scheduler_Interface {
     const HOOK = 'discord_bot_jlg_dispatch_analytics_alert';
     const ACTION_SCHEDULER_GROUP = 'discord-bot-jlg';
 
