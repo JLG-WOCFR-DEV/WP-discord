@@ -15,6 +15,44 @@ if (!defined('DAY_IN_SECONDS')) {
     define('DAY_IN_SECONDS', 86400);
 }
 
+if (!function_exists('get_file_data')) {
+    function get_file_data($file, $default_headers, $context = '') {
+        unset($context);
+
+        $data = array();
+
+        if (!is_array($default_headers)) {
+            $default_headers = array();
+        }
+
+        foreach ($default_headers as $header_key => $header_name) {
+            $data[$header_key] = '';
+        }
+
+        if (!is_readable($file)) {
+            return $data;
+        }
+
+        $file_data = file_get_contents($file, false, null, 0, 8192);
+
+        if (false === $file_data) {
+            return $data;
+        }
+
+        foreach ($default_headers as $header_key => $header_name) {
+            $pattern = '/^[ \t\/*#@]*' . preg_quote($header_name, '/') . ':(.*)$/mi';
+
+            if (preg_match($pattern, $file_data, $matches) && isset($matches[1])) {
+                $value = trim($matches[1]);
+                $value = preg_replace('/[\r\n].*/', '', $value);
+                $data[$header_key] = $value;
+            }
+        }
+
+        return $data;
+    }
+}
+
 if (!function_exists('plugin_dir_path')) {
     function plugin_dir_path($file) {
         return rtrim(dirname($file), '/\\') . '/';
@@ -75,6 +113,40 @@ if (!function_exists('wp_schedule_event')) {
         );
 
         return true;
+    }
+}
+
+if (!function_exists('wp_schedule_single_event')) {
+    function wp_schedule_single_event($timestamp, $hook, $args = array()) {
+        return wp_schedule_event($timestamp, 'single', $hook, $args);
+    }
+}
+
+if (!function_exists('wp_next_scheduled')) {
+    function wp_next_scheduled($hook) {
+        if (!isset($GLOBALS['wp_test_scheduled_events']) || !is_array($GLOBALS['wp_test_scheduled_events'])) {
+            return false;
+        }
+
+        $next = false;
+
+        foreach ($GLOBALS['wp_test_scheduled_events'] as $event) {
+            if (!isset($event['hook']) || $event['hook'] !== $hook) {
+                continue;
+            }
+
+            $timestamp = isset($event['timestamp']) ? (int) $event['timestamp'] : 0;
+
+            if (0 === $timestamp) {
+                continue;
+            }
+
+            if (false === $next || $timestamp < $next) {
+                $next = $timestamp;
+            }
+        }
+
+        return $next;
     }
 }
 
@@ -151,6 +223,8 @@ if (!defined('AUTH_SALT')) {
     define('AUTH_SALT', 'tests-fixed-auth-salt');
 }
 
+require_once __DIR__ . '/includes/plugin-shim.php';
+
 require_once __DIR__ . '/../../inc/helpers.php';
 require_once __DIR__ . '/../../inc/class-discord-analytics.php';
 require_once __DIR__ . '/../../inc/class-discord-http.php';
@@ -171,26 +245,6 @@ require_once __DIR__ . '/../../inc/class-discord-metrics-registry.php';
 require_once __DIR__ . '/../../inc/class-discord-analytics-alert-scheduler.php';
 require_once __DIR__ . '/../../inc/class-discord-metrics-controller.php';
 require_once __DIR__ . '/../../inc/cron.php';
-
-if (!defined('DISCORD_BOT_JLG_OPTION_NAME')) {
-    define('DISCORD_BOT_JLG_OPTION_NAME', 'discord_server_stats_options');
-}
-
-if (!defined('DISCORD_BOT_JLG_CACHE_KEY')) {
-    define('DISCORD_BOT_JLG_CACHE_KEY', 'discord_server_stats_cache');
-}
-
-if (!defined('DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION')) {
-    define('DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION', 300);
-}
-
-if (!defined('DISCORD_BOT_JLG_PLUGIN_URL')) {
-    define('DISCORD_BOT_JLG_PLUGIN_URL', 'https://example.com/wp-content/plugins/discord-bot-jlg/');
-}
-
-if (!defined('DISCORD_BOT_JLG_VERSION')) {
-    define('DISCORD_BOT_JLG_VERSION', 'test');
-}
 
 if (!function_exists('esc_html__')) {
     function esc_html__($text, $domain = null) {
@@ -553,11 +607,12 @@ $GLOBALS['wp_test_enqueued_scripts']   = array();
 $GLOBALS['wp_test_localized_scripts']  = array();
 $GLOBALS['wp_test_inline_scripts']     = array();
 
-function wp_register_style($handle, $src = '', $deps = array(), $ver = false) {
+function wp_register_style($handle, $src = '', $deps = array(), $ver = false, $media = 'all') {
     $GLOBALS['wp_test_registered_styles'][$handle] = array(
-        'src'  => $src,
-        'deps' => $deps,
-        'ver'  => $ver,
+        'src'   => $src,
+        'deps'  => $deps,
+        'ver'   => $ver,
+        'media' => $media,
     );
 
     return true;
@@ -925,6 +980,7 @@ if (!class_exists('WP_REST_Response')) {
     class WP_REST_Response {
         protected $data;
         protected $status;
+        protected $headers = array();
 
         public function __construct($data = null, $status = 200) {
             $this->data   = $data;
@@ -945,6 +1001,17 @@ if (!class_exists('WP_REST_Response')) {
 
         public function set_status($status) {
             $this->status = (int) $status;
+        }
+
+        public function header($key, $value) {
+            $key = strtolower((string) $key);
+            $this->headers[$key] = $value;
+
+            return $this;
+        }
+
+        public function get_headers() {
+            return $this->headers;
         }
     }
 }
