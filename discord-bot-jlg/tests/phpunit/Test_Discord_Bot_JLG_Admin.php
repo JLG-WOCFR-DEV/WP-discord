@@ -323,10 +323,32 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
         if ($should_update_rotation) {
             $this->assertGreaterThanOrEqual($time_before, $result_rotation);
             $this->assertLessThanOrEqual($time_after, $result_rotation);
+            $metadata = $this->calculate_expected_secret_metadata(
+                $expected_token,
+                $result_rotation,
+                $result_rotation
+            );
+            $this->assertSame($metadata['expires_at'], (int) $result['bot_token_expires_at']);
+            $this->assertSame($metadata['status'], $result['bot_token_status']);
+            $expected['bot_token_expires_at'] = $metadata['expires_at'];
+            $expected['bot_token_status']     = $metadata['status'];
         } elseif ($should_reset_rotation) {
             $this->assertSame(0, $result_rotation);
+            $metadata = $this->calculate_expected_secret_metadata('', 0, $result_rotation);
+            $this->assertSame($metadata['expires_at'], (int) $result['bot_token_expires_at']);
+            $this->assertSame($metadata['status'], $result['bot_token_status']);
+            $expected['bot_token_expires_at'] = $metadata['expires_at'];
+            $expected['bot_token_status']     = $metadata['status'];
         } else {
             $this->assertSame($expected_rotation, $result_rotation);
+            $this->assertSame(
+                isset($expected['bot_token_expires_at']) ? (int) $expected['bot_token_expires_at'] : 0,
+                isset($result['bot_token_expires_at']) ? (int) $result['bot_token_expires_at'] : 0
+            );
+            $this->assertSame(
+                isset($expected['bot_token_status']) ? $expected['bot_token_status'] : 'missing',
+                isset($result['bot_token_status']) ? $result['bot_token_status'] : 'missing'
+            );
         }
 
         unset($expected['bot_token'], $result['bot_token']);
@@ -400,9 +422,14 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
         $result   = $this->admin->sanitize_options($input);
         $expected = $this->get_expected_defaults();
         $expected['bot_token'] = '';
+        $metadata = $this->calculate_expected_secret_metadata('', 0, current_time('timestamp'));
+        $expected['bot_token_expires_at'] = $metadata['expires_at'];
+        $expected['bot_token_status']     = $metadata['status'];
 
         $this->assertSame('', $result['bot_token']);
         $this->assertSame(0, $result['bot_token_rotated_at']);
+        $this->assertSame(0, (int) $result['bot_token_expires_at']);
+        $this->assertSame('missing', $result['bot_token_status']);
 
         unset($expected['bot_token'], $result['bot_token']);
         unset($expected['bot_token_rotated_at'], $result['bot_token_rotated_at']);
@@ -605,9 +632,37 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
     }
 
     private function get_expected_defaults(): array {
+        $min_cache_duration = self::get_min_cache_duration();
+        $expected_token     = isset($this->saved_options['bot_token'])
+            ? $this->saved_options['bot_token']
+            : '';
+        $expected_rotation  = isset($this->saved_options['bot_token_rotated_at'])
+            ? (int) $this->saved_options['bot_token_rotated_at']
+            : 0;
+        $metadata           = $this->calculate_expected_secret_metadata(
+            $expected_token,
+            $expected_rotation,
+            current_time('timestamp')
+        );
+        $default_refresh_interval = max(
+            Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL,
+            min(3600, (int) $this->saved_options['default_refresh_interval'])
+        );
+        $analytics_retention = max(0, (int) $this->saved_options['analytics_retention_days']);
+        $default_alert_drop = class_exists('Discord_Bot_JLG_Alerts')
+            ? (int) Discord_Bot_JLG_Alerts::DEFAULT_DROP_PERCENT
+            : 35;
+        $default_alert_cooldown = class_exists('Discord_Bot_JLG_Alerts')
+            ? (int) Discord_Bot_JLG_Alerts::DEFAULT_COOLDOWN_MINUTES
+            : 60;
+
         return array(
             'server_id'      => '',
-            'bot_token'      => $this->saved_options['bot_token'],
+            'bot_token'      => $expected_token,
+            'bot_token_rotated_at' => $expected_rotation,
+            'bot_token_expires_at' => $metadata['expires_at'],
+            'bot_token_status'     => $metadata['status'],
+            'server_profiles'      => array(),
             'demo_mode'      => 0,
             'show_online'    => 0,
             'show_total'     => 0,
@@ -619,23 +674,97 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
             'default_refresh_enabled' => 0,
             'default_theme'   => 'dark',
             'widget_title'   => '',
+            'invite_url'     => '',
+            'invite_label'   => '',
             'cache_duration' => max(
-                self::get_min_cache_duration(),
+                $min_cache_duration,
                 min(3600, (int) $this->saved_options['cache_duration'])
             ),
             'custom_css'     => '',
-            'default_refresh_interval' => max(
-                Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL,
-                min(3600, (int) $this->saved_options['default_refresh_interval'])
-            ),
-            'analytics_retention_days' => max(0, (int) $this->saved_options['analytics_retention_days']),
-            'bot_token_rotated_at'    => $this->rotation_timestamp,
+            'default_refresh_interval' => $default_refresh_interval,
+            'analytics_retention_days' => $analytics_retention,
+            'analytics_alerts_enabled' => 0,
+            'analytics_alert_drop_percent' => $default_alert_drop,
+            'analytics_alert_recipients' => '',
+            'analytics_alert_webhook' => '',
+            'analytics_alert_webhook_secret' => '',
+            'analytics_alert_cooldown' => $default_alert_cooldown,
             'stat_bg_color'      => '#123456',
             'stat_text_color'    => 'rgba(255, 255, 255, 0.9)',
             'accent_color'       => '#654321',
             'accent_color_alt'   => '#765432',
             'accent_text_color'  => '#111111',
-            'server_profiles'    => array(),
+            'default_icon_online'      => '',
+            'default_icon_total'       => '',
+            'default_icon_presence'    => '',
+            'default_icon_approximate' => '',
+            'default_icon_premium'     => '',
+            'default_label_online'            => '',
+            'default_label_total'             => '',
+            'default_label_presence'          => '',
+            'default_label_presence_online'   => '',
+            'default_label_presence_idle'     => '',
+            'default_label_presence_dnd'      => '',
+            'default_label_presence_offline'  => '',
+            'default_label_presence_streaming'=> '',
+            'default_label_presence_other'    => '',
+            'default_label_approximate'       => '',
+            'default_label_premium'           => '',
+            'default_label_premium_singular'  => '',
+            'default_label_premium_plural'    => '',
         );
+    }
+
+    private function calculate_expected_secret_metadata($token, $rotated_at, $current_timestamp = null): array {
+        $metadata = array(
+            'expires_at' => 0,
+            'status'     => 'missing',
+        );
+
+        $token            = (string) $token;
+        $rotated_at       = (int) $rotated_at;
+        $current_timestamp = (null === $current_timestamp)
+            ? current_time('timestamp')
+            : (int) $current_timestamp;
+
+        if ('' === $token) {
+            return $metadata;
+        }
+
+        if ($rotated_at <= 0) {
+            $metadata['status'] = 'unknown';
+
+            return $metadata;
+        }
+
+        $max_age_days = $this->get_secret_rotation_max_age_days();
+        $expires_at   = $rotated_at + ($max_age_days * DAY_IN_SECONDS);
+
+        $metadata['expires_at'] = $expires_at;
+        $metadata['status']     = ($current_timestamp >= $expires_at) ? 'expired' : 'active';
+
+        return $metadata;
+    }
+
+    private function get_secret_rotation_max_age_days(): int {
+        $label = function_exists('__')
+            ? __('configuration principale', 'discord-bot-jlg')
+            : 'configuration principale';
+        $max_age_days = Discord_Bot_JLG_Admin::SECRET_ROTATION_MAX_AGE_DAYS;
+
+        if (function_exists('apply_filters')) {
+            $filtered = (int) apply_filters(
+                'discord_bot_jlg_secret_rotation_max_age_days',
+                $max_age_days,
+                'default',
+                $label
+            );
+
+            if ($filtered > 0) {
+                $max_age_days = $filtered;
+            }
+        }
+
+        return $max_age_days;
     }
 }
