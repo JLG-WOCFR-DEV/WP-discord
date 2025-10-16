@@ -56,6 +56,16 @@ if (!function_exists('sanitize_hex_color')) {
 }
 
 if (!function_exists('add_settings_error')) {
+    if (defined('ABSPATH')) {
+        $template_path = rtrim(ABSPATH, '/\\') . '/wp-admin/includes/template.php';
+
+        if (is_readable($template_path)) {
+            require_once $template_path;
+        }
+    }
+}
+
+if (!function_exists('add_settings_error')) {
     /**
      * Lightweight polyfill for WordPress add_settings_error().
      *
