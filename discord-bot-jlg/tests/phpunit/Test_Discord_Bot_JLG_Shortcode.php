@@ -264,6 +264,55 @@ class Test_Discord_Bot_JLG_Shortcode extends TestCase {
         $this->assertStringContainsString('--discord-accent-contrast: #0f0f0f', $html);
     }
 
+    public function test_prepare_avatar_url_preserves_fragment_and_nested_query_arguments() {
+        $shortcode = $this->get_shortcode_instance();
+
+        $base_url = 'https://cdn.discordapp.com/icons/123456789/abcdef.png?size=128&foo=bar&meta[color]=red#profile';
+        $result   = $this->invoke_prepare_avatar_url($shortcode, $base_url, '', 513);
+
+        $this->assertStringEndsWith('#profile', $result);
+
+        $parts = parse_url($result);
+        $this->assertIsArray($parts);
+        $this->assertSame('profile', $parts['fragment']);
+        $this->assertSame('/icons/123456789/abcdef.png', $parts['path']);
+
+        $query_args = array();
+        parse_str($parts['query'], $query_args);
+
+        $this->assertSame(
+            array(
+                'foo'  => 'bar',
+                'meta' => array('color' => 'red'),
+                'size' => '1024',
+            ),
+            $query_args
+        );
+    }
+
+    public function test_prepare_avatar_url_uses_fallback_url_when_base_is_empty() {
+        $shortcode = $this->get_shortcode_instance();
+
+        $fallback_url = 'https://cdn.discordapp.com/embed/avatars/0.png?size=32&ref=widget#fallback';
+        $result       = $this->invoke_prepare_avatar_url($shortcode, '', $fallback_url, 20);
+
+        $parts = parse_url($result);
+        $this->assertIsArray($parts);
+        $this->assertSame('fallback', $parts['fragment']);
+        $this->assertSame('/embed/avatars/0.png', $parts['path']);
+
+        $query_args = array();
+        parse_str($parts['query'], $query_args);
+
+        $this->assertSame(
+            array(
+                'ref'  => 'widget',
+                'size' => '32',
+            ),
+            $query_args
+        );
+    }
+
     public function test_frontend_script_has_no_forced_polyfill_dependencies() {
         $shortcode = $this->get_shortcode_instance();
 

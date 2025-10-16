@@ -152,6 +152,91 @@ if (!function_exists('esc_url_raw')) {
     }
 }
 
+if (!function_exists('remove_query_arg')) {
+    /**
+     * Lightweight polyfill for WordPress remove_query_arg().
+     *
+     * @param string|string[] $keys  Query parameter key or list of keys to remove.
+     * @param string|array     $query Optional URL or query arguments to modify.
+     *
+     * @return string|array Updated URL or array with the requested keys removed.
+     */
+    function remove_query_arg($keys, $query = '') {
+        if (!is_array($keys)) {
+            $keys = array($keys);
+        }
+
+        $normalized_keys = array();
+        foreach ($keys as $key) {
+            if (is_scalar($key)) {
+                $normalized_keys[] = (string) $key;
+            }
+        }
+
+        if (empty($normalized_keys)) {
+            return $query;
+        }
+
+        if (is_array($query)) {
+            foreach ($normalized_keys as $key) {
+                if (array_key_exists($key, $query)) {
+                    unset($query[$key]);
+                }
+            }
+
+            return $query;
+        }
+
+        if (false === $query || null === $query) {
+            return '';
+        }
+
+        $query = (string) $query;
+
+        if ('' === $query) {
+            return '';
+        }
+
+        $fragment = '';
+        $fragment_position = strpos($query, '#');
+        if (false !== $fragment_position) {
+            $fragment = substr($query, $fragment_position);
+            $query    = substr($query, 0, $fragment_position);
+        }
+
+        $question_mark_position = strpos($query, '?');
+        if (false === $question_mark_position) {
+            return $query . $fragment;
+        }
+
+        $base         = substr($query, 0, $question_mark_position);
+        $query_string = substr($query, $question_mark_position + 1);
+
+        $parsed_query = array();
+        if ('' !== $query_string) {
+            parse_str($query_string, $parsed_query);
+        }
+
+        foreach ($normalized_keys as $key) {
+            unset($parsed_query[$key]);
+        }
+
+        $rebuilt_query = http_build_query($parsed_query, '', '&', PHP_QUERY_RFC3986);
+
+        if ('' !== $rebuilt_query) {
+            $result = ('' !== $base ? $base . '?' . $rebuilt_query : '?' . $rebuilt_query);
+        } else {
+            $result = $base;
+
+            if ('' === $result && 0 === $question_mark_position) {
+                $result = '?';
+            }
+        }
+
+        return $result . $fragment;
+    }
+}
+
 if (!function_exists('discord_bot_jlg_get_available_themes')) {
     /**
      * Returns the list of allowed themes for the public components.
