@@ -3410,10 +3410,19 @@ class Discord_Bot_JLG_API {
             if ($retry_after_seconds > 0) {
                 $backoff = $retry_after_seconds;
             }
+        } elseif (429 === (int) $status_code) {
+            // When Discord does not provide a Retry-After header, honour the
+            // expectation that the caller decides the delay and avoid forcing
+            // the default backoff for rate limited responses.
+            $backoff = 0;
         }
 
         if ($backoff <= 0) {
-            $backoff = $base;
+            if (429 === (int) $status_code && $retry_after <= 0) {
+                $backoff = 0;
+            } else {
+                $backoff = $base;
+            }
         }
 
         if ($backoff > $max_backoff) {

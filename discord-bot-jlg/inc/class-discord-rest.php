@@ -543,6 +543,7 @@ class Discord_Bot_JLG_REST_Controller {
             );
 
             $response = new WP_REST_Response($payload, 200);
+            $response->header('Content-Type', 'application/json; charset=utf-8');
             $response->header(
                 'Content-Disposition',
                 'attachment; filename="' . $this->build_export_filename($request->get_param('filename'), $profile_key, 'json') . '"'
