@@ -11,6 +11,35 @@ if (!defined('DISCORD_BOT_JLG_SECRET_PREFIX')) {
     define('DISCORD_BOT_JLG_SECRET_PREFIX', 'dbjlg_enc_v2:');
 }
 
+if (!function_exists('discord_bot_jlg_has_auth_constants')) {
+    /**
+     * Determines whether the authentication constants required for secret
+     * encryption/decryption are available.
+     *
+     * @return bool
+     */
+    function discord_bot_jlg_has_auth_constants() {
+        $auth_key_defined  = defined('AUTH_KEY');
+        $auth_salt_defined = defined('AUTH_SALT');
+
+        $auth_key  = $auth_key_defined ? constant('AUTH_KEY') : '';
+        $auth_salt = $auth_salt_defined ? constant('AUTH_SALT') : '';
+
+        $available = (
+            $auth_key_defined
+            && $auth_salt_defined
+            && '' !== $auth_key
+            && '' !== $auth_salt
+        );
+
+        if (function_exists('apply_filters')) {
+            $available = (bool) apply_filters('discord_bot_jlg_has_auth_constants', $available);
+        }
+
+        return $available;
+    }
+}
+
 if (!function_exists('discord_bot_jlg_get_default_options')) {
     /**
      * Returns the default options used by the plugin.
@@ -357,7 +386,15 @@ if (!function_exists('discord_bot_jlg_sanitize_profile_key')) {
             return '';
         }
 
-        // Collapse whitespace to a single underscore so custom labels keep their intent.
+        // Replace gaps that precede a hyphenated segment with a hyphen so we
+        // preserve user intent for mixed separators like "Foo Bar-Baz".
+        $key = preg_replace('/\s+(?=[^\-\s]*-)/', '-', $key);
+
+        // Normalize hyphen spacing.
+        $key = preg_replace('/\s*-\s*/', '-', $key);
+
+        // Collapse remaining whitespace to underscores so custom labels keep
+        // their readability when converted to a slug.
         $key = preg_replace('/[\s]+/', '_', $key);
 
         if (function_exists('sanitize_key')) {
@@ -369,6 +406,9 @@ if (!function_exists('discord_bot_jlg_sanitize_profile_key')) {
         // Normalize repeated separators so generated slugs remain compact.
         $key = preg_replace('/_+/', '_', $key);
         $key = preg_replace('/-+/', '-', $key);
+        $key = preg_replace('/(?:_-|-_)+/', '-', $key);
+
+        $key = trim($key, '_-');
 
         return $key;
     }
@@ -692,7 +732,7 @@ if (!function_exists('discord_bot_jlg_encrypt_secret')) {
             return '';
         }
 
-        if (!defined('AUTH_KEY') || !defined('AUTH_SALT')) {
+        if (!discord_bot_jlg_has_auth_constants()) {
             return new WP_Error(
                 'discord_bot_jlg_encrypt_secret_missing_keys',
                 __('Les constantes AUTH_KEY et AUTH_SALT sont requises pour chiffrer le token Discord.', 'discord-bot-jlg')
@@ -772,7 +812,7 @@ if (!function_exists('discord_bot_jlg_decrypt_secret')) {
             );
         }
 
-        if (!defined('AUTH_KEY') || !defined('AUTH_SALT')) {
+        if (!discord_bot_jlg_has_auth_constants()) {
             return new WP_Error(
                 'discord_bot_jlg_decrypt_secret_missing_keys',
                 __('Les constantes AUTH_KEY et AUTH_SALT sont requises pour déchiffrer le token Discord.', 'discord-bot-jlg')
