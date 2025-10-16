@@ -496,6 +496,53 @@ class Test_Discord_Bot_JLG_API extends TestCase {
         $this->assertSame('555666777', $analytics->snapshots[0]['server_id']);
     }
 
+    public function test_get_stats_bypass_cache_forces_connector_attempt_when_circuit_open() {
+        $option_name = 'discord_server_stats_options';
+        $cache_key   = 'discord_server_stats_cache';
+
+        delete_option(Discord_Bot_JLG_API::CONNECTOR_STATE_OPTION);
+
+        $GLOBALS['wp_test_options'][$option_name] = array(
+            'server_id'      => '24680',
+            'cache_duration' => 30,
+        );
+
+        $http_client = new Mock_Discord_Bot_JLG_Http_Client();
+        $api         = new Discord_Bot_JLG_API($option_name, $cache_key, 60, $http_client);
+
+        $api->get_stats(array('bypass_cache' => true));
+
+        $this->assertSame(1, $http_client->call_count, 'Initial attempt should hit the network once.');
+
+        $state = get_option(Discord_Bot_JLG_API::CONNECTOR_STATE_OPTION);
+        $this->assertIsArray($state);
+        $this->assertArrayHasKey('default:widget', $state);
+        $widget_state = $state['default:widget'];
+        $this->assertGreaterThan(0, $widget_state['open_until']);
+        $this->assertTrue($widget_state['last_attempt_was_network']);
+        $this->assertSame(1, $widget_state['attempts']);
+
+        $api->get_stats(array('bypass_cache' => false));
+
+        $this->assertSame(1, $http_client->call_count, 'Circuit breaker should short-circuit normal traffic.');
+
+        $state = get_option(Discord_Bot_JLG_API::CONNECTOR_STATE_OPTION);
+        $this->assertArrayHasKey('default:widget', $state);
+        $widget_state = $state['default:widget'];
+        $this->assertFalse($widget_state['last_attempt_was_network']);
+        $this->assertSame(2, $widget_state['attempts']);
+
+        $api->get_stats(array('bypass_cache' => true));
+
+        $this->assertSame(2, $http_client->call_count, 'Forced attempt should bypass the open circuit and reach the network.');
+
+        $state = get_option(Discord_Bot_JLG_API::CONNECTOR_STATE_OPTION);
+        $this->assertArrayHasKey('default:widget', $state);
+        $widget_state = $state['default:widget'];
+        $this->assertTrue($widget_state['last_attempt_was_network']);
+        $this->assertSame(3, $widget_state['attempts']);
+    }
+
     public function test_clear_all_cached_data_removes_last_fallback_option() {
         $option_name = 'discord_server_stats_options';
         $cache_key   = 'discord_server_stats_cache';
@@ -643,6 +690,7 @@ class Test_Discord_Bot_JLG_API extends TestCase {
 
     public function retry_after_header_provider() {
         return array(
+            // Sub-second Retry-After headers should be rounded up to 1 second.
             'fractional-seconds' => array('0.5', 1),
             'milliseconds-suffix' => array('250ms', 1),
             'seconds-with-unit' => array('1.2s', 2),

@@ -34,30 +34,6 @@ require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/cron.php';
 
 add_filter('cron_schedules', 'discord_bot_jlg_register_cron_schedule');
 
-if (!function_exists('discord_bot_jlg_get_default_options')) {
-    /**
-     * Renvoie les valeurs par défaut utilisées pour initialiser les options du plugin.
-     *
-     * @return array
-     */
-    function discord_bot_jlg_get_default_options() {
-        return array(
-            'server_id'      => '',
-            'bot_token'      => '',
-            'bot_token_rotated_at' => 0,
-            'server_profiles'=> array(),
-            'demo_mode'      => false,
-            'show_online'    => true,
-            'show_total'     => true,
-            'custom_css'     => '',
-            'widget_title'   => 'Discord Server',
-            'cache_duration' => DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION,
-            'analytics_retention_days' => DISCORD_BOT_JLG_ANALYTICS_RETENTION_DEFAULT,
-            'analytics_alert_webhook_secret' => '',
-        );
-    }
-}
-
 /**
  * Supprime les données enregistrées par le plugin lors de la désinstallation.
  *

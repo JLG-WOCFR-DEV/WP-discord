@@ -29,6 +29,9 @@ class Discord_Bot_JLG_Metrics_Controller {
      */
     private $event_logger;
 
+    /**
+     * @param object $alert_scheduler Scheduler instance expected to implement schedule().
+     */
     public function __construct(
         Discord_Bot_JLG_Metrics_Registry $registry,
         Discord_Bot_JLG_Options_Repository $options_repository,
@@ -37,6 +40,12 @@ class Discord_Bot_JLG_Metrics_Controller {
     ) {
         $this->registry           = $registry;
         $this->options_repository = $options_repository;
+        if (!is_object($alert_scheduler) || !method_exists($alert_scheduler, 'schedule')) {
+            throw new InvalidArgumentException(
+                'Discord_Bot_JLG_Metrics_Controller requires an alert scheduler exposing a schedule() method.'
+            );
+        }
+
         $this->alert_scheduler    = $alert_scheduler;
         $this->event_logger       = ($event_logger instanceof Discord_Bot_JLG_Event_Logger)
             ? $event_logger
@@ -140,7 +149,7 @@ class Discord_Bot_JLG_Metrics_Controller {
             );
         }
 
-        $scheduled = $this->alert_scheduler->schedule(
+        $scheduled = $this->get_alert_scheduler()->schedule(
             array(
                 'profile_key' => $profile_key,
                 'server_id'   => $server_id,
@@ -166,6 +175,16 @@ class Discord_Bot_JLG_Metrics_Controller {
             ),
             202
         );
+    }
+
+    private function get_alert_scheduler() {
+        if (!is_object($this->alert_scheduler) || !method_exists($this->alert_scheduler, 'schedule')) {
+            throw new RuntimeException(
+                'Discord_Bot_JLG_Metrics_Controller alert scheduler must expose a schedule() method.'
+            );
+        }
+
+        return $this->alert_scheduler;
     }
 
     private function render_prometheus(array $state) {

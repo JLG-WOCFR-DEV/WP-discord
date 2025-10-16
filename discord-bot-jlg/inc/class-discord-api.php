@@ -861,6 +861,7 @@ class Discord_Bot_JLG_API {
             array(
                 'force_demo'   => false,
                 'bypass_cache' => false,
+                'force_refresh' => false,
                 'profile_key'  => '',
                 'server_id'    => '',
             )
@@ -868,6 +869,7 @@ class Discord_Bot_JLG_API {
 
         $args['force_demo']   = discord_bot_jlg_validate_bool($args['force_demo']);
         $args['bypass_cache'] = discord_bot_jlg_validate_bool($args['bypass_cache']);
+        $args['force_refresh'] = discord_bot_jlg_validate_bool($args['force_refresh']);
         $args['profile_key']  = isset($args['profile_key']) ? discord_bot_jlg_sanitize_profile_key($args['profile_key']) : '';
         $args['server_id']    = isset($args['server_id']) ? $this->sanitize_server_id($args['server_id']) : '';
 
@@ -998,10 +1000,13 @@ class Discord_Bot_JLG_API {
             $context['options'] = array();
         }
 
+        $force_refresh = !empty($args['force_refresh']);
+
         $runtime_args = array(
-            'force_demo'   => !empty($args['force_demo']),
-            'bypass_cache' => !empty($args['bypass_cache']),
-            'signature'    => isset($context['signature']) ? (string) $context['signature'] : '',
+            'force_demo'     => !empty($args['force_demo']),
+            'bypass_cache'   => !empty($args['bypass_cache']),
+            'force_refresh'  => $force_refresh,
+            'signature'      => isset($context['signature']) ? (string) $context['signature'] : '',
         );
 
         $runtime_key = $this->get_runtime_cache_key($runtime_args);
@@ -1020,6 +1025,15 @@ class Discord_Bot_JLG_API {
                 $runtime_retry_after = (int) $this->runtime_retry_after[$runtime_key];
             }
         }
+
+        $force_connector_attempt = (!empty($args['bypass_cache']) || $force_refresh);
+
+        if (true === $force_connector_attempt) {
+            $options['__force_connector_attempt'] = true;
+            $context['force_connector_attempt'] = true;
+        }
+
+        $context['options'] = $options;
 
         return array(
             'options'             => $options,
@@ -1659,6 +1673,7 @@ class Discord_Bot_JLG_API {
             $stats = $this->get_stats(
                 array(
                     'bypass_cache' => $bypass_cache,
+                    'force_refresh' => $force_refresh,
                     'profile_key'  => $profile_key_override,
                     'server_id'    => $server_id_override,
                 )
@@ -2275,9 +2290,10 @@ class Discord_Bot_JLG_API {
         }
 
         $normalized_args = array(
-            'force_demo'   => isset($args['force_demo']) ? (bool) $args['force_demo'] : false,
-            'bypass_cache' => isset($args['bypass_cache']) ? (bool) $args['bypass_cache'] : false,
-            'signature'    => isset($args['signature']) ? (string) $args['signature'] : '',
+            'force_demo'    => isset($args['force_demo']) ? (bool) $args['force_demo'] : false,
+            'bypass_cache'  => isset($args['bypass_cache']) ? (bool) $args['bypass_cache'] : false,
+            'force_refresh' => isset($args['force_refresh']) ? (bool) $args['force_refresh'] : false,
+            'signature'     => isset($args['signature']) ? (string) $args['signature'] : '',
         );
 
         return md5(wp_json_encode($normalized_args));
@@ -3237,10 +3253,15 @@ class Discord_Bot_JLG_API {
         $now = $this->get_current_timestamp();
         $open_until = isset($state['open_until']) ? (int) $state['open_until'] : 0;
         $attempts = isset($state['attempts']) ? (int) $state['attempts'] : 0;
+        $force_attempt = !empty($options['__force_connector_attempt']);
         $log_context = array(
             'attempt'              => $attempts + 1,
             'consecutive_failures' => isset($state['failures']) ? (int) $state['failures'] : 0,
         );
+
+        if ($force_attempt) {
+            $log_context['forced_attempt'] = true;
+        }
 
         if ($open_until > 0) {
             $log_context['circuit_open_until'] = $open_until;
@@ -3252,16 +3273,20 @@ class Discord_Bot_JLG_API {
                 $retry_after = 1;
             }
 
-            $log_context['next_retry_after'] = $retry_after;
-            $updated_state = $this->register_connector_attempt($profile_key, $channel, false);
+            if (false === $force_attempt) {
+                $log_context['next_retry_after'] = $retry_after;
+                $updated_state = $this->register_connector_attempt($profile_key, $channel, false);
 
-            return array(
-                'short_circuit' => true,
-                'retry_after'   => $retry_after,
-                'profile_key'   => $profile_key,
-                'state'         => $updated_state,
-                'log_context'   => $log_context,
-            );
+                return array(
+                    'short_circuit' => true,
+                    'retry_after'   => $retry_after,
+                    'profile_key'   => $profile_key,
+                    'state'         => $updated_state,
+                    'log_context'   => $log_context,
+                );
+            }
+
+            $log_context['circuit_override'] = true;
         }
 
         $updated_state = $this->register_connector_attempt($profile_key, $channel, true);
@@ -3380,7 +3405,11 @@ class Discord_Bot_JLG_API {
         $backoff = (int) round($base * pow(2, $exponent));
 
         if ($retry_after > 0) {
-            $backoff = max($backoff, (int) $retry_after);
+            $retry_after_seconds = (int) ceil((float) $retry_after);
+
+            if ($retry_after_seconds > 0) {
+                $backoff = $retry_after_seconds;
+            }
         }
 
         if ($backoff <= 0) {

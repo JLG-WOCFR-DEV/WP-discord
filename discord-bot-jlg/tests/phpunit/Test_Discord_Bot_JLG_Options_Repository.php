@@ -86,4 +86,23 @@ class Test_Discord_Bot_JLG_Options_Repository extends TestCase {
         $this->assertIsArray($filtered);
         $this->assertSame($baseline['bar'], $filtered['bar']);
     }
+
+    public function test_default_provider_is_available_when_only_inc_classes_loaded() {
+        $option_name = 'discord_bot_jlg_repository_defaults';
+
+        delete_option($option_name);
+
+        $repository = new Discord_Bot_JLG_Options_Repository(
+            $option_name,
+            'discord_bot_jlg_get_default_options'
+        );
+
+        $options = $repository->get_options();
+
+        $this->assertIsArray($options);
+        $this->assertArrayHasKey('server_id', $options);
+        $this->assertArrayHasKey('cache_duration', $options);
+        $this->assertSame(DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION, $options['cache_duration']);
+        $this->assertSame(DISCORD_BOT_JLG_ANALYTICS_RETENTION_DEFAULT, $options['analytics_retention_days']);
+    }
 }

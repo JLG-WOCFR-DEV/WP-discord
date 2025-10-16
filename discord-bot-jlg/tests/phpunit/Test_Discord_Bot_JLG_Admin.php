@@ -407,6 +407,28 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
         }
     }
 
+    public function test_sanitize_options_boolean_field_key_order() {
+        $result = $this->admin->sanitize_options(array());
+
+        $keys = array_keys($result);
+
+        $expected_order = array(
+            'demo_mode',
+            'show_online',
+            'show_total',
+            'show_presence_breakdown',
+            'show_approximate_member_count',
+            'show_premium_subscriptions',
+            'show_server_name',
+            'show_server_avatar',
+            'default_refresh_enabled',
+        );
+
+        $actual_order = array_values(array_intersect($keys, $expected_order));
+
+        $this->assertSame($expected_order, $actual_order);
+    }
+
     /**
      * @runInSeparateProcess
      * @preserveGlobalState disabled
@@ -724,6 +746,9 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
             'demo_mode'      => 0,
             'show_online'    => 0,
             'show_total'     => 0,
+            'show_presence_breakdown'       => 0,
+            'show_approximate_member_count' => 0,
+            'show_premium_subscriptions'    => 0,
             'show_server_name'   => 0,
             'show_server_avatar' => 0,
             'default_refresh_enabled' => 0,
@@ -767,9 +792,6 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
             'default_label_premium'           => '',
             'default_label_premium_singular'  => '',
             'default_label_premium_plural'    => '',
-            'show_presence_breakdown' => 0,
-            'show_approximate_member_count' => 0,
-            'show_premium_subscriptions' => 0,
         );
     }
 

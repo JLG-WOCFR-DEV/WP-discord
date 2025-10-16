@@ -267,13 +267,32 @@ class Test_Discord_Bot_JLG_Helpers extends TestCase {
      */
     public function provide_sanitize_profile_key_inputs() {
         return array(
-            'spaces converted to hyphen' => array('My Profile Name', 'my-profile-name'),
-            'multiple spaces collapsed' => array('Multiple   Spaces  Allowed', 'multiple-spaces-allowed'),
-            'mixed case trimmed' => array('  Mixed Case Label  ', 'mixed-case-label'),
-            'punctuation removed' => array('Spacing & punctuation!', 'spacing-punctuation'),
+            'spaces converted to underscore' => array('My Profile Name', 'my_profile_name'),
+            'multiple spaces collapsed' => array('Multiple   Spaces  Allowed', 'multiple_spaces_allowed'),
+            'mixed case trimmed' => array('  Mixed Case Label  ', 'mixed_case_label'),
+            'punctuation removed' => array('Spacing & punctuation!', 'spacing_punctuation'),
             'hyphen retained' => array('Already-Slug', 'already-slug'),
             'underscore retained' => array('Already_Slug', 'already_slug'),
             'combined separators' => array('Profile_With Mixed-Separators', 'profile_with-mixed-separators'),
+            'punctuation squashed into underscore' => array('Custom Key!!', 'custom_key'),
+        );
+    }
+
+    public function test_remove_query_arg_handles_associative_arrays() {
+        $input = array(
+            'size'   => '256',
+            'foo'    => 'bar',
+            'nested' => array('alpha' => 'beta'),
+        );
+
+        $result = remove_query_arg(array('size', 'missing'), $input);
+
+        $this->assertSame(
+            array(
+                'foo'    => 'bar',
+                'nested' => array('alpha' => 'beta'),
+            ),
+            $result
         );
     }
 

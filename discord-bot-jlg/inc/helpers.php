@@ -11,6 +11,38 @@ if (!defined('DISCORD_BOT_JLG_SECRET_PREFIX')) {
     define('DISCORD_BOT_JLG_SECRET_PREFIX', 'dbjlg_enc_v2:');
 }
 
+if (!function_exists('discord_bot_jlg_get_default_options')) {
+    /**
+     * Returns the default options used by the plugin.
+     *
+     * @return array
+     */
+    function discord_bot_jlg_get_default_options() {
+        $default_cache_duration = defined('DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION')
+            ? DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION
+            : 300;
+
+        $default_analytics_retention = defined('DISCORD_BOT_JLG_ANALYTICS_RETENTION_DEFAULT')
+            ? DISCORD_BOT_JLG_ANALYTICS_RETENTION_DEFAULT
+            : 90;
+
+        return array(
+            'server_id'                     => '',
+            'bot_token'                     => '',
+            'bot_token_rotated_at'          => 0,
+            'server_profiles'               => array(),
+            'demo_mode'                     => false,
+            'show_online'                   => true,
+            'show_total'                    => true,
+            'custom_css'                    => '',
+            'widget_title'                  => 'Discord Server',
+            'cache_duration'                => $default_cache_duration,
+            'analytics_retention_days'      => $default_analytics_retention,
+            'analytics_alert_webhook_secret' => '',
+        );
+    }
+}
+
 if (!function_exists('absint')) {
     /**
      * Lightweight polyfill for WordPress absint().
@@ -117,6 +149,91 @@ if (!function_exists('esc_url_raw')) {
         }
 
         return preg_replace('/[\r\n\t\0\x0B]/', '', $sanitized);
+    }
+}
+
+if (!function_exists('remove_query_arg')) {
+    /**
+     * Lightweight polyfill for WordPress remove_query_arg().
+     *
+     * @param string|string[] $keys  Query parameter key or list of keys to remove.
+     * @param string|array     $query Optional URL or query arguments to modify.
+     *
+     * @return string|array Updated URL or array with the requested keys removed.
+     */
+    function remove_query_arg($keys, $query = '') {
+        if (!is_array($keys)) {
+            $keys = array($keys);
+        }
+
+        $normalized_keys = array();
+        foreach ($keys as $key) {
+            if (is_scalar($key)) {
+                $normalized_keys[] = (string) $key;
+            }
+        }
+
+        if (empty($normalized_keys)) {
+            return $query;
+        }
+
+        if (is_array($query)) {
+            foreach ($normalized_keys as $key) {
+                if (array_key_exists($key, $query)) {
+                    unset($query[$key]);
+                }
+            }
+
+            return $query;
+        }
+
+        if (false === $query || null === $query) {
+            return '';
+        }
+
+        $query = (string) $query;
+
+        if ('' === $query) {
+            return '';
+        }
+
+        $fragment = '';
+        $fragment_position = strpos($query, '#');
+        if (false !== $fragment_position) {
+            $fragment = substr($query, $fragment_position);
+            $query    = substr($query, 0, $fragment_position);
+        }
+
+        $question_mark_position = strpos($query, '?');
+        if (false === $question_mark_position) {
+            return $query . $fragment;
+        }
+
+        $base         = substr($query, 0, $question_mark_position);
+        $query_string = substr($query, $question_mark_position + 1);
+
+        $parsed_query = array();
+        if ('' !== $query_string) {
+            parse_str($query_string, $parsed_query);
+        }
+
+        foreach ($normalized_keys as $key) {
+            unset($parsed_query[$key]);
+        }
+
+        $rebuilt_query = http_build_query($parsed_query, '', '&', PHP_QUERY_RFC3986);
+
+        if ('' !== $rebuilt_query) {
+            $result = ('' !== $base ? $base . '?' . $rebuilt_query : '?' . $rebuilt_query);
+        } else {
+            $result = $base;
+
+            if ('' === $result && 0 === $question_mark_position) {
+                $result = '?';
+            }
+        }
+
+        return $result . $fragment;
     }
 }
 
@@ -240,8 +357,17 @@ if (!function_exists('discord_bot_jlg_sanitize_profile_key')) {
             return '';
         }
 
-        $key = preg_replace('/[\s]+/', '-', $key);
-        $key = preg_replace('/[^a-z0-9_-]/', '', $key);
+        // Collapse whitespace to a single underscore so custom labels keep their intent.
+        $key = preg_replace('/[\s]+/', '_', $key);
+
+        if (function_exists('sanitize_key')) {
+            $key = sanitize_key($key);
+        } else {
+            $key = preg_replace('/[^a-z0-9_-]/', '', $key);
+        }
+
+        // Normalize repeated separators so generated slugs remain compact.
+        $key = preg_replace('/_+/', '_', $key);
         $key = preg_replace('/-+/', '-', $key);
 
         return $key;
