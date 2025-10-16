@@ -2421,6 +2421,12 @@
                 var parsedSeconds = parseFloat(trimmedValue);
                 if (!isNaN(parsedSeconds) && parsedSeconds >= 0) {
                     numericValue = parsedSeconds * 1000;
+                } else {
+                    var parsedTimestamp = Date.parse(trimmedValue);
+                    if (!isNaN(parsedTimestamp)) {
+                        var delta = parsedTimestamp - Date.now();
+                        numericValue = delta > 0 ? delta : 0;
+                    }
                 }
             }
         } else if (typeof rawValue === 'number') {
@@ -2434,6 +2440,34 @@
         }
 
         return numericValue;
+    }
+
+    function extractRetryAfterFromHeaders(headers) {
+        if (!headers || typeof headers.get !== 'function') {
+            return null;
+        }
+
+        var headerValue = null;
+
+        try {
+            headerValue = headers.get('Retry-After');
+        } catch (error) {
+            headerValue = null;
+        }
+
+        if (!headerValue) {
+            try {
+                headerValue = headers.get('X-RateLimit-Reset-After');
+            } catch (error) {
+                headerValue = null;
+            }
+        }
+
+        if (!headerValue) {
+            return null;
+        }
+
+        return convertRetryAfterToMilliseconds(headerValue);
     }
 
     function elementHasClass(element, className) {
@@ -4912,8 +4946,13 @@
             fetchPromise = requestStatsViaAjax(config, overrides, requestOptions);
         }
 
+        var headerRetryAfterMs = null;
         var requestPromise = fetchPromise
             .then(function (response) {
+                if (response && typeof response === 'object') {
+                    headerRetryAfterMs = extractRetryAfterFromHeaders(response.headers);
+                }
+
                 if (!response || typeof response !== 'object') {
                     var invalidResponseError = new Error('Invalid network response');
                     invalidResponseError.userMessage = getLocalizedString(
@@ -4927,6 +4966,10 @@
                     var statusError = new Error('HTTP error ' + response.status);
                     statusError.status = response.status;
                     statusError.statusText = response.statusText;
+
+                    if (headerRetryAfterMs !== null) {
+                        statusError.retryAfter = headerRetryAfterMs;
+                    }
 
                     var jsonSource = typeof response.clone === 'function'
                         ? response.clone()
@@ -5005,6 +5048,10 @@
             })
             .then(function (data) {
                 if (!data || typeof data !== 'object') {
+                    if (typeof resultInfo.retryAfter !== 'number' && headerRetryAfterMs !== null) {
+                        resultInfo.retryAfter = headerRetryAfterMs;
+                    }
+
                     return resultInfo;
                 }
 
@@ -5070,6 +5117,10 @@
                         }
                     }
 
+                    if (typeof resultInfo.retryAfter !== 'number' && headerRetryAfterMs !== null) {
+                        resultInfo.retryAfter = headerRetryAfterMs;
+                    }
+
                     resultInfo.rateLimited = true;
 
                     return resultInfo;
@@ -5117,6 +5168,10 @@
                     if (successRetryAfter !== null) {
                         resultInfo.retryAfter = successRetryAfter;
                     }
+                }
+
+                if (typeof resultInfo.retryAfter !== 'number' && headerRetryAfterMs !== null) {
+                    resultInfo.retryAfter = headerRetryAfterMs;
                 }
 
                 clearErrorMessage(container);
@@ -5333,6 +5388,11 @@
                 }
 
                 showErrorMessage(container, message);
+
+                if (typeof resultInfo.retryAfter !== 'number' && headerRetryAfterMs !== null) {
+                    resultInfo.retryAfter = headerRetryAfterMs;
+                }
+
                 return resultInfo;
             });
 

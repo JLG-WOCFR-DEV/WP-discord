@@ -676,6 +676,52 @@ describe('discord-bot-jlg integration', () => {
         expect(lastCall[1]).toBe(60000);
     });
 
+    test('rate limited response without retry_after payload falls back to Retry-After header', async () => {
+        const container = createContainer();
+
+        window.discordBotJlg = {
+            ajaxUrl: 'https://example.com/wp-admin/admin-ajax.php',
+            nonce: 'nonce',
+            requiresNonce: true,
+            locale: 'en-US',
+            minRefreshInterval: '5'
+        };
+
+        const headers = {
+            get: (name) => {
+                if (typeof name === 'string' && name.toLowerCase() === 'retry-after') {
+                    return '120';
+                }
+
+                return null;
+            }
+        };
+
+        global.fetch.mockResolvedValue({
+            ok: true,
+            headers,
+            json: () => Promise.resolve({
+                success: true,
+                data: {
+                    rate_limited: true,
+                    message: 'Too many requests'
+                }
+            })
+        });
+
+        loadScript();
+
+        runTimerByDelay(15000);
+        await flushPromises();
+
+        const errorMessage = container.querySelector('.discord-error-message');
+        expect(errorMessage).not.toBeNull();
+        expect(errorMessage.textContent).toBe('Too many requests');
+
+        const lastCall = setTimeoutSpy.mock.calls[setTimeoutSpy.mock.calls.length - 1];
+        expect(lastCall[1]).toBe(120000);
+    });
+
     test('fallback success response propagates retry_after delay to next refresh', async () => {
         const container = createContainer({ fallbackDemo: 'true', demo: 'true' });
 
@@ -848,6 +894,57 @@ describe('discord-bot-jlg integration', () => {
 
         const lastCall = setTimeoutSpy.mock.calls[setTimeoutSpy.mock.calls.length - 1];
         expect(lastCall[1]).toBe(15000);
+    });
+
+    test('http error respects Retry-After date header for scheduling', async () => {
+        jest.setSystemTime(new Date('2024-01-01T00:00:00Z'));
+        const container = createContainer();
+
+        window.discordBotJlg = {
+            ajaxUrl: 'https://example.com/wp-admin/admin-ajax.php',
+            nonce: 'nonce',
+            requiresNonce: true,
+            locale: 'en-US',
+            minRefreshInterval: '5'
+        };
+
+        const headers = {
+            get: (name) => {
+                if (typeof name === 'string' && name.toLowerCase() === 'retry-after') {
+                    return 'Tue, 01 Jan 2024 00:05:00 GMT';
+                }
+
+                return null;
+            }
+        };
+
+        const jsonMock = jest.fn().mockResolvedValue({
+            message: 'Service unavailable',
+            data: {
+                message: 'Service unavailable'
+            }
+        });
+
+        global.fetch.mockResolvedValue({
+            ok: false,
+            status: 503,
+            statusText: 'Service Unavailable',
+            headers,
+            json: jsonMock,
+            text: () => Promise.resolve('Service unavailable')
+        });
+
+        loadScript();
+
+        runTimerByDelay(15000);
+        await flushPromises();
+
+        const errorMessage = container.querySelector('.discord-error-message');
+        expect(errorMessage).not.toBeNull();
+        expect(errorMessage.textContent).toBe('Service unavailable');
+
+        const lastCall = setTimeoutSpy.mock.calls[setTimeoutSpy.mock.calls.length - 1];
+        expect(lastCall[1]).toBe(300000);
     });
 
     test('stale notice renders with formatted timestamp', async () => {
