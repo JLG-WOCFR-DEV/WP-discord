@@ -95,6 +95,7 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
 
     public function tearDown(): void {
         delete_option(DISCORD_BOT_JLG_OPTION_NAME);
+        delete_transient(DISCORD_BOT_JLG_CACHE_KEY . Discord_Bot_JLG_API::FALLBACK_RETRY_SUFFIX);
 
         parent::tearDown();
     }
@@ -535,6 +536,8 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
     }
 
     public function test_test_discord_connection_uses_date_i18n_when_wp_date_unavailable() {
+        delete_transient(DISCORD_BOT_JLG_CACHE_KEY . Discord_Bot_JLG_API::FALLBACK_RETRY_SUFFIX);
+
         $options = $this->saved_options;
         $options['demo_mode'] = 0;
         update_option(DISCORD_BOT_JLG_OPTION_NAME, $options);
@@ -594,6 +597,7 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
         $this->assertSame($next_retry, $last_call['timestamp']);
 
         delete_option(Discord_Bot_JLG_API::LAST_FALLBACK_OPTION);
+        delete_transient(DISCORD_BOT_JLG_CACHE_KEY . Discord_Bot_JLG_API::FALLBACK_RETRY_SUFFIX);
     }
 
     private static function get_min_cache_duration(): int {
