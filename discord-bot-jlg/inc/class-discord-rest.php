@@ -82,6 +82,12 @@ class Discord_Bot_JLG_REST_Controller {
                             'type'              => 'string',
                             'sanitize_callback' => 'discord_bot_jlg_sanitize_profile_key',
                         ),
+                        'profile_keys' => array(
+                            'description'       => __('Plusieurs profils à comparer (tableau ou liste séparée par des virgules).', 'discord-bot-jlg'),
+                            'type'              => 'array',
+                            'items'             => array('type' => 'string'),
+                            'sanitize_callback' => array($this, 'sanitize_profile_keys_param'),
+                        ),
                         'server_id' => array(
                             'description'       => __('Identifiant du serveur Discord.', 'discord-bot-jlg'),
                             'type'              => 'string',
@@ -256,14 +262,9 @@ class Discord_Bot_JLG_REST_Controller {
             return rest_ensure_response(new WP_REST_Response($response, 501));
         }
 
-        $profile_key = $request->get_param('profile_key');
-        if (!is_string($profile_key)) {
-            $profile_key = '';
-        }
-        $profile_key = discord_bot_jlg_sanitize_profile_key($profile_key);
-
-        if ('' === $profile_key) {
-            $profile_key = 'default';
+        $profile_keys = $this->normalize_requested_profile_keys($request);
+        if (empty($profile_keys)) {
+            $profile_keys = array('default');
         }
 
         $server_id = $request->get_param('server_id');
@@ -279,44 +280,106 @@ class Discord_Bot_JLG_REST_Controller {
             $days = 30;
         }
 
-        $cache_ttl = $this->get_analytics_cache_ttl($profile_key, $server_id, $days);
-        $cache_key = $this->get_analytics_cache_key($profile_key, $server_id, $days);
+        $profiles_metadata = $this->api->get_server_profiles(false);
+        $series_payloads   = array();
+        $timeline          = array();
+        $range_bounds      = array('start' => null, 'end' => null);
 
-        $aggregates = $this->maybe_get_cached_analytics($cache_key, $cache_ttl);
+        foreach ($profile_keys as $profile_key) {
+            $cache_ttl = $this->get_analytics_cache_ttl($profile_key, $server_id, $days);
+            $cache_key = $this->get_analytics_cache_key($profile_key, $server_id, $days);
 
-        if (!is_array($aggregates)) {
-            $aggregates = $analytics->get_aggregates(
-                array(
-                    'profile_key' => $profile_key,
-                    'server_id'   => $server_id,
-                    'days'        => $days,
-                )
-            );
-
-            if (is_wp_error($aggregates)) {
-                return $aggregates;
-            }
-
-            if (false === $aggregates) {
-                return rest_ensure_response(
-                    new WP_Error(
-                        'discord_bot_jlg_analytics_unavailable',
-                        __('Impossible de récupérer les analyses.', 'discord-bot-jlg'),
-                        array('status' => 500)
-                    )
-                );
-            }
+            $aggregates = $this->maybe_get_cached_analytics($cache_key, $cache_ttl);
 
             if (!is_array($aggregates)) {
-                $aggregates = array();
+                $aggregates = $analytics->get_aggregates(
+                    array(
+                        'profile_key' => $profile_key,
+                        'server_id'   => $server_id,
+                        'days'        => $days,
+                    )
+                );
+
+                if (is_wp_error($aggregates)) {
+                    return $aggregates;
+                }
+
+                if (false === $aggregates) {
+                    return rest_ensure_response(
+                        new WP_Error(
+                            'discord_bot_jlg_analytics_unavailable',
+                            __('Impossible de récupérer les analyses.', 'discord-bot-jlg'),
+                            array('status' => 500)
+                        )
+                    );
+                }
+
+                if (!is_array($aggregates)) {
+                    $aggregates = array();
+                }
+
+                $this->maybe_store_cached_analytics($cache_key, $aggregates, $cache_ttl);
             }
 
-            $this->maybe_store_cached_analytics($cache_key, $aggregates, $cache_ttl);
+            $series_payloads[$profile_key] = $aggregates;
+
+            if (isset($aggregates['range']) && is_array($aggregates['range'])) {
+                $range_bounds['start'] = $this->min_timestamp($range_bounds['start'], $aggregates['range'], 'start');
+                $range_bounds['end']   = $this->max_timestamp($range_bounds['end'], $aggregates['range'], 'end');
+            }
+
+            $timeline = $this->merge_timeline($timeline, isset($aggregates['timeseries']) ? $aggregates['timeseries'] : array());
+        }
+
+        $series = array();
+        $timeline = array_values(array_unique($timeline));
+        sort($timeline);
+
+        foreach ($series_payloads as $profile_key => $aggregates) {
+            $label = $this->resolve_profile_label($profile_key, $profiles_metadata);
+            $timeseries = isset($aggregates['timeseries']) && is_array($aggregates['timeseries'])
+                ? $this->align_timeseries_to_timeline($aggregates['timeseries'], $timeline)
+                : $this->build_empty_timeseries($timeline);
+
+            $series[] = array(
+                'profile_key'   => $profile_key,
+                'label'         => $label,
+                'averages'      => isset($aggregates['averages']) ? $aggregates['averages'] : array(),
+                'peak_presence' => isset($aggregates['peak_presence']) ? $aggregates['peak_presence'] : array(),
+                'boost_trend'   => isset($aggregates['boost_trend']) ? $aggregates['boost_trend'] : array(),
+                'timeseries'    => $timeseries,
+            );
+        }
+
+        $range = array(
+            'start' => $this->resolve_timestamp_bound($range_bounds['start']),
+            'end'   => $this->resolve_timestamp_bound($range_bounds['end']),
+            'days'  => $days,
+        );
+
+        $data = array(
+            'range'  => $range,
+            'series' => $series,
+        );
+
+        if (1 === count($series)) {
+            $first = $series[0];
+            $data = array_merge(
+                $data,
+                array(
+                    'profile_key'   => $first['profile_key'],
+                    'label'         => $first['label'],
+                    'averages'      => $first['averages'],
+                    'peak_presence' => $first['peak_presence'],
+                    'boost_trend'   => $first['boost_trend'],
+                    'timeseries'    => $first['timeseries'],
+                )
+            );
         }
 
         $response = array(
             'success' => true,
-            'data'    => $aggregates,
+            'data'    => $data,
         );
 
         return rest_ensure_response(new WP_REST_Response($response, 200));
@@ -520,6 +583,220 @@ class Discord_Bot_JLG_REST_Controller {
         }
 
         return $ttl;
+    }
+
+    public function sanitize_profile_keys_param($value) {
+        if (is_string($value)) {
+            $parts = preg_split('/[\s,]+/', $value);
+        } elseif (is_array($value)) {
+            $parts = $value;
+        } else {
+            return array();
+        }
+
+        $sanitized = array();
+
+        foreach ($parts as $part) {
+            if (is_array($part)) {
+                $sanitized = array_merge($sanitized, $this->sanitize_profile_keys_param($part));
+                continue;
+            }
+
+            $key = discord_bot_jlg_sanitize_profile_key((string) $part);
+            if ('' === $key) {
+                continue;
+            }
+
+            $sanitized[] = $key;
+        }
+
+        return array_values(array_unique($sanitized));
+    }
+
+    private function normalize_requested_profile_keys(WP_REST_Request $request) {
+        $profile_keys = array();
+
+        $multi_param = $request->get_param('profile_keys');
+        if (null !== $multi_param) {
+            $profile_keys = array_merge($profile_keys, $this->sanitize_profile_keys_param($multi_param));
+        }
+
+        $single_param = $request->get_param('profile_key');
+        if (is_array($single_param)) {
+            $profile_keys = array_merge($profile_keys, $this->sanitize_profile_keys_param($single_param));
+        } else {
+            $single_key = discord_bot_jlg_sanitize_profile_key((string) $single_param);
+            if ('' !== $single_key) {
+                $profile_keys[] = $single_key;
+            }
+        }
+
+        $profile_keys = array_values(array_unique($profile_keys));
+
+        if (empty($profile_keys)) {
+            return array();
+        }
+
+        return array_map(function ($key) {
+            return ('' === $key) ? 'default' : $key;
+        }, $profile_keys);
+    }
+
+    private function resolve_profile_label($profile_key, $profiles_metadata) {
+        if (is_array($profiles_metadata) && isset($profiles_metadata[$profile_key])) {
+            $label = isset($profiles_metadata[$profile_key]['label']) ? $profiles_metadata[$profile_key]['label'] : '';
+            if ('' !== $label) {
+                return $label;
+            }
+        }
+
+        if ('default' === $profile_key) {
+            return __('Profil par défaut', 'discord-bot-jlg');
+        }
+
+        return $profile_key;
+    }
+
+    private function merge_timeline($timeline, $timeseries) {
+        if (!is_array($timeline)) {
+            $timeline = array();
+        }
+
+        if (!is_array($timeseries)) {
+            return $timeline;
+        }
+
+        foreach ($timeseries as $point) {
+            if (!is_array($point) || !isset($point['timestamp'])) {
+                continue;
+            }
+
+            $timestamp = (int) $point['timestamp'];
+            if ($timestamp <= 0) {
+                continue;
+            }
+
+            $timeline[] = $timestamp;
+        }
+
+        return $timeline;
+    }
+
+    private function align_timeseries_to_timeline($timeseries, $timeline) {
+        if (!is_array($timeline) || empty($timeline)) {
+            return array();
+        }
+
+        $indexed = array();
+
+        if (is_array($timeseries)) {
+            foreach ($timeseries as $point) {
+                if (!is_array($point) || !isset($point['timestamp'])) {
+                    continue;
+                }
+
+                $timestamp = (int) $point['timestamp'];
+                if ($timestamp <= 0) {
+                    continue;
+                }
+
+                $indexed[$timestamp] = array(
+                    'timestamp' => $timestamp,
+                    'online'    => isset($point['online']) ? $point['online'] : null,
+                    'presence'  => isset($point['presence']) ? $point['presence'] : null,
+                    'total'     => isset($point['total']) ? $point['total'] : null,
+                    'premium'   => isset($point['premium']) ? $point['premium'] : null,
+                );
+            }
+        }
+
+        $aligned = array();
+
+        foreach ($timeline as $timestamp) {
+            $timestamp = (int) $timestamp;
+            if (isset($indexed[$timestamp])) {
+                $aligned[] = $indexed[$timestamp];
+                continue;
+            }
+
+            $aligned[] = array(
+                'timestamp' => $timestamp,
+                'online'    => null,
+                'presence'  => null,
+                'total'     => null,
+                'premium'   => null,
+            );
+        }
+
+        return $aligned;
+    }
+
+    private function build_empty_timeseries($timeline) {
+        if (!is_array($timeline)) {
+            return array();
+        }
+
+        $empty = array();
+        foreach ($timeline as $timestamp) {
+            $timestamp = (int) $timestamp;
+            if ($timestamp <= 0) {
+                continue;
+            }
+
+            $empty[] = array(
+                'timestamp' => $timestamp,
+                'online'    => null,
+                'presence'  => null,
+                'total'     => null,
+                'premium'   => null,
+            );
+        }
+
+        return $empty;
+    }
+
+    private function min_timestamp($current, $range, $key) {
+        if (!is_array($range) || !isset($range[$key])) {
+            return $current;
+        }
+
+        $value = (int) $range[$key];
+        if ($value <= 0) {
+            return $current;
+        }
+
+        if (null === $current || $value < $current) {
+            return $value;
+        }
+
+        return $current;
+    }
+
+    private function max_timestamp($current, $range, $key) {
+        if (!is_array($range) || !isset($range[$key])) {
+            return $current;
+        }
+
+        $value = (int) $range[$key];
+        if ($value <= 0) {
+            return $current;
+        }
+
+        if (null === $current || $value > $current) {
+            return $value;
+        }
+
+        return $current;
+    }
+
+    private function resolve_timestamp_bound($value) {
+        if (null === $value) {
+            return null;
+        }
+
+        $value = (int) $value;
+
+        return $value > 0 ? $value : null;
     }
 
     private function maybe_get_cached_analytics($cache_key, $ttl) {

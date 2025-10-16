@@ -36,14 +36,27 @@ class Stubbed_Discord_Bot_JLG_API_For_REST extends Discord_Bot_JLG_API {
 
 class Stubbed_Discord_Bot_JLG_Analytics {
     public $last_args = array();
+    public $call_log = array();
     private $payload;
+    private $payload_map = array();
 
     public function __construct($payload = array()) {
         $this->payload = $payload;
     }
 
+    public function set_payload_map(array $map) {
+        $this->payload_map = $map;
+    }
+
     public function get_aggregates($args = array()) {
         $this->last_args = $args;
+        $this->call_log[] = $args;
+
+        $profile_key = isset($args['profile_key']) ? $args['profile_key'] : '';
+        if (isset($this->payload_map[$profile_key])) {
+            return $this->payload_map[$profile_key];
+        }
+
         return $this->payload;
     }
 }
@@ -194,7 +207,13 @@ class Test_Discord_Bot_JLG_REST_Controller extends TestCase {
 
         $payload = $response->get_data();
         $this->assertTrue($payload['success']);
-        $this->assertSame($analytics_payload, $payload['data']);
+        $this->assertArrayHasKey('data', $payload);
+        $this->assertArrayHasKey('series', $payload['data']);
+        $this->assertCount(1, $payload['data']['series']);
+        $series_entry = $payload['data']['series'][0];
+        $this->assertSame('guild', $series_entry['profile_key']);
+        $this->assertSame($analytics_payload['timeseries'], $series_entry['timeseries']);
+        $this->assertSame($series_entry['timeseries'], $payload['data']['timeseries']);
         $this->assertArrayHasKey('profile_key', $analytics->last_args);
         $this->assertSame('guild', $analytics->last_args['profile_key']);
         $this->assertSame(5, $analytics->last_args['days']);
@@ -211,6 +230,62 @@ class Test_Discord_Bot_JLG_REST_Controller extends TestCase {
         $payload = $response->get_data();
         $this->assertFalse($payload['success']);
         $this->assertArrayHasKey('message', $payload['data']);
+    }
+
+    public function test_analytics_route_supports_multiple_profiles() {
+        $api       = new Stubbed_Discord_Bot_JLG_API_For_REST();
+        $analytics = new Stubbed_Discord_Bot_JLG_Analytics();
+        $analytics->set_payload_map(
+            array(
+                'alpha' => array(
+                    'timeseries' => array(
+                        array('timestamp' => 100, 'presence' => 5, 'online' => 2),
+                        array('timestamp' => 200, 'presence' => 7, 'online' => 3),
+                    ),
+                ),
+                'beta'  => array(
+                    'timeseries' => array(
+                        array('timestamp' => 100, 'presence' => 3, 'online' => 1),
+                        array('timestamp' => 300, 'presence' => 6, 'online' => 2),
+                    ),
+                ),
+            )
+        );
+
+        $controller = new Discord_Bot_JLG_REST_Controller($api, $analytics);
+        $request    = new WP_REST_Request();
+        $request->set_param('profile_keys', array('alpha', 'beta'));
+        $request->set_param('days', 4);
+
+        $response = $controller->handle_get_analytics($request);
+        $this->assertSame(200, $response->get_status());
+
+        $payload = $response->get_data();
+        $this->assertTrue($payload['success']);
+        $this->assertArrayHasKey('series', $payload['data']);
+        $this->assertCount(2, $payload['data']['series']);
+
+        $series_keys = array();
+        foreach ($payload['data']['series'] as $series_entry) {
+            if (isset($series_entry['profile_key'])) {
+                $series_keys[] = $series_entry['profile_key'];
+            }
+        }
+        sort($series_keys);
+        $this->assertSame(array('alpha', 'beta'), $series_keys);
+
+        $timeline = array();
+        foreach ($payload['data']['series'][0]['timeseries'] as $point) {
+            if (isset($point['timestamp'])) {
+                $timeline[] = $point['timestamp'];
+            }
+        }
+        $this->assertContains(100, $timeline);
+        $this->assertContains(200, $timeline);
+
+        $this->assertCount(2, $analytics->call_log);
+        $this->assertSame('alpha', $analytics->call_log[0]['profile_key']);
+        $this->assertSame('beta', $analytics->call_log[1]['profile_key']);
     }
 
     public function test_export_analytics_uses_cached_payload_when_available() {

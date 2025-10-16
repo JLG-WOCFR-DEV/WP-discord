@@ -3935,32 +3935,12 @@ class Discord_Bot_JLG_Admin {
                 <h2>📈 <?php esc_html_e('Tendances des statistiques', 'discord-bot-jlg'); ?></h2>
                 <p class="description"><?php echo esc_html($retention_text); ?></p>
             </div>
+            <div class="discord-analytics-panel__filters" data-role="analytics-filters"></div>
             <div class="discord-analytics-panel__body">
                 <div class="discord-analytics-panel__canvas">
                     <canvas id="discord-analytics-chart" height="240" role="img" aria-label="<?php esc_attr_e('Évolution des présences et boosts Discord', 'discord-bot-jlg'); ?>"></canvas>
                 </div>
-                <div class="discord-analytics-panel__summary">
-                    <div class="discord-analytics-summary__item">
-                        <span class="discord-analytics-summary__label"><?php esc_html_e('Moyenne en ligne', 'discord-bot-jlg'); ?></span>
-                        <span class="discord-analytics-summary__value" data-role="analytics-average-online">—</span>
-                    </div>
-                    <div class="discord-analytics-summary__item">
-                        <span class="discord-analytics-summary__label"><?php esc_html_e('Présence moyenne', 'discord-bot-jlg'); ?></span>
-                        <span class="discord-analytics-summary__value" data-role="analytics-average-presence">—</span>
-                    </div>
-                    <div class="discord-analytics-summary__item">
-                        <span class="discord-analytics-summary__label"><?php esc_html_e('Moyenne totale', 'discord-bot-jlg'); ?></span>
-                        <span class="discord-analytics-summary__value" data-role="analytics-average-total">—</span>
-                    </div>
-                    <div class="discord-analytics-summary__item">
-                        <span class="discord-analytics-summary__label"><?php esc_html_e('Pic de présence', 'discord-bot-jlg'); ?></span>
-                        <span class="discord-analytics-summary__value" data-role="analytics-peak-presence">—</span>
-                    </div>
-                    <div class="discord-analytics-summary__item">
-                        <span class="discord-analytics-summary__label"><?php esc_html_e('Tendance des boosts', 'discord-bot-jlg'); ?></span>
-                        <span class="discord-analytics-summary__value" data-role="analytics-boost-trend">—</span>
-                    </div>
-                </div>
+                <div class="discord-analytics-panel__summary" data-role="analytics-summary"></div>
             </div>
             <p class="discord-analytics-panel__notice" data-role="analytics-notice"></p>
         </div>
@@ -4294,6 +4274,63 @@ class Discord_Bot_JLG_Admin {
         $options   = $this->api->get_plugin_options();
         $retention = $this->api->get_analytics_retention_days($options);
 
+        $profiles = $this->api->get_server_profiles(false);
+        if (!isset($profiles['default'])) {
+            $profiles = array_merge(
+                array(
+                    'default' => array(
+                        'key'   => 'default',
+                        'label' => esc_html__('Profil par défaut', 'discord-bot-jlg'),
+                    ),
+                ),
+                $profiles
+            );
+        }
+
+        $profile_entries = array();
+        foreach ($profiles as $profile_key => $profile_data) {
+            $label = isset($profile_data['label']) ? $profile_data['label'] : '';
+            if ('' === $label) {
+                $label = ('default' === $profile_key)
+                    ? esc_html__('Profil par défaut', 'discord-bot-jlg')
+                    : $profile_key;
+            }
+
+            $profile_entries[] = array(
+                'key'       => $profile_key,
+                'label'     => $label,
+                'server_id' => isset($profile_data['server_id']) ? $profile_data['server_id'] : '',
+            );
+        }
+
+        if (empty($profile_entries)) {
+            $profile_entries[] = array(
+                'key'   => 'default',
+                'label' => esc_html__('Profil par défaut', 'discord-bot-jlg'),
+            );
+        }
+
+        $requested_profiles = wp_list_pluck($profile_entries, 'key');
+
+        $default_selection = apply_filters(
+            'discord_bot_jlg_admin_default_profiles',
+            array_slice($requested_profiles, 0, min(2, count($requested_profiles))),
+            $profile_entries
+        );
+
+        if (empty($default_selection)) {
+            $default_selection = array($profile_entries[0]['key']);
+        }
+
+        $comparison_presets = $this->build_admin_comparison_presets($profile_entries, $default_selection);
+        $annotations = apply_filters('discord_bot_jlg_admin_analytics_annotations', array(), $profile_entries);
+
+        $requested_days = (int) $retention;
+        if ($requested_days <= 0) {
+            $requested_days = 7;
+        }
+        $requested_days = min(30, max(7, $requested_days));
+
         wp_localize_script(
             'discord-bot-jlg-admin-analytics',
             'discordBotJlgAdminAnalytics',
@@ -4302,22 +4339,140 @@ class Discord_Bot_JLG_Admin {
                 'nonce'          => wp_create_nonce('wp_rest'),
                 'canvasId'       => 'discord-analytics-chart',
                 'containerId'    => 'discord-analytics-panel',
-                'profileKey'     => '',
-                'days'           => 7,
+                'days'           => $requested_days,
+                'defaultMetric'  => 'presence',
+                'defaultProfiles'=> array_values($default_selection),
+                'requestedProfiles' => array_values($requested_profiles),
+                'profiles'       => $profile_entries,
+                'comparisonPresets' => $comparison_presets,
+                'annotations'    => $annotations,
                 'retentionDays'  => (int) $retention,
                 'labels'         => array(
-                    'averageOnline'    => esc_html__('Moyenne en ligne', 'discord-bot-jlg'),
-                    'averagePresence'  => esc_html__('Présence moyenne', 'discord-bot-jlg'),
-                    'averageTotal'     => esc_html__('Moyenne totale', 'discord-bot-jlg'),
-                    'peakPresence'     => esc_html__('Pic de présence', 'discord-bot-jlg'),
-                    'boostTrend'       => esc_html__('Tendance des boosts', 'discord-bot-jlg'),
-                    'noData'           => esc_html__('Pas encore de données collectées.', 'discord-bot-jlg'),
+                    'averageOnline'      => esc_html__('Moyenne en ligne', 'discord-bot-jlg'),
+                    'averagePresence'    => esc_html__('Présence moyenne', 'discord-bot-jlg'),
+                    'averageTotal'       => esc_html__('Moyenne totale', 'discord-bot-jlg'),
+                    'peakPresence'       => esc_html__('Pic de présence', 'discord-bot-jlg'),
+                    'boostTrend'         => esc_html__('Tendance des boosts', 'discord-bot-jlg'),
+                    'noData'             => esc_html__('Pas encore de données collectées.', 'discord-bot-jlg'),
+                    'rangeLabel'         => esc_html__('Fenêtre temporelle', 'discord-bot-jlg'),
+                    'rangeAll'           => esc_html__('Toute la période', 'discord-bot-jlg'),
+                    'rangeCustom'        => esc_html__('Personnalisé', 'discord-bot-jlg'),
+                    'rangeStart'         => esc_html__('Début', 'discord-bot-jlg'),
+                    'rangeEnd'           => esc_html__('Fin', 'discord-bot-jlg'),
+                    'exportCsv'          => esc_html__('Exporter CSV', 'discord-bot-jlg'),
+                    'exportPng'          => esc_html__('Exporter PNG', 'discord-bot-jlg'),
+                    'annotationsToggle'  => esc_html__('Afficher les annotations', 'discord-bot-jlg'),
+                    'annotations'        => esc_html__('Annotations', 'discord-bot-jlg'),
+                    'annotationOnline'   => esc_html__('Pic en ligne', 'discord-bot-jlg'),
+                    'annotationPresence' => esc_html__('Pic de présence', 'discord-bot-jlg'),
+                    'annotationPremium'  => esc_html__('Pic de boosts', 'discord-bot-jlg'),
+                    'profileFilterLabel' => esc_html__('Profils à comparer', 'discord-bot-jlg'),
+                    'profileSelectAll'   => esc_html__('Tout sélectionner', 'discord-bot-jlg'),
+                    'profileSelectNone'  => esc_html__('Tout désélectionner', 'discord-bot-jlg'),
+                    'presetLabel'        => esc_html__('Presets de comparaison', 'discord-bot-jlg'),
+                    'metricLabel'        => esc_html__('Métrique', 'discord-bot-jlg'),
+                    'metricPresence'     => esc_html__('Présence', 'discord-bot-jlg'),
+                    'metricOnline'       => esc_html__('En ligne', 'discord-bot-jlg'),
+                    'metricTotal'        => esc_html__('Total', 'discord-bot-jlg'),
+                    'metricPremium'      => esc_html__('Boosts', 'discord-bot-jlg'),
+                    'exportTargetLabel'  => esc_html__('Exporter', 'discord-bot-jlg'),
+                    'exportCombined'     => esc_html__('Combiné', 'discord-bot-jlg'),
+                    'summaryTitle'       => esc_html__('Synthèse', 'discord-bot-jlg'),
+                    'summaryPresence'    => esc_html__('Présence moyenne', 'discord-bot-jlg'),
+                    'summaryOnline'      => esc_html__('Moy. en ligne', 'discord-bot-jlg'),
+                    'summaryTotal'       => esc_html__('Moy. membres', 'discord-bot-jlg'),
+                    'summaryPeak'        => esc_html__('Pic de présence', 'discord-bot-jlg'),
+                    'summaryBoost'       => esc_html__('Boosts', 'discord-bot-jlg'),
                 ),
             )
         );
 
         wp_enqueue_script('discord-bot-jlg-chartjs');
         wp_enqueue_script('discord-bot-jlg-admin-analytics');
+    }
+
+    private function build_admin_comparison_presets($profiles, $default_selection) {
+        if (!is_array($profiles)) {
+            $profiles = array();
+        }
+
+        if (!is_array($default_selection)) {
+            $default_selection = array();
+        }
+
+        $presets = array();
+
+        $all_keys = array();
+        foreach ($profiles as $profile) {
+            if (!isset($profile['key'])) {
+                continue;
+            }
+            $all_keys[] = $profile['key'];
+        }
+
+        if (!empty($all_keys)) {
+            $presets[] = array(
+                'id'       => 'all-profiles',
+                'label'    => esc_html__('Tous les profils', 'discord-bot-jlg'),
+                'profiles' => array_values($all_keys),
+            );
+        }
+
+        if (!empty($default_selection)) {
+            $presets[] = array(
+                'id'       => 'default-selection',
+                'label'    => esc_html__('Sélection par défaut', 'discord-bot-jlg'),
+                'profiles' => array_values($default_selection),
+            );
+        }
+
+        $featured = array_slice($profiles, 0, 3);
+        if (count($featured) >= 2) {
+            $presets[] = array(
+                'id'       => 'first-duo',
+                'label'    => esc_html__('Comparer les deux premiers', 'discord-bot-jlg'),
+                'profiles' => array($featured[0]['key'], $featured[1]['key']),
+            );
+        }
+
+        foreach ($profiles as $profile) {
+            if (!isset($profile['key'])) {
+                continue;
+            }
+
+            $label = isset($profile['label']) && $profile['label']
+                ? $profile['label']
+                : $profile['key'];
+
+            $presets[] = array(
+                'id'       => 'focus-' . sanitize_title($profile['key']),
+                'label'    => sprintf(
+                    /* translators: %s: profile label. */
+                    esc_html__('Focus sur %s', 'discord-bot-jlg'),
+                    $label
+                ),
+                'profiles' => array($profile['key']),
+            );
+        }
+
+        $unique = array();
+        $seen   = array();
+
+        foreach ($presets as $preset) {
+            if (empty($preset['profiles'])) {
+                continue;
+            }
+
+            $signature = implode('|', $preset['profiles']);
+            if (isset($seen[$signature])) {
+                continue;
+            }
+
+            $seen[$signature] = true;
+            $unique[]         = $preset;
+        }
+
+        return apply_filters('discord_bot_jlg_admin_comparison_presets', $unique, $profiles, $default_selection);
     }
 
     /**
