@@ -102,6 +102,10 @@ function discord_bot_jlg_uninstall() {
         require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-options-repository.php';
     }
 
+    if (!class_exists('Discord_Bot_JLG_Token_Store')) {
+        require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-token-store.php';
+    }
+
     if (class_exists('Discord_Bot_JLG_API')) {
         $analytics = new Discord_Bot_JLG_Analytics();
         $event_logger = new Discord_Bot_JLG_Event_Logger();
@@ -130,6 +134,14 @@ function discord_bot_jlg_uninstall() {
         }
     }
 
+    if (class_exists('Discord_Bot_JLG_Token_Store')) {
+        global $wpdb;
+        $token_store = new Discord_Bot_JLG_Token_Store($wpdb);
+        if ($wpdb && method_exists($wpdb, 'query')) {
+            $wpdb->query('DROP TABLE IF EXISTS ' . $token_store->get_table_name());
+        }
+    }
+
     if (class_exists('Discord_Bot_JLG_Event_Logger')) {
         delete_option(Discord_Bot_JLG_Event_Logger::OPTION_NAME);
     }
@@ -141,6 +153,7 @@ require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/helpers.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-analytics.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-http.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-cache-gateway.php';
+require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-token-store.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-profile-repository.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-http-connector.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-event-logger.php';
@@ -203,6 +216,7 @@ class DiscordServerStats {
     private $rest_controller;
     private $analytics;
     private $event_logger;
+    private $token_store;
     private $options_repository;
     private $job_queue;
     private $alerts;
@@ -216,6 +230,7 @@ class DiscordServerStats {
 
         $this->analytics = new Discord_Bot_JLG_Analytics();
         $this->event_logger = new Discord_Bot_JLG_Event_Logger();
+        $this->token_store = new Discord_Bot_JLG_Token_Store();
         $this->options_repository = new Discord_Bot_JLG_Options_Repository(
             DISCORD_BOT_JLG_OPTION_NAME,
             'discord_bot_jlg_get_default_options'
@@ -644,6 +659,10 @@ class DiscordServerStats {
 
         if ($this->analytics instanceof Discord_Bot_JLG_Analytics) {
             $this->analytics->install();
+        }
+
+        if ($this->token_store instanceof Discord_Bot_JLG_Token_Store) {
+            $this->token_store->install();
         }
 
         Discord_Bot_JLG_Capabilities::ensure_roles_have_capabilities();
