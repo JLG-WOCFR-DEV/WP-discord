@@ -234,7 +234,17 @@ class Test_Discord_Bot_JLG_REST_Controller extends TestCase {
 
     public function test_analytics_route_returns_aggregates() {
         $api = new Stubbed_Discord_Bot_JLG_API_For_REST();
-        $analytics_payload = array('timeseries' => array(array('timestamp' => 1000, 'online' => 12)));
+        $analytics_payload = array(
+            'timeseries' => array(
+                array(
+                    'timestamp' => 1000,
+                    'online'    => 12,
+                    'presence'  => null,
+                    'total'     => null,
+                    'premium'   => null,
+                ),
+            ),
+        );
         $analytics = new Stubbed_Discord_Bot_JLG_Analytics($analytics_payload);
 
         $controller = new Discord_Bot_JLG_REST_Controller($api, $analytics);
