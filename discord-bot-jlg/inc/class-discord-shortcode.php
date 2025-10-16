@@ -715,10 +715,6 @@ class Discord_Bot_JLG_Shortcode {
             $refresh_interval = max($min_refresh_interval, intval($atts['refresh_interval']));
         }
 
-        if ($refresh_interval > 0) {
-            $attributes[] = sprintf('data-refresh="%s"', esc_attr($refresh_interval));
-        }
-
         $this->enqueue_assets($options, ($refresh_interval > 0));
 
         $stale_notice_text = '';
@@ -1016,6 +1012,10 @@ class Discord_Bot_JLG_Shortcode {
 
         $attributes[] = sprintf('data-status-variant="%s"', esc_attr($status_variant));
         $attributes[] = sprintf('data-can-force-refresh="%s"', esc_attr($can_force_refresh ? 'true' : 'false'));
+
+        if ($refresh_interval > 0) {
+            $attributes[] = sprintf('data-refresh="%s"', esc_attr($refresh_interval));
+        }
 
         if ($cache_duration > 0) {
             $attributes[] = sprintf('data-cache-duration="%d"', (int) $cache_duration);
