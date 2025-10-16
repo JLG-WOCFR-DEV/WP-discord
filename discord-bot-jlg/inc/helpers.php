@@ -11,6 +11,38 @@ if (!defined('DISCORD_BOT_JLG_SECRET_PREFIX')) {
     define('DISCORD_BOT_JLG_SECRET_PREFIX', 'dbjlg_enc_v2:');
 }
 
+if (!function_exists('discord_bot_jlg_get_default_options')) {
+    /**
+     * Returns the default options used by the plugin.
+     *
+     * @return array
+     */
+    function discord_bot_jlg_get_default_options() {
+        $default_cache_duration = defined('DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION')
+            ? DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION
+            : 300;
+
+        $default_analytics_retention = defined('DISCORD_BOT_JLG_ANALYTICS_RETENTION_DEFAULT')
+            ? DISCORD_BOT_JLG_ANALYTICS_RETENTION_DEFAULT
+            : 90;
+
+        return array(
+            'server_id'                     => '',
+            'bot_token'                     => '',
+            'bot_token_rotated_at'          => 0,
+            'server_profiles'               => array(),
+            'demo_mode'                     => false,
+            'show_online'                   => true,
+            'show_total'                    => true,
+            'custom_css'                    => '',
+            'widget_title'                  => 'Discord Server',
+            'cache_duration'                => $default_cache_duration,
+            'analytics_retention_days'      => $default_analytics_retention,
+            'analytics_alert_webhook_secret' => '',
+        );
+    }
+}
+
 if (!function_exists('absint')) {
     /**
      * Lightweight polyfill for WordPress absint().
