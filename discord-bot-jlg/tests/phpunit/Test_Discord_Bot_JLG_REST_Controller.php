@@ -502,6 +502,16 @@ class Test_Discord_Bot_JLG_REST_Controller extends TestCase {
         $this->assertSame(200, $response->get_status());
         $this->assertSame(array(), $analytics->last_args);
 
+        $headers = $response->get_headers();
+        $this->assertIsArray($headers);
+        $this->assertArrayHasKey('Content-Disposition', $headers);
+
+        $pattern = sprintf(
+            '/attachment; filename="discord-analytics-%s-[0-9]{8}-[0-9]{6}\\.json"/',
+            preg_quote($sanitized_profile, '/')
+        );
+        $this->assertMatchesRegularExpression($pattern, $headers['Content-Disposition']);
+
         $payload = $response->get_data();
         $this->assertTrue($payload['success']);
         $this->assertSame($cached_payload['range'], $payload['data']['range']);
@@ -559,6 +569,19 @@ class Test_Discord_Bot_JLG_REST_Controller extends TestCase {
         $this->assertSame($profile_key, $analytics->last_args['profile_key']);
         $this->assertSame($server_id, $analytics->last_args['server_id']);
         $this->assertSame($days, $analytics->last_args['days']);
+
+        $headers = $response->get_headers();
+        $this->assertIsArray($headers);
+        $this->assertArrayHasKey('Content-Type', $headers);
+        $this->assertSame('text/csv; charset=utf-8', $headers['Content-Type']);
+
+        $this->assertArrayHasKey('Content-Disposition', $headers);
+        $expected_profile = discord_bot_jlg_sanitize_profile_key($profile_key);
+        $pattern = sprintf(
+            '/attachment; filename="discord-analytics-%s-[0-9]{8}-[0-9]{6}\\.csv"/',
+            preg_quote($expected_profile, '/')
+        );
+        $this->assertMatchesRegularExpression($pattern, $headers['Content-Disposition']);
 
         $cached = get_transient($cache_key);
         $this->assertSame($payload, $cached);
