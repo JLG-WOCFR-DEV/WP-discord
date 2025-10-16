@@ -206,7 +206,20 @@ class Discord_Stats_Widget extends WP_Widget {
         $instance['show_card_title'] = !empty($new_instance['show_card_title']) ? 1 : 0;
         $instance['card_title']      = isset($new_instance['card_title']) ? sanitize_text_field($new_instance['card_title']) : '';
 
-        $profile_key = isset($new_instance['profile_key']) ? discord_bot_jlg_sanitize_profile_key($new_instance['profile_key']) : '';
+        $profile_key = '';
+        if (isset($new_instance['profile_key'])) {
+            $raw_profile_key = $new_instance['profile_key'];
+
+            if (!is_string($raw_profile_key) && is_scalar($raw_profile_key)) {
+                $raw_profile_key = (string) $raw_profile_key;
+            }
+
+            if (is_string($raw_profile_key)) {
+                $normalized_profile_key = sanitize_title($raw_profile_key);
+                $profile_key = discord_bot_jlg_sanitize_profile_key($normalized_profile_key);
+            }
+        }
+
         $instance['profile_key'] = $profile_key;
 
         $server_id_override = isset($new_instance['server_id_override'])

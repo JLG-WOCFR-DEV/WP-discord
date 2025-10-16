@@ -60,6 +60,18 @@ class Test_Discord_Stats_Widget extends TestCase {
         $this->assertSame('123456', $updated['server_id_override']);
     }
 
+    public function test_update_normalizes_profile_key_with_accents() {
+        $widget = new Discord_Stats_Widget();
+
+        $new_instance = array(
+            'profile_key' => 'Profil Élève',
+        );
+
+        $updated = $widget->update($new_instance, array());
+
+        $this->assertSame('profil-eleve', $updated['profile_key']);
+    }
+
     public function test_update_handles_metric_toggles() {
         $widget = new Discord_Stats_Widget();
 
@@ -87,7 +99,7 @@ class Test_Discord_Stats_Widget extends TestCase {
         );
 
         $instance = array(
-            'profile_key'        => 'profil-special',
+            'profile_key'        => 'Profil Personnel',
             'server_id_override' => '987654321',
         );
 
@@ -96,7 +108,7 @@ class Test_Discord_Stats_Widget extends TestCase {
         ob_end_clean();
 
         $this->assertNotNull($GLOBALS['discord_bot_jlg_last_shortcode']);
-        $this->assertStringContainsString('profile="profil-special"', $GLOBALS['discord_bot_jlg_last_shortcode']);
+        $this->assertStringContainsString('profile="profil-personnel"', $GLOBALS['discord_bot_jlg_last_shortcode']);
         $this->assertStringContainsString('server_id="987654321"', $GLOBALS['discord_bot_jlg_last_shortcode']);
         $this->assertStringNotContainsString('bot_token=', $GLOBALS['discord_bot_jlg_last_shortcode']);
     }
