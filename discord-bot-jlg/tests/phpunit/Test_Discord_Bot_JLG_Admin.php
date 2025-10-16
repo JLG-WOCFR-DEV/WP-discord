@@ -54,14 +54,41 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
      */
     protected $rotation_timestamp;
 
+    /**
+     * @var string
+     */
+    protected $saved_bot_token_plain;
+
+    /**
+     * @var string
+     */
+    protected $saved_bot_token_encrypted;
+
     public function setUp(): void {
         parent::setUp();
 
+        if (!defined('AUTH_KEY')) {
+            define('AUTH_KEY', 'discord-bot-jlg-tests-auth-key');
+        }
+
+        if (!defined('AUTH_SALT')) {
+            define('AUTH_SALT', 'discord-bot-jlg-tests-auth-salt');
+        }
+
         $this->rotation_timestamp = current_time('timestamp') - (5 * DAY_IN_SECONDS);
+
+        $this->saved_bot_token_plain = 'stored-token';
+        $encrypted_token = discord_bot_jlg_encrypt_secret($this->saved_bot_token_plain);
+
+        if (is_wp_error($encrypted_token)) {
+            $this->fail('Failed to encrypt test token: ' . $encrypted_token->get_error_message());
+        }
+
+        $this->saved_bot_token_encrypted = $encrypted_token;
 
         $this->saved_options = array(
             'server_id'      => '424242424242424242',
-            'bot_token'      => 'stored-token',
+            'bot_token'      => $this->saved_bot_token_encrypted,
             'bot_token_rotated_at' => $this->rotation_timestamp,
             'demo_mode'      => 1,
             'show_online'    => 1,
@@ -302,11 +329,11 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
         $time_after  = current_time('timestamp');
         $expected = array_merge($this->get_expected_defaults(), $expected_overrides);
 
-        $result_token   = isset($result['bot_token']) ? $result['bot_token'] : '';
-        $expected_token = $this->saved_options['bot_token'];
+        $result_token         = isset($result['bot_token']) ? $result['bot_token'] : '';
+        $expected_token_plain = $this->saved_bot_token_plain;
 
         if (array_key_exists('bot_token', $expected_overrides)) {
-            $expected_token = $expected_overrides['bot_token'];
+            $expected_token_plain = (string) $expected_overrides['bot_token'];
         }
 
         $result_rotation   = isset($result['bot_token_rotated_at']) ? (int) $result['bot_token_rotated_at'] : 0;
@@ -325,7 +352,7 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
             $this->assertGreaterThanOrEqual($time_before, $result_rotation);
             $this->assertLessThanOrEqual($time_after, $result_rotation);
             $metadata = $this->calculate_expected_secret_metadata(
-                $expected_token,
+                $expected_token_plain,
                 $result_rotation,
                 $result_rotation
             );
@@ -357,14 +384,14 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
 
         $this->assertSame($expected, $result);
 
-        if ('' === $expected_token) {
+        if ('' === $expected_token_plain) {
             $this->assertSame('', $result_token);
         } else {
             $this->assertTrue(discord_bot_jlg_is_encrypted_secret($result_token));
             $decrypted = discord_bot_jlg_decrypt_secret($result_token);
 
             $this->assertFalse(is_wp_error($decrypted));
-            $this->assertSame($expected_token, $decrypted);
+            $this->assertSame($expected_token_plain, $decrypted);
         }
     }
 
@@ -384,6 +411,12 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
 
         $this->assertSame($expected['bot_token'], $result['bot_token']);
         $this->assertSame($expected['bot_token_rotated_at'], $result['bot_token_rotated_at']);
+        $this->assertTrue(discord_bot_jlg_is_encrypted_secret($result['bot_token']));
+
+        $decrypted = discord_bot_jlg_decrypt_secret($result['bot_token']);
+
+        $this->assertFalse(is_wp_error($decrypted));
+        $this->assertSame($this->saved_bot_token_plain, $decrypted);
 
         unset($expected['bot_token'], $result['bot_token']);
         unset($expected['bot_token_rotated_at'], $result['bot_token_rotated_at']);
@@ -406,7 +439,7 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
         $decrypted = discord_bot_jlg_decrypt_secret($result['bot_token']);
 
         $this->assertFalse(is_wp_error($decrypted));
-        $this->assertSame($this->saved_options['bot_token'], $decrypted);
+        $this->assertSame($this->saved_bot_token_plain, $decrypted);
         $this->assertSame($this->rotation_timestamp, (int) $result['bot_token_rotated_at']);
 
         unset($expected['bot_token'], $result['bot_token']);
