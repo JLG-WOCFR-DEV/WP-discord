@@ -925,10 +925,18 @@ if (!class_exists('WP_REST_Response')) {
     class WP_REST_Response {
         protected $data;
         protected $status;
+        protected $headers;
 
-        public function __construct($data = null, $status = 200) {
-            $this->data   = $data;
-            $this->status = (int) $status;
+        public function __construct($data = null, $status = 200, $headers = array()) {
+            $this->data    = $data;
+            $this->status  = (int) $status;
+            $this->headers = array();
+
+            if (is_array($headers)) {
+                foreach ($headers as $key => $value) {
+                    $this->header($key, $value);
+                }
+            }
         }
 
         public function get_data() {
@@ -945,6 +953,30 @@ if (!class_exists('WP_REST_Response')) {
 
         public function set_status($status) {
             $this->status = (int) $status;
+        }
+
+        public function header($key, $value) {
+            if (!is_string($key) || '' === $key) {
+                return $this;
+            }
+
+            if (is_array($value)) {
+                $value = implode(', ', array_map('strval', $value));
+            } elseif (is_object($value) && method_exists($value, '__toString')) {
+                $value = (string) $value;
+            } elseif (is_object($value)) {
+                $value = '';
+            } else {
+                $value = (string) $value;
+            }
+
+            $this->headers[$key] = $value;
+
+            return $this;
+        }
+
+        public function get_headers() {
+            return $this->headers;
         }
     }
 }
