@@ -334,6 +334,14 @@ class Discord_Bot_JLG_Admin {
         );
 
         add_settings_field(
+            'analytics_alert_webhook_secret',
+            __('Secret du webhook entrant', 'discord-bot-jlg'),
+            array($this, 'analytics_alert_webhook_secret_render'),
+            'discord_stats_settings',
+            'discord_stats_alerts_section'
+        );
+
+        add_settings_field(
             'analytics_alert_cooldown',
             __('Délai minimum entre alertes (minutes)', 'discord-bot-jlg'),
             array($this, 'analytics_alert_cooldown_render'),
@@ -480,6 +488,9 @@ class Discord_Bot_JLG_Admin {
                 : '',
             'analytics_alert_webhook' => isset($current_options['analytics_alert_webhook'])
                 ? $this->sanitize_alert_webhook($current_options['analytics_alert_webhook'])
+                : '',
+            'analytics_alert_webhook_secret' => isset($current_options['analytics_alert_webhook_secret'])
+                ? $this->sanitize_alert_webhook_secret($current_options['analytics_alert_webhook_secret'])
                 : '',
             'analytics_alert_cooldown' => isset($current_options['analytics_alert_cooldown'])
                 ? max(5, (int) $current_options['analytics_alert_cooldown'])
@@ -783,6 +794,12 @@ class Discord_Bot_JLG_Admin {
                     'warning'
                 );
             }
+        }
+
+        if (array_key_exists('analytics_alert_webhook_secret', $input)) {
+            $sanitized['analytics_alert_webhook_secret'] = $this->sanitize_alert_webhook_secret(
+                $input['analytics_alert_webhook_secret']
+            );
         }
 
         if (array_key_exists('analytics_alert_cooldown', $input)) {
@@ -1536,6 +1553,26 @@ class Discord_Bot_JLG_Admin {
         }
 
         return $sanitized;
+    }
+
+    private function sanitize_alert_webhook_secret($value) {
+        if (is_array($value)) {
+            return '';
+        }
+
+        $value = trim((string) $value);
+
+        if ('' === $value) {
+            return '';
+        }
+
+        $value = preg_replace('/[^A-Za-z0-9_\-\.:]/', '', $value);
+
+        if (strlen($value) > 128) {
+            $value = substr($value, 0, 128);
+        }
+
+        return $value;
     }
 
     private function sanitize_profile_server_id($value) {
@@ -2480,6 +2517,21 @@ class Discord_Bot_JLG_Admin {
                class="regular-text"
                placeholder="https://hooks.slack.com/..." />
         <p class="description"><?php esc_html_e('Optionnel. Notification envoyée en JSON (HTTPS) pour Slack, Discord, etc.', 'discord-bot-jlg'); ?></p>
+        <?php
+    }
+
+    public function analytics_alert_webhook_secret_render() {
+        $options = get_option($this->option_name);
+        $value = isset($options['analytics_alert_webhook_secret'])
+            ? sanitize_text_field($options['analytics_alert_webhook_secret'])
+            : '';
+        ?>
+        <input type="text"
+               name="<?php echo esc_attr($this->option_name); ?>[analytics_alert_webhook_secret]"
+               value="<?php echo esc_attr($value); ?>"
+               class="regular-text"
+               maxlength="128" />
+        <p class="description"><?php esc_html_e('Clé secrète utilisée pour valider la signature HMAC des webhooks entrants.', 'discord-bot-jlg'); ?></p>
         <?php
     }
 

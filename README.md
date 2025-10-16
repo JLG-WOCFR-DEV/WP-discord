@@ -131,6 +131,8 @@ Un widget « Discord Bot - JLG » est disponible via le menu « Widgets ».
 - Endpoints REST `discord-bot-jlg/v1/stats` et `discord-bot-jlg/v1/analytics` pour récupérer les compteurs en temps réel ou agrégés, protégés par la capacité `view_discord_analytics` (et `export_discord_analytics` pour les exports) ou une clé d’accès filtrable (`discord_bot_jlg_rest_access_key`).【F:discord-bot-jlg/inc/class-discord-rest.php†L23-L199】【F:discord-bot-jlg/inc/class-discord-rest.php†L200-L337】
 - Endpoint REST `discord-bot-jlg/v1/analytics/export` pour télécharger les timeseries en CSV ou JSON (colonnes personnalisées, fuseau horaire, nom de fichier).【F:discord-bot-jlg/inc/class-discord-rest.php†L23-L244】【F:discord-bot-jlg/inc/class-discord-rest.php†L246-L453】
 - Endpoint REST `discord-bot-jlg/v1/events` fournissant un journal structuré des appels Discord (durée, statut HTTP, quotas restants, diagnostics) afin d’alimenter des outils d’observabilité ou des alertes automatisées.【F:discord-bot-jlg/inc/class-discord-api.php†L1991-L2133】【F:discord-bot-jlg/inc/class-discord-rest.php†L23-L152】
+- Endpoint REST `discord-bot-jlg/v1/metrics` exposant un flux Prometheus (texte brut) compilant les succès/erreurs HTTP, la durée cumulée des appels, les quotas restants et le volume d’événements enregistrés par le logger interne.【F:discord-bot-jlg/inc/class-discord-metrics-controller.php†L1-L210】【F:discord-bot-jlg/inc/class-discord-metrics-registry.php†L1-L152】
+- Endpoint REST `discord-bot-jlg/v1/webhooks/alerts` recevant des alertes analytics JSON signées (HMAC `sha256`) et les planifiant dans Action Scheduler pour diffusion via `Discord_Bot_JLG_Alerts`.【F:discord-bot-jlg/inc/class-discord-metrics-controller.php†L38-L154】【F:discord-bot-jlg/inc/class-discord-analytics-alert-scheduler.php†L1-L101】
 - Intégration WP-CLI avec commandes `wp discord-bot refresh-cache` et `wp discord-bot clear-cache` pour forcer une synchronisation ou purger les données sans passer par l’UI.【F:discord-bot-jlg/inc/class-discord-cli.php†L24-L81】
 - Test « Site Health » dédié indiquant l’état de la connexion Discord, les erreurs récentes et les prochaines tentatives de rafraîchissement.【F:discord-bot-jlg/inc/class-discord-site-health.php†L17-L105】
 - Chargement des traductions et assets spécifiques (bloc, scripts, styles) afin d’assurer une intégration native à l’écosystème WordPress.【F:discord-bot-jlg/discord-bot-jlg.php†L105-L180】【F:discord-bot-jlg/discord-bot-jlg.php†L226-L315】
@@ -151,6 +153,13 @@ add_filter('discord_bot_jlg_should_log_discord_http_event', function ($should_lo
     return !empty($event_context['status_code']); // Ignore les entrées sans statut HTTP.
 }, 10, 2);
 ```
+
+### Activation du webhook analytics
+
+1. Activez les alertes analytics dans **Réglages > Discord Bot > Centre d’alertes** et renseignez une clé secrète dans le champ « Secret du webhook entrant ».【F:discord-bot-jlg/inc/class-discord-admin.php†L294-L338】【F:discord-bot-jlg/inc/class-discord-admin.php†L2496-L2524】
+2. Depuis votre plateforme analytics, publiez un POST JSON vers `/wp-json/discord-bot-jlg/v1/webhooks/alerts` en signant le corps avec `sha256=HMAC(body, secret)` dans l’en-tête `X-Discord-Bot-JLG-Signature`.
+3. Le plugin valide la signature, enfile le traitement via Action Scheduler puis réutilise `Discord_Bot_JLG_Alerts` pour notifier les destinataires configurés (e-mails, webhooks sortants).【F:discord-bot-jlg/inc/class-discord-metrics-controller.php†L96-L154】【F:discord-bot-jlg/inc/class-discord-analytics-alert-scheduler.php†L9-L101】
+4. Les métriques Prometheus disponibles sur `/wp-json/discord-bot-jlg/v1/metrics` reflètent l’activité des appels Discord, des alertes planifiées et des quotas restants pour instrumenter vos tableaux de bord.【F:discord-bot-jlg/inc/class-discord-metrics-controller.php†L56-L210】【F:discord-bot-jlg/inc/class-discord-metrics-registry.php†L23-L129】
 
 ## Désinstallation
 La suppression du plugin depuis WordPress efface automatiquement l’option `discord_server_stats_options` et le transient `discord_server_stats_cache` associés aux statistiques du serveur.
