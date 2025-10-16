@@ -1,0 +1,121 @@
+// Jest Snapshot v1, https://goo.gl/fbAQLP
+
+exports[`discord-bot-jlg-admin-analytics helpers buildDatasets generates aligned datasets with annotations 1`] = `
+{
+  "annotationMeta": {
+    "0": {
+      "1": [
+        "Annotations • 15 • 1/1/1970, 12:03:20 AM",
+        "Milestone • 1/1/1970, 12:03:20 AM",
+      ],
+      "2": [
+        "Campaign • 1/1/1970, 12:05:00 AM",
+      ],
+    },
+    "1": {
+      "2": [
+        "Annotations • 24 • 1/1/1970, 12:05:00 AM",
+        "Campaign • 1/1/1970, 12:05:00 AM",
+      ],
+    },
+  },
+  "datasets": [
+    {
+      "backgroundColor": "rgba(29, 78, 216, 0.16)",
+      "borderColor": "#1d4ed8",
+      "data": [
+        10,
+        15,
+        12,
+      ],
+      "fill": false,
+      "label": "Alpha — Présence",
+      "pointHoverRadius": [
+        5,
+        9,
+        9,
+      ],
+      "pointRadius": [
+        2,
+        7,
+        7,
+      ],
+      "spanGaps": true,
+      "tension": 0.3,
+    },
+    {
+      "backgroundColor": "rgba(22, 163, 74, 0.16)",
+      "borderColor": "#16a34a",
+      "data": [
+        20,
+        null,
+        24,
+      ],
+      "fill": false,
+      "label": "Beta — Présence",
+      "pointHoverRadius": [
+        5,
+        5,
+        9,
+      ],
+      "pointRadius": [
+        2,
+        2,
+        7,
+      ],
+      "spanGaps": true,
+      "tension": 0.3,
+    },
+  ],
+}
+`;
+
+exports[`discord-bot-jlg-admin-analytics helpers prepareConfig fills defaults and keeps snapshots stable 1`] = `
+{
+  "annotations": [
+    {
+      "label": "Launch",
+      "metric": "presence",
+      "profiles": [
+        "alpha",
+      ],
+      "timestamp": 1700000000,
+    },
+  ],
+  "canvasId": "discord-analytics-chart",
+  "comparisonPresets": [
+    {
+      "id": "solo-alpha",
+      "label": "Alpha only",
+      "profiles": [
+        "alpha",
+      ],
+    },
+  ],
+  "containerId": "discord-analytics-panel",
+  "days": 7,
+  "defaultMetric": "presence",
+  "defaultProfiles": [
+    "alpha",
+  ],
+  "labels": {},
+  "nonce": "",
+  "profiles": [
+    {
+      "key": "alpha",
+      "label": "Alpha",
+      "server_id": "",
+    },
+    {
+      "key": "beta",
+      "label": "beta",
+      "server_id": "",
+    },
+  ],
+  "requestedProfiles": [
+    "alpha",
+    "beta",
+  ],
+  "restUrl": "",
+}
+`;
