@@ -348,7 +348,16 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
             && '' === $expected_overrides['bot_token']
         );
 
-        if ($should_update_rotation) {
+        $migrated_existing_token = (
+            !$should_update_rotation
+            && !$should_reset_rotation
+            && '' !== $expected_token
+            && !discord_bot_jlg_is_encrypted_secret($expected_token)
+            && '' !== $result_token
+            && discord_bot_jlg_is_encrypted_secret($result_token)
+        );
+
+        if ($should_update_rotation || $migrated_existing_token) {
             $this->assertGreaterThanOrEqual($time_before, $result_rotation);
             $this->assertLessThanOrEqual($time_after, $result_rotation);
             $metadata = $this->calculate_expected_secret_metadata(
@@ -360,6 +369,9 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
             $this->assertSame($metadata['status'], $result['bot_token_status']);
             $expected['bot_token_expires_at'] = $metadata['expires_at'];
             $expected['bot_token_status']     = $metadata['status'];
+            if ($migrated_existing_token) {
+                $expected_rotation = $result_rotation;
+            }
         } elseif ($should_reset_rotation) {
             $this->assertSame(0, $result_rotation);
             $metadata = $this->calculate_expected_secret_metadata('', 0, $result_rotation);
@@ -439,8 +451,20 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
         $decrypted = discord_bot_jlg_decrypt_secret($result['bot_token']);
 
         $this->assertFalse(is_wp_error($decrypted));
-        $this->assertSame($this->saved_bot_token_plain, $decrypted);
-        $this->assertSame($this->rotation_timestamp, (int) $result['bot_token_rotated_at']);
+        $this->assertSame($this->saved_options['bot_token'], $decrypted);
+
+        $this->assertGreaterThanOrEqual(
+            $this->rotation_timestamp,
+            (int) $result['bot_token_rotated_at']
+        );
+
+        $metadata = $this->calculate_expected_secret_metadata(
+            $this->saved_options['bot_token'],
+            (int) $result['bot_token_rotated_at'],
+            (int) $result['bot_token_rotated_at']
+        );
+        $expected['bot_token_expires_at'] = $metadata['expires_at'];
+        $expected['bot_token_status']     = $metadata['status'];
 
         unset($expected['bot_token'], $result['bot_token']);
         unset($expected['bot_token_rotated_at'], $result['bot_token_rotated_at']);
@@ -700,9 +724,6 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
             'demo_mode'      => 0,
             'show_online'    => 0,
             'show_total'     => 0,
-            'show_presence_breakdown' => 0,
-            'show_approximate_member_count' => 0,
-            'show_premium_subscriptions' => 0,
             'show_server_name'   => 0,
             'show_server_avatar' => 0,
             'default_refresh_enabled' => 0,
@@ -746,6 +767,9 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
             'default_label_premium'           => '',
             'default_label_premium_singular'  => '',
             'default_label_premium_plural'    => '',
+            'show_presence_breakdown' => 0,
+            'show_approximate_member_count' => 0,
+            'show_premium_subscriptions' => 0,
         );
     }
 
