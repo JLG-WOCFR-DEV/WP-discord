@@ -143,6 +143,14 @@ if (!class_exists('WP_Widget')) {
     }
 }
 
+if (!defined('AUTH_KEY')) {
+    define('AUTH_KEY', 'tests-fixed-auth-key');
+}
+
+if (!defined('AUTH_SALT')) {
+    define('AUTH_SALT', 'tests-fixed-auth-salt');
+}
+
 require_once __DIR__ . '/../../inc/helpers.php';
 require_once __DIR__ . '/../../inc/class-discord-analytics.php';
 require_once __DIR__ . '/../../inc/class-discord-http.php';
