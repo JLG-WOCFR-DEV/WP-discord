@@ -234,7 +234,15 @@ if (!function_exists('discord_bot_jlg_sanitize_profile_key')) {
         }
 
         $key = strtolower($key);
+        $key = trim($key);
+
+        if ('' === $key) {
+            return '';
+        }
+
+        $key = preg_replace('/[\s]+/', '-', $key);
         $key = preg_replace('/[^a-z0-9_-]/', '', $key);
+        $key = preg_replace('/-+/', '-', $key);
 
         return $key;
     }
