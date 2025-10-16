@@ -198,6 +198,57 @@ if (!function_exists('esc_html__')) {
     }
 }
 
+if (!function_exists('sanitize_title')) {
+    function sanitize_title($title, $fallback_title = '', $context = 'save') {
+        unset($fallback_title, $context);
+
+        if (!is_string($title)) {
+            if (is_scalar($title)) {
+                $title = (string) $title;
+            } else {
+                return '';
+            }
+        }
+
+        $title = strip_tags($title);
+        $title = html_entity_decode($title, ENT_QUOTES, 'UTF-8');
+
+        $converted = false;
+        if (function_exists('iconv')) {
+            $converted = @iconv('UTF-8', 'ASCII//TRANSLIT//IGNORE', $title);
+        }
+
+        if (false !== $converted && null !== $converted && '' !== $converted) {
+            $title = $converted;
+        } else {
+            $replacements = array(
+                'à' => 'a', 'á' => 'a', 'â' => 'a', 'ã' => 'a', 'ä' => 'a', 'å' => 'a',
+                'À' => 'a', 'Á' => 'a', 'Â' => 'a', 'Ã' => 'a', 'Ä' => 'a', 'Å' => 'a',
+                'ç' => 'c', 'Ç' => 'c',
+                'è' => 'e', 'é' => 'e', 'ê' => 'e', 'ë' => 'e',
+                'È' => 'e', 'É' => 'e', 'Ê' => 'e', 'Ë' => 'e',
+                'ì' => 'i', 'í' => 'i', 'î' => 'i', 'ï' => 'i',
+                'Ì' => 'i', 'Í' => 'i', 'Î' => 'i', 'Ï' => 'i',
+                'ñ' => 'n', 'Ñ' => 'n',
+                'ò' => 'o', 'ó' => 'o', 'ô' => 'o', 'õ' => 'o', 'ö' => 'o', 'ø' => 'o',
+                'Ò' => 'o', 'Ó' => 'o', 'Ô' => 'o', 'Õ' => 'o', 'Ö' => 'o', 'Ø' => 'o',
+                'ù' => 'u', 'ú' => 'u', 'û' => 'u', 'ü' => 'u',
+                'Ù' => 'u', 'Ú' => 'u', 'Û' => 'u', 'Ü' => 'u',
+                'ý' => 'y', 'ÿ' => 'y', 'Ý' => 'y',
+            );
+
+            $title = strtr($title, $replacements);
+        }
+
+        $title = strtolower($title);
+        $title = preg_replace('/[^a-z0-9_\-\s]/', '', $title);
+        $title = preg_replace('/[\s]+/', '-', $title);
+        $title = trim($title, '-');
+
+        return $title;
+    }
+}
+
 if (!function_exists('esc_html_e')) {
     function esc_html_e($text, $domain = null) {
         echo esc_html__($text, $domain);
