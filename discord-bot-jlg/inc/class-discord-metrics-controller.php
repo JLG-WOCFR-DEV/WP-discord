@@ -20,7 +20,7 @@ class Discord_Bot_JLG_Metrics_Controller {
     private $options_repository;
 
     /**
-     * @var Discord_Bot_JLG_Analytics_Alert_Scheduler
+     * @var Discord_Bot_JLG_Analytics_Alert_Scheduler_Interface
      */
     private $alert_scheduler;
 
@@ -32,7 +32,7 @@ class Discord_Bot_JLG_Metrics_Controller {
     public function __construct(
         Discord_Bot_JLG_Metrics_Registry $registry,
         Discord_Bot_JLG_Options_Repository $options_repository,
-        Discord_Bot_JLG_Analytics_Alert_Scheduler $alert_scheduler,
+        Discord_Bot_JLG_Analytics_Alert_Scheduler_Interface $alert_scheduler,
         $event_logger = null
     ) {
         $this->registry           = $registry;
