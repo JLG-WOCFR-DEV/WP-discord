@@ -197,6 +197,70 @@ if (!function_exists('wp_set_script_translations')) {
     }
 }
 
+if (!function_exists('remove_query_arg')) {
+    function remove_query_arg($keys, $query = false) {
+        $keys = (array) $keys;
+
+        if (is_array($query)) {
+            foreach ($keys as $key) {
+                if (array_key_exists($key, $query)) {
+                    unset($query[$key]);
+                }
+            }
+
+            return $query;
+        }
+
+        if (!is_string($query)) {
+            return '';
+        }
+
+        $fragment = '';
+        $fragment_position = strpos($query, '#');
+        if (false !== $fragment_position) {
+            $fragment = substr($query, $fragment_position);
+            $query    = substr($query, 0, $fragment_position);
+        }
+
+        $base = $query;
+        $query_string = '';
+
+        $query_position = strpos($query, '?');
+        if (false !== $query_position) {
+            $base         = substr($query, 0, $query_position);
+            $query_string = substr($query, $query_position + 1);
+        }
+
+        if ('' === $query_string) {
+            return $base . $fragment;
+        }
+
+        parse_str($query_string, $params);
+
+        if (!is_array($params)) {
+            return $base . $fragment;
+        }
+
+        foreach ($keys as $key) {
+            if (array_key_exists($key, $params)) {
+                unset($params[$key]);
+            }
+        }
+
+        if (empty($params)) {
+            return $base . $fragment;
+        }
+
+        $new_query = http_build_query($params, '', '&', PHP_QUERY_RFC3986);
+
+        if ('' === $new_query) {
+            return $base . $fragment;
+        }
+
+        return $base . '?' . $new_query . $fragment;
+    }
+}
+
 if (!class_exists('WP_Widget')) {
     class WP_Widget {
         public $id_base;
@@ -315,9 +379,27 @@ if (!function_exists('esc_html')) {
     }
 }
 
+if (!function_exists('esc_url')) {
+    function esc_url($url) {
+        return is_string($url) ? filter_var($url, FILTER_SANITIZE_URL) : '';
+    }
+}
+
+if (!function_exists('esc_url_raw')) {
+    function esc_url_raw($url) {
+        return esc_url($url);
+    }
+}
+
 if (!function_exists('esc_attr')) {
     function esc_attr($text) {
         return is_string($text) ? $text : (string) $text;
+    }
+}
+
+if (!function_exists('esc_attr__')) {
+    function esc_attr__($text, $domain = null) {
+        return esc_attr($text);
     }
 }
 
@@ -982,9 +1064,16 @@ if (!class_exists('WP_REST_Response')) {
         protected $status;
         protected $headers = array();
 
-        public function __construct($data = null, $status = 200) {
-            $this->data   = $data;
-            $this->status = (int) $status;
+        public function __construct($data = null, $status = 200, $headers = array()) {
+            $this->data    = $data;
+            $this->status  = (int) $status;
+            $this->headers = array();
+
+            if (is_array($headers)) {
+                foreach ($headers as $key => $value) {
+                    $this->header($key, $value);
+                }
+            }
         }
 
         public function get_data() {
