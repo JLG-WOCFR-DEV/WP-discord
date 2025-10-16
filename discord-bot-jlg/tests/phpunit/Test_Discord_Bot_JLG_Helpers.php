@@ -255,6 +255,28 @@ class Test_Discord_Bot_JLG_Helpers extends TestCase {
         remove_all_filters('discord_bot_jlg_secret_migrated');
     }
 
+    /**
+     * @dataProvider provide_sanitize_profile_key_inputs
+     */
+    public function test_sanitize_profile_key_handles_typical_inputs($input, $expected) {
+        $this->assertSame($expected, discord_bot_jlg_sanitize_profile_key($input));
+    }
+
+    /**
+     * @return array<string, array{0: string, 1: string}>
+     */
+    public function provide_sanitize_profile_key_inputs() {
+        return array(
+            'spaces converted to hyphen' => array('My Profile Name', 'my-profile-name'),
+            'multiple spaces collapsed' => array('Multiple   Spaces  Allowed', 'multiple-spaces-allowed'),
+            'mixed case trimmed' => array('  Mixed Case Label  ', 'mixed-case-label'),
+            'punctuation removed' => array('Spacing & punctuation!', 'spacing-punctuation'),
+            'hyphen retained' => array('Already-Slug', 'already-slug'),
+            'underscore retained' => array('Already_Slug', 'already_slug'),
+            'combined separators' => array('Profile_With Mixed-Separators', 'profile_with-mixed-separators'),
+        );
+    }
+
     private function define_auth_constants(): void {
         if (!defined('AUTH_KEY')) {
             define('AUTH_KEY', self::AUTH_KEY);
