@@ -48,6 +48,47 @@ class Stubbed_Discord_Bot_JLG_Analytics {
     }
 }
 
+if (!function_exists('wp_remote_retrieve_response_code')) {
+    function wp_remote_retrieve_response_code($response) {
+        if (is_array($response) && isset($response['response']['code'])) {
+            return (int) $response['response']['code'];
+        }
+
+        return 0;
+    }
+}
+
+if (!function_exists('wp_remote_retrieve_header')) {
+    function wp_remote_retrieve_header($response, $header) {
+        if (!is_array($response) || empty($response['headers']) || !is_array($response['headers'])) {
+            return '';
+        }
+
+        $header = strtolower((string) $header);
+
+        foreach ($response['headers'] as $name => $value) {
+            if (strtolower((string) $name) === $header) {
+                return $value;
+            }
+        }
+
+        return '';
+    }
+}
+
+class Stubbed_Discord_Bot_JLG_Alert_Scheduler {
+    public $scheduled = array();
+
+    public function schedule(array $payload, $delay = 0) {
+        $this->scheduled[] = array(
+            'payload' => $payload,
+            'delay'   => $delay,
+        );
+
+        return true;
+    }
+}
+
 class Test_Discord_Bot_JLG_REST_Controller extends TestCase {
     protected function tearDown(): void {
         $GLOBALS['wp_test_nonce_validations'] = array();
@@ -198,6 +239,115 @@ class Test_Discord_Bot_JLG_REST_Controller extends TestCase {
         $this->assertArrayHasKey('profile_key', $analytics->last_args);
         $this->assertSame('guild', $analytics->last_args['profile_key']);
         $this->assertSame(5, $analytics->last_args['days']);
+    }
+
+    public function test_metrics_route_renders_prometheus_metrics() {
+        $registry = new Discord_Bot_JLG_Metrics_Registry('discord_bot_jlg_metrics_test_state');
+        $registry->reset();
+
+        $response_ok = array(
+            'response' => array('code' => 200),
+            'headers'  => array('X-RateLimit-Remaining' => '42'),
+        );
+
+        $registry->record_http_request($response_ok, 'https://discord.com/api', array(), 'widget', 'req_1', 120);
+        $registry->record_event(array('type' => 'discord_http'));
+
+        $scheduler = new Stubbed_Discord_Bot_JLG_Alert_Scheduler();
+        $options_repository = new Discord_Bot_JLG_Options_Repository(
+            DISCORD_BOT_JLG_OPTION_NAME,
+            'discord_bot_jlg_get_default_options'
+        );
+
+        $controller = new Discord_Bot_JLG_Metrics_Controller($registry, $options_repository, $scheduler);
+
+        $GLOBALS['wp_test_current_user_can'] = array('manage_options' => true);
+        $request = new WP_REST_Request('GET', '/discord-bot-jlg/v1/metrics');
+
+        $response = $controller->handle_get_metrics($request);
+        $this->assertInstanceOf(WP_REST_Response::class, $response);
+
+        $body = $response->get_data();
+        $this->assertIsString($body);
+        $this->assertStringContainsString('discord_bot_jlg_http_requests_total', $body);
+        $this->assertStringContainsString('context="widget"', $body);
+        $this->assertStringContainsString('discord_bot_jlg_logged_events_total', $body);
+
+        delete_option('discord_bot_jlg_metrics_test_state');
+        delete_option(DISCORD_BOT_JLG_OPTION_NAME);
+    }
+
+    public function test_alert_webhook_requires_valid_signature() {
+        $options = discord_bot_jlg_get_default_options();
+        $options['analytics_alert_webhook_secret'] = 'super-secret';
+        update_option(DISCORD_BOT_JLG_OPTION_NAME, $options);
+
+        $registry = new Discord_Bot_JLG_Metrics_Registry('discord_bot_jlg_metrics_test_state');
+        $scheduler = new Stubbed_Discord_Bot_JLG_Alert_Scheduler();
+        $options_repository = new Discord_Bot_JLG_Options_Repository(
+            DISCORD_BOT_JLG_OPTION_NAME,
+            'discord_bot_jlg_get_default_options'
+        );
+
+        $controller = new Discord_Bot_JLG_Metrics_Controller($registry, $options_repository, $scheduler);
+
+        $payload = array(
+            'profile_key' => 'guild',
+            'server_id'   => '12345',
+            'stats'       => array('online' => 12),
+        );
+
+        $body = wp_json_encode($payload);
+        $signature = 'sha256=' . hash_hmac('sha256', $body, 'super-secret');
+
+        $request = new WP_REST_Request('POST', '/discord-bot-jlg/v1/webhooks/alerts');
+        $request->set_body($body);
+        $request->set_header('X-Discord-Bot-JLG-Signature', $signature);
+
+        $response = $controller->handle_alert_webhook($request);
+
+        $this->assertSame(202, $response->get_status());
+        $this->assertCount(1, $scheduler->scheduled);
+        $this->assertSame('guild', $scheduler->scheduled[0]['payload']['profile_key']);
+        $this->assertSame('12345', $scheduler->scheduled[0]['payload']['server_id']);
+
+        delete_option('discord_bot_jlg_metrics_test_state');
+        delete_option(DISCORD_BOT_JLG_OPTION_NAME);
+    }
+
+    public function test_alert_webhook_rejects_invalid_signature() {
+        $options = discord_bot_jlg_get_default_options();
+        $options['analytics_alert_webhook_secret'] = 'super-secret';
+        update_option(DISCORD_BOT_JLG_OPTION_NAME, $options);
+
+        $registry = new Discord_Bot_JLG_Metrics_Registry('discord_bot_jlg_metrics_test_state');
+        $scheduler = new Stubbed_Discord_Bot_JLG_Alert_Scheduler();
+        $options_repository = new Discord_Bot_JLG_Options_Repository(
+            DISCORD_BOT_JLG_OPTION_NAME,
+            'discord_bot_jlg_get_default_options'
+        );
+
+        $controller = new Discord_Bot_JLG_Metrics_Controller($registry, $options_repository, $scheduler);
+
+        $payload = array(
+            'profile_key' => 'guild',
+            'server_id'   => '12345',
+            'stats'       => array('online' => 12),
+        );
+
+        $body = wp_json_encode($payload);
+
+        $request = new WP_REST_Request('POST', '/discord-bot-jlg/v1/webhooks/alerts');
+        $request->set_body($body);
+        $request->set_header('X-Discord-Bot-JLG-Signature', 'sha256=invalid');
+
+        $response = $controller->handle_alert_webhook($request);
+
+        $this->assertSame(401, $response->get_status());
+        $this->assertCount(0, $scheduler->scheduled);
+
+        delete_option('discord_bot_jlg_metrics_test_state');
+        delete_option(DISCORD_BOT_JLG_OPTION_NAME);
     }
 
     public function test_analytics_route_handles_missing_service() {

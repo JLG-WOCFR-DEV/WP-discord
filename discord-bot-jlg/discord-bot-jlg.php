@@ -53,6 +53,7 @@ if (!function_exists('discord_bot_jlg_get_default_options')) {
             'widget_title'   => 'Discord Server',
             'cache_duration' => DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION,
             'analytics_retention_days' => DISCORD_BOT_JLG_ANALYTICS_RETENTION_DEFAULT,
+            'analytics_alert_webhook_secret' => '',
         );
     }
 }
@@ -154,6 +155,9 @@ require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-shortcode.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-widget.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-site-health.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-rest.php';
+require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-metrics-registry.php';
+require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-analytics-alert-scheduler.php';
+require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-metrics-controller.php';
 
 if (defined('WP_CLI') && WP_CLI) {
     require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-cli.php';
@@ -202,6 +206,9 @@ class DiscordServerStats {
     private $options_repository;
     private $job_queue;
     private $alerts;
+    private $metrics_registry;
+    private $metrics_controller;
+    private $alert_scheduler;
     private $cron_state_option = 'discord_bot_jlg_cron_state';
 
     public function __construct() {
@@ -232,7 +239,16 @@ class DiscordServerStats {
         $this->shortcode = new Discord_Bot_JLG_Shortcode(DISCORD_BOT_JLG_OPTION_NAME, $this->api);
         $this->widget    = new Discord_Bot_JLG_Widget();
         $this->site_health = new Discord_Bot_JLG_Site_Health($this->api);
+        $this->metrics_registry = new Discord_Bot_JLG_Metrics_Registry();
+        $this->alert_scheduler  = new Discord_Bot_JLG_Analytics_Alert_Scheduler($this->alerts, $this->event_logger);
+        $this->alert_scheduler->register();
         $this->rest_controller = new Discord_Bot_JLG_REST_Controller($this->api, $this->analytics, $this->event_logger);
+        $this->metrics_controller = new Discord_Bot_JLG_Metrics_Controller(
+            $this->metrics_registry,
+            $this->options_repository,
+            $this->alert_scheduler,
+            $this->event_logger
+        );
 
         add_filter('default_option_' . DISCORD_BOT_JLG_OPTION_NAME, array($this, 'provide_default_options'));
         add_filter('option_' . DISCORD_BOT_JLG_OPTION_NAME, array($this, 'merge_options_with_defaults'));
@@ -258,6 +274,8 @@ class DiscordServerStats {
         add_action(DISCORD_BOT_JLG_CRON_HOOK, array($this, 'handle_cron_tick'), 100);
         add_action('discord_bot_jlg_refresh_job_failed', array($this, 'handle_refresh_job_failure'), 10, 3);
         add_action('discord_bot_jlg_refresh_job_succeeded', array($this, 'handle_refresh_job_success'), 10, 2);
+        add_action('discord_bot_jlg_after_http_request', array($this->metrics_registry, 'record_http_request'), 10, 6);
+        add_action('discord_bot_jlg_event_logged', array($this->metrics_registry, 'record_event'), 10, 1);
     }
 
     private function get_block_editor_config() {

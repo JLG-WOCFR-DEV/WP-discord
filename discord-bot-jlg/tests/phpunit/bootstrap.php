@@ -158,6 +158,9 @@ require_once __DIR__ . '/../../inc/class-discord-widget.php';
 require_once __DIR__ . '/../../inc/class-discord-shortcode.php';
 require_once __DIR__ . '/../../inc/class-discord-site-health.php';
 require_once __DIR__ . '/../../inc/class-discord-rest.php';
+require_once __DIR__ . '/../../inc/class-discord-metrics-registry.php';
+require_once __DIR__ . '/../../inc/class-discord-analytics-alert-scheduler.php';
+require_once __DIR__ . '/../../inc/class-discord-metrics-controller.php';
 require_once __DIR__ . '/../../inc/cron.php';
 
 if (!defined('DISCORD_BOT_JLG_OPTION_NAME')) {
@@ -778,11 +781,15 @@ if (!class_exists('WP_REST_Request')) {
         private $params = array();
         private $headers = array();
         private $route = '';
+        private $body = '';
+        private $json_params = array();
 
         public function __construct($method = 'GET', $route = '') {
             $this->params  = array();
             $this->headers = array();
             $this->route   = is_string($route) ? $route : '';
+            $this->body    = '';
+            $this->json_params = array();
         }
 
         public function set_param($key, $value) {
@@ -795,6 +802,31 @@ if (!class_exists('WP_REST_Request')) {
 
         public function get_params() {
             return $this->params;
+        }
+
+        public function set_body($body) {
+            $this->body = (string) $body;
+        }
+
+        public function get_body() {
+            return $this->body;
+        }
+
+        public function set_json_params($params) {
+            $this->json_params = is_array($params) ? $params : array();
+        }
+
+        public function get_json_params() {
+            if (!empty($this->json_params)) {
+                return $this->json_params;
+            }
+
+            if ('' === $this->body) {
+                return array();
+            }
+
+            $decoded = json_decode($this->body, true);
+            return is_array($decoded) ? $decoded : array();
         }
 
         public function set_header($key, $value) {
