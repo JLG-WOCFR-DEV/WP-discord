@@ -50,6 +50,23 @@ class Discord_Bot_JLG_Capabilities {
             return $map[$action];
         }
 
+        if (is_string($action)) {
+            if (0 === strpos($action, 'view_profile_stats:')) {
+                return self::VIEW_ANALYTICS;
+            }
+
+            if (
+                0 === strpos($action, 'view_profile_analytics:')
+                || 0 === strpos($action, 'view_profile_events:')
+            ) {
+                return self::VIEW_ANALYTICS;
+            }
+
+            if (0 === strpos($action, 'export_profile_analytics:')) {
+                return self::EXPORT_ANALYTICS;
+            }
+        }
+
         return 'manage_options';
     }
 

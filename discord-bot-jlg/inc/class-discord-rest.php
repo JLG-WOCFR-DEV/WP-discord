@@ -3,6 +3,10 @@ if (false === defined('ABSPATH')) {
     exit;
 }
 
+if (!class_exists('Discord_Bot_JLG_API_Key_Repository')) {
+    require_once __DIR__ . '/class-discord-api-key-repository.php';
+}
+
 class Discord_Bot_JLG_REST_Controller {
     const ROUTE_NAMESPACE = 'discord-bot-jlg/v1';
     const ROUTE_STATS = '/stats';
@@ -1097,6 +1101,15 @@ class Discord_Bot_JLG_REST_Controller {
             return true;
         }
 
+        $profile_key = $this->determine_requested_profile_key($request);
+        $scope = $this->determine_required_scope($request);
+
+        if ('manage_profiles' !== $scope) {
+            if ($this->validate_request_api_key_access($request, $scope, $profile_key, $required_action)) {
+                return true;
+            }
+        }
+
         $configured_key = apply_filters('discord_bot_jlg_rest_access_key', '');
         if (is_string($configured_key)) {
             $configured_key = trim($configured_key);
@@ -1134,8 +1147,10 @@ class Discord_Bot_JLG_REST_Controller {
             $route = '';
         }
 
+        $profile_key = $this->determine_requested_profile_key($request);
+
         if (false !== strpos($route, self::ROUTE_ANALYTICS_EXPORT)) {
-            return 'export_analytics';
+            return 'export_profile_analytics:' . $profile_key;
         }
 
         if (false !== strpos($route, self::ROUTE_STATS)) {
@@ -1145,17 +1160,65 @@ class Discord_Bot_JLG_REST_Controller {
                 return 'manage_profiles';
             }
 
-            return 'view_analytics';
+            return 'view_profile_stats:' . $profile_key;
         }
 
         if (
             false !== strpos($route, self::ROUTE_ANALYTICS)
             || false !== strpos($route, self::ROUTE_EVENTS)
         ) {
-            return 'view_analytics';
+            return 'view_profile_analytics:' . $profile_key;
         }
 
-        return 'view_analytics';
+        return 'view_profile_analytics:' . $profile_key;
+    }
+
+    private function determine_requested_profile_key(WP_REST_Request $request) {
+        if (!($request instanceof WP_REST_Request)) {
+            return 'default';
+        }
+
+        $profile_key = discord_bot_jlg_sanitize_profile_key($request->get_param('profile_key'));
+        if ('' === $profile_key) {
+            $profile_key = 'default';
+        }
+
+        return $profile_key;
+    }
+
+    private function determine_required_scope(WP_REST_Request $request) {
+        $route = '';
+
+        if ($request instanceof WP_REST_Request) {
+            $route = $request->get_route();
+        }
+
+        if (!is_string($route)) {
+            $route = '';
+        }
+
+        if (false !== strpos($route, self::ROUTE_ANALYTICS_EXPORT)) {
+            return 'export';
+        }
+
+        if (false !== strpos($route, self::ROUTE_STATS)) {
+            $force_refresh = discord_bot_jlg_validate_bool($request->get_param('force_refresh'));
+
+            if ($force_refresh) {
+                return 'manage_profiles';
+            }
+
+            return 'stats';
+        }
+
+        if (
+            false !== strpos($route, self::ROUTE_ANALYTICS)
+            || false !== strpos($route, self::ROUTE_EVENTS)
+        ) {
+            return 'analytics';
+        }
+
+        return 'analytics';
     }
 
     private function request_requires_cookie_nonce(WP_REST_Request $request) {
@@ -1219,6 +1282,72 @@ class Discord_Bot_JLG_REST_Controller {
         return false;
     }
 
+    private function validate_request_api_key_access(WP_REST_Request $request, $scope, $profile_key, $required_action) {
+        $access_key = $this->extract_request_access_key($request);
+
+        if ('' === $access_key) {
+            return false;
+        }
+
+        $repository = $this->api->get_api_key_repository();
+        if (!($repository instanceof Discord_Bot_JLG_API_Key_Repository)) {
+            return false;
+        }
+
+        $validation = $repository->validate_key_for_request(
+            $access_key,
+            array(
+                'scope'       => $scope,
+                'profile_key' => $profile_key,
+                'route'       => $request->get_route(),
+                'action'      => $required_action,
+            )
+        );
+
+        if (!is_array($validation)) {
+            return false;
+        }
+
+        if (!empty($validation['valid'])) {
+            $key_record = isset($validation['key']) && is_array($validation['key']) ? $validation['key'] : array();
+
+            if (isset($key_record['id'])) {
+                $repository->record_usage((int) $key_record['id']);
+            }
+
+            $this->log_api_key_event(
+                'granted',
+                array(
+                    'scope'       => $scope,
+                    'profile_key' => $profile_key,
+                    'route'       => $request->get_route(),
+                    'key'         => $key_record,
+                    'fingerprint' => isset($validation['fingerprint']) ? $validation['fingerprint'] : '',
+                )
+            );
+
+            return true;
+        }
+
+        $error = isset($validation['error']) ? $validation['error'] : 'denied';
+        $fingerprint = isset($validation['fingerprint']) ? $validation['fingerprint'] : '';
+        $key_record = isset($validation['key']) && is_array($validation['key']) ? $validation['key'] : array();
+
+        $this->log_api_key_event(
+            'denied',
+            array(
+                'scope'       => $scope,
+                'profile_key' => $profile_key,
+                'route'       => $request->get_route(),
+                'error'       => $error,
+                'key'         => $key_record,
+                'fingerprint' => $fingerprint,
+            )
+        );
+
+        return false;
+    }
+
     private function extract_request_access_key(WP_REST_Request $request) {
         $access_key = $request->get_param('access_key');
 
@@ -1226,10 +1355,70 @@ class Discord_Bot_JLG_REST_Controller {
             $access_key = $request->get_header('X-Discord-Analytics-Key');
         }
 
+        if (!is_string($access_key) || '' === trim($access_key)) {
+            $access_key = $request->get_header('X-Api-Key');
+        }
+
+        if (!is_string($access_key) || '' === trim($access_key)) {
+            $authorization = $request->get_header('authorization');
+            if (is_string($authorization) && '' !== $authorization) {
+                if (0 === stripos($authorization, 'bearer ')) {
+                    $access_key = substr($authorization, 7);
+                } elseif (0 === stripos($authorization, 'token ')) {
+                    $access_key = substr($authorization, 6);
+                }
+            }
+        }
+
         if (!is_string($access_key)) {
             return '';
         }
 
         return trim($access_key);
+    }
+
+    private function log_api_key_event($outcome, array $context = array()) {
+        if (!($this->event_logger instanceof Discord_Bot_JLG_Event_Logger)) {
+            return;
+        }
+
+        $payload = array(
+            'channel' => 'rest',
+            'action'  => 'access',
+            'outcome' => sanitize_key($outcome),
+        );
+
+        if (!empty($context['scope'])) {
+            $payload['scope'] = sanitize_key($context['scope']);
+        }
+
+        if (!empty($context['profile_key'])) {
+            $payload['profile_key'] = discord_bot_jlg_sanitize_profile_key($context['profile_key']);
+        }
+
+        if (!empty($context['route']) && is_string($context['route'])) {
+            $payload['route'] = sanitize_text_field($context['route']);
+        }
+
+        if (!empty($context['error'])) {
+            $payload['error'] = sanitize_key($context['error']);
+        }
+
+        if (isset($context['key']) && is_array($context['key'])) {
+            $key = $context['key'];
+            if (isset($key['id'])) {
+                $payload['key_id'] = (int) $key['id'];
+            }
+            if (!empty($key['fingerprint'])) {
+                $payload['fingerprint'] = substr(sanitize_text_field($key['fingerprint']), 0, 12);
+            }
+            if (!empty($key['label'])) {
+                $payload['label'] = sanitize_text_field($key['label']);
+            }
+        } elseif (!empty($context['fingerprint'])) {
+            $payload['fingerprint'] = substr(sanitize_text_field($context['fingerprint']), 0, 12);
+        }
+
+        $this->event_logger->log('rest_api_key', $payload);
     }
 }
