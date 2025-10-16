@@ -80,6 +80,10 @@ function discord_bot_jlg_uninstall() {
             require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-event-logger.php';
         }
 
+        if (!class_exists('Discord_Bot_JLG_API_Key_Repository')) {
+            require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-api-key-repository.php';
+        }
+
         if (!class_exists('Discord_Bot_JLG_Options_Repository')) {
             require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-options-repository.php';
         }
@@ -95,6 +99,10 @@ function discord_bot_jlg_uninstall() {
 
     if (!class_exists('Discord_Bot_JLG_Event_Logger')) {
         require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-event-logger.php';
+    }
+
+    if (!class_exists('Discord_Bot_JLG_API_Key_Repository')) {
+        require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-api-key-repository.php';
     }
 
     if (!class_exists('Discord_Bot_JLG_Options_Repository')) {
@@ -129,6 +137,14 @@ function discord_bot_jlg_uninstall() {
         }
     }
 
+    if (class_exists('Discord_Bot_JLG_API_Key_Repository')) {
+        global $wpdb;
+        $api_keys = new Discord_Bot_JLG_API_Key_Repository($wpdb);
+        if ($wpdb && method_exists($wpdb, 'query')) {
+            $wpdb->query('DROP TABLE IF EXISTS ' . $api_keys->get_table_name());
+        }
+    }
+
     if (class_exists('Discord_Bot_JLG_Event_Logger')) {
         delete_option(Discord_Bot_JLG_Event_Logger::OPTION_NAME);
     }
@@ -143,6 +159,7 @@ require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-cache-gateway.php'
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-profile-repository.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-http-connector.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-event-logger.php';
+require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-api-key-repository.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-options-repository.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-capabilities.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-alerts.php';
@@ -202,6 +219,7 @@ class DiscordServerStats {
     private $options_repository;
     private $job_queue;
     private $alerts;
+    private $api_key_repository;
     private $cron_state_option = 'discord_bot_jlg_cron_state';
 
     public function __construct() {
@@ -213,6 +231,7 @@ class DiscordServerStats {
             DISCORD_BOT_JLG_OPTION_NAME,
             'discord_bot_jlg_get_default_options'
         );
+        $this->api_key_repository = new Discord_Bot_JLG_API_Key_Repository();
 
         $this->api       = new Discord_Bot_JLG_API(
             DISCORD_BOT_JLG_OPTION_NAME,
@@ -221,7 +240,12 @@ class DiscordServerStats {
             null,
             $this->analytics,
             $this->event_logger,
-            $this->options_repository
+            $this->options_repository,
+            null,
+            null,
+            null,
+            null,
+            $this->api_key_repository
         );
         $this->alerts    = new Discord_Bot_JLG_Alerts($this->options_repository, $this->analytics, $this->event_logger);
         $this->job_queue = new Discord_Bot_JLG_Job_Queue($this->api, DISCORD_BOT_JLG_OPTION_NAME, $this->event_logger);
@@ -626,6 +650,10 @@ class DiscordServerStats {
 
         if ($this->analytics instanceof Discord_Bot_JLG_Analytics) {
             $this->analytics->install();
+        }
+
+        if ($this->api_key_repository instanceof Discord_Bot_JLG_API_Key_Repository) {
+            $this->api_key_repository->install();
         }
 
         Discord_Bot_JLG_Capabilities::ensure_roles_have_capabilities();

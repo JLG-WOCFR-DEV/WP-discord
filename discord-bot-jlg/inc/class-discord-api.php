@@ -16,6 +16,10 @@ if (!class_exists('Discord_Bot_JLG_Profile_Repository')) {
     require_once __DIR__ . '/class-discord-profile-repository.php';
 }
 
+if (!class_exists('Discord_Bot_JLG_API_Key_Repository')) {
+    require_once __DIR__ . '/class-discord-api-key-repository.php';
+}
+
 if (!class_exists('Discord_Bot_JLG_Cache_Gateway')) {
     require_once __DIR__ . '/class-discord-cache-gateway.php';
 }
@@ -76,6 +80,7 @@ class Discord_Bot_JLG_API {
     private $stats_service;
     private $connector_state_registry;
     private $connector_state_dirty;
+    private $api_key_repository;
 
     /**
      * Prépare le service d'accès aux statistiques avec les clés et durées nécessaires.
@@ -86,7 +91,7 @@ class Discord_Bot_JLG_API {
      *
      * @return void
      */
-    public function __construct($option_name, $cache_key, $default_cache_duration = 300, $http_client = null, $analytics = null, $event_logger = null, $options_repository = null, $profile_repository = null, $cache_gateway = null, $http_connector = null, $logger = null) {
+    public function __construct($option_name, $cache_key, $default_cache_duration = 300, $http_client = null, $analytics = null, $event_logger = null, $options_repository = null, $profile_repository = null, $cache_gateway = null, $http_connector = null, $logger = null, $api_key_repository = null) {
         $this->option_name = $option_name;
         $this->base_cache_key = $cache_key;
         $this->cache_key = $cache_key;
@@ -135,6 +140,8 @@ class Discord_Bot_JLG_API {
         $this->stats_service = null;
         $this->connector_state_registry = null;
         $this->connector_state_dirty = false;
+        $this->api_key_repository = null;
+        $this->set_api_key_repository($api_key_repository);
     }
 
     public function set_analytics_service($analytics) {
@@ -176,6 +183,27 @@ class Discord_Bot_JLG_API {
         }
 
         return null;
+    }
+
+    public function set_api_key_repository($repository) {
+        if ($repository instanceof Discord_Bot_JLG_API_Key_Repository) {
+            $this->api_key_repository = $repository;
+            return;
+        }
+
+        if (null === $repository) {
+            $this->api_key_repository = null;
+        }
+    }
+
+    public function get_api_key_repository() {
+        if ($this->api_key_repository instanceof Discord_Bot_JLG_API_Key_Repository) {
+            return $this->api_key_repository;
+        }
+
+        $this->api_key_repository = new Discord_Bot_JLG_API_Key_Repository();
+
+        return $this->api_key_repository;
     }
 
     public function set_alerts_service($alerts) {

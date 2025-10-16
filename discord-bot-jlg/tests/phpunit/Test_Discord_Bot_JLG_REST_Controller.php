@@ -54,6 +54,7 @@ class Test_Discord_Bot_JLG_REST_Controller extends TestCase {
         $GLOBALS['wp_test_is_user_logged_in'] = false;
         $GLOBALS['wp_test_current_user_can']  = null;
         $GLOBALS['wp_test_transients']        = array();
+        delete_option(Discord_Bot_JLG_Event_Logger::OPTION_NAME);
 
         parent::tearDown();
     }
@@ -323,5 +324,81 @@ class Test_Discord_Bot_JLG_REST_Controller extends TestCase {
         $this->assertIsArray($entry);
         $this->assertArrayHasKey('ttl', $entry);
         $this->assertGreaterThan(0, $entry['ttl']);
+    }
+
+    public function test_permission_callback_accepts_api_key_for_stats_scope() {
+        $GLOBALS['wp_test_current_user_can'] = array('manage_options' => false);
+
+        $api = new Stubbed_Discord_Bot_JLG_API_For_REST();
+        $repository = new Discord_Bot_JLG_API_Key_Repository(null);
+        $api->set_api_key_repository($repository);
+
+        $key = $repository->create_key(
+            array(
+                'label'        => 'Tests',
+                'profile_keys' => array('default'),
+                'scopes'       => array('stats'),
+            )
+        );
+
+        $controller = new Discord_Bot_JLG_REST_Controller($api, null);
+        $request    = new WP_REST_Request('GET', '/discord-bot-jlg/v1/stats');
+        $request->set_param('profile_key', 'default');
+        $request->set_param('access_key', $key['key']);
+
+        $this->assertTrue($controller->check_rest_permissions($request));
+    }
+
+    public function test_permission_callback_rejects_expired_api_key() {
+        $GLOBALS['wp_test_current_user_can'] = array('manage_options' => false);
+
+        $api = new Stubbed_Discord_Bot_JLG_API_For_REST();
+        $repository = new Discord_Bot_JLG_API_Key_Repository(null);
+        $api->set_api_key_repository($repository);
+
+        $key = $repository->create_key(
+            array(
+                'label'        => 'Expired',
+                'profile_keys' => array('default'),
+                'scopes'       => array('stats'),
+                'expires_at'   => gmdate('Y-m-d H:i:s', current_time('timestamp', true) - DAY_IN_SECONDS),
+            )
+        );
+
+        $controller = new Discord_Bot_JLG_REST_Controller($api, null);
+        $request    = new WP_REST_Request('GET', '/discord-bot-jlg/v1/stats');
+        $request->set_param('profile_key', 'default');
+        $request->set_param('access_key', $key['key']);
+
+        $result = $controller->check_rest_permissions($request);
+
+        $this->assertInstanceOf(WP_Error::class, $result);
+        $this->assertSame('discord_bot_jlg_forbidden', $result->get_error_code());
+    }
+
+    public function test_permission_callback_rejects_api_key_forbidden_profile() {
+        $GLOBALS['wp_test_current_user_can'] = array('manage_options' => false);
+
+        $api = new Stubbed_Discord_Bot_JLG_API_For_REST();
+        $repository = new Discord_Bot_JLG_API_Key_Repository(null);
+        $api->set_api_key_repository($repository);
+
+        $key = $repository->create_key(
+            array(
+                'label'        => 'Restricted',
+                'profile_keys' => array('other'),
+                'scopes'       => array('stats'),
+            )
+        );
+
+        $controller = new Discord_Bot_JLG_REST_Controller($api, null);
+        $request    = new WP_REST_Request('GET', '/discord-bot-jlg/v1/stats');
+        $request->set_param('profile_key', 'default');
+        $request->set_param('access_key', $key['key']);
+
+        $result = $controller->check_rest_permissions($request);
+
+        $this->assertInstanceOf(WP_Error::class, $result);
+        $this->assertSame('discord_bot_jlg_forbidden', $result->get_error_code());
     }
 }

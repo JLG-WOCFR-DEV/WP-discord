@@ -16,6 +16,9 @@ class Discord_Bot_JLG_Admin {
     private $demo_page_hook_suffix;
     private $forced_setup_step;
     private $event_logger;
+    private $api_key_repository;
+    private $last_generated_api_key;
+    private $last_generated_api_key_label;
 
     /**
      * Initialise l'instance avec la clé d'option et le client API utilisé pour les vérifications.
@@ -33,6 +36,9 @@ class Discord_Bot_JLG_Admin {
         $this->event_logger = ($event_logger instanceof Discord_Bot_JLG_Event_Logger)
             ? $event_logger
             : $this->api->get_event_logger();
+        $this->api_key_repository = $this->api->get_api_key_repository();
+        $this->last_generated_api_key = '';
+        $this->last_generated_api_key_label = '';
 
         add_action('admin_post_discord_bot_jlg_export_log', array($this, 'handle_monitoring_export'));
         add_action('admin_notices', array($this, 'maybe_display_secret_rotation_notice'));
@@ -2503,6 +2509,8 @@ class Discord_Bot_JLG_Admin {
      * @return void
      */
     public function options_page() {
+        $this->handle_api_key_actions();
+
         $tabs        = $this->get_admin_tabs();
         $current_tab = $this->get_current_admin_tab($tabs);
 
@@ -2524,6 +2532,53 @@ class Discord_Bot_JLG_Admin {
             <?php $this->render_admin_footer_note(); ?>
         </div>
         <?php
+    }
+
+    private function handle_api_key_actions() {
+        if (empty($_POST['discord_bot_jlg_api_keys_action'])) { // phpcs:ignore WordPress.Security.NonceVerification.Missing
+            return;
+        }
+
+        $requested_tab = isset($_REQUEST['tab']) // phpcs:ignore WordPress.Security.NonceVerification.Missing -- lecture seule.
+            ? sanitize_key(wp_unslash($_REQUEST['tab']))
+            : '';
+
+        if ('api_keys' !== $requested_tab) {
+            return;
+        }
+
+        if (!Discord_Bot_JLG_Capabilities::current_user_can('manage_profiles')) {
+            add_settings_error(
+                'discord_stats_settings',
+                'discord_bot_jlg_api_key_permissions',
+                esc_html__('Accès refusé : seuls les administrateurs peuvent gérer les clés API.', 'discord-bot-jlg'),
+                'error'
+            );
+
+            return;
+        }
+
+        if (!check_admin_referer('discord_bot_jlg_api_keys_action', 'discord_bot_jlg_api_keys_nonce')) {
+            add_settings_error(
+                'discord_stats_settings',
+                'discord_bot_jlg_api_key_nonce',
+                esc_html__('Échec de la vérification de sécurité pour l’action sur les clés API.', 'discord-bot-jlg'),
+                'error'
+            );
+
+            return;
+        }
+
+        $action = sanitize_key(wp_unslash($_POST['discord_bot_jlg_api_keys_action']));
+
+        switch ($action) {
+            case 'generate':
+                $this->process_api_key_generation();
+                break;
+            case 'revoke':
+                $this->process_api_key_revocation();
+                break;
+        }
     }
 
     /**
@@ -2591,6 +2646,147 @@ class Discord_Bot_JLG_Admin {
         $this->test_discord_connection($profile_key);
     }
 
+    private function process_api_key_generation() {
+        if (!($this->api_key_repository instanceof Discord_Bot_JLG_API_Key_Repository)) {
+            add_settings_error(
+                'discord_stats_settings',
+                'discord_bot_jlg_api_key_repository_missing',
+                esc_html__('Impossible de générer une clé API : stockage indisponible.', 'discord-bot-jlg'),
+                'error'
+            );
+
+            return;
+        }
+
+        $label = isset($_POST['api_key_label'])
+            ? sanitize_text_field(wp_unslash($_POST['api_key_label']))
+            : '';
+        $profile_keys = isset($_POST['api_key_profiles'])
+            ? array_map('sanitize_text_field', (array) wp_unslash($_POST['api_key_profiles']))
+            : array();
+        $scopes = isset($_POST['api_key_scopes'])
+            ? array_map('sanitize_key', (array) wp_unslash($_POST['api_key_scopes']))
+            : array();
+        $expiration_days = isset($_POST['api_key_expiration_days'])
+            ? max(0, (int) $_POST['api_key_expiration_days'])
+            : 0;
+
+        $expires_at = '';
+        if ($expiration_days > 0) {
+            $expires_timestamp = current_time('timestamp', true) + ($expiration_days * DAY_IN_SECONDS);
+            $expires_at = gmdate('Y-m-d H:i:s', $expires_timestamp);
+        }
+
+        $created_by = function_exists('get_current_user_id') ? (int) get_current_user_id() : 0;
+
+        $result = $this->api_key_repository->create_key(
+            array(
+                'label'        => $label,
+                'profile_keys' => $profile_keys,
+                'scopes'       => $scopes,
+                'created_by'   => $created_by,
+                'expires_at'   => $expires_at,
+            )
+        );
+
+        if (!is_array($result) || empty($result['key'])) {
+            add_settings_error(
+                'discord_stats_settings',
+                'discord_bot_jlg_api_key_creation_failed',
+                esc_html__('Impossible de générer la clé API. Veuillez réessayer.', 'discord-bot-jlg'),
+                'error'
+            );
+
+            return;
+        }
+
+        $this->last_generated_api_key = $result['key'];
+        $this->last_generated_api_key_label = isset($result['label']) ? $result['label'] : '';
+
+        add_settings_error(
+            'discord_stats_settings',
+            'discord_bot_jlg_api_key_created',
+            esc_html__('Nouvelle clé API générée. Copiez-la immédiatement depuis le panneau ci-dessous.', 'discord-bot-jlg'),
+            'updated'
+        );
+
+        if ($this->event_logger instanceof Discord_Bot_JLG_Event_Logger) {
+            $profiles = isset($result['profiles']) && is_array($result['profiles']) ? $result['profiles'] : array();
+            $scopes_logged = isset($result['scopes']) && is_array($result['scopes']) ? $result['scopes'] : array();
+
+            $this->event_logger->log(
+                'rest_api_key',
+                array(
+                    'channel' => 'admin',
+                    'action'  => 'generated',
+                    'key_id'  => isset($result['id']) ? (int) $result['id'] : 0,
+                    'profiles'=> $profiles,
+                    'scopes'  => $scopes_logged,
+                )
+            );
+        }
+    }
+
+    private function process_api_key_revocation() {
+        if (!($this->api_key_repository instanceof Discord_Bot_JLG_API_Key_Repository)) {
+            add_settings_error(
+                'discord_stats_settings',
+                'discord_bot_jlg_api_key_repository_missing',
+                esc_html__('Impossible de révoquer la clé API : stockage indisponible.', 'discord-bot-jlg'),
+                'error'
+            );
+
+            return;
+        }
+
+        $key_id = isset($_POST['api_key_id']) ? (int) $_POST['api_key_id'] : 0;
+        if ($key_id <= 0) {
+            add_settings_error(
+                'discord_stats_settings',
+                'discord_bot_jlg_api_key_invalid',
+                esc_html__('Clé API introuvable ou identifiant invalide.', 'discord-bot-jlg'),
+                'error'
+            );
+
+            return;
+        }
+
+        $record = $this->api_key_repository->get_key_by_id($key_id);
+        $label = '';
+        if (is_array($record) && !empty($record['label'])) {
+            $label = sanitize_text_field($record['label']);
+        }
+
+        $this->api_key_repository->revoke_key($key_id);
+
+        $message = ($label)
+            ? sprintf(
+                /* translators: %s: API key label. */
+                esc_html__('La clé API « %s » a été révoquée.', 'discord-bot-jlg'),
+                $label
+            )
+            : esc_html__('La clé API a été révoquée.', 'discord-bot-jlg');
+
+        add_settings_error(
+            'discord_stats_settings',
+            'discord_bot_jlg_api_key_revoked',
+            $message,
+            'updated'
+        );
+
+        if ($this->event_logger instanceof Discord_Bot_JLG_Event_Logger) {
+            $this->event_logger->log(
+                'rest_api_key',
+                array(
+                    'channel' => 'admin',
+                    'action'  => 'revoked',
+                    'key_id'  => $key_id,
+                    'label'   => $label,
+                )
+            );
+        }
+    }
+
     /**
      * Retourne la configuration des onglets disponibles.
      *
@@ -2642,6 +2838,12 @@ class Discord_Bot_JLG_Admin {
                     ),
                 ),
                 'sidebar_panels' => array('automation_tips', 'quick_links'),
+            ),
+            'api_keys'    => array(
+                'label'          => __('Clés API', 'discord-bot-jlg'),
+                'icon'           => '🔑',
+                'render_callback'=> array($this, 'render_api_keys_admin_tab'),
+                'sidebar_panels' => array('api_keys_help', 'quick_links'),
             ),
             'monitoring'   => array(
                 'label'          => __('Surveillance', 'discord-bot-jlg'),
@@ -2727,6 +2929,295 @@ class Discord_Bot_JLG_Admin {
         }
 
         echo '</nav>';
+    }
+
+    private function render_api_keys_admin_tab() {
+        ?>
+        <div class="discord-bot-settings-main" aria-live="polite">
+            <?php
+            if (!($this->api_key_repository instanceof Discord_Bot_JLG_API_Key_Repository)) {
+                echo '<p>' . esc_html__('Le stockage des clés API est indisponible sur ce site. Vérifiez les droits de la base de données.', 'discord-bot-jlg') . '</p>';
+                echo '</div>';
+                return;
+            }
+
+            if ('' !== $this->last_generated_api_key) {
+                $label = ('' !== $this->last_generated_api_key_label)
+                    ? sprintf(
+                        /* translators: %s: API key label. */
+                        esc_html__('Clé « %s »', 'discord-bot-jlg'),
+                        esc_html($this->last_generated_api_key_label)
+                    )
+                    : esc_html__('Clé API générée', 'discord-bot-jlg');
+
+                printf(
+                    '<div class="notice notice-success"><p><strong>%1$s</strong> : <code class="discord-api-key-secret">%2$s</code></p><p class="description">%3$s</p></div>',
+                    $label,
+                    esc_html($this->last_generated_api_key),
+                    esc_html__('Conservez cette clé en lieu sûr : elle ne sera plus affichée.', 'discord-bot-jlg')
+                );
+            }
+
+            $available_profiles = array(
+                'default' => __('Profil principal', 'discord-bot-jlg'),
+            );
+
+            $configured_profiles = $this->api->get_server_profiles(false);
+            if (is_array($configured_profiles)) {
+                foreach ($configured_profiles as $profile) {
+                    if (!is_array($profile)) {
+                        continue;
+                    }
+
+                    $profile_key = isset($profile['key']) ? discord_bot_jlg_sanitize_profile_key($profile['key']) : '';
+                    if ('' === $profile_key || isset($available_profiles[$profile_key])) {
+                        continue;
+                    }
+
+                    $label = isset($profile['label']) ? sanitize_text_field($profile['label']) : $profile_key;
+                    $available_profiles[$profile_key] = $label;
+                }
+            }
+
+            $allowed_scopes = $this->api_key_repository->get_allowed_scopes();
+            $scope_labels = array(
+                'stats'     => __('Lecture des statistiques instantanées', 'discord-bot-jlg'),
+                'analytics' => __('Lecture des analyses agrégées', 'discord-bot-jlg'),
+                'export'    => __('Export des données analytics', 'discord-bot-jlg'),
+            );
+
+            $form_action = add_query_arg(
+                array(
+                    'page' => 'discord-bot-jlg',
+                    'tab'  => 'api_keys',
+                ),
+                admin_url('admin.php')
+            );
+            ?>
+            <div class="components-card discord-admin-card">
+                <div class="components-card__body">
+                    <h2 class="discord-admin-card__title"><?php esc_html_e('🔐 Générer une nouvelle clé API', 'discord-bot-jlg'); ?></h2>
+                    <p class="description"><?php esc_html_e('Chaque clé est limitée aux profils et aux scopes sélectionnés. Utilisez-les pour les intégrations externes (tableaux de bord, exports automatisés, etc.).', 'discord-bot-jlg'); ?></p>
+                    <form method="post" action="<?php echo esc_url($form_action); ?>" class="discord-api-key-form">
+                        <?php wp_nonce_field('discord_bot_jlg_api_keys_action', 'discord_bot_jlg_api_keys_nonce'); ?>
+                        <input type="hidden" name="discord_bot_jlg_api_keys_action" value="generate" />
+                        <p>
+                            <label for="discord-api-key-label"><strong><?php esc_html_e('Nom interne', 'discord-bot-jlg'); ?></strong></label><br />
+                            <input type="text" id="discord-api-key-label" name="api_key_label" class="regular-text" placeholder="<?php esc_attr_e('Tableau de bord marketing', 'discord-bot-jlg'); ?>" />
+                        </p>
+                        <fieldset class="discord-api-key-fieldset">
+                            <legend><strong><?php esc_html_e('Profils autorisés', 'discord-bot-jlg'); ?></strong></legend>
+                            <label>
+                                <input type="checkbox" name="api_key_profiles[]" value="__all__" />
+                                <?php esc_html_e('Tous les profils actuels et futurs', 'discord-bot-jlg'); ?>
+                            </label>
+                            <?php foreach ($available_profiles as $profile_key => $label) : ?>
+                                <label>
+                                    <input type="checkbox" name="api_key_profiles[]" value="<?php echo esc_attr($profile_key); ?>" />
+                                    <?php echo esc_html($label); ?>
+                                </label>
+                            <?php endforeach; ?>
+                        </fieldset>
+                        <fieldset class="discord-api-key-fieldset">
+                            <legend><strong><?php esc_html_e('Permissions REST', 'discord-bot-jlg'); ?></strong></legend>
+                            <?php foreach ($allowed_scopes as $scope) :
+                                $label = isset($scope_labels[$scope]) ? $scope_labels[$scope] : $scope;
+                                ?>
+                                <label>
+                                    <input type="checkbox" name="api_key_scopes[]" value="<?php echo esc_attr($scope); ?>" />
+                                    <?php echo esc_html($label); ?>
+                                </label>
+                            <?php endforeach; ?>
+                            <p class="description"><?php esc_html_e('Sélectionnez au moins une permission. Sans sélection, la lecture des statistiques instantanées sera autorisée par défaut.', 'discord-bot-jlg'); ?></p>
+                        </fieldset>
+                        <p>
+                            <label for="discord-api-key-expiration"><strong><?php esc_html_e('Expiration (en jours)', 'discord-bot-jlg'); ?></strong></label><br />
+                            <input type="number" id="discord-api-key-expiration" name="api_key_expiration_days" min="0" max="365" step="1" value="0" class="small-text" />
+                            <span class="description"><?php esc_html_e('Laissez 0 pour une clé sans date de fin.', 'discord-bot-jlg'); ?></span>
+                        </p>
+                        <?php submit_button(esc_html__('Générer la clé API', 'discord-bot-jlg'), 'primary'); ?>
+                    </form>
+                </div>
+            </div>
+
+            <?php
+            $keys = $this->api_key_repository->list_keys(array('include_revoked' => true));
+            ?>
+            <div class="components-card discord-admin-card">
+                <div class="components-card__body">
+                    <h2 class="discord-admin-card__title"><?php esc_html_e('🗝️ Clés existantes', 'discord-bot-jlg'); ?></h2>
+                    <?php if (empty($keys)) : ?>
+                        <p><?php esc_html_e('Aucune clé API enregistrée pour le moment.', 'discord-bot-jlg'); ?></p>
+                    <?php else : ?>
+                        <table class="widefat fixed striped">
+                            <thead>
+                                <tr>
+                                    <th><?php esc_html_e('Étiquette', 'discord-bot-jlg'); ?></th>
+                                    <th><?php esc_html_e('Profils', 'discord-bot-jlg'); ?></th>
+                                    <th><?php esc_html_e('Permissions', 'discord-bot-jlg'); ?></th>
+                                    <th><?php esc_html_e('Usage', 'discord-bot-jlg'); ?></th>
+                                    <th><?php esc_html_e('Expiration', 'discord-bot-jlg'); ?></th>
+                                    <th><?php esc_html_e('Dernier accès', 'discord-bot-jlg'); ?></th>
+                                    <th><?php esc_html_e('Statut', 'discord-bot-jlg'); ?></th>
+                                    <th class="column-actions">&nbsp;</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <?php foreach ($keys as $key) :
+                                    $profiles = isset($key['profiles']) && is_array($key['profiles']) ? $key['profiles'] : array();
+                                    $profile_labels = array();
+                                    if (in_array('__all__', $profiles, true) || in_array('all', $profiles, true) || in_array('*', $profiles, true)) {
+                                        $profile_labels[] = esc_html__('Tous les profils', 'discord-bot-jlg');
+                                    } else {
+                                        foreach ($profiles as $profile_key) {
+                                            $profile_labels[] = isset($available_profiles[$profile_key])
+                                                ? esc_html($available_profiles[$profile_key])
+                                                : esc_html($profile_key);
+                                        }
+                                    }
+
+                                    $scopes = isset($key['scopes']) && is_array($key['scopes']) ? $key['scopes'] : array();
+                                    $scope_labels_rendered = array();
+                                    foreach ($scopes as $scope) {
+                                        $scope_labels_rendered[] = isset($scope_labels[$scope]) ? esc_html($scope_labels[$scope]) : esc_html($scope);
+                                    }
+
+                                    $usage_count = isset($key['usage_count']) ? (int) $key['usage_count'] : 0;
+                                    $fingerprint = isset($key['fingerprint']) ? substr(sanitize_text_field($key['fingerprint']), 0, 12) : '';
+                                    $expires_at = isset($key['expires_at']) ? $key['expires_at'] : '';
+                                    $last_used_at = isset($key['last_used_at']) ? $key['last_used_at'] : '';
+                                    $revoked_at = isset($key['revoked_at']) ? $key['revoked_at'] : '';
+
+                                    $expires_timestamp = ('' !== $expires_at) ? strtotime($expires_at . ' +0000') : 0;
+                                    $is_expired = ($expires_timestamp > 0 && $expires_timestamp <= current_time('timestamp', true));
+                                    $is_revoked = ('' !== $revoked_at);
+                                    $status_label = $is_revoked
+                                        ? esc_html__('Révoquée', 'discord-bot-jlg')
+                                        : ($is_expired ? esc_html__('Expirée', 'discord-bot-jlg') : esc_html__('Active', 'discord-bot-jlg'));
+                                    $status_class = $is_revoked ? 'status-revoked' : ($is_expired ? 'status-expired' : 'status-active');
+                                    ?>
+                                    <tr>
+                                        <td>
+                                            <strong><?php echo esc_html(isset($key['label']) ? $key['label'] : ''); ?></strong><br />
+                                            <?php if ('' !== $fingerprint) : ?>
+                                                <code><?php echo esc_html($fingerprint); ?></code>
+                                            <?php endif; ?>
+                                        </td>
+                                        <td><?php echo !empty($profile_labels) ? esc_html(implode(', ', $profile_labels)) : '—'; ?></td>
+                                        <td><?php echo !empty($scope_labels_rendered) ? esc_html(implode(', ', $scope_labels_rendered)) : '—'; ?></td>
+                                        <td><?php echo esc_html(number_format_i18n($usage_count)); ?></td>
+                                        <td><?php echo esc_html($this->format_api_key_datetime($expires_at)); ?></td>
+                                        <td><?php echo esc_html($this->format_api_key_datetime($last_used_at)); ?></td>
+                                        <td><span class="discord-api-key-status <?php echo esc_attr($status_class); ?>"><?php echo $status_label; ?></span></td>
+                                        <td>
+                                            <?php if (!$is_revoked) : ?>
+                                                <form method="post" action="<?php echo esc_url($form_action); ?>">
+                                                    <?php wp_nonce_field('discord_bot_jlg_api_keys_action', 'discord_bot_jlg_api_keys_nonce'); ?>
+                                                    <input type="hidden" name="discord_bot_jlg_api_keys_action" value="revoke" />
+                                                    <input type="hidden" name="api_key_id" value="<?php echo esc_attr((int) $key['id']); ?>" />
+                                                    <?php submit_button(esc_html__('Révoquer', 'discord-bot-jlg'), 'delete', 'submit', false); ?>
+                                                </form>
+                                            <?php else : ?>
+                                                <span class="dashicons dashicons-lock" aria-hidden="true"></span>
+                                            <?php endif; ?>
+                                        </td>
+                                    </tr>
+                                <?php endforeach; ?>
+                            </tbody>
+                        </table>
+                    <?php endif; ?>
+                </div>
+            </div>
+
+            <?php
+            $events = ($this->event_logger instanceof Discord_Bot_JLG_Event_Logger)
+                ? $this->event_logger->get_events(
+                    array(
+                        'type'  => 'rest_api_key',
+                        'limit' => 10,
+                    )
+                )
+                : array();
+            ?>
+            <div class="components-card discord-admin-card">
+                <div class="components-card__body">
+                    <h2 class="discord-admin-card__title"><?php esc_html_e('📝 Derniers événements', 'discord-bot-jlg'); ?></h2>
+                    <?php if (empty($events)) : ?>
+                        <p><?php esc_html_e('Aucun accès API récent enregistré.', 'discord-bot-jlg'); ?></p>
+                    <?php else : ?>
+                        <ul class="discord-admin-list">
+                            <?php foreach ($events as $event) :
+                                $timestamp = isset($event['timestamp']) ? (int) $event['timestamp'] : 0;
+                                $context = isset($event['context']) && is_array($event['context']) ? $event['context'] : array();
+                                $action = isset($context['action']) ? sanitize_text_field($context['action']) : '';
+                                $outcome = isset($context['outcome']) ? sanitize_text_field($context['outcome']) : '';
+                                $scope = isset($context['scope']) ? sanitize_text_field($context['scope']) : '';
+                                $profile = isset($context['profile_key']) ? sanitize_text_field($context['profile_key']) : '';
+                                $fingerprint = isset($context['fingerprint']) ? substr(sanitize_text_field($context['fingerprint']), 0, 12) : '';
+                                $label = isset($context['label']) ? sanitize_text_field($context['label']) : '';
+                                $key_id = isset($context['key_id']) ? (int) $context['key_id'] : 0;
+
+                                $timestamp_label = ($timestamp > 0)
+                                    ? discord_bot_jlg_format_datetime('Y-m-d H:i', $timestamp)
+                                    : '';
+
+                                $description_parts = array();
+                                if ('' !== $action) {
+                                    $description_parts[] = sprintf(esc_html__('Action : %s', 'discord-bot-jlg'), esc_html($action));
+                                }
+                                if ('' !== $outcome) {
+                                    $description_parts[] = sprintf(esc_html__('Résultat : %s', 'discord-bot-jlg'), esc_html($outcome));
+                                }
+                                if ('' !== $scope) {
+                                    $description_parts[] = sprintf(esc_html__('Scope : %s', 'discord-bot-jlg'), esc_html($scope));
+                                }
+                                if ('' !== $profile) {
+                                    $description_parts[] = sprintf(esc_html__('Profil : %s', 'discord-bot-jlg'), esc_html($profile));
+                                }
+                                if ('' !== $fingerprint) {
+                                    $description_parts[] = sprintf(esc_html__('Empreinte : %s', 'discord-bot-jlg'), esc_html($fingerprint));
+                                }
+                                if ($key_id > 0) {
+                                    $description_parts[] = sprintf(esc_html__('ID : %d', 'discord-bot-jlg'), $key_id);
+                                }
+                                if ('' !== $label) {
+                                    $description_parts[] = sprintf(esc_html__('Clé : %s', 'discord-bot-jlg'), esc_html($label));
+                                }
+                                ?>
+                                <li>
+                                    <strong><?php echo esc_html($timestamp_label); ?></strong>
+                                    <?php if (!empty($description_parts)) : ?>
+                                        — <?php echo esc_html(implode(' · ', $description_parts)); ?>
+                                    <?php endif; ?>
+                                </li>
+                            <?php endforeach; ?>
+                        </ul>
+                    <?php endif; ?>
+                </div>
+            </div>
+        </div>
+        <?php
+    }
+
+    private function format_api_key_datetime($datetime) {
+        if (!is_string($datetime) || '' === $datetime) {
+            return '—';
+        }
+
+        $timestamp = strtotime($datetime . ' +0000');
+        if ($timestamp <= 0) {
+            return '—';
+        }
+
+        if (function_exists('get_date_from_gmt')) {
+            $format = get_option('date_format') . ' ' . get_option('time_format');
+            $formatted = get_date_from_gmt($datetime, $format);
+            if ('' !== $formatted) {
+                return $formatted;
+            }
+        }
+
+        return gmdate('Y-m-d H:i', $timestamp) . ' UTC';
     }
 
     /**
@@ -3721,6 +4212,9 @@ class Discord_Bot_JLG_Admin {
                     case 'automation_tips':
                         $this->render_automation_tips_panel();
                         break;
+                    case 'api_keys_help':
+                        $this->render_api_keys_help_panel();
+                        break;
                     case 'monitoring_help':
                         $this->render_monitoring_help_panel();
                         break;
@@ -3830,6 +4324,22 @@ class Discord_Bot_JLG_Admin {
                     <li><?php esc_html_e('Activez la rétention analytics pour alimenter les graphiques et les KPI.', 'discord-bot-jlg'); ?></li>
                     <li><?php esc_html_e('Les caches courts améliorent la réactivité, mais surveillez les erreurs dans l’onglet Surveillance.', 'discord-bot-jlg'); ?></li>
                 </ul>
+            </div>
+        </div>
+        <?php
+    }
+
+    private function render_api_keys_help_panel() {
+        ?>
+        <div class="components-card discord-admin-card">
+            <div class="components-card__body">
+                <h3 class="discord-admin-card__title"><?php esc_html_e('🔑 Astuces clés API', 'discord-bot-jlg'); ?></h3>
+                <ul class="discord-admin-list">
+                    <li><?php esc_html_e('Générez une clé par usage (ex. exports marketing) pour suivre facilement les accès.', 'discord-bot-jlg'); ?></li>
+                    <li><?php esc_html_e('Limitez chaque clé aux profils et permissions nécessaires pour réduire l’exposition.', 'discord-bot-jlg'); ?></li>
+                    <li><?php esc_html_e('Révoquez immédiatement les clés non utilisées ou en cas de doute.', 'discord-bot-jlg'); ?></li>
+                </ul>
+                <p class="description"><?php esc_html_e('Les accès sont journalisés dans l’onglet ci-contre et consultables via l’API REST /events.', 'discord-bot-jlg'); ?></p>
             </div>
         </div>
         <?php
