@@ -10,6 +10,8 @@
             <file>discord-bot-jlg/tests/phpunit/Test_Discord_Bot_JLG_Site_Health.php</file>
             <file>discord-bot-jlg/tests/phpunit/Test_Discord_Bot_JLG_Cron.php</file>
             <file>discord-bot-jlg/tests/phpunit/Test_Discord_Bot_JLG_Stats_Service.php</file>
+            <file>discord-bot-jlg/tests/phpunit/Test_Discord_Bot_JLG_Helpers.php</file>
+            <file>discord-bot-jlg/tests/phpunit/Test_Discord_Bot_JLG_Shortcode.php</file>
         </testsuite>
     </testsuites>
 </phpunit>
