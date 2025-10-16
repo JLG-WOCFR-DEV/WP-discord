@@ -239,9 +239,6 @@ class Test_Discord_Bot_JLG_REST_Controller extends TestCase {
                 array(
                     'timestamp' => 1000,
                     'online'    => 12,
-                    'presence'  => null,
-                    'total'     => null,
-                    'premium'   => null,
                 ),
             ),
         );
@@ -264,7 +261,18 @@ class Test_Discord_Bot_JLG_REST_Controller extends TestCase {
         $this->assertCount(1, $payload['data']['series']);
         $series_entry = $payload['data']['series'][0];
         $this->assertSame('guild', $series_entry['profile_key']);
-        $this->assertSame($analytics_payload['timeseries'], $series_entry['timeseries']);
+
+        $this->assertCount(1, $series_entry['timeseries']);
+        $point = $series_entry['timeseries'][0];
+        $this->assertSame(1000, $point['timestamp']);
+        $this->assertSame(12, $point['online']);
+        $this->assertArrayHasKey('presence', $point);
+        $this->assertArrayHasKey('total', $point);
+        $this->assertArrayHasKey('premium', $point);
+        $this->assertNull($point['presence']);
+        $this->assertNull($point['total']);
+        $this->assertNull($point['premium']);
+
         $this->assertSame($series_entry['timeseries'], $payload['data']['timeseries']);
         $this->assertArrayHasKey('profile_key', $analytics->last_args);
         $this->assertSame('guild', $analytics->last_args['profile_key']);
