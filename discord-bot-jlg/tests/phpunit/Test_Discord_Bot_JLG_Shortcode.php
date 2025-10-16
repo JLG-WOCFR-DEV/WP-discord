@@ -41,6 +41,7 @@ class Test_Discord_Bot_JLG_Shortcode extends TestCase {
             'custom_css'    => $custom_css,
             'show_server_name' => true,
             'show_server_avatar' => true,
+            'show_presence_breakdown' => true,
             'default_refresh_enabled' => true,
             'default_refresh_interval' => 45,
             'default_theme' => 'dark',
@@ -80,6 +81,14 @@ class Test_Discord_Bot_JLG_Shortcode extends TestCase {
             'server_name'          => 'Test Guild',
             'server_avatar_base_url' => 'https://cdn.discordapp.com/icons/123456789/abcdef.png',
             'server_avatar_url'    => 'https://cdn.discordapp.com/icons/123456789/abcdef.png?size=64',
+            'presence_count_by_status' => array(
+                'online'    => 6,
+                'idle'      => 3,
+                'dnd'       => 2,
+                'offline'   => 10,
+                'streaming' => 1,
+                'other'     => 1,
+            ),
         );
 
         $api->method('get_plugin_options')->willReturn($options);
@@ -87,6 +96,14 @@ class Test_Discord_Bot_JLG_Shortcode extends TestCase {
         $api->method('get_demo_stats')->willReturn($stats);
 
         return new Discord_Bot_JLG_Shortcode(DISCORD_BOT_JLG_OPTION_NAME, $api);
+    }
+
+    private function invoke_prepare_avatar_url(Discord_Bot_JLG_Shortcode $shortcode, $base_url, $fallback_url, $size) {
+        $reflection = new ReflectionClass(Discord_Bot_JLG_Shortcode::class);
+        $method     = $reflection->getMethod('prepare_avatar_url');
+        $method->setAccessible(true);
+
+        return $method->invoke($shortcode, $base_url, $fallback_url, $size);
     }
 
     public function test_render_shortcode_rejects_malicious_width() {
@@ -236,6 +253,7 @@ class Test_Discord_Bot_JLG_Shortcode extends TestCase {
             'stat_bg_color'     => '#abcdef',
             'stat_text_color'   => 'rgb(10, 20, 30)',
             'accent_color'      => '#ff00aa',
+            'accent_color_alt'  => '',
             'accent_text_color' => '#0f0f0f',
         ));
 
@@ -257,5 +275,31 @@ class Test_Discord_Bot_JLG_Shortcode extends TestCase {
 
         $this->assertIsArray($registered_script['deps']);
         $this->assertSame(array(), $registered_script['deps']);
+    }
+
+    public function test_prepare_avatar_url_handles_missing_size_parameter() {
+        $shortcode = $this->get_shortcode_instance();
+
+        $result = $this->invoke_prepare_avatar_url(
+            $shortcode,
+            'https://cdn.discordapp.com/icons/123456789/abcdef.png',
+            '',
+            256
+        );
+
+        $this->assertSame('https://cdn.discordapp.com/icons/123456789/abcdef.png?size=256', $result);
+    }
+
+    public function test_prepare_avatar_url_overrides_existing_size_parameter() {
+        $shortcode = $this->get_shortcode_instance();
+
+        $result = $this->invoke_prepare_avatar_url(
+            $shortcode,
+            '',
+            'https://cdn.discordapp.com/icons/123456789/abcdef.png?size=32',
+            512
+        );
+
+        $this->assertSame('https://cdn.discordapp.com/icons/123456789/abcdef.png?size=512', $result);
     }
 }
