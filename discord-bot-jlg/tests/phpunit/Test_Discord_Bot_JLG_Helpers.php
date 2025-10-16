@@ -277,6 +277,24 @@ class Test_Discord_Bot_JLG_Helpers extends TestCase {
         );
     }
 
+    public function test_remove_query_arg_handles_associative_arrays() {
+        $input = array(
+            'size'   => '256',
+            'foo'    => 'bar',
+            'nested' => array('alpha' => 'beta'),
+        );
+
+        $result = remove_query_arg(array('size', 'missing'), $input);
+
+        $this->assertSame(
+            array(
+                'foo'    => 'bar',
+                'nested' => array('alpha' => 'beta'),
+            ),
+            $result
+        );
+    }
+
     private function define_auth_constants(): void {
         if (!defined('AUTH_KEY')) {
             define('AUTH_KEY', self::AUTH_KEY);

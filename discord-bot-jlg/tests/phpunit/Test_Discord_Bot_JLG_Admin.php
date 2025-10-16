@@ -792,9 +792,6 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
             'default_label_premium'           => '',
             'default_label_premium_singular'  => '',
             'default_label_premium_plural'    => '',
-            'show_presence_breakdown' => 0,
-            'show_approximate_member_count' => 0,
-            'show_premium_subscriptions' => 0,
         );
     }
 
