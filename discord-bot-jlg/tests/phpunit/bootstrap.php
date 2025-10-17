@@ -292,14 +292,6 @@ if (!class_exists('WP_Widget')) {
     }
 }
 
-if (!defined('AUTH_KEY')) {
-    define('AUTH_KEY', 'tests-fixed-auth-key');
-}
-
-if (!defined('AUTH_SALT')) {
-    define('AUTH_SALT', 'tests-fixed-auth-salt');
-}
-
 if (!function_exists('esc_html__')) {
     function esc_html__($text, $domain = null) {
         return $text;
