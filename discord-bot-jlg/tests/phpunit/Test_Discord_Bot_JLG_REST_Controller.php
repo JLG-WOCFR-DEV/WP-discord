@@ -310,6 +310,15 @@ class Test_Discord_Bot_JLG_REST_Controller extends TestCase {
         $this->assertStringContainsString('discord_bot_jlg_http_requests_total', $body);
         $this->assertStringContainsString('context="widget"', $body);
         $this->assertStringContainsString('discord_bot_jlg_logged_events_total', $body);
+        $this->assertSame('text/plain; version=0.0.4', wp_test_rest_response_get_header($response, 'Content-Type'));
+
+        ob_start();
+        $served = apply_filters('rest_pre_serve_request', false, new WP_REST_Server(), $response, $request);
+        $output = ob_get_clean();
+
+        $this->assertTrue($served);
+        $this->assertSame($body, $output);
+        $this->assertSame('#', substr(ltrim($output), 0, 1));
 
         delete_option('discord_bot_jlg_metrics_test_state');
         delete_option(DISCORD_BOT_JLG_OPTION_NAME);
