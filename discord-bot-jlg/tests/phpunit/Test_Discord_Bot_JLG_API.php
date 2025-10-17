@@ -692,7 +692,9 @@ class Test_Discord_Bot_JLG_API extends TestCase {
         return array(
             // Sub-second Retry-After headers should be rounded up to 1 second.
             'fractional-seconds' => array('0.5', 1),
+            'fractional-seconds-trimmed' => array(' 0.5 ', 1),
             'milliseconds-suffix' => array('250ms', 1),
+            'milliseconds-with-padding' => array(' 250ms ', 1),
             'seconds-with-unit' => array('1.2s', 2),
             'decimal-comma' => array('1,4', 2),
             'uppercase-ms' => array('150MS', 1),
