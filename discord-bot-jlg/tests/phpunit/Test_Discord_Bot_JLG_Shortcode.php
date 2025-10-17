@@ -339,6 +339,52 @@ class Test_Discord_Bot_JLG_Shortcode extends TestCase {
         $this->assertSame('https://cdn.discordapp.com/icons/123456789/abcdef.png?size=256', $result);
     }
 
+    public function test_prepare_avatar_url_preserves_unrelated_query_arguments_when_size_is_missing() {
+        $shortcode = $this->get_shortcode_instance();
+
+        $base_url = 'https://cdn.discordapp.com/icons/123456789/abcdef.png?foo=bar&meta[color]=blue';
+        $result   = $this->invoke_prepare_avatar_url($shortcode, $base_url, '', 256);
+
+        $parts = parse_url($result);
+        $this->assertIsArray($parts);
+        $this->assertSame('/icons/123456789/abcdef.png', $parts['path']);
+
+        $query_args = array();
+        parse_str($parts['query'], $query_args);
+
+        $this->assertSame(
+            array(
+                'foo'  => 'bar',
+                'meta' => array('color' => 'blue'),
+                'size' => '256',
+            ),
+            $query_args
+        );
+    }
+
+    public function test_prepare_avatar_url_handles_fallback_without_size_parameter() {
+        $shortcode = $this->get_shortcode_instance();
+
+        $fallback_url = 'https://cdn.discordapp.com/embed/avatars/0.png?ref=widget&meta[source]=profile';
+        $result       = $this->invoke_prepare_avatar_url($shortcode, '', $fallback_url, 128);
+
+        $parts = parse_url($result);
+        $this->assertIsArray($parts);
+        $this->assertSame('/embed/avatars/0.png', $parts['path']);
+
+        $query_args = array();
+        parse_str($parts['query'], $query_args);
+
+        $this->assertSame(
+            array(
+                'ref'  => 'widget',
+                'meta' => array('source' => 'profile'),
+                'size' => '128',
+            ),
+            $query_args
+        );
+    }
+
     public function test_prepare_avatar_url_overrides_existing_size_parameter() {
         $shortcode = $this->get_shortcode_instance();
 

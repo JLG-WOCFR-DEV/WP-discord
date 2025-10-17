@@ -199,10 +199,23 @@ if (!function_exists('wp_set_script_translations')) {
 
 if (!function_exists('remove_query_arg')) {
     function remove_query_arg($keys, $query = false) {
-        $keys = (array) $keys;
+        if (!is_array($keys)) {
+            $keys = array($keys);
+        }
+
+        $normalized_keys = array();
+        foreach ($keys as $key) {
+            if (is_scalar($key)) {
+                $normalized_keys[] = (string) $key;
+            }
+        }
+
+        if (empty($normalized_keys)) {
+            return $query;
+        }
 
         if (is_array($query)) {
-            foreach ($keys as $key) {
+            foreach ($normalized_keys as $key) {
                 if (array_key_exists($key, $query)) {
                     unset($query[$key]);
                 }
@@ -211,7 +224,13 @@ if (!function_exists('remove_query_arg')) {
             return $query;
         }
 
-        if (!is_string($query)) {
+        if (false === $query || null === $query) {
+            $query = isset($_SERVER['REQUEST_URI']) ? (string) $_SERVER['REQUEST_URI'] : '';
+        } else {
+            $query = (string) $query;
+        }
+
+        if ('' === $query) {
             return '';
         }
 
@@ -222,42 +241,36 @@ if (!function_exists('remove_query_arg')) {
             $query    = substr($query, 0, $fragment_position);
         }
 
-        $base = $query;
-        $query_string = '';
-
-        $query_position = strpos($query, '?');
-        if (false !== $query_position) {
-            $base         = substr($query, 0, $query_position);
-            $query_string = substr($query, $query_position + 1);
+        $question_mark_position = strpos($query, '?');
+        if (false === $question_mark_position) {
+            return $query . $fragment;
         }
 
-        if ('' === $query_string) {
-            return $base . $fragment;
+        $base         = substr($query, 0, $question_mark_position);
+        $query_string = substr($query, $question_mark_position + 1);
+
+        $parsed_query = array();
+        if ('' !== $query_string) {
+            parse_str($query_string, $parsed_query);
         }
 
-        parse_str($query_string, $params);
-
-        if (!is_array($params)) {
-            return $base . $fragment;
+        foreach ($normalized_keys as $key) {
+            unset($parsed_query[$key]);
         }
 
-        foreach ($keys as $key) {
-            if (array_key_exists($key, $params)) {
-                unset($params[$key]);
+        $rebuilt_query = http_build_query($parsed_query, '', '&', PHP_QUERY_RFC3986);
+
+        if ('' !== $rebuilt_query) {
+            $result = ('' !== $base ? $base . '?' . $rebuilt_query : '?' . $rebuilt_query);
+        } else {
+            $result = $base;
+
+            if ('' === $result && 0 === $question_mark_position) {
+                $result = '?';
             }
         }
 
-        if (empty($params)) {
-            return $base . $fragment;
-        }
-
-        $new_query = http_build_query($params, '', '&', PHP_QUERY_RFC3986);
-
-        if ('' === $new_query) {
-            return $base . $fragment;
-        }
-
-        return $base . '?' . $new_query . $fragment;
+        return $result . $fragment;
     }
 }
 
