@@ -961,6 +961,10 @@ class Discord_Bot_JLG_API {
             $service_error = isset($service_result['error']) ? (string) $service_result['error'] : '';
             $existing_error = $this->last_error;
 
+            if (!empty($service_result['used_cache'])) {
+                $this->maybe_record_cached_short_circuit($options, $args, $context);
+            }
+
             if ('' !== $service_error) {
                 if ('' !== $existing_error && false === strpos($service_error, $existing_error)) {
                     $service_error = trim($service_error . ' (' . $existing_error . ')');
@@ -979,6 +983,54 @@ class Discord_Bot_JLG_API {
             return $this->remember_runtime_result($runtime_key, $stats);
         } finally {
             $this->cache_key = $original_cache_key;
+        }
+    }
+
+    private function maybe_record_cached_short_circuit($options, $args, $context) {
+        if (!is_array($options)) {
+            return;
+        }
+
+        if (!is_array($args)) {
+            $args = array();
+        }
+
+        if (!empty($args['bypass_cache']) || !empty($args['force_refresh'])) {
+            return;
+        }
+
+        if (!empty($options['__force_connector_attempt']) || !empty($options['__force_connector_attempt_active'])) {
+            return;
+        }
+
+        $profile_key = $this->resolve_profile_key_from_options($options);
+        $now         = $this->get_current_timestamp();
+        $channels    = array('widget', 'bot');
+
+        if (is_array($context) && isset($context['channel'])) {
+            $normalized = $this->normalize_connector_channel($context['channel']);
+            if ('' !== $normalized) {
+                $channels = array($normalized);
+            }
+        }
+
+        $this->ensure_connector_state_registry();
+
+        foreach ($channels as $channel) {
+            $key = $this->get_connector_state_key($profile_key, $channel);
+
+            if (!isset($this->connector_state_registry[$key])) {
+                continue;
+            }
+
+            $state = $this->connector_state_registry[$key];
+            $open_until = isset($state['open_until']) ? (int) $state['open_until'] : 0;
+
+            if ($open_until <= $now) {
+                continue;
+            }
+
+            $this->register_connector_attempt($profile_key, $channel, false);
         }
     }
 
