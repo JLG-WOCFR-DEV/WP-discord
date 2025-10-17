@@ -593,30 +593,52 @@ class Test_Discord_Bot_JLG_API extends TestCase {
         unset($GLOBALS['wp_test_options'][$option_name]);
     }
 
-    public function test_get_stats_force_refresh_bypasses_runtime_cache() {
+    public function test_forced_calls_bypass_runtime_cache() {
         $option_name = 'discord_server_stats_options';
         $cache_key   = 'discord_server_stats_cache';
+
+        delete_option(Discord_Bot_JLG_API::CONNECTOR_STATE_OPTION);
+        delete_transient($cache_key);
+        delete_transient($cache_key . Discord_Bot_JLG_API::LAST_GOOD_SUFFIX);
 
         $GLOBALS['wp_test_options'][$option_name] = array(
             'server_id'      => '13579',
             'cache_duration' => 45,
+            'bot_token'      => 'token-13579',
         );
 
-        $http_client = new Mock_Discord_Bot_JLG_Http_Client();
+        $widget_payload = array(
+            'presence_count' => 3,
+            'name'           => 'Runtime Cache Guild',
+            'members'        => array(
+                array('id' => 1, 'status' => 'online'),
+                array('id' => 2, 'status' => 'offline'),
+                array('id' => 3, 'status' => 'idle'),
+            ),
+        );
+
+        $bot_payload = array(
+            'approximate_presence_count' => 3,
+            'approximate_member_count'   => 42,
+            'name'                       => 'Runtime Cache Bot Guild',
+        );
+
+        $http_client = new Successful_Mock_Discord_Bot_JLG_Http_Client($widget_payload, $bot_payload);
         $api         = new Discord_Bot_JLG_API($option_name, $cache_key, 60, $http_client);
 
-        $api->get_stats(array('force_refresh' => true));
+        $api->get_stats(array('bypass_cache' => true));
+        $this->assertCount(2, $http_client->requests, 'Forced bypass should trigger both widget and bot requests.');
 
-        $this->assertSame(1, $http_client->call_count, 'Initial forced refresh should hit the network once.');
-
-        $api->get_stats(array('force_refresh' => true));
-
-        $this->assertSame(
-            2,
-            $http_client->call_count,
-            'A forced refresh should bypass the runtime cache and reach the network again.'
+        $api->get_stats(array('bypass_cache' => true));
+        $this->assertCount(
+            4,
+            $http_client->requests,
+            'Second forced bypass should ignore runtime cache and trigger the HTTP client again.'
         );
 
+        delete_option(Discord_Bot_JLG_API::CONNECTOR_STATE_OPTION);
+        delete_transient($cache_key);
+        delete_transient($cache_key . Discord_Bot_JLG_API::LAST_GOOD_SUFFIX);
         unset($GLOBALS['wp_test_options'][$option_name]);
     }
 

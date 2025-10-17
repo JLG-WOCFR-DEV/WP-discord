@@ -802,6 +802,18 @@ if (!function_exists('discord_bot_jlg_encrypt_secret')) {
             );
         }
 
+        $auth_key_defined  = defined('AUTH_KEY');
+        $auth_salt_defined = defined('AUTH_SALT');
+        $auth_key          = $auth_key_defined ? constant('AUTH_KEY') : '';
+        $auth_salt         = $auth_salt_defined ? constant('AUTH_SALT') : '';
+
+        if (!$auth_key_defined || '' === $auth_key || !$auth_salt_defined || '' === $auth_salt) {
+            return new WP_Error(
+                'discord_bot_jlg_encrypt_secret_missing_keys',
+                __('Les constantes AUTH_KEY et AUTH_SALT sont requises pour chiffrer le token Discord.', 'discord-bot-jlg')
+            );
+        }
+
         $has_openssl_encrypt = function_exists('openssl_encrypt');
         if (function_exists('apply_filters')) {
             $has_openssl_encrypt = (bool) apply_filters(
@@ -835,7 +847,7 @@ if (!function_exists('discord_bot_jlg_encrypt_secret')) {
             );
         }
 
-        $key_material = hash('sha256', AUTH_KEY, true);
+        $key_material = hash('sha256', $auth_key, true);
 
         $ciphertext = openssl_encrypt($secret, 'aes-256-cbc', $key_material, OPENSSL_RAW_DATA, $iv);
 
@@ -846,7 +858,7 @@ if (!function_exists('discord_bot_jlg_encrypt_secret')) {
             );
         }
 
-        $mac = hash_hmac('sha256', $iv . $ciphertext, AUTH_SALT, true);
+        $mac = hash_hmac('sha256', $iv . $ciphertext, $auth_salt, true);
 
         return DISCORD_BOT_JLG_SECRET_PREFIX . base64_encode($iv . $ciphertext . $mac);
     }
@@ -876,6 +888,18 @@ if (!function_exists('discord_bot_jlg_decrypt_secret')) {
         }
 
         if (!discord_bot_jlg_has_auth_constants()) {
+            return new WP_Error(
+                'discord_bot_jlg_decrypt_secret_missing_keys',
+                __('Les constantes AUTH_KEY et AUTH_SALT sont requises pour déchiffrer le token Discord.', 'discord-bot-jlg')
+            );
+        }
+
+        $auth_key_defined  = defined('AUTH_KEY');
+        $auth_salt_defined = defined('AUTH_SALT');
+        $auth_key          = $auth_key_defined ? constant('AUTH_KEY') : '';
+        $auth_salt         = $auth_salt_defined ? constant('AUTH_SALT') : '';
+
+        if (!$auth_key_defined || '' === $auth_key || !$auth_salt_defined || '' === $auth_salt) {
             return new WP_Error(
                 'discord_bot_jlg_decrypt_secret_missing_keys',
                 __('Les constantes AUTH_KEY et AUTH_SALT sont requises pour déchiffrer le token Discord.', 'discord-bot-jlg')
@@ -934,7 +958,7 @@ if (!function_exists('discord_bot_jlg_decrypt_secret')) {
             );
         }
 
-        $key_material = hash('sha256', AUTH_KEY, true);
+        $key_material = hash('sha256', $auth_key, true);
 
         $iv_length = 16;
         $mac_length = 32;
@@ -984,7 +1008,7 @@ if (!function_exists('discord_bot_jlg_decrypt_secret')) {
             if (strlen($ciphertext_and_mac) > $mac_length) {
                 $ciphertext = substr($ciphertext_and_mac, 0, -$mac_length);
                 $mac        = substr($ciphertext_and_mac, -$mac_length);
-                $expected   = hash_hmac('sha256', $iv . $ciphertext, AUTH_SALT, true);
+                $expected   = hash_hmac('sha256', $iv . $ciphertext, $auth_salt, true);
 
                 if (!hash_equals($expected, $mac)) {
                     return new WP_Error(
@@ -1010,7 +1034,7 @@ if (!function_exists('discord_bot_jlg_decrypt_secret')) {
 
         $ciphertext = substr($decoded, 0, -$mac_length);
         $mac        = substr($decoded, -$mac_length);
-        $expected   = hash_hmac('sha256', $ciphertext, AUTH_SALT, true);
+        $expected   = hash_hmac('sha256', $ciphertext, $auth_salt, true);
 
         if (!hash_equals($expected, $mac)) {
             return new WP_Error(
@@ -1019,7 +1043,7 @@ if (!function_exists('discord_bot_jlg_decrypt_secret')) {
             );
         }
 
-        $iv_material = hash('sha256', AUTH_SALT . AUTH_KEY, true);
+        $iv_material = hash('sha256', $auth_salt . $auth_key, true);
         $iv          = substr($iv_material, 0, $iv_length);
 
         $plaintext = openssl_decrypt($ciphertext, 'aes-256-cbc', $key_material, OPENSSL_RAW_DATA, $iv);
