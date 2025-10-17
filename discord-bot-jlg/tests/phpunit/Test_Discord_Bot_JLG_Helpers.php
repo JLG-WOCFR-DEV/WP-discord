@@ -279,6 +279,7 @@ class Test_Discord_Bot_JLG_Helpers extends TestCase {
         $this->assertSame($plaintext, $decrypted);
         $this->assertIsArray($captured);
         $this->assertSame($legacy, $captured[1]);
+        $this->assertNotSame($legacy, $captured[0]);
         $this->assertTrue(discord_bot_jlg_is_encrypted_secret($captured[0]));
         $this->assertStringStartsWith(DISCORD_BOT_JLG_SECRET_PREFIX, $captured[0]);
         $this->assertNotSame($legacy, $captured[0]);
@@ -313,6 +314,7 @@ class Test_Discord_Bot_JLG_Helpers extends TestCase {
         $this->assertSame($plaintext, $decrypted);
         $this->assertIsArray($captured);
         $this->assertSame($legacy, $captured[1]);
+        $this->assertNotSame($legacy, $captured[0]);
         $this->assertTrue(discord_bot_jlg_is_encrypted_secret($captured[0]));
         $this->assertStringStartsWith(DISCORD_BOT_JLG_SECRET_PREFIX, $captured[0]);
         $this->assertNotSame($legacy, $captured[0]);
