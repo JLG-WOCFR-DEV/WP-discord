@@ -666,12 +666,15 @@ class Discord_Bot_JLG_Admin {
         }
 
         if ($preserve_existing_secret) {
-            $sanitized['bot_token_expires_at'] = isset($current_options['bot_token_expires_at'])
-                ? (int) $current_options['bot_token_expires_at']
-                : 0;
-            $sanitized['bot_token_status'] = isset($current_options['bot_token_status'])
-                ? sanitize_key($current_options['bot_token_status'])
-                : 'missing';
+            $metadata = $this->finalize_secret_metadata(
+                'default',
+                $sanitized['bot_token'],
+                $sanitized['bot_token_rotated_at'],
+                $current_timestamp,
+                __('configuration principale', 'discord-bot-jlg')
+            );
+            $sanitized['bot_token_expires_at'] = $metadata['expires_at'];
+            $sanitized['bot_token_status'] = $metadata['status'];
         } else {
             $main_secret_metadata = $this->finalize_secret_metadata(
                 'default',
