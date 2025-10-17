@@ -722,6 +722,28 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
         delete_transient(DISCORD_BOT_JLG_CACHE_KEY . Discord_Bot_JLG_API::FALLBACK_RETRY_SUFFIX);
     }
 
+    public function test_sanitize_options_preserves_encrypted_token_when_bot_token_field_blank() {
+        $existing_options = get_option(DISCORD_BOT_JLG_OPTION_NAME);
+        $this->assertIsArray($existing_options);
+
+        $existing_options['bot_token_expires_at'] = $this->rotation_timestamp + (15 * DAY_IN_SECONDS);
+        $existing_options['bot_token_status']     = 'active';
+        update_option(DISCORD_BOT_JLG_OPTION_NAME, $existing_options);
+
+        $result = $this->admin->sanitize_options(
+            array(
+                'bot_token'    => '   ',
+                'widget_title' => ' Updated title ',
+            )
+        );
+
+        $this->assertSame($this->saved_bot_token_encrypted, $result['bot_token']);
+        $this->assertSame($this->rotation_timestamp, $result['bot_token_rotated_at']);
+        $this->assertSame($existing_options['bot_token_expires_at'], $result['bot_token_expires_at']);
+        $this->assertSame($existing_options['bot_token_status'], $result['bot_token_status']);
+        $this->assertSame(sanitize_text_field(' Updated title '), $result['widget_title']);
+    }
+
     private static function get_min_cache_duration(): int {
         return max(60, (int) Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL);
     }
