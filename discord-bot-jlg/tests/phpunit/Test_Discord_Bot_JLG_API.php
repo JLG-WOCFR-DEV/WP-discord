@@ -543,6 +543,56 @@ class Test_Discord_Bot_JLG_API extends TestCase {
         $this->assertSame(3, $widget_state['attempts']);
     }
 
+    public function test_get_stats_force_refresh_forces_connector_attempt_when_circuit_open() {
+        $option_name = 'discord_server_stats_options';
+        $cache_key   = 'discord_server_stats_cache';
+
+        delete_option(Discord_Bot_JLG_API::CONNECTOR_STATE_OPTION);
+
+        $GLOBALS['wp_test_options'][$option_name] = array(
+            'server_id'      => '13579',
+            'cache_duration' => 45,
+        );
+
+        $http_client = new Mock_Discord_Bot_JLG_Http_Client();
+        $api         = new Discord_Bot_JLG_API($option_name, $cache_key, 60, $http_client);
+
+        $api->get_stats(array('force_refresh' => true));
+
+        $this->assertSame(1, $http_client->call_count, 'Initial forced refresh should hit the network once.');
+
+        $state = get_option(Discord_Bot_JLG_API::CONNECTOR_STATE_OPTION);
+        $this->assertIsArray($state);
+        $this->assertArrayHasKey('default:widget', $state);
+        $widget_state = $state['default:widget'];
+        $this->assertGreaterThan(time(), $widget_state['open_until']);
+        $this->assertTrue($widget_state['last_attempt_was_network']);
+        $this->assertSame(1, $widget_state['attempts']);
+
+        $api->get_stats(array());
+
+        $this->assertSame(1, $http_client->call_count, 'Circuit breaker should short-circuit normal traffic after the failure.');
+
+        $state = get_option(Discord_Bot_JLG_API::CONNECTOR_STATE_OPTION);
+        $this->assertArrayHasKey('default:widget', $state);
+        $widget_state = $state['default:widget'];
+        $this->assertFalse($widget_state['last_attempt_was_network']);
+        $this->assertSame(2, $widget_state['attempts']);
+
+        $api->get_stats(array('force_refresh' => true));
+
+        $this->assertSame(2, $http_client->call_count, 'Forced refresh should bypass the open circuit and reach the network.');
+
+        $state = get_option(Discord_Bot_JLG_API::CONNECTOR_STATE_OPTION);
+        $this->assertArrayHasKey('default:widget', $state);
+        $widget_state = $state['default:widget'];
+        $this->assertTrue($widget_state['last_attempt_was_network']);
+        $this->assertSame(3, $widget_state['attempts']);
+
+        delete_option(Discord_Bot_JLG_API::CONNECTOR_STATE_OPTION);
+        unset($GLOBALS['wp_test_options'][$option_name]);
+    }
+
     public function test_clear_all_cached_data_removes_last_fallback_option() {
         $option_name = 'discord_server_stats_options';
         $cache_key   = 'discord_server_stats_cache';
