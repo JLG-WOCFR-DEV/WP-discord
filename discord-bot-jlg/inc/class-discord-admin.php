@@ -460,6 +460,8 @@ class Discord_Bot_JLG_Admin {
             'server_profiles'=> isset($current_options['server_profiles']) && is_array($current_options['server_profiles'])
                 ? $current_options['server_profiles']
                 : array(),
+            // Display toggles default to off so the boolean normalization loop can
+            // enable them based on the submitted form values.
             'demo_mode'      => 0,
             'show_online'    => 0,
             'show_total'     => 0,
