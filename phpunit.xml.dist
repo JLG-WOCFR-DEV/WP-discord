@@ -7,6 +7,7 @@
         <testsuite name="Discord Bot - JLG">
             <file>discord-bot-jlg/tests/phpunit/Test_Discord_Bot_JLG_Http_Client.php</file>
             <file>discord-bot-jlg/tests/phpunit/Test_Discord_Bot_JLG_API.php</file>
+            <file>discord-bot-jlg/tests/phpunit/Test_Discord_Bot_JLG_Admin.php</file>
             <file>discord-bot-jlg/tests/phpunit/Test_Discord_Bot_JLG_Site_Health.php</file>
             <file>discord-bot-jlg/tests/phpunit/Test_Discord_Bot_JLG_Cron.php</file>
             <file>discord-bot-jlg/tests/phpunit/Test_Discord_Bot_JLG_Stats_Service.php</file>
