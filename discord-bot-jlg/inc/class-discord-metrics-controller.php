@@ -103,12 +103,7 @@ class Discord_Bot_JLG_Metrics_Controller {
 
         add_filter('rest_pre_serve_request', array($this, 'serve_metrics_as_plain_text'), 10, 4);
 
-        $response = new WP_REST_Response(
-            array(
-                'raw_body' => $body,
-            ),
-            200
-        );
+        $response = new WP_REST_Response($body, 200);
 
         $response->header('Content-Type', 'text/plain; version=0.0.4');
 
