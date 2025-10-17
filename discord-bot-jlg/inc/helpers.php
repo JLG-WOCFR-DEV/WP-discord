@@ -33,10 +33,14 @@ if (!function_exists('discord_bot_jlg_has_auth_constants')) {
         );
 
         if (function_exists('apply_filters')) {
-            $available = (bool) apply_filters('discord_bot_jlg_has_auth_constants', $available);
+            $filtered = (bool) apply_filters('discord_bot_jlg_has_auth_constants', $available);
+
+            if ($available) {
+                $available = $filtered;
+            }
         }
 
-        return $available;
+        return (bool) $available;
     }
 }
 
