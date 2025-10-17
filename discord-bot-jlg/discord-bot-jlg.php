@@ -205,6 +205,9 @@ class DiscordServerStats {
     private $job_queue;
     private $alerts;
     private $api_key_repository;
+    private $metrics_registry;
+    private $alert_scheduler;
+    private $metrics_controller;
     private $cron_state_option = 'discord_bot_jlg_cron_state';
 
     public function __construct() {
