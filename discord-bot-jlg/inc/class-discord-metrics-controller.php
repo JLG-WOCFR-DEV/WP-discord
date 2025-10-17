@@ -101,7 +101,67 @@ class Discord_Bot_JLG_Metrics_Controller {
         $state = $this->registry->get_state();
         $body  = $this->render_prometheus($state);
 
-        return new WP_REST_Response($body, 200);
+        add_filter('rest_pre_serve_request', array($this, 'serve_metrics_as_plain_text'), 10, 4);
+
+        $response = new WP_REST_Response($body, 200);
+        $response->set_data($body);
+        $response->header('Content-Type', 'text/plain; version=0.0.4');
+
+        return $response;
+    }
+
+    public function serve_metrics_as_plain_text($served, $server, $response, $request) {
+        unset($server);
+
+        if ($served) {
+            return $served;
+        }
+
+        if (!($request instanceof WP_REST_Request)) {
+            return $served;
+        }
+
+        $route = $request->get_route();
+        $metrics_route = '/' . self::ROUTE_NAMESPACE . self::ROUTE_METRICS;
+
+        if ($route !== $metrics_route) {
+            return $served;
+        }
+
+        if (function_exists('remove_filter')) {
+            remove_filter('rest_pre_serve_request', array($this, 'serve_metrics_as_plain_text'), 10);
+        }
+
+        $body = '';
+        if (is_object($response) && method_exists($response, 'get_data')) {
+            $body_data = $response->get_data();
+            if (is_string($body_data)) {
+                $body = $body_data;
+            } elseif (is_scalar($body_data)) {
+                $body = (string) $body_data;
+            }
+        }
+
+        $can_send_headers = function_exists('headers_sent') ? !headers_sent() : true;
+
+        if ($can_send_headers && is_object($response) && method_exists($response, 'get_headers')) {
+            $headers = $response->get_headers();
+            if (is_array($headers)) {
+                foreach ($headers as $name => $value) {
+                    if (is_array($value)) {
+                        foreach ($value as $header_value) {
+                            header($name . ': ' . $header_value);
+                        }
+                    } else {
+                        header($name . ': ' . $value);
+                    }
+                }
+            }
+        }
+
+        echo $body;
+
+        return true;
     }
 
     public function handle_alert_webhook($request) {
