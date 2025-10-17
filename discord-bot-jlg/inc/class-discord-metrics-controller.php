@@ -20,7 +20,9 @@ class Discord_Bot_JLG_Metrics_Controller {
     private $options_repository;
 
     /**
-     * @var Discord_Bot_JLG_Analytics_Alert_Scheduler_Interface
+     * Scheduler instance expected to expose a schedule() method.
+     *
+     * @var object
      */
     private $alert_scheduler;
 
@@ -35,7 +37,7 @@ class Discord_Bot_JLG_Metrics_Controller {
     public function __construct(
         Discord_Bot_JLG_Metrics_Registry $registry,
         Discord_Bot_JLG_Options_Repository $options_repository,
-        Discord_Bot_JLG_Analytics_Alert_Scheduler_Interface $alert_scheduler,
+        $alert_scheduler,
         $event_logger = null
     ) {
         $this->registry           = $registry;
@@ -177,6 +179,13 @@ class Discord_Bot_JLG_Metrics_Controller {
         );
     }
 
+    /**
+     * Retrieve the scheduler instance.
+     *
+     * @return object
+     *
+     * @throws RuntimeException When the scheduler does not expose schedule().
+     */
     private function get_alert_scheduler() {
         if (!is_object($this->alert_scheduler) || !method_exists($this->alert_scheduler, 'schedule')) {
             throw new RuntimeException(
