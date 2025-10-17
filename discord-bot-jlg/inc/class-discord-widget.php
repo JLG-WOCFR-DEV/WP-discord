@@ -104,16 +104,8 @@ class Discord_Stats_Widget extends WP_Widget {
 
         $profile_key = '';
         if (isset($instance['profile_key'])) {
-            $raw_profile_key = $instance['profile_key'];
-
-            if (!is_string($raw_profile_key) && is_scalar($raw_profile_key)) {
-                $raw_profile_key = (string) $raw_profile_key;
-            }
-
-            if (is_string($raw_profile_key)) {
-                $raw_profile_key = sanitize_title($raw_profile_key);
-                $profile_key     = discord_bot_jlg_sanitize_profile_key($raw_profile_key);
-            }
+            $raw_profile_key = sanitize_title($instance['profile_key']);
+            $profile_key = discord_bot_jlg_sanitize_profile_key($raw_profile_key);
         }
         if ('' !== $profile_key) {
             $shortcode_atts['profile'] = $profile_key;
