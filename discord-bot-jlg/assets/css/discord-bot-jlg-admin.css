@@ -199,6 +199,44 @@
     max-width: 280px;
 }
 
+.discord-settings-grid {
+    display: grid;
+    gap: 12px;
+    width: 100%;
+}
+
+.discord-settings-grid--icons {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+    max-width: 720px;
+}
+
+.discord-settings-grid--labels {
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    max-width: 900px;
+}
+
+.discord-settings-grid--presence {
+    grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+    max-width: 900px;
+}
+
+.discord-settings-grid__field {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    min-width: 0;
+}
+
+.discord-settings-grid__input {
+    width: 100%;
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+.discord-settings-grid__input--icon {
+    max-width: 120px;
+}
+
 .discord-profiles-table td,
 .discord-profiles-table th {
     vertical-align: top;
