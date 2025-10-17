@@ -1048,14 +1048,23 @@ class Discord_Bot_JLG_API {
         }
 
         if ($force_connector_attempt) {
-            if (empty($options['__force_connector_attempt'])) {
-                $options['__force_connector_attempt'] = true;
-            }
+            $options['__force_connector_attempt'] = true;
+            $options['__force_connector_attempt_active'] = true;
 
             $context['force_connector_attempt'] = true;
             $runtime_key = '';
-        } elseif (isset($options['__force_connector_attempt'])) {
-            unset($options['__force_connector_attempt']);
+        } else {
+            if (isset($options['__force_connector_attempt'])) {
+                $options['__force_connector_attempt'] = false;
+            }
+
+            if (isset($options['__force_connector_attempt_active'])) {
+                unset($options['__force_connector_attempt_active']);
+            }
+
+            if (isset($context['force_connector_attempt'])) {
+                $context['force_connector_attempt'] = false;
+            }
         }
 
         $this->runtime_cache_enabled = !$skip_runtime_cache;
@@ -3284,7 +3293,11 @@ class Discord_Bot_JLG_API {
         $now = $this->get_current_timestamp();
         $open_until = isset($state['open_until']) ? (int) $state['open_until'] : 0;
         $attempts = isset($state['attempts']) ? (int) $state['attempts'] : 0;
-        $force_attempt = !empty($options['__force_connector_attempt']);
+        $force_attempt = !empty($options['__force_connector_attempt_active']);
+
+        if (false === $force_attempt && !empty($options['__force_connector_attempt'])) {
+            $force_attempt = true;
+        }
         $log_context = array(
             'attempt'              => $attempts + 1,
             'consecutive_failures' => isset($state['failures']) ? (int) $state['failures'] : 0,

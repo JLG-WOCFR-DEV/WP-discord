@@ -163,7 +163,7 @@ class Discord_Bot_JLG_Http_Connector {
             'serverId'   => $server_id,
         );
 
-        if (!empty($options['__force_connector_attempt'])) {
+        if (!empty($options['__force_connector_attempt']) || !empty($options['__force_connector_attempt_active'])) {
             $context['forcedAttempt'] = true;
         }
 
