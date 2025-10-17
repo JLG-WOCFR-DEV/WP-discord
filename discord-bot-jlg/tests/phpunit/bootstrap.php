@@ -1105,9 +1105,20 @@ if (!class_exists('WP_REST_Response')) {
             $this->status = (int) $status;
         }
 
-        public function header($key, $value) {
-            $key = strtolower((string) $key);
-            $this->headers[$key] = $value;
+        public function header($key, $value, $replace = true) {
+            if (!is_string($key) || '' === $key) {
+                return $this;
+            }
+
+            if (!is_array($this->headers)) {
+                $this->headers = array();
+            }
+
+            if ($replace || !isset($this->headers[$key])) {
+                $this->headers[$key] = $value;
+            } else {
+                $this->headers[$key] .= ', ' . $value;
+            }
 
             return $this;
         }
@@ -1124,6 +1135,26 @@ function rest_ensure_response($response) {
     }
 
     return new WP_REST_Response($response);
+}
+
+function wp_test_rest_response_get_header(WP_REST_Response $response, $header) {
+    $headers = $response->get_headers();
+
+    if (!is_array($headers)) {
+        return '';
+    }
+
+    foreach ($headers as $key => $value) {
+        if (0 === strcasecmp($key, (string) $header)) {
+            if (is_array($value)) {
+                return reset($value);
+            }
+
+            return $value;
+        }
+    }
+
+    return '';
 }
 
 function register_rest_route($namespace, $route, $args = array(), $override = false) {
