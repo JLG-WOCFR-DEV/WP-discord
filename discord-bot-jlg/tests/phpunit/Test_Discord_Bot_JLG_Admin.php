@@ -427,6 +427,23 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
         $actual_order = array_values(array_intersect($keys, $expected_order));
 
         $this->assertSame($expected_order, $actual_order);
+
+        $show_total_index = array_search('show_total', $keys, true);
+
+        $this->assertNotFalse($show_total_index, 'show_total key should be present in sanitized defaults.');
+
+        $expected_slice = array(
+            'show_total',
+            'show_presence_breakdown',
+            'show_approximate_member_count',
+            'show_premium_subscriptions',
+            'show_server_name',
+        );
+
+        $this->assertSame(
+            $expected_slice,
+            array_slice($keys, $show_total_index, count($expected_slice))
+        );
     }
 
     /**
