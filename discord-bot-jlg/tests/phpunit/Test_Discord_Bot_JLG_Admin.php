@@ -410,8 +410,6 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
     public function test_sanitize_options_boolean_field_key_order() {
         $result = $this->admin->sanitize_options(array());
 
-        $keys = array_keys($result);
-
         $expected_order = array(
             'demo_mode',
             'show_online',
@@ -424,9 +422,10 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
             'default_refresh_enabled',
         );
 
-        $actual_order = array_values(array_intersect($keys, $expected_order));
+        $display_flags = array_intersect_key($result, array_flip($expected_order));
 
-        $this->assertSame($expected_order, $actual_order);
+        $this->assertSame($expected_order, array_keys($display_flags));
+        $this->assertSame(array_fill_keys($expected_order, 0), $display_flags);
     }
 
     /**
