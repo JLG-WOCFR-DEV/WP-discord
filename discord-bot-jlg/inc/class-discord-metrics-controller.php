@@ -20,10 +20,9 @@ class Discord_Bot_JLG_Metrics_Controller {
     private $options_repository;
 
     /**
-     * Scheduler expected to provide a schedule() method.
+     * Scheduler instance expected to expose a schedule() method.
      *
      * @var object
-     * @phpstan-var object{schedule: callable}
      */
     private $alert_scheduler;
 
@@ -182,8 +181,11 @@ class Discord_Bot_JLG_Metrics_Controller {
     }
 
     /**
+     * Retrieve the scheduler instance.
+     *
      * @return object
-     * @phpstan-return object{schedule: callable}
+     *
+     * @throws RuntimeException When the scheduler does not expose schedule().
      */
     private function get_alert_scheduler() {
         if (!is_object($this->alert_scheduler) || !method_exists($this->alert_scheduler, 'schedule')) {

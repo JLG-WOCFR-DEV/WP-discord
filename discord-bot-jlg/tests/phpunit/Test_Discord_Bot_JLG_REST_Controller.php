@@ -89,7 +89,7 @@ if (!function_exists('wp_remote_retrieve_header')) {
     }
 }
 
-class Stubbed_Discord_Bot_JLG_Alert_Scheduler implements Discord_Bot_JLG_Analytics_Alert_Scheduler_Interface {
+class Stubbed_Discord_Bot_JLG_Alert_Scheduler {
     public $scheduled = array();
 
     public function schedule(array $payload, $delay = 0) {
