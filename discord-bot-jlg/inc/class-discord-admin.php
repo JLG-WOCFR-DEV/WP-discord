@@ -2248,17 +2248,16 @@ class Discord_Bot_JLG_Admin {
         <fieldset>
             <legend class="screen-reader-text"><?php esc_html_e('Icônes par défaut', 'discord-bot-jlg'); ?></legend>
             <p class="description"><?php esc_html_e('Définissez des icônes ou émojis proposés par défaut dans le shortcode, le bloc et le widget.', 'discord-bot-jlg'); ?></p>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 12px; max-width: 720px;">
+            <div class="discord-settings-grid discord-settings-grid--icons">
                 <?php foreach ($defaults as $option_key => $metadata) :
                     $current_value = isset($options[$option_key]) ? $options[$option_key] : '';
                     ?>
-                    <label style="display: flex; flex-direction: column; gap: 4px;">
+                    <label class="discord-settings-grid__field">
                         <span><?php echo esc_html($metadata['label']); ?></span>
                         <input type="text"
                                name="<?php echo esc_attr($this->option_name); ?>[<?php echo esc_attr($option_key); ?>]"
                                value="<?php echo esc_attr($current_value); ?>"
-                               class="regular-text"
-                               style="max-width: 120px;"
+                               class="regular-text discord-settings-grid__input discord-settings-grid__input--icon"
                                placeholder="<?php echo esc_attr($metadata['placeholder']); ?>" />
                     </label>
                 <?php endforeach; ?>
@@ -2296,32 +2295,32 @@ class Discord_Bot_JLG_Admin {
         <fieldset>
             <legend class="screen-reader-text"><?php esc_html_e('Libellés par défaut', 'discord-bot-jlg'); ?></legend>
             <p class="description"><?php esc_html_e('Ces textes sont injectés automatiquement dans le bloc, le shortcode et le widget. Laissez vide pour conserver les libellés natifs.', 'discord-bot-jlg'); ?></p>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 12px; max-width: 900px;">
+            <div class="discord-settings-grid discord-settings-grid--labels">
                 <?php foreach ($main_labels as $option_key => $metadata) :
                     $current_value = isset($options[$option_key]) ? $options[$option_key] : '';
                     ?>
-                    <label style="display: flex; flex-direction: column; gap: 4px;">
+                    <label class="discord-settings-grid__field">
                         <span><?php echo esc_html($metadata['label']); ?></span>
                         <input type="text"
                                name="<?php echo esc_attr($this->option_name); ?>[<?php echo esc_attr($option_key); ?>]"
                                value="<?php echo esc_attr($current_value); ?>"
-                               class="regular-text"
+                               class="regular-text discord-settings-grid__input"
                                placeholder="<?php echo esc_attr($metadata['placeholder']); ?>" />
                     </label>
                 <?php endforeach; ?>
             </div>
 
             <h4 style="margin-top: 18px;"><?php esc_html_e('Détails de présence', 'discord-bot-jlg'); ?></h4>
-            <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; max-width: 900px;">
+            <div class="discord-settings-grid discord-settings-grid--presence">
                 <?php foreach ($presence_labels as $option_key => $metadata) :
                     $current_value = isset($options[$option_key]) ? $options[$option_key] : '';
                     ?>
-                    <label style="display: flex; flex-direction: column; gap: 4px;">
+                    <label class="discord-settings-grid__field">
                         <span><?php echo esc_html($metadata['label']); ?></span>
                         <input type="text"
                                name="<?php echo esc_attr($this->option_name); ?>[<?php echo esc_attr($option_key); ?>]"
                                value="<?php echo esc_attr($current_value); ?>"
-                               class="regular-text"
+                               class="regular-text discord-settings-grid__input"
                                placeholder="<?php echo esc_attr($metadata['placeholder']); ?>" />
                     </label>
                 <?php endforeach; ?>
