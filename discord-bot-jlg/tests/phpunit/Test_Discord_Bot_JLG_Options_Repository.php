@@ -99,6 +99,14 @@ class Test_Discord_Bot_JLG_Options_Repository extends TestCase {
 
         $options = $repository->get_options();
 
+        $this->assertTrue(function_exists('discord_bot_jlg_get_default_options'));
+
+        $reflection = new \ReflectionFunction('discord_bot_jlg_get_default_options');
+        $this->assertStringContainsString(
+            '/inc/helpers.php',
+            str_replace('\\', '/', $reflection->getFileName())
+        );
+
         $this->assertIsArray($options);
         $this->assertArrayHasKey('server_id', $options);
         $this->assertArrayHasKey('cache_duration', $options);

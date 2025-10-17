@@ -30,6 +30,7 @@ define('DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION', 300);
 define('DISCORD_BOT_JLG_CRON_HOOK', 'discord_bot_jlg_refresh_cache');
 define('DISCORD_BOT_JLG_ANALYTICS_RETENTION_DEFAULT', 90);
 
+require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/helpers.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/cron.php';
 
 add_filter('cron_schedules', 'discord_bot_jlg_register_cron_schedule');
@@ -132,8 +133,6 @@ function discord_bot_jlg_uninstall() {
 }
 
 register_uninstall_hook(__FILE__, 'discord_bot_jlg_uninstall');
-
-require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/helpers.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-analytics.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-http.php';
 require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/class-discord-cache-gateway.php';
