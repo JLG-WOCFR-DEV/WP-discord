@@ -584,6 +584,7 @@ class Discord_Bot_JLG_Admin {
 
         if (!$constant_overridden) {
             $delete_requested = !empty($input['bot_token_delete']);
+            $skip_bot_token_migration = false;
 
             if ($delete_requested) {
                 $sanitized['bot_token'] = '';
@@ -621,11 +622,26 @@ class Discord_Bot_JLG_Admin {
                         $sanitized['bot_token'] = $encrypted;
                         $sanitized['bot_token_rotated_at'] = $current_timestamp;
                     }
+                } else {
+                    $skip_bot_token_migration = true;
+                    $sanitized['bot_token'] = isset($current_options['bot_token'])
+                        ? $current_options['bot_token']
+                        : '';
+                    $sanitized['bot_token_rotated_at'] = isset($current_options['bot_token_rotated_at'])
+                        ? (int) $current_options['bot_token_rotated_at']
+                        : 0;
+                    $sanitized['bot_token_expires_at'] = isset($current_options['bot_token_expires_at'])
+                        ? (int) $current_options['bot_token_expires_at']
+                        : 0;
+                    $sanitized['bot_token_status'] = isset($current_options['bot_token_status'])
+                        ? sanitize_key($current_options['bot_token_status'])
+                        : 'missing';
                 }
             }
 
             if (
-                '' !== $sanitized['bot_token']
+                !$skip_bot_token_migration
+                && '' !== $sanitized['bot_token']
                 && !discord_bot_jlg_is_encrypted_secret($sanitized['bot_token'])
                 && !$skip_token_migration
             ) {
