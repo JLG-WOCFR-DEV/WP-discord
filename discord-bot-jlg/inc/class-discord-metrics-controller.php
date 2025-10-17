@@ -101,14 +101,9 @@ class Discord_Bot_JLG_Metrics_Controller {
         $state = $this->registry->get_state();
         $body  = $this->render_prometheus($state);
 
-        $response = new WP_REST_Response();
-        $response->set_status(200);
-        $response->set_data($body);
-        $response->header('Content-Type', 'text/plain; version=0.0.4');
-
         add_filter('rest_pre_serve_request', array($this, 'serve_metrics_as_plain_text'), 10, 4);
 
-        return $response;
+        return $this->prepare_plain_text_response($body);
     }
 
     public function serve_metrics_as_plain_text($served, $server, $response, $request) {
@@ -129,40 +124,74 @@ class Discord_Bot_JLG_Metrics_Controller {
             return $served;
         }
 
+        if (!($response instanceof WP_REST_Response)) {
+            return $served;
+        }
+
         if (function_exists('remove_filter')) {
             remove_filter('rest_pre_serve_request', array($this, 'serve_metrics_as_plain_text'), 10);
         }
 
-        $body = '';
-        if (is_object($response) && method_exists($response, 'get_data')) {
-            $body_data = $response->get_data();
-            if (is_string($body_data)) {
-                $body = $body_data;
-            } elseif (is_scalar($body_data)) {
-                $body = (string) $body_data;
-            }
+        $body = $this->get_plain_text_body_from_response($response);
+
+        if ('' === $body) {
+            return $served;
         }
 
-        $can_send_headers = function_exists('headers_sent') ? !headers_sent() : true;
-
-        if ($can_send_headers && is_object($response) && method_exists($response, 'get_headers')) {
-            $headers = $response->get_headers();
-            if (is_array($headers)) {
-                foreach ($headers as $name => $value) {
-                    if (is_array($value)) {
-                        foreach ($value as $header_value) {
-                            header($name . ': ' . $header_value);
-                        }
-                    } else {
-                        header($name . ': ' . $value);
-                    }
-                }
-            }
-        }
+        $this->send_response_headers($response);
 
         echo $body;
 
         return true;
+    }
+
+    private function prepare_plain_text_response($body) {
+        $response = new WP_REST_Response(null, 200);
+        $response->set_data((string) $body);
+        $response->header('Content-Type', 'text/plain; version=0.0.4');
+
+        return $response;
+    }
+
+    private function get_plain_text_body_from_response($response) {
+        if (!($response instanceof WP_REST_Response)) {
+            return '';
+        }
+
+        $data = $response->get_data();
+
+        if (is_string($data)) {
+            return $data;
+        }
+
+        if (is_scalar($data)) {
+            return (string) $data;
+        }
+
+        return '';
+    }
+
+    private function send_response_headers(WP_REST_Response $response) {
+        $can_send_headers = function_exists('headers_sent') ? !headers_sent() : true;
+
+        if (!$can_send_headers) {
+            return;
+        }
+
+        $headers = $response->get_headers();
+        if (!is_array($headers) || empty($headers)) {
+            return;
+        }
+
+        foreach ($headers as $name => $value) {
+            if (is_array($value)) {
+                foreach ($value as $header_value) {
+                    header($name . ': ' . $header_value, true);
+                }
+            } else {
+                header($name . ': ' . $value, true);
+            }
+        }
     }
 
     public function handle_alert_webhook($request) {
