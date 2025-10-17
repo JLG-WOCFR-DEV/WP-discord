@@ -74,7 +74,7 @@ class Discord_Bot_JLG_Stats_Service {
         $config = array_merge($defaults, $payload);
 
         $result = array(
-            'stats'          => null,
+            'stats'          => array(),
             'error'          => '',
             'retry_after'    => max(0, (int) $config['last_retry_after']),
             'fallback_used'  => false,
@@ -110,7 +110,7 @@ class Discord_Bot_JLG_Stats_Service {
         if (false === (bool) $config['bypass_cache']) {
             $cached_stats = $this->cache_gateway->get($cache_key);
             if (false !== $cached_stats) {
-                $result['stats'] = $cached_stats;
+                $result['stats'] = $this->normalize_stats_payload($cached_stats);
                 $result['used_cache'] = true;
                 $this->log_stage('cache_hit', $profile_key, $server_id, array(
                     'cache_key' => $cache_key,
@@ -123,7 +123,7 @@ class Discord_Bot_JLG_Stats_Service {
             $message = __('Aucun identifiant de serveur Discord n’est configuré.', 'discord-bot-jlg');
             $result['error'] = $message;
             $fallback = $this->fallback($config, $message, $profile_key, $server_id);
-            $result['stats'] = $fallback['stats'];
+            $result['stats'] = $this->normalize_stats_payload($fallback['stats']);
             $result['retry_after'] = $fallback['retry_after'];
             $result['fallback_used'] = true;
             return $result;
@@ -156,7 +156,7 @@ class Discord_Bot_JLG_Stats_Service {
                 $result['lock_key'] = $lock_key;
                 $retry_after = max($lock_ttl, $this->read_retry_after($config));
                 $fallback = $this->fallback($config, $message, $profile_key, $server_id, $retry_after);
-                $result['stats'] = $fallback['stats'];
+                $result['stats'] = $this->normalize_stats_payload($fallback['stats']);
                 $result['retry_after'] = $fallback['retry_after'];
                 $result['fallback_used'] = true;
                 $this->log_stage('lock_conflict', $profile_key, $server_id, array(
@@ -194,7 +194,7 @@ class Discord_Bot_JLG_Stats_Service {
                 $message = __('Impossible d’obtenir des statistiques exploitables depuis Discord.', 'discord-bot-jlg');
                 $result['error'] = $message;
                 $fallback = $this->fallback($config, $message, $profile_key, $server_id, $retry_after);
-                $result['stats'] = $fallback['stats'];
+                $result['stats'] = $this->normalize_stats_payload($fallback['stats']);
                 $result['retry_after'] = $fallback['retry_after'];
                 $result['fallback_used'] = true;
                 return $result;
@@ -204,7 +204,7 @@ class Discord_Bot_JLG_Stats_Service {
                 call_user_func($config['persist_success'], $stats, $options, $context, $config['args']);
             }
 
-            $result['stats'] = $stats;
+            $result['stats'] = $this->normalize_stats_payload($stats);
             $result['retry_after'] = max(0, (int) $retry_after);
             $this->log_stage('success', $profile_key, $server_id, array(
                 'cache_key'  => $cache_key,
@@ -220,7 +220,7 @@ class Discord_Bot_JLG_Stats_Service {
 
             $result['error'] = $message;
             $fallback = $this->fallback($config, $message, $profile_key, $server_id, $this->read_retry_after($config));
-            $result['stats'] = $fallback['stats'];
+            $result['stats'] = $this->normalize_stats_payload($fallback['stats']);
             $result['retry_after'] = $fallback['retry_after'];
             $result['fallback_used'] = true;
             $this->log_stage('exception', $profile_key, $server_id, array(
@@ -302,9 +302,13 @@ class Discord_Bot_JLG_Stats_Service {
         ));
 
         return array(
-            'stats'       => $stats,
+            'stats'       => $this->normalize_stats_payload($stats),
             'retry_after' => max(0, (int) $retry_after),
         );
+    }
+
+    private function normalize_stats_payload($stats) {
+        return is_array($stats) ? $stats : array();
     }
 
     private function acquire_lock($lock_key, array $payload, $ttl, $register_callback = null) {

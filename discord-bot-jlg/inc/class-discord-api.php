@@ -932,7 +932,7 @@ class Discord_Bot_JLG_API {
                 'options'            => $options,
                 'context'            => $context,
                 'args'               => $args,
-                'bypass_cache'       => (bool) $args['bypass_cache'],
+                'bypass_cache'       => (bool) ($args['bypass_cache'] || $args['force_refresh']),
                 'fallback_provider'  => function ($force_fallback = true) {
                     return $this->get_demo_stats((bool) $force_fallback);
                 },
@@ -957,7 +957,10 @@ class Discord_Bot_JLG_API {
                 'last_retry_after'   => $this->last_retry_after,
             ));
 
-            $stats = isset($service_result['stats']) ? $service_result['stats'] : null;
+            $stats = isset($service_result['stats']) ? $service_result['stats'] : array();
+            if (!is_array($stats)) {
+                $stats = array();
+            }
             $service_error = isset($service_result['error']) ? (string) $service_result['error'] : '';
             $existing_error = $this->last_error;
 
