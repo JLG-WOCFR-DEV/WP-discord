@@ -287,31 +287,14 @@ if (!defined('AUTH_SALT')) {
     define('AUTH_SALT', 'tests-fixed-auth-salt');
 }
 
-require_once __DIR__ . '/includes/plugin-shim.php';
-
-require_once __DIR__ . '/../../inc/helpers.php';
-require_once __DIR__ . '/../../inc/class-discord-analytics.php';
-require_once __DIR__ . '/../../inc/class-discord-http.php';
-require_once __DIR__ . '/../../inc/class-discord-cache-gateway.php';
-require_once __DIR__ . '/../../inc/class-discord-profile-repository.php';
-require_once __DIR__ . '/../../inc/class-discord-http-connector.php';
-require_once __DIR__ . '/../../inc/class-discord-event-logger.php';
-require_once __DIR__ . '/../../inc/class-discord-api-key-repository.php';
-require_once __DIR__ . '/../../inc/class-discord-options-repository.php';
-require_once __DIR__ . '/../../inc/class-discord-capabilities.php';
-require_once __DIR__ . '/../../inc/class-discord-api.php';
-require_once __DIR__ . '/../../inc/class-discord-admin.php';
-require_once __DIR__ . '/../../inc/class-discord-widget.php';
-require_once __DIR__ . '/../../inc/class-discord-shortcode.php';
-require_once __DIR__ . '/../../inc/class-discord-site-health.php';
-require_once __DIR__ . '/../../inc/class-discord-rest.php';
-require_once __DIR__ . '/../../inc/class-discord-metrics-registry.php';
-require_once __DIR__ . '/../../inc/class-discord-analytics-alert-scheduler.php';
-require_once __DIR__ . '/../../inc/class-discord-metrics-controller.php';
-require_once __DIR__ . '/../../inc/cron.php';
-
 if (!function_exists('esc_html__')) {
     function esc_html__($text, $domain = null) {
+        return $text;
+    }
+}
+
+if (!function_exists('__')) {
+    function __($text, $domain = null) {
         return $text;
     }
 }
@@ -903,6 +886,8 @@ function apply_filters($hook, $value, ...$args) {
     return $value;
 }
 
+require_once __DIR__ . '/../../discord-bot-jlg.php';
+
 function wp_safe_remote_get($url, $args = array()) {
     $GLOBALS['wp_test_last_remote_request'] = array(
         'url'  => $url,
@@ -1126,10 +1111,6 @@ function register_rest_route($namespace, $route, $args = array(), $override = fa
     );
 
     return true;
-}
-
-function __($text, $domain = null) {
-    return $text;
 }
 
 if (!function_exists('wp_validate_boolean')) {
