@@ -267,7 +267,7 @@ class Test_Discord_Bot_JLG_Shortcode extends TestCase {
     public function test_prepare_avatar_url_preserves_fragment_and_nested_query_arguments() {
         $shortcode = $this->get_shortcode_instance();
 
-        $base_url = 'https://cdn.discordapp.com/icons/123456789/abcdef.png?size=128&foo=bar&meta[color]=red#profile';
+        $base_url = 'https://cdn.discordapp.com/icons/123456789/abcdef.png?size=128&foo=bar&meta[color]=red&meta[shape]=circle&filters[status][online]=1#profile';
         $result   = $this->invoke_prepare_avatar_url($shortcode, $base_url, '', 513);
 
         $this->assertStringEndsWith('#profile', $result);
@@ -283,11 +283,26 @@ class Test_Discord_Bot_JLG_Shortcode extends TestCase {
         $this->assertSame(
             array(
                 'foo'  => 'bar',
-                'meta' => array('color' => 'red'),
+                'meta' => array(
+                    'color' => 'red',
+                    'shape' => 'circle',
+                ),
+                'filters' => array(
+                    'status' => array('online' => '1'),
+                ),
                 'size' => '1024',
             ),
             $query_args
         );
+    }
+
+    public function test_prepare_avatar_url_handles_query_string_only_base() {
+        $shortcode = $this->get_shortcode_instance();
+
+        $base_url = '?size=64&foo=bar#partial';
+        $result   = $this->invoke_prepare_avatar_url($shortcode, $base_url, '', 100);
+
+        $this->assertSame('?foo=bar&size=128#partial', $result);
     }
 
     public function test_prepare_avatar_url_uses_fallback_url_when_base_is_empty() {

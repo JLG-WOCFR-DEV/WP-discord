@@ -185,32 +185,36 @@ if (!function_exists('remove_query_arg')) {
     /**
      * Lightweight polyfill for WordPress remove_query_arg().
      *
+     * Mirrors the core implementation closely so complex query strings and
+     * associative arrays retain their shape.
+     *
      * @param string|string[] $keys  Query parameter key or list of keys to remove.
      * @param string|array     $query Optional URL or query arguments to modify.
      *
      * @return string|array Updated URL or array with the requested keys removed.
      */
     function remove_query_arg($keys, $query = '') {
-        if (!is_array($keys)) {
-            $keys = array($keys);
-        }
-
-        $normalized_keys = array();
-        foreach ($keys as $key) {
-            if (is_scalar($key)) {
-                $normalized_keys[] = (string) $key;
+        if (is_array($keys)) {
+            foreach ($keys as $key => $value) {
+                if (is_int($key)) {
+                    $query = remove_query_arg($value, $query);
+                } else {
+                    $query = remove_query_arg($key, $query);
+                }
             }
-        }
 
-        if (empty($normalized_keys)) {
             return $query;
         }
 
+        if (!is_scalar($keys) || '' === (string) $keys) {
+            return $query;
+        }
+
+        $key = (string) $keys;
+
         if (is_array($query)) {
-            foreach ($normalized_keys as $key) {
-                if (array_key_exists($key, $query)) {
-                    unset($query[$key]);
-                }
+            if (array_key_exists($key, $query)) {
+                unset($query[$key]);
             }
 
             return $query;
@@ -226,7 +230,7 @@ if (!function_exists('remove_query_arg')) {
             return '';
         }
 
-        $fragment = '';
+        $fragment          = '';
         $fragment_position = strpos($query, '#');
         if (false !== $fragment_position) {
             $fragment = substr($query, $fragment_position);
@@ -234,21 +238,80 @@ if (!function_exists('remove_query_arg')) {
         }
 
         $question_mark_position = strpos($query, '?');
+        $query_string           = '';
+        $base                   = $query;
+
         if (false === $question_mark_position) {
-            return $query . $fragment;
+            if ('' !== $query && 0 === strpos($query, '?')) {
+                $base         = '';
+                $query_string = substr($query, 1);
+            } else {
+                return $query . $fragment;
+            }
+        } else {
+            $base         = substr($query, 0, $question_mark_position);
+            $query_string = substr($query, $question_mark_position + 1);
         }
 
-        $base         = substr($query, 0, $question_mark_position);
-        $query_string = substr($query, $question_mark_position + 1);
+        if ('' === $query_string) {
+            return $base . $fragment;
+        }
 
         $parsed_query = array();
-        if ('' !== $query_string) {
-            parse_str($query_string, $parsed_query);
+        parse_str($query_string, $parsed_query);
+
+        if (!function_exists('discord_bot_jlg_remove_query_arg_from_array')) {
+            /**
+             * @internal Helper for remove_query_arg() polyfill to remove nested keys.
+             *
+             * @param array  $params Query array to modify in place.
+             * @param string $key    Query key to remove.
+             */
+            function discord_bot_jlg_remove_query_arg_from_array(array &$params, $key) {
+                if (!is_string($key) || '' === $key) {
+                    return;
+                }
+
+                if (false === strpos($key, '[')) {
+                    if (array_key_exists($key, $params)) {
+                        unset($params[$key]);
+                    }
+
+                    return;
+                }
+
+                $segments = preg_split('/\[(.*?)\]/', $key, -1, PREG_SPLIT_NO_EMPTY | PREG_SPLIT_DELIM_CAPTURE);
+
+                if (empty($segments)) {
+                    return;
+                }
+
+                $target =& $params;
+                $last   = array_pop($segments);
+
+                foreach ($segments as $segment) {
+                    if (!is_array($target) || !array_key_exists($segment, $target)) {
+                        return;
+                    }
+
+                    $target =& $target[$segment];
+                }
+
+                if ('' === $last) {
+                    if (is_array($target)) {
+                        $target = array();
+                    }
+
+                    return;
+                }
+
+                if (is_array($target) && array_key_exists($last, $target)) {
+                    unset($target[$last]);
+                }
+            }
         }
 
-        foreach ($normalized_keys as $key) {
-            unset($parsed_query[$key]);
-        }
+        discord_bot_jlg_remove_query_arg_from_array($parsed_query, $key);
 
         $rebuilt_query = http_build_query($parsed_query, '', '&', PHP_QUERY_RFC3986);
 
@@ -257,7 +320,7 @@ if (!function_exists('remove_query_arg')) {
         } else {
             $result = $base;
 
-            if ('' === $result && 0 === $question_mark_position) {
+            if ('' === $result && (false !== $question_mark_position || 0 === strpos($query, '?'))) {
                 $result = '?';
             }
         }
