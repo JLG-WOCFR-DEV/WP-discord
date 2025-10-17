@@ -593,6 +593,33 @@ class Test_Discord_Bot_JLG_API extends TestCase {
         unset($GLOBALS['wp_test_options'][$option_name]);
     }
 
+    public function test_get_stats_force_refresh_bypasses_runtime_cache() {
+        $option_name = 'discord_server_stats_options';
+        $cache_key   = 'discord_server_stats_cache';
+
+        $GLOBALS['wp_test_options'][$option_name] = array(
+            'server_id'      => '13579',
+            'cache_duration' => 45,
+        );
+
+        $http_client = new Mock_Discord_Bot_JLG_Http_Client();
+        $api         = new Discord_Bot_JLG_API($option_name, $cache_key, 60, $http_client);
+
+        $api->get_stats(array('force_refresh' => true));
+
+        $this->assertSame(1, $http_client->call_count, 'Initial forced refresh should hit the network once.');
+
+        $api->get_stats(array('force_refresh' => true));
+
+        $this->assertSame(
+            2,
+            $http_client->call_count,
+            'A forced refresh should bypass the runtime cache and reach the network again.'
+        );
+
+        unset($GLOBALS['wp_test_options'][$option_name]);
+    }
+
     public function test_clear_all_cached_data_removes_last_fallback_option() {
         $option_name = 'discord_server_stats_options';
         $cache_key   = 'discord_server_stats_cache';

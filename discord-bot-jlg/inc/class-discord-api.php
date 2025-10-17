@@ -1029,6 +1029,16 @@ class Discord_Bot_JLG_API {
         $force_connector_attempt = (!empty($args['bypass_cache']) || $force_refresh);
 
         if ($force_connector_attempt) {
+            $runtime_hit = false;
+            if ('' !== $runtime_key) {
+                unset($this->runtime_cache[$runtime_key]);
+                unset($this->runtime_errors[$runtime_key]);
+                unset($this->runtime_retry_after[$runtime_key]);
+            }
+            $runtime_value = null;
+            $runtime_error = '';
+            $runtime_retry_after = 0;
+
             if (empty($options['__force_connector_attempt'])) {
                 $options['__force_connector_attempt'] = true;
             }
