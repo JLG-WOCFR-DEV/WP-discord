@@ -113,6 +113,31 @@ class Test_Discord_Stats_Widget extends TestCase {
         $this->assertStringNotContainsString('bot_token=', $GLOBALS['discord_bot_jlg_last_shortcode']);
     }
 
+    public function test_widget_shortcode_uses_stored_profile_key_slug() {
+        $widget = new Discord_Stats_Widget();
+
+        $stored_instance = $widget->update(
+            array(
+                'profile_key' => 'Profil Personnel',
+            ),
+            array()
+        );
+
+        $args = array(
+            'before_widget' => '',
+            'after_widget'  => '',
+            'before_title'  => '',
+            'after_title'   => '',
+        );
+
+        ob_start();
+        $widget->widget($args, $stored_instance);
+        ob_end_clean();
+
+        $this->assertNotNull($GLOBALS['discord_bot_jlg_last_shortcode']);
+        $this->assertStringContainsString('profile="profil-personnel"', $GLOBALS['discord_bot_jlg_last_shortcode']);
+    }
+
     public function test_widget_shortcode_includes_metric_toggles() {
         $widget = new Discord_Stats_Widget();
 

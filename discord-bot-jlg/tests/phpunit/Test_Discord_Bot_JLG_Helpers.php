@@ -67,6 +67,7 @@ class Test_Discord_Bot_JLG_Helpers extends TestCase {
         $result = discord_bot_jlg_encrypt_secret('token');
 
         $this->assertTrue(is_wp_error($result));
+        $this->assertSame('discord_bot_jlg_encrypt_secret_missing_keys', $result->get_error_code());
         $this->assertSame(
             'Les constantes AUTH_KEY et AUTH_SALT sont requises pour chiffrer le token Discord.',
             $result->get_error_message()
@@ -87,6 +88,7 @@ class Test_Discord_Bot_JLG_Helpers extends TestCase {
         $result = discord_bot_jlg_encrypt_secret('token');
 
         $this->assertTrue(is_wp_error($result));
+        $this->assertSame('discord_bot_jlg_encrypt_secret_missing_openssl', $result->get_error_code());
         $this->assertSame(
             'La bibliothèque OpenSSL est requise pour chiffrer le token Discord.',
             $result->get_error_message()
@@ -103,6 +105,7 @@ class Test_Discord_Bot_JLG_Helpers extends TestCase {
         $result = discord_bot_jlg_decrypt_secret($payload);
 
         $this->assertTrue(is_wp_error($result));
+        $this->assertSame('discord_bot_jlg_decrypt_secret_missing_keys', $result->get_error_code());
         $this->assertSame(
             'Les constantes AUTH_KEY et AUTH_SALT sont requises pour déchiffrer le token Discord.',
             $result->get_error_message()
@@ -126,6 +129,7 @@ class Test_Discord_Bot_JLG_Helpers extends TestCase {
         $result = discord_bot_jlg_decrypt_secret($encrypted);
 
         $this->assertTrue(is_wp_error($result));
+        $this->assertSame('discord_bot_jlg_decrypt_secret_missing_openssl', $result->get_error_code());
         $this->assertSame(
             'La bibliothèque OpenSSL est requise pour déchiffrer le token Discord.',
             $result->get_error_message()
@@ -140,6 +144,7 @@ class Test_Discord_Bot_JLG_Helpers extends TestCase {
         $result = discord_bot_jlg_decrypt_secret('not-encrypted');
 
         $this->assertTrue(is_wp_error($result));
+        $this->assertSame('discord_bot_jlg_decrypt_secret_unrecognized_prefix', $result->get_error_code());
         $this->assertSame(
             'Le format du token enregistré n’est pas reconnu comme un secret chiffré.',
             $result->get_error_message()
@@ -156,6 +161,7 @@ class Test_Discord_Bot_JLG_Helpers extends TestCase {
         $result = discord_bot_jlg_decrypt_secret(DISCORD_BOT_JLG_SECRET_PREFIX . '@@@');
 
         $this->assertTrue(is_wp_error($result));
+        $this->assertSame('discord_bot_jlg_decrypt_secret_invalid_payload', $result->get_error_code());
         $this->assertSame(
             'Le token chiffré est corrompu ou incomplet.',
             $result->get_error_message()
@@ -181,6 +187,7 @@ class Test_Discord_Bot_JLG_Helpers extends TestCase {
         $result = discord_bot_jlg_decrypt_secret($tampered);
 
         $this->assertTrue(is_wp_error($result));
+        $this->assertSame('discord_bot_jlg_decrypt_secret_mac_mismatch', $result->get_error_code());
         $this->assertSame(
             'Le token chiffré n’a pas pu être vérifié.',
             $result->get_error_message()
@@ -216,8 +223,13 @@ class Test_Discord_Bot_JLG_Helpers extends TestCase {
         $this->assertSame($plaintext, $decrypted);
         $this->assertIsArray($captured);
         $this->assertSame($legacy, $captured[1]);
+        $this->assertNotSame($legacy, $captured[0]);
         $this->assertTrue(discord_bot_jlg_is_encrypted_secret($captured[0]));
         $this->assertStringStartsWith(DISCORD_BOT_JLG_SECRET_PREFIX, $captured[0]);
+        $this->assertSame(
+            $plaintext,
+            discord_bot_jlg_decrypt_secret($captured[0])
+        );
 
         remove_all_filters('discord_bot_jlg_secret_migrated');
     }
@@ -249,8 +261,13 @@ class Test_Discord_Bot_JLG_Helpers extends TestCase {
         $this->assertSame($plaintext, $decrypted);
         $this->assertIsArray($captured);
         $this->assertSame($legacy, $captured[1]);
+        $this->assertNotSame($legacy, $captured[0]);
         $this->assertTrue(discord_bot_jlg_is_encrypted_secret($captured[0]));
         $this->assertStringStartsWith(DISCORD_BOT_JLG_SECRET_PREFIX, $captured[0]);
+        $this->assertSame(
+            $plaintext,
+            discord_bot_jlg_decrypt_secret($captured[0])
+        );
 
         remove_all_filters('discord_bot_jlg_secret_migrated');
     }
