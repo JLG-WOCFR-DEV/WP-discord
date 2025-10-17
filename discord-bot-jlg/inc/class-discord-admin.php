@@ -1612,6 +1612,17 @@ class Discord_Bot_JLG_Admin {
         return $sanitized;
     }
 
+    /**
+     * Sanitize the secret used for analytics alert webhooks.
+     *
+     * The value must consist of printable ASCII characters so that secrets
+     * encoded in base64 (and similar formats) are preserved. To avoid storing
+     * unexpectedly large payloads, the value is capped at 128 characters.
+     *
+     * @param mixed $value Raw secret value.
+     *
+     * @return string Sanitized secret or an empty string if invalid.
+     */
     private function sanitize_alert_webhook_secret($value) {
         if (is_array($value)) {
             return '';
@@ -1623,7 +1634,9 @@ class Discord_Bot_JLG_Admin {
             return '';
         }
 
-        $value = preg_replace('/[^A-Za-z0-9_\-\.:]/', '', $value);
+        if (!preg_match("/^[\x20-\x7E]+$/", $value)) {
+            return '';
+        }
 
         if (strlen($value) > 128) {
             $value = substr($value, 0, 128);
