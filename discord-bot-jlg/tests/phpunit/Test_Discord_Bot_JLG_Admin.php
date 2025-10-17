@@ -221,6 +221,14 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
                     'analytics_alert_webhook_secret' => 'ZXhhbXBsZStzZWNyZXQ9PQ==',
                 ),
             ),
+            'analytics-alert-secret-allows-plus-slash-equals' => array(
+                array(
+                    'analytics_alert_webhook_secret' => 'abc+/=',
+                ),
+                array(
+                    'analytics_alert_webhook_secret' => 'abc+/=',
+                ),
+            ),
             'custom-css-media-query-preserved' => array(
                 array(
                     'custom_css' => $media_query_css,

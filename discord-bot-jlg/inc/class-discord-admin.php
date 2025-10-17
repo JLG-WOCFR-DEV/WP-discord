@@ -1619,7 +1619,7 @@ class Discord_Bot_JLG_Admin {
      * The value must consist of printable ASCII characters so that secrets
      * encoded in base64 (and similar formats) are preserved. To avoid storing
      * unexpectedly large payloads, the value is capped at
-     * self::ALERT_WEBHOOK_SECRET_MAX_LENGTH (128 characters).
+     * self::ALERT_WEBHOOK_SECRET_MAX_LENGTH characters.
      *
      * @param mixed $value Raw secret value.
      *
@@ -1636,7 +1636,7 @@ class Discord_Bot_JLG_Admin {
             return '';
         }
 
-        if (!preg_match("/^[\x20-\x7E]+$/", $value)) {
+        if (!preg_match('/^[\x20-\x7E]+$/', $value)) {
             return '';
         }
 
