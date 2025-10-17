@@ -991,12 +991,14 @@ if (!function_exists('discord_bot_jlg_decrypt_secret')) {
                 );
             }
 
-            if (function_exists('discord_bot_jlg_encrypt_secret')) {
-                $migrated = discord_bot_jlg_encrypt_secret($plaintext);
+            $migrated = discord_bot_jlg_encrypt_secret($plaintext);
 
-                if (!is_wp_error($migrated) && function_exists('do_action')) {
-                    do_action('discord_bot_jlg_secret_migrated', $migrated, $secret);
-                }
+            if (is_wp_error($migrated)) {
+                return $migrated;
+            }
+
+            if (function_exists('do_action') && discord_bot_jlg_is_encrypted_secret($migrated)) {
+                do_action('discord_bot_jlg_secret_migrated', $migrated, $secret);
             }
 
             return $plaintext;
@@ -1057,12 +1059,14 @@ if (!function_exists('discord_bot_jlg_decrypt_secret')) {
             );
         }
 
-        if (function_exists('discord_bot_jlg_encrypt_secret')) {
-            $migrated = discord_bot_jlg_encrypt_secret($plaintext);
+        $migrated = discord_bot_jlg_encrypt_secret($plaintext);
 
-            if (!is_wp_error($migrated) && function_exists('do_action')) {
-                do_action('discord_bot_jlg_secret_migrated', $migrated, $secret);
-            }
+        if (is_wp_error($migrated)) {
+            return $migrated;
+        }
+
+        if (function_exists('do_action') && discord_bot_jlg_is_encrypted_secret($migrated)) {
+            do_action('discord_bot_jlg_secret_migrated', $migrated, $secret);
         }
 
         return $plaintext;

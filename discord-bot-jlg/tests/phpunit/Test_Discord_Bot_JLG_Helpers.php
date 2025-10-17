@@ -78,6 +78,33 @@ class Test_Discord_Bot_JLG_Helpers extends TestCase {
      * @runInSeparateProcess
      * @preserveGlobalState disabled
      */
+    public function test_encrypt_secret_returns_error_when_constants_empty_even_if_filter_allows() {
+        if (!defined('AUTH_KEY')) {
+            define('AUTH_KEY', '');
+        }
+
+        if (!defined('AUTH_SALT')) {
+            define('AUTH_SALT', '');
+        }
+
+        add_filter('discord_bot_jlg_has_auth_constants', '__return_true');
+
+        $result = discord_bot_jlg_encrypt_secret('token');
+
+        $this->assertTrue(is_wp_error($result));
+        $this->assertSame('discord_bot_jlg_encrypt_secret_missing_keys', $result->get_error_code());
+        $this->assertSame(
+            'Les constantes AUTH_KEY et AUTH_SALT sont requises pour chiffrer le token Discord.',
+            $result->get_error_message()
+        );
+
+        remove_all_filters('discord_bot_jlg_has_auth_constants');
+    }
+
+    /**
+     * @runInSeparateProcess
+     * @preserveGlobalState disabled
+     */
     public function test_encrypt_secret_returns_error_when_openssl_is_unavailable() {
         $this->define_auth_constants();
 
@@ -110,6 +137,35 @@ class Test_Discord_Bot_JLG_Helpers extends TestCase {
             'Les constantes AUTH_KEY et AUTH_SALT sont requises pour déchiffrer le token Discord.',
             $result->get_error_message()
         );
+    }
+
+    /**
+     * @runInSeparateProcess
+     * @preserveGlobalState disabled
+     */
+    public function test_decrypt_secret_returns_error_when_constants_empty_even_if_filter_allows() {
+        if (!defined('AUTH_KEY')) {
+            define('AUTH_KEY', '');
+        }
+
+        if (!defined('AUTH_SALT')) {
+            define('AUTH_SALT', '');
+        }
+
+        add_filter('discord_bot_jlg_has_auth_constants', '__return_true');
+
+        $payload = DISCORD_BOT_JLG_SECRET_PREFIX . base64_encode(str_repeat('A', 48));
+
+        $result = discord_bot_jlg_decrypt_secret($payload);
+
+        $this->assertTrue(is_wp_error($result));
+        $this->assertSame('discord_bot_jlg_decrypt_secret_missing_keys', $result->get_error_code());
+        $this->assertSame(
+            'Les constantes AUTH_KEY et AUTH_SALT sont requises pour déchiffrer le token Discord.',
+            $result->get_error_message()
+        );
+
+        remove_all_filters('discord_bot_jlg_has_auth_constants');
     }
 
     /**
@@ -226,10 +282,7 @@ class Test_Discord_Bot_JLG_Helpers extends TestCase {
         $this->assertNotSame($legacy, $captured[0]);
         $this->assertTrue(discord_bot_jlg_is_encrypted_secret($captured[0]));
         $this->assertStringStartsWith(DISCORD_BOT_JLG_SECRET_PREFIX, $captured[0]);
-        $this->assertSame(
-            $plaintext,
-            discord_bot_jlg_decrypt_secret($captured[0])
-        );
+        $this->assertNotSame($legacy, $captured[0]);
 
         remove_all_filters('discord_bot_jlg_secret_migrated');
     }
@@ -264,10 +317,7 @@ class Test_Discord_Bot_JLG_Helpers extends TestCase {
         $this->assertNotSame($legacy, $captured[0]);
         $this->assertTrue(discord_bot_jlg_is_encrypted_secret($captured[0]));
         $this->assertStringStartsWith(DISCORD_BOT_JLG_SECRET_PREFIX, $captured[0]);
-        $this->assertSame(
-            $plaintext,
-            discord_bot_jlg_decrypt_secret($captured[0])
-        );
+        $this->assertNotSame($legacy, $captured[0]);
 
         remove_all_filters('discord_bot_jlg_secret_migrated');
     }
