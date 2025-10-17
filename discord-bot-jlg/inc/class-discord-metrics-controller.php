@@ -20,7 +20,10 @@ class Discord_Bot_JLG_Metrics_Controller {
     private $options_repository;
 
     /**
-     * @var Discord_Bot_JLG_Analytics_Alert_Scheduler_Interface
+     * Scheduler expected to provide a schedule() method.
+     *
+     * @var object
+     * @phpstan-var object{schedule: callable}
      */
     private $alert_scheduler;
 
@@ -31,11 +34,12 @@ class Discord_Bot_JLG_Metrics_Controller {
 
     /**
      * @param object $alert_scheduler Scheduler instance expected to implement schedule().
+     * @phpstan-param object{schedule: callable} $alert_scheduler
      */
     public function __construct(
         Discord_Bot_JLG_Metrics_Registry $registry,
         Discord_Bot_JLG_Options_Repository $options_repository,
-        Discord_Bot_JLG_Analytics_Alert_Scheduler_Interface $alert_scheduler,
+        $alert_scheduler,
         $event_logger = null
     ) {
         $this->registry           = $registry;
@@ -177,6 +181,10 @@ class Discord_Bot_JLG_Metrics_Controller {
         );
     }
 
+    /**
+     * @return object
+     * @phpstan-return object{schedule: callable}
+     */
     private function get_alert_scheduler() {
         if (!is_object($this->alert_scheduler) || !method_exists($this->alert_scheduler, 'schedule')) {
             throw new RuntimeException(
