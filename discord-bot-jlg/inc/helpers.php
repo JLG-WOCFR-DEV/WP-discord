@@ -802,6 +802,18 @@ if (!function_exists('discord_bot_jlg_encrypt_secret')) {
             );
         }
 
+        $auth_key_defined  = defined('AUTH_KEY');
+        $auth_salt_defined = defined('AUTH_SALT');
+        $auth_key          = $auth_key_defined ? constant('AUTH_KEY') : '';
+        $auth_salt         = $auth_salt_defined ? constant('AUTH_SALT') : '';
+
+        if (!$auth_key_defined || '' === $auth_key || !$auth_salt_defined || '' === $auth_salt) {
+            return new WP_Error(
+                'discord_bot_jlg_encrypt_secret_missing_keys',
+                __('Les constantes AUTH_KEY et AUTH_SALT sont requises pour chiffrer le token Discord.', 'discord-bot-jlg')
+            );
+        }
+
         $has_openssl_encrypt = function_exists('openssl_encrypt');
         if (function_exists('apply_filters')) {
             $has_openssl_encrypt = (bool) apply_filters(
@@ -876,6 +888,18 @@ if (!function_exists('discord_bot_jlg_decrypt_secret')) {
         }
 
         if (!discord_bot_jlg_has_auth_constants()) {
+            return new WP_Error(
+                'discord_bot_jlg_decrypt_secret_missing_keys',
+                __('Les constantes AUTH_KEY et AUTH_SALT sont requises pour déchiffrer le token Discord.', 'discord-bot-jlg')
+            );
+        }
+
+        $auth_key_defined  = defined('AUTH_KEY');
+        $auth_salt_defined = defined('AUTH_SALT');
+        $auth_key          = $auth_key_defined ? constant('AUTH_KEY') : '';
+        $auth_salt         = $auth_salt_defined ? constant('AUTH_SALT') : '';
+
+        if (!$auth_key_defined || '' === $auth_key || !$auth_salt_defined || '' === $auth_salt) {
             return new WP_Error(
                 'discord_bot_jlg_decrypt_secret_missing_keys',
                 __('Les constantes AUTH_KEY et AUTH_SALT sont requises pour déchiffrer le token Discord.', 'discord-bot-jlg')
@@ -967,12 +991,14 @@ if (!function_exists('discord_bot_jlg_decrypt_secret')) {
                 );
             }
 
-            if (function_exists('discord_bot_jlg_encrypt_secret')) {
-                $migrated = discord_bot_jlg_encrypt_secret($plaintext);
+            $migrated = discord_bot_jlg_encrypt_secret($plaintext);
 
-                if (!is_wp_error($migrated) && function_exists('do_action')) {
-                    do_action('discord_bot_jlg_secret_migrated', $migrated, $secret);
-                }
+            if (is_wp_error($migrated)) {
+                return $migrated;
+            }
+
+            if (function_exists('do_action') && discord_bot_jlg_is_encrypted_secret($migrated)) {
+                do_action('discord_bot_jlg_secret_migrated', $migrated, $secret);
             }
 
             return $plaintext;
@@ -1033,12 +1059,14 @@ if (!function_exists('discord_bot_jlg_decrypt_secret')) {
             );
         }
 
-        if (function_exists('discord_bot_jlg_encrypt_secret')) {
-            $migrated = discord_bot_jlg_encrypt_secret($plaintext);
+        $migrated = discord_bot_jlg_encrypt_secret($plaintext);
 
-            if (!is_wp_error($migrated) && function_exists('do_action')) {
-                do_action('discord_bot_jlg_secret_migrated', $migrated, $secret);
-            }
+        if (is_wp_error($migrated)) {
+            return $migrated;
+        }
+
+        if (function_exists('do_action') && discord_bot_jlg_is_encrypted_secret($migrated)) {
+            do_action('discord_bot_jlg_secret_migrated', $migrated, $secret);
         }
 
         return $plaintext;
