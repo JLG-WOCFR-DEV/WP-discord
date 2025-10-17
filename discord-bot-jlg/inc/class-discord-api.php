@@ -62,6 +62,7 @@ class Discord_Bot_JLG_API {
     private $last_error;
     private $runtime_cache;
     private $runtime_errors;
+    private $runtime_cache_enabled;
     private $last_retry_after;
     private $runtime_retry_after;
     private $http_client;
@@ -99,6 +100,7 @@ class Discord_Bot_JLG_API {
         $this->last_error = '';
         $this->runtime_cache = array();
         $this->runtime_errors = array();
+        $this->runtime_cache_enabled = true;
         $this->last_retry_after = 0;
         $this->runtime_retry_after = array();
         $this->http_client = ($http_client instanceof Discord_Bot_JLG_Http_Client)
@@ -855,6 +857,7 @@ class Discord_Bot_JLG_API {
     public function get_stats($args = array()) {
         $this->last_error = '';
         $this->last_retry_after = 0;
+        $this->runtime_cache_enabled = true;
 
         $args = wp_parse_args(
             $args,
@@ -1027,6 +1030,7 @@ class Discord_Bot_JLG_API {
         }
 
         $force_connector_attempt = (!empty($args['bypass_cache']) || $force_refresh);
+        $skip_runtime_cache = $force_connector_attempt;
 
         if ($force_connector_attempt) {
             $runtime_hit         = false;
@@ -1049,7 +1053,12 @@ class Discord_Bot_JLG_API {
             }
 
             $context['force_connector_attempt'] = true;
+            $runtime_key = '';
+        } elseif (isset($options['__force_connector_attempt'])) {
+            unset($options['__force_connector_attempt']);
         }
+
+        $this->runtime_cache_enabled = !$skip_runtime_cache;
 
         $context['options'] = $options;
 
@@ -2318,7 +2327,11 @@ class Discord_Bot_JLG_API {
     }
 
     private function remember_runtime_result($runtime_key, $stats) {
-        if ('' !== $runtime_key) {
+        $should_store = $this->runtime_cache_enabled && '' !== $runtime_key;
+
+        $this->runtime_cache_enabled = true;
+
+        if ($should_store) {
             $this->runtime_cache[$runtime_key]       = $stats;
             $this->runtime_errors[$runtime_key]      = $this->last_error;
             $this->runtime_retry_after[$runtime_key] = $this->last_retry_after;
