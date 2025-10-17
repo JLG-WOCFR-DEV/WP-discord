@@ -485,23 +485,32 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
 
         $this->assertTrue(discord_bot_jlg_is_encrypted_secret($result['bot_token']));
 
+        $this->assertSame(
+            $this->saved_options['bot_token'],
+            $result['bot_token'],
+            'Encrypted bot token should remain identical when submitting an empty value.'
+        );
+
         $decrypted = discord_bot_jlg_decrypt_secret($result['bot_token']);
 
         $this->assertFalse(is_wp_error($decrypted));
-        $this->assertSame($this->saved_options['bot_token'], $decrypted);
+        $this->assertSame($this->saved_bot_token_plain, $decrypted);
 
-        $this->assertGreaterThanOrEqual(
-            $this->rotation_timestamp,
-            (int) $result['bot_token_rotated_at']
+        $this->assertSame(
+            (int) $this->saved_options['bot_token_rotated_at'],
+            (int) $result['bot_token_rotated_at'],
+            'Rotation timestamp should not change when the token value is left empty.'
         );
 
         $metadata = $this->calculate_expected_secret_metadata(
             $this->saved_options['bot_token'],
-            (int) $result['bot_token_rotated_at'],
-            (int) $result['bot_token_rotated_at']
+            (int) $this->saved_options['bot_token_rotated_at']
         );
         $expected['bot_token_expires_at'] = $metadata['expires_at'];
         $expected['bot_token_status']     = $metadata['status'];
+
+        $this->assertSame($expected['bot_token'], $result['bot_token']);
+        $this->assertSame($expected['bot_token_rotated_at'], $result['bot_token_rotated_at']);
 
         unset($expected['bot_token'], $result['bot_token']);
         unset($expected['bot_token_rotated_at'], $result['bot_token_rotated_at']);
@@ -720,6 +729,28 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
 
         delete_option(Discord_Bot_JLG_API::LAST_FALLBACK_OPTION);
         delete_transient(DISCORD_BOT_JLG_CACHE_KEY . Discord_Bot_JLG_API::FALLBACK_RETRY_SUFFIX);
+    }
+
+    public function test_sanitize_options_preserves_encrypted_token_when_bot_token_field_blank() {
+        $existing_options = get_option(DISCORD_BOT_JLG_OPTION_NAME);
+        $this->assertIsArray($existing_options);
+
+        $existing_options['bot_token_expires_at'] = $this->rotation_timestamp + (15 * DAY_IN_SECONDS);
+        $existing_options['bot_token_status']     = 'active';
+        update_option(DISCORD_BOT_JLG_OPTION_NAME, $existing_options);
+
+        $result = $this->admin->sanitize_options(
+            array(
+                'bot_token'    => '   ',
+                'widget_title' => ' Updated title ',
+            )
+        );
+
+        $this->assertSame($this->saved_bot_token_encrypted, $result['bot_token']);
+        $this->assertSame($this->rotation_timestamp, $result['bot_token_rotated_at']);
+        $this->assertSame($existing_options['bot_token_expires_at'], $result['bot_token_expires_at']);
+        $this->assertSame($existing_options['bot_token_status'], $result['bot_token_status']);
+        $this->assertSame(sanitize_text_field(' Updated title '), $result['widget_title']);
     }
 
     private static function get_min_cache_duration(): int {
