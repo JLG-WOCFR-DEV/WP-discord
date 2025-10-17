@@ -469,7 +469,7 @@ if (!function_exists('discord_bot_jlg_sanitize_profile_key')) {
         // Normalize repeated separators so generated slugs remain compact.
         $key = preg_replace('/_+/', '_', $key);
         $key = preg_replace('/-+/', '-', $key);
-        $key = preg_replace('/(?:_-|-_)+/', '-', $key);
+        $key = preg_replace('/(?:_-|-_)+/', '_', $key);
 
         $key = trim($key, '_-');
 
