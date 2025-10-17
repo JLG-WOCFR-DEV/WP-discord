@@ -433,7 +433,7 @@ class Discord_Stats_Widget extends WP_Widget {
                 <label for="<?php echo esc_attr($this->get_field_id('server_id_override')); ?>"><?php esc_html_e('Remplacer l’ID du serveur', 'discord-bot-jlg'); ?></label>
                 <input class="widefat" id="<?php echo esc_attr($this->get_field_id('server_id_override')); ?>"
                        name="<?php echo esc_attr($this->get_field_name('server_id_override')); ?>" type="text"
-                       value="<?php echo esc_attr($instance['server_id_override']); ?>" placeholder="1234567890" />
+                       value="<?php echo esc_attr($instance['server_id_override']); ?>" placeholder="1234567890" autocomplete="username" />
             </p>
 
             <p>
