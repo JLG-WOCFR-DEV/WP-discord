@@ -103,8 +103,13 @@ class Discord_Bot_JLG_Metrics_Controller {
 
         add_filter('rest_pre_serve_request', array($this, 'serve_metrics_as_plain_text'), 10, 4);
 
-        $response = new WP_REST_Response($body, 200);
-        $response->set_data($body);
+        $response = new WP_REST_Response(
+            array(
+                'raw_body' => $body,
+            ),
+            200
+        );
+
         $response->header('Content-Type', 'text/plain; version=0.0.4');
 
         return $response;
@@ -137,6 +142,8 @@ class Discord_Bot_JLG_Metrics_Controller {
             $body_data = $response->get_data();
             if (is_string($body_data)) {
                 $body = $body_data;
+            } elseif (is_array($body_data) && isset($body_data['raw_body']) && is_string($body_data['raw_body'])) {
+                $body = $body_data['raw_body'];
             } elseif (is_scalar($body_data)) {
                 $body = (string) $body_data;
             }
