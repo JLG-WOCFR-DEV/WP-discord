@@ -485,23 +485,32 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
 
         $this->assertTrue(discord_bot_jlg_is_encrypted_secret($result['bot_token']));
 
+        $this->assertSame(
+            $this->saved_options['bot_token'],
+            $result['bot_token'],
+            'Encrypted bot token should remain identical when submitting an empty value.'
+        );
+
         $decrypted = discord_bot_jlg_decrypt_secret($result['bot_token']);
 
         $this->assertFalse(is_wp_error($decrypted));
-        $this->assertSame($this->saved_options['bot_token'], $decrypted);
+        $this->assertSame($this->saved_bot_token_plain, $decrypted);
 
-        $this->assertGreaterThanOrEqual(
-            $this->rotation_timestamp,
-            (int) $result['bot_token_rotated_at']
+        $this->assertSame(
+            (int) $this->saved_options['bot_token_rotated_at'],
+            (int) $result['bot_token_rotated_at'],
+            'Rotation timestamp should not change when the token value is left empty.'
         );
 
         $metadata = $this->calculate_expected_secret_metadata(
             $this->saved_options['bot_token'],
-            (int) $result['bot_token_rotated_at'],
-            (int) $result['bot_token_rotated_at']
+            (int) $this->saved_options['bot_token_rotated_at']
         );
         $expected['bot_token_expires_at'] = $metadata['expires_at'];
         $expected['bot_token_status']     = $metadata['status'];
+
+        $this->assertSame($expected['bot_token'], $result['bot_token']);
+        $this->assertSame($expected['bot_token_rotated_at'], $result['bot_token_rotated_at']);
 
         unset($expected['bot_token'], $result['bot_token']);
         unset($expected['bot_token_rotated_at'], $result['bot_token_rotated_at']);
