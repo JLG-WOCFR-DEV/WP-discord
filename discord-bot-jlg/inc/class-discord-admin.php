@@ -1723,7 +1723,7 @@ class Discord_Bot_JLG_Admin {
                             <td>
                                 <label>
                                     <span class="screen-reader-text"><?php esc_html_e('ID du serveur', 'discord-bot-jlg'); ?></span>
-                                    <input type="text" class="regular-text" name="<?php echo esc_attr($this->option_name); ?>[server_profiles][<?php echo esc_attr($profile_key); ?>][server_id]" value="<?php echo esc_attr($server_id); ?>" placeholder="1234567890" />
+                                    <input type="text" class="regular-text" name="<?php echo esc_attr($this->option_name); ?>[server_profiles][<?php echo esc_attr($profile_key); ?>][server_id]" value="<?php echo esc_attr($server_id); ?>" placeholder="1234567890" autocomplete="username" />
                                 </label>
                                 <p class="description"><?php esc_html_e('Saisissez l’identifiant numérique de votre serveur Discord.', 'discord-bot-jlg'); ?></p>
                             </td>
@@ -1796,7 +1796,7 @@ class Discord_Bot_JLG_Admin {
                 <tr>
                     <th scope="row"><?php esc_html_e('Nouveau profil', 'discord-bot-jlg'); ?></th>
                     <td>
-                        <input type="text" class="regular-text" name="<?php echo esc_attr($this->option_name); ?>[new_profile][server_id]" placeholder="1234567890" />
+                        <input type="text" class="regular-text" name="<?php echo esc_attr($this->option_name); ?>[new_profile][server_id]" placeholder="1234567890" autocomplete="username" />
                         <p class="description"><?php esc_html_e('Identifiant du serveur Discord.', 'discord-bot-jlg'); ?></p>
                     </td>
                     <td>
