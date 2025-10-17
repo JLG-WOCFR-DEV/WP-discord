@@ -13,6 +13,7 @@
             <file>discord-bot-jlg/tests/phpunit/Test_Discord_Bot_JLG_Stats_Service.php</file>
             <file>discord-bot-jlg/tests/phpunit/Test_Discord_Bot_JLG_Helpers.php</file>
             <file>discord-bot-jlg/tests/phpunit/Test_Discord_Bot_JLG_Shortcode.php</file>
+            <file>discord-bot-jlg/tests/phpunit/Test_Discord_Bot_JLG_REST_Controller.php</file>
         </testsuite>
     </testsuites>
 </phpunit>

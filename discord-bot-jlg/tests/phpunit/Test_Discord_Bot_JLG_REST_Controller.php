@@ -318,6 +318,7 @@ class Test_Discord_Bot_JLG_REST_Controller extends TestCase {
 
         $this->assertTrue($served);
         $this->assertSame($body, $output);
+        $this->assertStringStartsWith('# HELP', ltrim($output));
         $this->assertSame('#', substr(ltrim($output), 0, 1));
 
         delete_option('discord_bot_jlg_metrics_test_state');
