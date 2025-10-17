@@ -457,9 +457,11 @@ class Discord_Bot_JLG_Admin {
             'bot_token_status' => isset($current_options['bot_token_status'])
                 ? sanitize_key($current_options['bot_token_status'])
                 : 'missing',
-            'server_profiles'=> isset($current_options['server_profiles']) && is_array($current_options['server_profiles'])
+            'server_profiles' => isset($current_options['server_profiles']) && is_array($current_options['server_profiles'])
                 ? $current_options['server_profiles']
                 : array(),
+            // Display toggles default to off so the boolean normalization loop can
+            // enable them based on the submitted form values.
             'demo_mode'      => 0,
             'show_online'    => 0,
             'show_total'     => 0,

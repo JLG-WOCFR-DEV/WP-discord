@@ -410,8 +410,6 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
     public function test_sanitize_options_boolean_field_key_order() {
         $result = $this->admin->sanitize_options(array());
 
-        $keys = array_keys($result);
-
         $expected_order = array(
             'demo_mode',
             'show_online',
@@ -424,9 +422,26 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
             'default_refresh_enabled',
         );
 
-        $actual_order = array_values(array_intersect($keys, $expected_order));
+        $display_flags = array_intersect_key($result, array_flip($expected_order));
 
         $this->assertSame($expected_order, $actual_order);
+
+        $show_total_index = array_search('show_total', $keys, true);
+
+        $this->assertNotFalse($show_total_index, 'show_total key should be present in sanitized defaults.');
+
+        $expected_slice = array(
+            'show_total',
+            'show_presence_breakdown',
+            'show_approximate_member_count',
+            'show_premium_subscriptions',
+            'show_server_name',
+        );
+
+        $this->assertSame(
+            $expected_slice,
+            array_slice($keys, $show_total_index, count($expected_slice))
+        );
     }
 
     /**

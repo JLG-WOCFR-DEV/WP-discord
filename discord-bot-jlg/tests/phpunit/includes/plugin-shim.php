@@ -37,20 +37,5 @@ if (!defined('DISCORD_BOT_JLG_ANALYTICS_RETENTION_DEFAULT')) {
 }
 
 if (!function_exists('discord_bot_jlg_get_default_options')) {
-    function discord_bot_jlg_get_default_options() {
-        return array(
-            'server_id'                     => '',
-            'bot_token'                     => '',
-            'bot_token_rotated_at'          => 0,
-            'server_profiles'               => array(),
-            'demo_mode'                     => false,
-            'show_online'                   => true,
-            'show_total'                    => true,
-            'custom_css'                    => '',
-            'widget_title'                  => 'Discord Server',
-            'cache_duration'                => DISCORD_BOT_JLG_DEFAULT_CACHE_DURATION,
-            'analytics_retention_days'      => DISCORD_BOT_JLG_ANALYTICS_RETENTION_DEFAULT,
-            'analytics_alert_webhook_secret'=> '',
-        );
-    }
+    require_once DISCORD_BOT_JLG_PLUGIN_PATH . 'inc/helpers.php';
 }
