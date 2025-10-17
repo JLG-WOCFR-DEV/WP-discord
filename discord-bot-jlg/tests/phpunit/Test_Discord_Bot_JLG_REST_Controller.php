@@ -510,7 +510,9 @@ class Test_Discord_Bot_JLG_REST_Controller extends TestCase {
             '/attachment; filename="discord-analytics-%s-[0-9]{8}-[0-9]{6}\\.json"/',
             preg_quote($sanitized_profile, '/')
         );
-        $this->assertMatchesRegularExpression($pattern, $headers['Content-Disposition']);
+        $content_disposition = wp_test_rest_response_get_header($response, 'Content-Disposition');
+        $this->assertNotSame('', $content_disposition);
+        $this->assertMatchesRegularExpression($pattern, $content_disposition);
 
         $payload = $response->get_data();
         $this->assertTrue($payload['success']);
@@ -573,7 +575,8 @@ class Test_Discord_Bot_JLG_REST_Controller extends TestCase {
         $headers = $response->get_headers();
         $this->assertIsArray($headers);
         $this->assertArrayHasKey('Content-Type', $headers);
-        $this->assertSame('text/csv; charset=utf-8', $headers['Content-Type']);
+        $content_type = wp_test_rest_response_get_header($response, 'Content-Type');
+        $this->assertSame('text/csv; charset=utf-8', $content_type);
 
         $this->assertArrayHasKey('Content-Disposition', $headers);
         $expected_profile = discord_bot_jlg_sanitize_profile_key($profile_key);
@@ -581,7 +584,9 @@ class Test_Discord_Bot_JLG_REST_Controller extends TestCase {
             '/attachment; filename="discord-analytics-%s-[0-9]{8}-[0-9]{6}\\.csv"/',
             preg_quote($expected_profile, '/')
         );
-        $this->assertMatchesRegularExpression($pattern, $headers['Content-Disposition']);
+        $content_disposition = wp_test_rest_response_get_header($response, 'Content-Disposition');
+        $this->assertNotSame('', $content_disposition);
+        $this->assertMatchesRegularExpression($pattern, $content_disposition);
 
         $cached = get_transient($cache_key);
         $this->assertSame($payload, $cached);

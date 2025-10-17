@@ -33,6 +33,7 @@ class Discord_Bot_JLG_Metrics_Controller {
 
     /**
      * @param object $alert_scheduler Scheduler instance expected to implement schedule().
+     * @phpstan-param object{schedule: callable} $alert_scheduler
      */
     public function __construct(
         Discord_Bot_JLG_Metrics_Registry $registry,

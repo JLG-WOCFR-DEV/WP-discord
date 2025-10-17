@@ -199,10 +199,23 @@ if (!function_exists('wp_set_script_translations')) {
 
 if (!function_exists('remove_query_arg')) {
     function remove_query_arg($keys, $query = false) {
-        $keys = (array) $keys;
+        if (!is_array($keys)) {
+            $keys = array($keys);
+        }
+
+        $normalized_keys = array();
+        foreach ($keys as $key) {
+            if (is_scalar($key)) {
+                $normalized_keys[] = (string) $key;
+            }
+        }
+
+        if (empty($normalized_keys)) {
+            return $query;
+        }
 
         if (is_array($query)) {
-            foreach ($keys as $key) {
+            foreach ($normalized_keys as $key) {
                 if (array_key_exists($key, $query)) {
                     unset($query[$key]);
                 }
@@ -211,7 +224,13 @@ if (!function_exists('remove_query_arg')) {
             return $query;
         }
 
-        if (!is_string($query)) {
+        if (false === $query || null === $query) {
+            $query = isset($_SERVER['REQUEST_URI']) ? (string) $_SERVER['REQUEST_URI'] : '';
+        } else {
+            $query = (string) $query;
+        }
+
+        if ('' === $query) {
             return '';
         }
 
@@ -222,42 +241,36 @@ if (!function_exists('remove_query_arg')) {
             $query    = substr($query, 0, $fragment_position);
         }
 
-        $base = $query;
-        $query_string = '';
-
-        $query_position = strpos($query, '?');
-        if (false !== $query_position) {
-            $base         = substr($query, 0, $query_position);
-            $query_string = substr($query, $query_position + 1);
+        $question_mark_position = strpos($query, '?');
+        if (false === $question_mark_position) {
+            return $query . $fragment;
         }
 
-        if ('' === $query_string) {
-            return $base . $fragment;
+        $base         = substr($query, 0, $question_mark_position);
+        $query_string = substr($query, $question_mark_position + 1);
+
+        $parsed_query = array();
+        if ('' !== $query_string) {
+            parse_str($query_string, $parsed_query);
         }
 
-        parse_str($query_string, $params);
-
-        if (!is_array($params)) {
-            return $base . $fragment;
+        foreach ($normalized_keys as $key) {
+            unset($parsed_query[$key]);
         }
 
-        foreach ($keys as $key) {
-            if (array_key_exists($key, $params)) {
-                unset($params[$key]);
+        $rebuilt_query = http_build_query($parsed_query, '', '&', PHP_QUERY_RFC3986);
+
+        if ('' !== $rebuilt_query) {
+            $result = ('' !== $base ? $base . '?' . $rebuilt_query : '?' . $rebuilt_query);
+        } else {
+            $result = $base;
+
+            if ('' === $result && 0 === $question_mark_position) {
+                $result = '?';
             }
         }
 
-        if (empty($params)) {
-            return $base . $fragment;
-        }
-
-        $new_query = http_build_query($params, '', '&', PHP_QUERY_RFC3986);
-
-        if ('' === $new_query) {
-            return $base . $fragment;
-        }
-
-        return $base . '?' . $new_query . $fragment;
+        return $result . $fragment;
     }
 }
 
@@ -287,31 +300,14 @@ if (!defined('AUTH_SALT')) {
     define('AUTH_SALT', 'tests-fixed-auth-salt');
 }
 
-require_once __DIR__ . '/includes/plugin-shim.php';
-
-require_once __DIR__ . '/../../inc/helpers.php';
-require_once __DIR__ . '/../../inc/class-discord-analytics.php';
-require_once __DIR__ . '/../../inc/class-discord-http.php';
-require_once __DIR__ . '/../../inc/class-discord-cache-gateway.php';
-require_once __DIR__ . '/../../inc/class-discord-profile-repository.php';
-require_once __DIR__ . '/../../inc/class-discord-http-connector.php';
-require_once __DIR__ . '/../../inc/class-discord-event-logger.php';
-require_once __DIR__ . '/../../inc/class-discord-api-key-repository.php';
-require_once __DIR__ . '/../../inc/class-discord-options-repository.php';
-require_once __DIR__ . '/../../inc/class-discord-capabilities.php';
-require_once __DIR__ . '/../../inc/class-discord-api.php';
-require_once __DIR__ . '/../../inc/class-discord-admin.php';
-require_once __DIR__ . '/../../inc/class-discord-widget.php';
-require_once __DIR__ . '/../../inc/class-discord-shortcode.php';
-require_once __DIR__ . '/../../inc/class-discord-site-health.php';
-require_once __DIR__ . '/../../inc/class-discord-rest.php';
-require_once __DIR__ . '/../../inc/class-discord-metrics-registry.php';
-require_once __DIR__ . '/../../inc/class-discord-analytics-alert-scheduler.php';
-require_once __DIR__ . '/../../inc/class-discord-metrics-controller.php';
-require_once __DIR__ . '/../../inc/cron.php';
-
 if (!function_exists('esc_html__')) {
     function esc_html__($text, $domain = null) {
+        return $text;
+    }
+}
+
+if (!function_exists('__')) {
+    function __($text, $domain = null) {
         return $text;
     }
 }
@@ -903,6 +899,8 @@ function apply_filters($hook, $value, ...$args) {
     return $value;
 }
 
+require_once __DIR__ . '/../../discord-bot-jlg.php';
+
 function wp_safe_remote_get($url, $args = array()) {
     $GLOBALS['wp_test_last_remote_request'] = array(
         'url'  => $url,
@@ -1092,9 +1090,20 @@ if (!class_exists('WP_REST_Response')) {
             $this->status = (int) $status;
         }
 
-        public function header($key, $value) {
-            $key = strtolower((string) $key);
-            $this->headers[$key] = $value;
+        public function header($key, $value, $replace = true) {
+            if (!is_string($key) || '' === $key) {
+                return $this;
+            }
+
+            if (!is_array($this->headers)) {
+                $this->headers = array();
+            }
+
+            if ($replace || !isset($this->headers[$key])) {
+                $this->headers[$key] = $value;
+            } else {
+                $this->headers[$key] .= ', ' . $value;
+            }
 
             return $this;
         }
@@ -1113,6 +1122,26 @@ function rest_ensure_response($response) {
     return new WP_REST_Response($response);
 }
 
+function wp_test_rest_response_get_header(WP_REST_Response $response, $header) {
+    $headers = $response->get_headers();
+
+    if (!is_array($headers)) {
+        return '';
+    }
+
+    foreach ($headers as $key => $value) {
+        if (0 === strcasecmp($key, (string) $header)) {
+            if (is_array($value)) {
+                return reset($value);
+            }
+
+            return $value;
+        }
+    }
+
+    return '';
+}
+
 function register_rest_route($namespace, $route, $args = array(), $override = false) {
     if (!isset($GLOBALS['wp_test_rest_routes'])) {
         $GLOBALS['wp_test_rest_routes'] = array();
@@ -1126,10 +1155,6 @@ function register_rest_route($namespace, $route, $args = array(), $override = fa
     );
 
     return true;
-}
-
-function __($text, $domain = null) {
-    return $text;
 }
 
 if (!function_exists('wp_validate_boolean')) {
