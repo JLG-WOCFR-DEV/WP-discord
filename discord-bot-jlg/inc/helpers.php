@@ -386,16 +386,16 @@ if (!function_exists('discord_bot_jlg_sanitize_profile_key')) {
             return '';
         }
 
-        // Replace gaps that precede a hyphenated segment with a hyphen so we
-        // preserve user intent for mixed separators like "Foo Bar-Baz".
-        $key = preg_replace('/\s+(?=[^\-\s]*-)/', '-', $key);
-
-        // Normalize hyphen spacing.
+        // Normalize spacing around existing hyphen separators without creating
+        // new hyphenated segments from whitespace alone.
         $key = preg_replace('/\s*-\s*/', '-', $key);
 
-        // Collapse remaining whitespace to underscores so custom labels keep
-        // their readability when converted to a slug.
+        // Translate all whitespace into underscores so labels like "Custom Key"
+        // become "custom_key" while keeping consecutive whitespace compact.
         $key = preg_replace('/[\s]+/', '_', $key);
+
+        // Collapse duplicate underscores created by consecutive whitespace.
+        $key = preg_replace('/_+/', '_', $key);
 
         if (function_exists('sanitize_key')) {
             $key = sanitize_key($key);
