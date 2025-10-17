@@ -3412,7 +3412,7 @@ class Discord_Bot_JLG_API {
 
         $this->set_connector_state_entry($profile_key, $channel, $state);
 
-        return $state;
+        return $this->get_connector_state_entry($profile_key, $channel);
     }
 
     private function register_connector_failure($profile_key, $channel, $retry_after, $status_code = 0, $error_code = '') {
