@@ -157,10 +157,16 @@ class Discord_Bot_JLG_Http_Connector {
             $server_id = Discord_Bot_JLG_Profile_Repository::sanitize_server_id($options['server_id']);
         }
 
-        return array(
+        $context = array(
             'channel'    => $channel,
             'profileKey' => $profile_key,
             'serverId'   => $server_id,
         );
+
+        if (!empty($options['__force_connector_attempt'])) {
+            $context['forcedAttempt'] = true;
+        }
+
+        return $context;
     }
 }

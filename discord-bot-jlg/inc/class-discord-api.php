@@ -1028,8 +1028,11 @@ class Discord_Bot_JLG_API {
 
         $force_connector_attempt = (!empty($args['bypass_cache']) || $force_refresh);
 
-        if (true === $force_connector_attempt) {
-            $options['__force_connector_attempt'] = true;
+        if ($force_connector_attempt) {
+            if (empty($options['__force_connector_attempt'])) {
+                $options['__force_connector_attempt'] = true;
+            }
+
             $context['force_connector_attempt'] = true;
         }
 
@@ -4015,6 +4018,7 @@ class Discord_Bot_JLG_API {
                     'consecutive_failures' => isset($attempt['log_context']['consecutive_failures'])
                         ? (int) $attempt['log_context']['consecutive_failures']
                         : 0,
+                    'forced_attempt'       => !empty($attempt['log_context']['forced_attempt']),
                 )
             ));
 
@@ -4293,6 +4297,7 @@ class Discord_Bot_JLG_API {
                     'consecutive_failures' => isset($attempt['log_context']['consecutive_failures'])
                         ? (int) $attempt['log_context']['consecutive_failures']
                         : 0,
+                    'forced_attempt'       => !empty($attempt['log_context']['forced_attempt']),
                 )
             ));
 
