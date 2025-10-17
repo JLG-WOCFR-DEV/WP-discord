@@ -3310,13 +3310,13 @@ class Discord_Bot_JLG_API {
 
         $retry_after = 0;
         if (isset($context['retry_after'])) {
-            $retry_after = max($retry_after, (int) $context['retry_after']);
+            $retry_after = max($retry_after, $this->normalize_retry_after_delay($context['retry_after']));
         }
 
         if ($response instanceof WP_Error) {
             $error_data = $response->get_error_data();
             if (is_array($error_data) && isset($error_data['retry_after'])) {
-                $retry_after = max($retry_after, (int) $error_data['retry_after']);
+                $retry_after = max($retry_after, $this->normalize_retry_after_delay($error_data['retry_after']));
             }
 
             if ('success' === $outcome) {
@@ -3404,12 +3404,10 @@ class Discord_Bot_JLG_API {
         $exponent = max(0, min($failures - 1, 8));
         $backoff = (int) round($base * pow(2, $exponent));
 
-        if ($retry_after > 0) {
-            $retry_after_seconds = (int) ceil((float) $retry_after);
+        $retry_after_seconds = $this->normalize_retry_after_delay($retry_after);
 
-            if ($retry_after_seconds > 0) {
-                $backoff = $retry_after_seconds;
-            }
+        if ($retry_after_seconds > 0) {
+            $backoff = $retry_after_seconds;
         } elseif (429 === (int) $status_code) {
             // When Discord does not provide a Retry-After header, honour the
             // expectation that the caller decides the delay and avoid forcing
@@ -3418,7 +3416,7 @@ class Discord_Bot_JLG_API {
         }
 
         if ($backoff <= 0) {
-            if (429 === (int) $status_code && $retry_after <= 0) {
+            if (429 === (int) $status_code && $retry_after_seconds <= 0) {
                 $backoff = 0;
             } else {
                 $backoff = $base;
@@ -3456,6 +3454,65 @@ class Discord_Bot_JLG_API {
 
         $this->set_connector_state_entry($profile_key, $channel, $state);
         $this->set_last_retry_after(0);
+    }
+
+    private function normalize_retry_after_delay($retry_after) {
+        if (is_int($retry_after)) {
+            return ($retry_after > 0) ? $retry_after : 0;
+        }
+
+        if (is_float($retry_after)) {
+            if (!is_finite($retry_after) || $retry_after <= 0) {
+                return 0;
+            }
+
+            return (int) ceil($retry_after);
+        }
+
+        if (!is_string($retry_after)) {
+            return 0;
+        }
+
+        $retry_after = trim($retry_after);
+
+        if ('' === $retry_after) {
+            return 0;
+        }
+
+        if (ctype_digit($retry_after)) {
+            $seconds = (int) $retry_after;
+
+            return ($seconds > 0) ? $seconds : 0;
+        }
+
+        $normalized = str_replace(',', '.', $retry_after);
+
+        if (preg_match('/^([0-9]+(?:\.[0-9]+)?)\s*(ms|s)?$/i', $normalized, $matches)) {
+            $value = (float) $matches[1];
+            $unit  = isset($matches[2]) ? strtolower($matches[2]) : 's';
+
+            if (!is_finite($value) || $value < 0) {
+                return 0;
+            }
+
+            if ('ms' === $unit) {
+                $value = $value / 1000;
+            }
+
+            return ($value > 0) ? (int) ceil($value) : 0;
+        }
+
+        if (is_numeric($normalized)) {
+            $value = (float) $normalized;
+
+            if (!is_finite($value) || $value <= 0) {
+                return 0;
+            }
+
+            return (int) ceil($value);
+        }
+
+        return 0;
     }
 
     private function ensure_connector_state_registry() {
