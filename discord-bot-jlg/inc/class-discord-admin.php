@@ -10,6 +10,7 @@ if (!defined('ABSPATH')) {
 class Discord_Bot_JLG_Admin {
 
     const SECRET_ROTATION_MAX_AGE_DAYS = 90;
+    const ALERT_WEBHOOK_SECRET_MAX_LENGTH = 128;
 
     private $option_name;
     private $api;
@@ -1617,7 +1618,8 @@ class Discord_Bot_JLG_Admin {
      *
      * The value must consist of printable ASCII characters so that secrets
      * encoded in base64 (and similar formats) are preserved. To avoid storing
-     * unexpectedly large payloads, the value is capped at 128 characters.
+     * unexpectedly large payloads, the value is capped at
+     * self::ALERT_WEBHOOK_SECRET_MAX_LENGTH (128 characters).
      *
      * @param mixed $value Raw secret value.
      *
@@ -1638,8 +1640,8 @@ class Discord_Bot_JLG_Admin {
             return '';
         }
 
-        if (strlen($value) > 128) {
-            $value = substr($value, 0, 128);
+        if (strlen($value) > self::ALERT_WEBHOOK_SECRET_MAX_LENGTH) {
+            $value = substr($value, 0, self::ALERT_WEBHOOK_SECRET_MAX_LENGTH);
         }
 
         return $value;

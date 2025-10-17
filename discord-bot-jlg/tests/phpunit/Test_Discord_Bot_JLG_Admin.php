@@ -761,6 +761,18 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
         $this->assertSame(sanitize_text_field(' Updated title '), $result['widget_title']);
     }
 
+    public function test_sanitize_alert_webhook_secret_accepts_plus_and_equals_characters() {
+        $secret = 'abc+/=123=';
+
+        $result = $this->admin->sanitize_options(
+            array(
+                'analytics_alert_webhook_secret' => $secret,
+            )
+        );
+
+        $this->assertSame($secret, $result['analytics_alert_webhook_secret']);
+    }
+
     private static function get_min_cache_duration(): int {
         return max(60, (int) Discord_Bot_JLG_API::MIN_PUBLIC_REFRESH_INTERVAL);
     }
