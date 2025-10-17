@@ -101,11 +101,12 @@ class Discord_Bot_JLG_Metrics_Controller {
         $state = $this->registry->get_state();
         $body  = $this->render_prometheus($state);
 
-        add_filter('rest_pre_serve_request', array($this, 'serve_metrics_as_plain_text'), 10, 4);
-
-        $response = new WP_REST_Response($body, 200);
+        $response = new WP_REST_Response();
+        $response->set_status(200);
         $response->set_data($body);
         $response->header('Content-Type', 'text/plain; version=0.0.4');
+
+        add_filter('rest_pre_serve_request', array($this, 'serve_metrics_as_plain_text'), 10, 4);
 
         return $response;
     }
