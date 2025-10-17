@@ -275,6 +275,7 @@ class Test_Discord_Bot_JLG_Helpers extends TestCase {
             'underscore retained' => array('Already_Slug', 'already_slug'),
             'combined separators' => array('Profile_With Mixed-Separators', 'profile_with-mixed-separators'),
             'punctuation squashed into underscore' => array('Custom Key!!', 'custom_key'),
+            'mixed whitespace collapsed' => array("Tabs\t and\n new lines", 'tabs_and_new_lines'),
         );
     }
 
