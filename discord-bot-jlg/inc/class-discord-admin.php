@@ -578,9 +578,10 @@ class Discord_Bot_JLG_Admin {
             }
         }
 
-        $constant_overridden  = (defined('DISCORD_BOT_JLG_TOKEN') && '' !== DISCORD_BOT_JLG_TOKEN);
-        $current_timestamp    = current_time('timestamp');
-        $skip_token_migration = false;
+        $constant_overridden     = (defined('DISCORD_BOT_JLG_TOKEN') && '' !== DISCORD_BOT_JLG_TOKEN);
+        $current_timestamp       = current_time('timestamp');
+        $skip_token_migration    = false;
+        $preserve_token_metadata = false;
 
         if (!$constant_overridden) {
             $delete_requested = !empty($input['bot_token_delete']);
@@ -599,6 +600,7 @@ class Discord_Bot_JLG_Admin {
                     $sanitized['bot_token_rotated_at'] = isset($current_options['bot_token_rotated_at'])
                         ? (int) $current_options['bot_token_rotated_at']
                         : 0;
+                    $preserve_token_metadata = true;
                     $skip_token_migration = true;
                 } elseif ('' !== $raw_token) {
                     $token_to_store = sanitize_text_field($raw_token);
@@ -629,6 +631,7 @@ class Discord_Bot_JLG_Admin {
                     $sanitized['bot_token_status'] = isset($current_options['bot_token_status'])
                         ? sanitize_key($current_options['bot_token_status'])
                         : 'missing';
+                    $preserve_token_metadata = true;
                 }
             }
 
@@ -665,8 +668,17 @@ class Discord_Bot_JLG_Admin {
             $current_timestamp,
             __('configuration principale', 'discord-bot-jlg')
         );
-        $sanitized['bot_token_expires_at'] = $main_secret_metadata['expires_at'];
-        $sanitized['bot_token_status'] = $main_secret_metadata['status'];
+        if (!$preserve_token_metadata || empty($sanitized['bot_token_status'])) {
+            $sanitized['bot_token_status'] = $main_secret_metadata['status'];
+        }
+
+        if (
+            !$preserve_token_metadata
+            || !isset($sanitized['bot_token_expires_at'])
+            || (int) $sanitized['bot_token_expires_at'] <= 0
+        ) {
+            $sanitized['bot_token_expires_at'] = $main_secret_metadata['expires_at'];
+        }
 
         $boolean_fields = array(
             'demo_mode',
