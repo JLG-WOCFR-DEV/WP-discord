@@ -600,7 +600,11 @@ class Discord_Bot_JLG_Admin {
                     $sanitized['bot_token_rotated_at'] = isset($current_options['bot_token_rotated_at'])
                         ? (int) $current_options['bot_token_rotated_at']
                         : 0;
-                    $preserve_token_metadata = true;
+                    $has_existing_status = isset($current_options['bot_token_status'])
+                        && '' !== $current_options['bot_token_status'];
+                    $has_existing_expiration = isset($current_options['bot_token_expires_at'])
+                        && (int) $current_options['bot_token_expires_at'] > 0;
+                    $preserve_token_metadata = $has_existing_status || $has_existing_expiration;
                     $skip_token_migration = true;
                 } elseif ('' !== $raw_token) {
                     $token_to_store = sanitize_text_field($raw_token);
