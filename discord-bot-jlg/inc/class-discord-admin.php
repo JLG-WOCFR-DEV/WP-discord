@@ -578,10 +578,9 @@ class Discord_Bot_JLG_Admin {
             }
         }
 
-        $constant_overridden      = (defined('DISCORD_BOT_JLG_TOKEN') && '' !== DISCORD_BOT_JLG_TOKEN);
-        $current_timestamp        = current_time('timestamp');
-        $skip_token_migration     = false;
-        $preserve_existing_secret = false;
+        $constant_overridden  = (defined('DISCORD_BOT_JLG_TOKEN') && '' !== DISCORD_BOT_JLG_TOKEN);
+        $current_timestamp    = current_time('timestamp');
+        $skip_token_migration = false;
 
         if (!$constant_overridden) {
             $delete_requested = !empty($input['bot_token_delete']);
@@ -594,19 +593,12 @@ class Discord_Bot_JLG_Admin {
                 $raw_token = trim((string) $input['bot_token']);
 
                 if ('' === $raw_token) {
-                    $preserve_existing_secret = true;
                     $sanitized['bot_token'] = isset($current_options['bot_token'])
                         ? $current_options['bot_token']
                         : '';
                     $sanitized['bot_token_rotated_at'] = isset($current_options['bot_token_rotated_at'])
                         ? (int) $current_options['bot_token_rotated_at']
                         : 0;
-                    $sanitized['bot_token_expires_at'] = isset($current_options['bot_token_expires_at'])
-                        ? (int) $current_options['bot_token_expires_at']
-                        : 0;
-                    $sanitized['bot_token_status'] = isset($current_options['bot_token_status'])
-                        ? sanitize_key($current_options['bot_token_status'])
-                        : 'missing';
                     $skip_token_migration = true;
                 } elseif ('' !== $raw_token) {
                     $token_to_store = sanitize_text_field($raw_token);
@@ -666,24 +658,15 @@ class Discord_Bot_JLG_Admin {
             $sanitized['bot_token_rotated_at'] = 0;
         }
 
-        if ($preserve_existing_secret) {
-            $sanitized['bot_token_expires_at'] = isset($current_options['bot_token_expires_at'])
-                ? (int) $current_options['bot_token_expires_at']
-                : 0;
-            $sanitized['bot_token_status'] = isset($current_options['bot_token_status'])
-                ? sanitize_key($current_options['bot_token_status'])
-                : 'missing';
-        } else {
-            $main_secret_metadata = $this->finalize_secret_metadata(
-                'default',
-                $sanitized['bot_token'],
-                $sanitized['bot_token_rotated_at'],
-                $current_timestamp,
-                __('configuration principale', 'discord-bot-jlg')
-            );
-            $sanitized['bot_token_expires_at'] = $main_secret_metadata['expires_at'];
-            $sanitized['bot_token_status'] = $main_secret_metadata['status'];
-        }
+        $main_secret_metadata = $this->finalize_secret_metadata(
+            'default',
+            $sanitized['bot_token'],
+            $sanitized['bot_token_rotated_at'],
+            $current_timestamp,
+            __('configuration principale', 'discord-bot-jlg')
+        );
+        $sanitized['bot_token_expires_at'] = $main_secret_metadata['expires_at'];
+        $sanitized['bot_token_status'] = $main_secret_metadata['status'];
 
         $boolean_fields = array(
             'demo_mode',

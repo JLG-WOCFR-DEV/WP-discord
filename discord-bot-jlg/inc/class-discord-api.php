@@ -2888,7 +2888,7 @@ class Discord_Bot_JLG_API {
 
     private function persist_fallback_stats($stats, $options, $reason = '') {
         if (!is_array($stats)) {
-            return $stats;
+            $stats = array();
         }
 
         $is_fallback = (
@@ -2900,18 +2900,12 @@ class Discord_Bot_JLG_API {
             return $stats;
         }
 
-        $forced_attempt = !empty($options['__force_connector_attempt_active']);
-
         if (!array_key_exists('stale', $stats)) {
             $stats['stale'] = true;
         }
 
         if (!isset($stats['last_updated']) || !is_numeric($stats['last_updated'])) {
             $stats['last_updated'] = time();
-        }
-
-        if ($forced_attempt) {
-            return $stats;
         }
 
         $ttl = $this->get_fallback_cache_ttl($options);
