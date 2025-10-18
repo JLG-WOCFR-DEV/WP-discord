@@ -2908,11 +2908,16 @@ class Discord_Bot_JLG_API {
             $stats['last_updated'] = time();
         }
 
+        $this->store_last_fallback_details($reason);
+
+        if (!empty($options['__force_connector_attempt_active'])) {
+            return $stats;
+        }
+
         $ttl = $this->get_fallback_cache_ttl($options);
 
         $this->register_current_cache_key();
         set_transient($this->cache_key, $stats, $ttl);
-        $this->store_last_fallback_details($reason);
 
         return $stats;
     }
