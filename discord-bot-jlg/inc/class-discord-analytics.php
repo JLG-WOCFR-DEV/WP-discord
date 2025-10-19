@@ -152,7 +152,17 @@ class Discord_Bot_JLG_Analytics {
             'presence_breakdown'         => $presence_breakdown,
         );
 
-        $formats = array('%s', '%s', '%s', '%d', '%d', '%d', '%d', '%d', '%s');
+        $formats = array(
+            '%s',
+            '%s',
+            '%s',
+            (null === $online) ? '%s' : '%d',
+            (null === $total) ? '%s' : '%d',
+            (null === $approx_presence) ? '%s' : '%d',
+            (null === $approx_members) ? '%s' : '%d',
+            (null === $premium) ? '%s' : '%d',
+            '%s',
+        );
 
         if (method_exists($this->wpdb, 'insert')) {
             $this->wpdb->insert($this->table_name, $data, $formats);

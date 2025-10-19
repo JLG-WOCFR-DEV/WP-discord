@@ -133,6 +133,9 @@ class Discord_Bot_JLG_API_Key_Repository {
         }
 
         $expires_at = $this->sanitize_datetime(isset($args['expires_at']) ? $args['expires_at'] : '');
+        if ('' === $expires_at) {
+            $expires_at = null;
+        }
         $created_by = isset($args['created_by']) ? (int) $args['created_by'] : 0;
 
         $secret = $this->generate_secret();
