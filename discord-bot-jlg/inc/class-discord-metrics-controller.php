@@ -86,7 +86,10 @@ class Discord_Bot_JLG_Metrics_Controller {
     }
 
     public function check_metrics_permissions($request) {
-        if (current_user_can('manage_options') || current_user_can(Discord_Bot_JLG_Capabilities::VIEW_ANALYTICS)) {
+        if (
+            current_user_can('manage_options')
+            || Discord_Bot_JLG_Capabilities::current_user_can('view_analytics')
+        ) {
             return true;
         }
 
