@@ -3731,7 +3731,11 @@ class Discord_Bot_JLG_Admin {
             );
         }
 
-        fclose($output);
+        if (is_resource($output)) {
+            fflush($output);
+            fclose($output);
+        }
+
         exit;
     }
 
