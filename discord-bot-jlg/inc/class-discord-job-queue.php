@@ -295,7 +295,7 @@ class Discord_Bot_JLG_Job_Queue {
             );
 
             if ($this->supports_action_scheduler()) {
-                $existing = as_next_scheduled_action(self::JOB_HOOK, $args, self::ACTION_SCHEDULER_GROUP);
+                $existing = as_next_scheduled_action(self::JOB_HOOK, array($args), self::ACTION_SCHEDULER_GROUP);
                 if (false !== $existing) {
                     return true;
                 }
@@ -325,7 +325,7 @@ class Discord_Bot_JLG_Job_Queue {
             for ($attempt = 1; $attempt <= $this->max_attempts; $attempt++) {
                 $args = $base_args;
                 $args['attempt'] = $attempt;
-                as_unschedule_action(self::JOB_HOOK, $args, self::ACTION_SCHEDULER_GROUP);
+                as_unschedule_action(self::JOB_HOOK, array($args), self::ACTION_SCHEDULER_GROUP);
             }
             return;
         }
