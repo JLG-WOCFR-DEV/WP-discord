@@ -345,6 +345,8 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
         $time_after  = current_time('timestamp');
         $expected = array_merge($this->get_expected_defaults(), $expected_overrides);
 
+        $expected_token = isset($expected['bot_token']) ? $expected['bot_token'] : '';
+
         $result_token         = isset($result['bot_token']) ? $result['bot_token'] : '';
         $expected_token_plain = $this->saved_bot_token_plain;
 
@@ -440,8 +442,10 @@ class Test_Discord_Bot_JLG_Admin extends WP_UnitTestCase {
 
         $display_flags = array_intersect_key($result, array_flip($expected_order));
 
+        $actual_order = array_keys($display_flags);
         $this->assertSame($expected_order, $actual_order);
 
+        $keys = $actual_order;
         $show_total_index = array_search('show_total', $keys, true);
 
         $this->assertNotFalse($show_total_index, 'show_total key should be present in sanitized defaults.');
