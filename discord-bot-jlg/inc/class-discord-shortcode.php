@@ -600,12 +600,20 @@ class Discord_Bot_JLG_Shortcode {
             $accent_color_alt = $accent_color;
         }
 
+        $auto_text_color = '';
+
         if ('' !== $stat_bg_color) {
             $style_declarations[] = '--discord-surface-background: ' . $stat_bg_color;
+
+            if ('' === $stat_text_color) {
+                $auto_text_color = discord_bot_jlg_get_auto_text_color($stat_bg_color);
+            }
         }
 
         if ('' !== $stat_text_color) {
             $style_declarations[] = '--discord-surface-text: ' . $stat_text_color;
+        } elseif ('' !== $auto_text_color) {
+            $style_declarations[] = '--discord-surface-text: ' . $auto_text_color;
         }
 
         if ('' !== $accent_color) {

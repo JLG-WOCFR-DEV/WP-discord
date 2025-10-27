@@ -264,6 +264,18 @@ class Test_Discord_Bot_JLG_Shortcode extends TestCase {
         $this->assertStringContainsString('--discord-accent-contrast: #0f0f0f', $html);
     }
 
+    public function test_render_shortcode_auto_adds_text_color_for_light_background() {
+        $shortcode = $this->get_shortcode_instance();
+
+        $html = $shortcode->render_shortcode(array(
+            'stat_bg_color'   => '#ffffff',
+            'stat_text_color' => '',
+        ));
+
+        $this->assertStringContainsString('--discord-surface-background: #ffffff', $html);
+        $this->assertStringContainsString('--discord-surface-text: #0b1120', $html);
+    }
+
     public function test_prepare_avatar_url_preserves_fragment_and_nested_query_arguments() {
         $shortcode = $this->get_shortcode_instance();
 

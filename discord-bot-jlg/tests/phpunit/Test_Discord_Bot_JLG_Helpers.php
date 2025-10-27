@@ -322,6 +322,18 @@ class Test_Discord_Bot_JLG_Helpers extends TestCase {
         remove_all_filters('discord_bot_jlg_secret_migrated');
     }
 
+    public function test_get_auto_text_color_prefers_dark_on_light_background() {
+        $this->assertSame('#0b1120', discord_bot_jlg_get_auto_text_color('#ffffff'));
+    }
+
+    public function test_get_auto_text_color_prefers_light_on_dark_background() {
+        $this->assertSame('#ffffff', discord_bot_jlg_get_auto_text_color('#0f172a'));
+    }
+
+    public function test_get_auto_text_color_handles_transparent_background() {
+        $this->assertSame('#0b1120', discord_bot_jlg_get_auto_text_color('rgba(255, 255, 255, 0.6)'));
+    }
+
     /**
      * @dataProvider provide_sanitize_profile_key_inputs
      */

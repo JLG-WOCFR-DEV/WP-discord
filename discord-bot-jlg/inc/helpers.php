@@ -737,6 +737,89 @@ if (!function_exists('discord_bot_jlg_calculate_contrast_ratio')) {
     }
 }
 
+if (!function_exists('discord_bot_jlg_get_auto_text_color')) {
+    /**
+     * Determines an accessible text color for a given background.
+     *
+     * @param string $background_color Background color string.
+     * @param string $light_candidate  Preferred light text color.
+     * @param string $dark_candidate   Preferred dark text color.
+     *
+     * @return string Sanitized text color or empty string when no suggestion can be made.
+     */
+    function discord_bot_jlg_get_auto_text_color($background_color, $light_candidate = '#ffffff', $dark_candidate = '#0b1120') {
+        $sanitized_background = discord_bot_jlg_sanitize_color($background_color);
+
+        if ('' === $sanitized_background) {
+            return '';
+        }
+
+        $light = discord_bot_jlg_sanitize_color($light_candidate);
+        if ('' === $light) {
+            $light = '#ffffff';
+        }
+
+        $dark = discord_bot_jlg_sanitize_color($dark_candidate);
+        if ('' === $dark) {
+            $dark = '#0b1120';
+        }
+
+        $candidates = array($light, $dark);
+        $best_color = '';
+        $best_ratio = 0;
+        $best_meets_threshold = false;
+
+        foreach ($candidates as $candidate) {
+            if ('' === $candidate) {
+                continue;
+            }
+
+            $ratio = discord_bot_jlg_calculate_contrast_ratio($candidate, $sanitized_background);
+
+            if (null === $ratio) {
+                continue;
+            }
+
+            $meets_threshold = ($ratio >= 4.5);
+
+            if ($meets_threshold) {
+                if (!$best_meets_threshold || $ratio > $best_ratio) {
+                    $best_color = $candidate;
+                    $best_ratio = $ratio;
+                    $best_meets_threshold = true;
+                }
+            } elseif (!$best_meets_threshold && $ratio > $best_ratio) {
+                $best_color = $candidate;
+                $best_ratio = $ratio;
+            }
+        }
+
+        if ('' !== $best_color) {
+            return $best_color;
+        }
+
+        $components = discord_bot_jlg_parse_color_components($sanitized_background);
+        if ($components) {
+            if (isset($components['a']) && $components['a'] < 1) {
+                $components = discord_bot_jlg_alpha_composite($components, array(
+                    'r' => 255,
+                    'g' => 255,
+                    'b' => 255,
+                    'a' => 1,
+                ));
+            }
+
+            $luminance = discord_bot_jlg_calculate_relative_luminance($components);
+
+            if (null !== $luminance) {
+                return ($luminance > 0.5) ? $dark : $light;
+            }
+        }
+
+        return $dark;
+    }
+}
+
 if (!function_exists('discord_bot_jlg_format_datetime')) {
     /**
      * Formats a timestamp using wp_date() when available, falling back to date_i18n().

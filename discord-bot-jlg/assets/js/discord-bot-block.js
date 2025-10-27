@@ -16,6 +16,215 @@
     var ToolbarButton = blockEditorComponents.ToolbarButton || components.ToolbarButton;
     var Button = components.Button;
 
+    function discordBotJlgClamp(value, min, max) {
+        var number = Number(value);
+
+        if (!isFinite(number)) {
+            number = 0;
+        }
+
+        if (number < min) {
+            return min;
+        }
+
+        if (number > max) {
+            return max;
+        }
+
+        return number;
+    }
+
+    function discordBotJlgParseColor(color) {
+        if (!color || typeof color !== 'string') {
+            return null;
+        }
+
+        var trimmed = color.trim();
+
+        if (!trimmed) {
+            return null;
+        }
+
+        if (trimmed.charAt(0) === '#') {
+            var hex = trimmed.slice(1);
+            var length = hex.length;
+
+            if (length === 3 || length === 4) {
+                var rShort = hex.charAt(0);
+                var gShort = hex.charAt(1);
+                var bShort = hex.charAt(2);
+                var aShort = length === 4 ? hex.charAt(3) : 'f';
+
+                return {
+                    r: parseInt(rShort + rShort, 16),
+                    g: parseInt(gShort + gShort, 16),
+                    b: parseInt(bShort + bShort, 16),
+                    a: length === 4 ? parseInt(aShort + aShort, 16) / 255 : 1
+                };
+            }
+
+            if (length === 6 || length === 8) {
+                var r = parseInt(hex.substr(0, 2), 16);
+                var g = parseInt(hex.substr(2, 2), 16);
+                var b = parseInt(hex.substr(4, 2), 16);
+                var a = length === 8 ? parseInt(hex.substr(6, 2), 16) / 255 : 1;
+
+                return { r: r, g: g, b: b, a: a };
+            }
+
+            return null;
+        }
+
+        var match = trimmed.match(/^rgba?\(\s*([0-9]{1,3})\s*,\s*([0-9]{1,3})\s*,\s*([0-9]{1,3})(?:\s*,\s*([0-9]*\.?[0-9]+))?\s*\)$/i);
+
+        if (!match) {
+            return null;
+        }
+
+        var red = discordBotJlgClamp(parseInt(match[1], 10), 0, 255);
+        var green = discordBotJlgClamp(parseInt(match[2], 10), 0, 255);
+        var blue = discordBotJlgClamp(parseInt(match[3], 10), 0, 255);
+        var alpha = typeof match[4] !== 'undefined' ? discordBotJlgClamp(parseFloat(match[4]), 0, 1) : 1;
+
+        return { r: red, g: green, b: blue, a: alpha };
+    }
+
+    function discordBotJlgAlphaComposite(foreground, background) {
+        var fgAlpha = typeof foreground.a === 'number' ? discordBotJlgClamp(foreground.a, 0, 1) : 1;
+        var bgAlpha = typeof background.a === 'number' ? discordBotJlgClamp(background.a, 0, 1) : 1;
+        var outAlpha = fgAlpha + bgAlpha * (1 - fgAlpha);
+
+        if (outAlpha <= 0) {
+            outAlpha = 1;
+        }
+
+        var compose = function (fgValue, bgValue) {
+            var fgChannel = discordBotJlgClamp(typeof fgValue === 'number' ? fgValue : 0, 0, 255);
+            var bgChannel = discordBotJlgClamp(typeof bgValue === 'number' ? bgValue : 0, 0, 255);
+            var value = (fgChannel * fgAlpha) + (bgChannel * bgAlpha * (1 - fgAlpha));
+
+            return Math.round(value / outAlpha);
+        };
+
+        return {
+            r: compose(foreground.r, background.r),
+            g: compose(foreground.g, background.g),
+            b: compose(foreground.b, background.b),
+            a: outAlpha
+        };
+    }
+
+    function discordBotJlgRelativeLuminance(color) {
+        if (!color || typeof color.r === 'undefined' || typeof color.g === 'undefined' || typeof color.b === 'undefined') {
+            return null;
+        }
+
+        var normalizeChannel = function (value) {
+            var channel = discordBotJlgClamp(value, 0, 255) / 255;
+
+            if (channel <= 0.03928) {
+                return channel / 12.92;
+            }
+
+            return Math.pow((channel + 0.055) / 1.055, 2.4);
+        };
+
+        var r = normalizeChannel(color.r);
+        var g = normalizeChannel(color.g);
+        var b = normalizeChannel(color.b);
+
+        return (0.2126 * r) + (0.7152 * g) + (0.0722 * b);
+    }
+
+    function discordBotJlgContrastRatio(foregroundColor, backgroundColor) {
+        var fg = discordBotJlgParseColor(foregroundColor);
+        var bg = discordBotJlgParseColor(backgroundColor);
+
+        if (!fg || !bg) {
+            return null;
+        }
+
+        if (typeof bg.a === 'number' && bg.a < 1) {
+            bg = discordBotJlgAlphaComposite(bg, { r: 255, g: 255, b: 255, a: 1 });
+        }
+
+        if (typeof fg.a === 'number' && fg.a < 1) {
+            fg = discordBotJlgAlphaComposite(fg, bg);
+        }
+
+        var fgLuminance = discordBotJlgRelativeLuminance(fg);
+        var bgLuminance = discordBotJlgRelativeLuminance(bg);
+
+        if (fgLuminance === null || bgLuminance === null) {
+            return null;
+        }
+
+        var lighter = Math.max(fgLuminance, bgLuminance);
+        var darker = Math.min(fgLuminance, bgLuminance);
+
+        return (lighter + 0.05) / (darker + 0.05);
+    }
+
+    function discordBotJlgPickAutoTextColor(backgroundColor) {
+        if (!backgroundColor || typeof backgroundColor !== 'string') {
+            return '';
+        }
+
+        var sanitized = backgroundColor.trim();
+
+        if (!sanitized) {
+            return '';
+        }
+
+        var light = '#ffffff';
+        var dark = '#0b1120';
+        var candidates = [light, dark];
+        var bestColor = '';
+        var bestRatio = 0;
+        var bestMeets = false;
+
+        for (var i = 0; i < candidates.length; i++) {
+            var candidate = candidates[i];
+            var ratio = discordBotJlgContrastRatio(candidate, sanitized);
+
+            if (ratio === null) {
+                continue;
+            }
+
+            var meets = ratio >= 4.5;
+
+            if (meets) {
+                if (!bestMeets || ratio > bestRatio) {
+                    bestColor = candidate;
+                    bestRatio = ratio;
+                    bestMeets = true;
+                }
+            } else if (!bestMeets && ratio > bestRatio) {
+                bestColor = candidate;
+                bestRatio = ratio;
+            }
+        }
+
+        if (bestColor) {
+            return bestColor;
+        }
+
+        var components = discordBotJlgParseColor(sanitized);
+        if (components) {
+            if (typeof components.a === 'number' && components.a < 1) {
+                components = discordBotJlgAlphaComposite(components, { r: 255, g: 255, b: 255, a: 1 });
+            }
+
+            var luminance = discordBotJlgRelativeLuminance(components);
+
+            if (luminance !== null) {
+                return luminance > 0.5 ? dark : light;
+            }
+        }
+
+        return dark;
+    }
+
     if (!BlockControls) {
         BlockControls = function (props) {
             return createElement(Fragment, null, props && props.children);
@@ -840,12 +1049,20 @@
         }
         style['--discord-radius'] = radiusValue + 'px';
 
+        var autoTextColor = '';
+
         if (previewAttributes.stat_bg_color) {
             style['--discord-surface-background'] = previewAttributes.stat_bg_color;
+
+            if (!previewAttributes.stat_text_color) {
+                autoTextColor = discordBotJlgPickAutoTextColor(previewAttributes.stat_bg_color);
+            }
         }
 
         if (previewAttributes.stat_text_color) {
             style['--discord-surface-text'] = previewAttributes.stat_text_color;
+        } else if (autoTextColor) {
+            style['--discord-surface-text'] = autoTextColor;
         }
 
         if (previewAttributes.accent_color) {
