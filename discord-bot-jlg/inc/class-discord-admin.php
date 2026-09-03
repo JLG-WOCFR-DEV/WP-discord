@@ -14,7 +14,6 @@ class Discord_Bot_JLG_Admin {
 
     private $option_name;
     private $api;
-    private $demo_page_hook_suffix;
     private $forced_setup_step;
     private $event_logger;
     private $api_key_repository;
@@ -32,7 +31,6 @@ class Discord_Bot_JLG_Admin {
     public function __construct($option_name, Discord_Bot_JLG_API $api, $event_logger = null) {
         $this->option_name = $option_name;
         $this->api         = $api;
-        $this->demo_page_hook_suffix = '';
         $this->forced_setup_step    = '';
         $this->event_logger = ($event_logger instanceof Discord_Bot_JLG_Event_Logger)
             ? $event_logger
@@ -51,36 +49,14 @@ class Discord_Bot_JLG_Admin {
      * @return void
      */
     public function add_admin_menu() {
-        $discord_icon = 'data:image/svg+xml;base64,PHN2ZyB2aWV3Qm94PSIwIDAgMjQgMjQiIHhtbG5zPSJodHRwOi8vd3d3LnczLm9yZy8yMDAwL3N2ZyI+PHBhdGggZmlsbD0iI2E0YWFiOCIgZD0iTTIwLjMxNyA0LjM3YTE5LjggMTkuOCAwIDAwLTQuODg1LTEuNTE1LjA3NC4wNzQgMCAwMC0uMDc5LjAzN2MtLjIxLjM3NS0uNDQ0Ljg2NC0uNjA4IDEuMjVhMTguMjcgMTguMjcgMCAwMC01LjQ4NyAwYy0uMTY1LS4zOTctLjQwNC0uODg1LS42MTgtMS4yNWEuMDc3LjA3NyAwIDAwLS4wNzktLjAzN0ExOS43NCAxOS43NCAwIDAwMy42NzcgNC4zN2EuMDcuMDcgMCAwMC0uMDMyLjAyN0MuNTMzIDkuMDQ2LS4zMiAxMy41OC4wOTkgMTguMDU3YS4wOC4wOCAwIDAwLjAzMS4wNTdBMTkuOSAxOS45IDAgMDA2LjA3MyAyMWEuMDc4LjA3OCAwIDAwLjA4NC0uMDI4IDEzLjQgMTMuNCAwIDAwMS4xNTUtMi4xLjA3Ni4wNzYgMCAwMC0uMDQxLS4xMDYgMTMuMSAxMy4xIDAgMDEtMS44NzItLjg5Mi4wNzcuMDc3IDAgMDEtLjAwOC0uMTI4IDE0IDE0IDAgMDAuMzctLjI5Mi4wNzQuMDc0IDAgMDEuMDc3LS4wMWMzLjkyNyAxLjc5MyA4LjE4IDEuNzkzIDEyLjA2IDAgYS4wNzQuMDc0IDAgMDEuMDc4LjAwOS4xMTkuMDk5LjI0Ni4xOTguMzczLjI5MmEuMDc3LjA3NyAwIDAxLS4wMDYuMTI3IDEyLjMgMTIuMyAwIDAxLTEuODczLjg5Mi4wNzcuMDc3IDAgMDAtLjA0MS4xMDdjMy43NDQgMS40MDMgMS4xNTUgMi4xLS4wODQuMDI4YS4wNzguMDc4IDAgMDAxOS45MDItMS45MDMuMDc2LjA3NiAwIDAwLjAzLS4wNTdjLjUzNy00LjU4LS45MDQtOC41NTMtMy44MjMtMTIuMDU3YS4wNi4wNiAwIDAwLS4wMzEtLjAyOHpNOC4wMiAxNS4yNzhjLTEuMTgzIDAtMi4xNTctMS4wODUtMi4xNTctMi40MiAwLTEuMzMzLjk1Ni0yLjQxOSAyLjE1Ny0yLjQxOSAxLjIxIDAgMi4xNzYgMS4wOTYgMi4xNTcgMi40MiAwIDEuMzM0LS45NTYgMi40MTktMi4xNTcgMi40MTl6bTcuOTc1IDBjLTEuMTgzIDAtMi4xNTctMS4wODUtMi4xNTctMi40MiAwLTEuMzMzLjk1NS0yLjQxOSAyLjE1Ny0yLjQxOXMyLjE1NyAxLjA5NiAyLjE1NyAyLjQyYzAgMS4zMzQtLjk1NiAyLjQxOS0yLjE1NyAyLjQxOXoiLz48L3N2Zz4=';
-
         $manage_settings_cap = Discord_Bot_JLG_Capabilities::get_capability('manage_settings');
 
-        add_menu_page(
+        add_options_page(
             __('Discord Bot - JLG', 'discord-bot-jlg'),
             __('Discord Bot', 'discord-bot-jlg'),
             $manage_settings_cap,
             'discord-bot-jlg',
-            array($this, 'options_page'),
-            $discord_icon,
-            30
-        );
-
-        add_submenu_page(
-            'discord-bot-jlg',
-            __('Configuration', 'discord-bot-jlg'),
-            __('Configuration', 'discord-bot-jlg'),
-            $manage_settings_cap,
-            'discord-bot-jlg',
             array($this, 'options_page')
-        );
-
-        $this->demo_page_hook_suffix = add_submenu_page(
-            'discord-bot-jlg',
-            __('Guide & Démo', 'discord-bot-jlg'),
-            __('Guide & Démo', 'discord-bot-jlg'),
-            $manage_settings_cap,
-            'discord-bot-demo',
-            array($this, 'demo_page')
         );
     }
 
@@ -851,9 +827,13 @@ class Discord_Bot_JLG_Admin {
         }
 
         if (array_key_exists('analytics_alert_webhook_secret', $input)) {
-            $sanitized['analytics_alert_webhook_secret'] = $this->sanitize_alert_webhook_secret(
-                $input['analytics_alert_webhook_secret']
-            );
+            $raw_secret = is_string($input['analytics_alert_webhook_secret'])
+                ? trim($input['analytics_alert_webhook_secret'])
+                : '';
+
+            if ('' !== $raw_secret && '••••' !== $raw_secret) {
+                $sanitized['analytics_alert_webhook_secret'] = $this->sanitize_alert_webhook_secret($raw_secret);
+            }
         }
 
         if (array_key_exists('analytics_alert_cooldown', $input)) {
@@ -2589,16 +2569,16 @@ class Discord_Bot_JLG_Admin {
 
     public function analytics_alert_webhook_secret_render() {
         $options = get_option($this->option_name);
-        $value = isset($options['analytics_alert_webhook_secret'])
-            ? sanitize_text_field($options['analytics_alert_webhook_secret'])
-            : '';
+        $has_secret = !empty($options['analytics_alert_webhook_secret']);
         ?>
-        <input type="text"
+        <input type="password"
                name="<?php echo esc_attr($this->option_name); ?>[analytics_alert_webhook_secret]"
-               value="<?php echo esc_attr($value); ?>"
+               value=""
                class="regular-text"
-               maxlength="128" />
-        <p class="description"><?php esc_html_e('Clé secrète utilisée pour valider la signature HMAC des webhooks entrants.', 'discord-bot-jlg'); ?></p>
+               maxlength="128"
+               autocomplete="new-password"
+               <?php if ($has_secret) : ?>placeholder="••••"<?php endif; ?> />
+        <p class="description"><?php esc_html_e('Clé secrète utilisée pour valider la signature HMAC des webhooks entrants. Laissez ce champ vide pour conserver la valeur actuelle.', 'discord-bot-jlg'); ?></p>
         <?php
     }
 
@@ -2629,7 +2609,7 @@ class Discord_Bot_JLG_Admin {
 
         ?>
         <div class="wrap">
-            <h1><?php esc_html_e('🎮 Discord Bot - JLG - Configuration', 'discord-bot-jlg'); ?></h1>
+            <h1><?php esc_html_e('Discord Bot - JLG - Configuration', 'discord-bot-jlg'); ?></h1>
             <?php settings_errors('discord_stats_settings'); ?>
             <?php $this->handle_test_connection_request(); ?>
 
@@ -2963,6 +2943,12 @@ class Discord_Bot_JLG_Admin {
                 'icon'           => '📊',
                 'render_callback'=> array($this, 'render_monitoring_dashboard'),
                 'sidebar_panels' => array('monitoring_help'),
+            ),
+            'guide'        => array(
+                'label'          => __('Guide & Démo', 'discord-bot-jlg'),
+                'icon'           => '',
+                'render_callback'=> array($this, 'demo_page'),
+                'sidebar_panels' => array('quick_links'),
             ),
         );
 
@@ -4375,8 +4361,8 @@ class Discord_Bot_JLG_Admin {
                 <h3 class="discord-admin-card__title"><?php esc_html_e('🚀 Liens rapides', 'discord-bot-jlg'); ?></h3>
                 <ul class="discord-quick-links">
                     <li>
-                        <a href="<?php echo esc_url(admin_url('admin.php?page=discord-bot-demo')); ?>" class="button button-primary button-block">
-                            <?php esc_html_e('📖 Guide & Démo', 'discord-bot-jlg'); ?>
+                        <a href="<?php echo esc_url(admin_url('admin.php?page=discord-bot-jlg&tab=guide')); ?>" class="button button-primary button-block">
+                            <?php esc_html_e('Guide & Démo', 'discord-bot-jlg'); ?>
                         </a>
                     </li>
                     <li>
@@ -4420,7 +4406,7 @@ class Discord_Bot_JLG_Admin {
                     <li><?php esc_html_e('Bannière e-sport : accent sur les présences et l’appel à l’action.', 'discord-bot-jlg'); ?></li>
                     <li><?php esc_html_e('Mode compact minimal : idéal pour les sidebars.', 'discord-bot-jlg'); ?></li>
                 </ul>
-                <a class="button button-secondary" href="<?php echo esc_url(admin_url('admin.php?page=discord-bot-demo')); ?>">
+                <a class="button button-secondary" href="<?php echo esc_url(admin_url('admin.php?page=discord-bot-jlg&tab=guide')); ?>">
                     <?php esc_html_e('Voir les aperçus', 'discord-bot-jlg'); ?>
                 </a>
             </div>
@@ -4510,8 +4496,7 @@ class Discord_Bot_JLG_Admin {
      */
     public function demo_page() {
         ?>
-        <div class="wrap">
-            <h1><?php esc_html_e('📖 Guide & Démonstration', 'discord-bot-jlg'); ?></h1>
+            <h2><?php esc_html_e('Guide & Démonstration', 'discord-bot-jlg'); ?></h2>
             <?php $this->render_demo_intro_notice(); ?>
 
             <?php $this->render_demo_analytics_overview(); ?>
@@ -4530,7 +4515,6 @@ class Discord_Bot_JLG_Admin {
             $this->render_demo_troubleshooting();
             $this->render_demo_footer_note();
             ?>
-        </div>
         <?php
     }
 
@@ -4850,18 +4834,19 @@ class Discord_Bot_JLG_Admin {
      */
     public function enqueue_admin_styles($hook_suffix) {
         $allowed_ids = array(
+            'settings_page_discord-bot-jlg',
             'toplevel_page_discord-bot-jlg',
-            'discord-bot-jlg_page_discord-bot-demo',
         );
 
-        if (!empty($this->demo_page_hook_suffix) && !in_array($this->demo_page_hook_suffix, $allowed_ids, true)) {
-            $allowed_ids[] = $this->demo_page_hook_suffix;
-        }
-
+        $current_screen = null;
         if (function_exists('get_current_screen')) {
             $current_screen = get_current_screen();
 
             if ($current_screen && !in_array($current_screen->id, $allowed_ids, true)) {
+                return;
+            }
+
+            if (!$current_screen && !in_array($hook_suffix, $allowed_ids, true)) {
                 return;
             }
         } elseif (!in_array($hook_suffix, $allowed_ids, true)) {
@@ -4877,7 +4862,11 @@ class Discord_Bot_JLG_Admin {
             DISCORD_BOT_JLG_VERSION
         );
 
-        if (empty($current_screen) || $current_screen->id !== 'discord-bot-jlg_page_discord-bot-demo') {
+        $current_tab = isset($_GET['tab']) // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- lecture seule.
+            ? sanitize_key(wp_unslash($_GET['tab']))
+            : '';
+
+        if ('guide' !== $current_tab) {
             return;
         }
 

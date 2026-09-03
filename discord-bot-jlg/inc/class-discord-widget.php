@@ -234,7 +234,13 @@ class Discord_Stats_Widget extends WP_Widget {
         $bot_token_override = isset($new_instance['bot_token_override'])
             ? sanitize_text_field($new_instance['bot_token_override'])
             : '';
-        $instance['bot_token_override'] = $bot_token_override;
+        if ('' === $bot_token_override) {
+            $instance['bot_token_override'] = isset($old_instance['bot_token_override'])
+                ? sanitize_text_field($old_instance['bot_token_override'])
+                : '';
+        } else {
+            $instance['bot_token_override'] = $bot_token_override;
+        }
 
         return $instance;
     }
@@ -439,8 +445,11 @@ class Discord_Stats_Widget extends WP_Widget {
             <p>
                 <label for="<?php echo esc_attr($this->get_field_id('bot_token_override')); ?>"><?php esc_html_e('Token du bot (prioritaire)', 'discord-bot-jlg'); ?></label>
                 <input class="widefat" id="<?php echo esc_attr($this->get_field_id('bot_token_override')); ?>"
-                       name="<?php echo esc_attr($this->get_field_name('bot_token_override')); ?>" type="text"
-                       value="<?php echo esc_attr($instance['bot_token_override']); ?>" autocomplete="off" />
+                       name="<?php echo esc_attr($this->get_field_name('bot_token_override')); ?>" type="password"
+                       value="" autocomplete="new-password" />
+            </p>
+            <p class="description">
+                <?php esc_html_e('Laissez ce champ vide pour conserver le token actuel.', 'discord-bot-jlg'); ?>
             </p>
 
             <p class="description">

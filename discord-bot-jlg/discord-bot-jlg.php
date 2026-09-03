@@ -200,7 +200,6 @@ class DiscordServerStats {
     private $rest_controller;
     private $analytics;
     private $event_logger;
-    private $token_store;
     private $options_repository;
     private $job_queue;
     private $alerts;
@@ -215,7 +214,7 @@ class DiscordServerStats {
 
         $this->analytics = new Discord_Bot_JLG_Analytics();
         $this->event_logger = new Discord_Bot_JLG_Event_Logger();
-        $this->token_store = new Discord_Bot_JLG_Token_Store();
+        // Tokens remain in options until a dedicated Token_Store migration.
         $this->options_repository = new Discord_Bot_JLG_Options_Repository(
             DISCORD_BOT_JLG_OPTION_NAME,
             'discord_bot_jlg_get_default_options'
