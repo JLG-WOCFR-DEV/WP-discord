@@ -894,10 +894,21 @@ function apply_filters($hook, $value, ...$args) {
 require_once __DIR__ . '/../../discord-bot-jlg.php';
 
 function wp_safe_remote_get($url, $args = array()) {
-    $GLOBALS['wp_test_last_remote_request'] = array(
+    $request = array(
         'url'  => $url,
         'args' => $args,
     );
+
+    if (!isset($GLOBALS['wp_test_remote_requests']) || !is_array($GLOBALS['wp_test_remote_requests'])) {
+        $GLOBALS['wp_test_remote_requests'] = array();
+    }
+
+    $GLOBALS['wp_test_remote_requests'][] = $request;
+    $GLOBALS['wp_test_last_remote_request'] = $request;
+
+    if (isset($GLOBALS['wp_test_remote_queue']) && is_array($GLOBALS['wp_test_remote_queue']) && $GLOBALS['wp_test_remote_queue']) {
+        return array_shift($GLOBALS['wp_test_remote_queue']);
+    }
 
     return array(
         'response' => array(

@@ -150,4 +150,35 @@ class Test_Discord_Bot_JLG_Site_Health extends TestCase {
             strip_tags($result['description'])
         );
     }
+
+    public function test_token_rotation_is_good_when_no_token_is_configured() {
+        update_option(DISCORD_BOT_JLG_OPTION_NAME, array('server_id' => '1'));
+
+        $api = $this->create_api();
+        $site_health = new Discord_Bot_JLG_Site_Health($api);
+
+        $result = $site_health->run_token_rotation_test();
+
+        $this->assertSame('good', $result['status']);
+    }
+
+    public function test_token_rotation_is_critical_when_token_expired() {
+        update_option(
+            DISCORD_BOT_JLG_OPTION_NAME,
+            array(
+                'bot_token'            => 'encrypted-token',
+                'bot_token_status'     => 'expired',
+                'bot_token_rotated_at' => 1,
+                'bot_token_expires_at' => 10,
+            )
+        );
+
+        $api = $this->create_api();
+        $site_health = new Discord_Bot_JLG_Site_Health($api);
+
+        $result = $site_health->run_token_rotation_test();
+
+        $this->assertSame('critical', $result['status']);
+        $this->assertStringContainsString('fenêtre de rotation', strip_tags($result['description']));
+    }
 }

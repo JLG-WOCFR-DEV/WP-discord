@@ -100,4 +100,116 @@ class Discord_Bot_JLG_CLI {
         $this->api->clear_all_cached_data();
         \WP_CLI::success(__('Tous les caches Discord Bot JLG et les traces de secours ont été vidés.', 'discord-bot-jlg'));
     }
+
+    /**
+     * Enregistre un nouveau token Discord et horodate sa rotation.
+     *
+     * ## OPTIONS
+     *
+     * [--profile=<profile>]
+     * : Clé du profil (`default` pour la configuration générale).
+     *
+     * [--token=<token>]
+     * : Nouveau token en clair. Requis.
+     *
+     * ## EXAMPLES
+     *
+     *     wp discord-bot rotate-token --token=NEWTOKEN
+     *     wp discord-bot rotate-token --profile=community --token=NEWTOKEN
+     *
+     * @when after_wp_load
+     *
+     * @param array $args
+     * @param array $assoc_args
+     *
+     * @return void
+     */
+    public function rotate_token($args, $assoc_args) {
+        $token = isset($assoc_args['token']) ? trim((string) $assoc_args['token']) : '';
+
+        if ('' === $token) {
+            \WP_CLI::error(__('Fournissez --token=<nouveau jeton>.', 'discord-bot-jlg'));
+            return;
+        }
+
+        $profile = isset($assoc_args['profile']) ? sanitize_key((string) $assoc_args['profile']) : 'default';
+
+        if ('' === $profile) {
+            $profile = 'default';
+        }
+
+        $encrypted = discord_bot_jlg_encrypt_secret($token);
+
+        if (is_wp_error($encrypted)) {
+            \WP_CLI::error($encrypted->get_error_message());
+            return;
+        }
+
+        $now = function_exists('current_time') ? (int) current_time('timestamp') : time();
+        $max_age_days = defined('DAY_IN_SECONDS') && class_exists('Discord_Bot_JLG_Admin')
+            ? (int) Discord_Bot_JLG_Admin::SECRET_ROTATION_MAX_AGE_DAYS
+            : 90;
+        $expires_at = $now + ($max_age_days * (defined('DAY_IN_SECONDS') ? DAY_IN_SECONDS : 86400));
+
+        $store = new Discord_Bot_JLG_Token_Store();
+        $store->install();
+        $saved = $store->save_token(
+            $profile,
+            array(
+                'token'      => $encrypted,
+                'rotated_at' => $now,
+                'expires_at' => $expires_at,
+                'status'     => 'active',
+            )
+        );
+
+        if (!$saved) {
+            \WP_CLI::error(__('Impossible d’enregistrer le token dans le magasin de secrets.', 'discord-bot-jlg'));
+            return;
+        }
+
+        $options = $this->api->get_plugin_options(true);
+
+        if (!is_array($options)) {
+            $options = array();
+        }
+
+        if ('default' === $profile) {
+            $options['bot_token'] = $encrypted;
+            $options['bot_token_rotated_at'] = $now;
+            $options['bot_token_expires_at'] = $expires_at;
+            $options['bot_token_status'] = 'active';
+        } else {
+            if (!isset($options['server_profiles']) || !is_array($options['server_profiles'])) {
+                $options['server_profiles'] = array();
+            }
+
+            if (!isset($options['server_profiles'][$profile]) || !is_array($options['server_profiles'][$profile])) {
+                $options['server_profiles'][$profile] = array();
+            }
+
+            $options['server_profiles'][$profile]['bot_token'] = $encrypted;
+            $options['server_profiles'][$profile]['bot_token_rotated_at'] = $now;
+            $options['server_profiles'][$profile]['bot_token_expires_at'] = $expires_at;
+            $options['server_profiles'][$profile]['bot_token_status'] = 'active';
+        }
+
+        $option_name = defined('DISCORD_BOT_JLG_OPTION_NAME')
+            ? DISCORD_BOT_JLG_OPTION_NAME
+            : 'discord_bot_jlg_options';
+
+        update_option($option_name, $options);
+
+        if (method_exists($this->api, 'clear_all_cached_data')) {
+            $this->api->clear_all_cached_data();
+        }
+
+        \WP_CLI::success(
+            sprintf(
+                /* translators: %s: profile key. */
+                __('Token Discord rotaté pour le profil « %s ».', 'discord-bot-jlg'),
+                $profile
+            )
+        );
+    }
 }

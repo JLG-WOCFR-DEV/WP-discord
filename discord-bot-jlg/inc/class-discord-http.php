@@ -82,53 +82,32 @@ class Discord_Bot_JLG_Http_Client {
         }
 
         $request_id = $this->generate_request_id($context);
+        $max_retries = (int) apply_filters('discord_bot_jlg_http_max_retries', 1, $url, $context, $args);
 
-        /**
-         * Permet de court-circuiter un appel HTTP avant son exécution.
-         *
-         * Retournez un tableau de réponse (`wp_safe_remote_get`) ou un `WP_Error` pour interrompre
-         * l'appel réseau et fournir une réponse personnalisée (ex. cache applicatif, circuit breaker).
-         *
-         * @since 1.2.0
-         *
-         * @param array|WP_Error|null $preempt    Valeur de préemption. Null pour poursuivre l'appel standard.
-         * @param string              $url        URL ciblée.
-         * @param array               $args       Arguments finaux transmis à `wp_safe_remote_get()`.
-         * @param string              $context    Contexte fonctionnel (`widget`, `bot`, ...).
-         * @param string              $request_id Identifiant unique de la requête.
-         */
-        $preempt = apply_filters(
-            'discord_bot_jlg_pre_http_request',
-            null,
-            $url,
-            $args,
-            $context,
-            $request_id
-        );
-
-        /**
-         * Se déclenche avant l'exécution d'un appel HTTP Discord.
-         *
-         * Peut être utilisé pour initialiser un traceur distribué, enregistrer des métriques ou enrichir
-         * un journal externe.
-         *
-         * @since 1.2.0
-         *
-         * @param string $url        URL ciblée.
-         * @param array  $args       Arguments transmis à `wp_safe_remote_get()`.
-         * @param string $context    Contexte fonctionnel (`widget`, `bot`, ...).
-         * @param string $request_id Identifiant unique de la requête.
-         */
-        do_action('discord_bot_jlg_before_http_request', $url, $args, $context, $request_id);
-
-        if (null !== $preempt) {
-            $response = $preempt;
-            $duration_ms = 0;
-        } else {
-            $start_time = microtime(true);
-            $response = wp_safe_remote_get($url, $args);
-            $duration_ms = $this->calculate_duration_ms($start_time);
+        if ($max_retries < 0) {
+            $max_retries = 0;
         }
+
+        $attempt = 0;
+        $response = null;
+        $duration_ms = 0;
+
+        do {
+            $attempt_request_id = $attempt > 0
+                ? $request_id . '_retry' . $attempt
+                : $request_id;
+
+            $result = $this->execute_request($url, $args, $context, $attempt_request_id);
+            $response = $result['response'];
+            $duration_ms += $result['duration_ms'];
+
+            if (!$this->should_retry($response, $attempt, $max_retries)) {
+                break;
+            }
+
+            $this->wait_before_retry($response, $attempt, $url, $context);
+            $attempt++;
+        } while ($attempt <= $max_retries);
 
         /**
          * Filtre la réponse HTTP renvoyée par l'appel Discord.
@@ -175,6 +154,163 @@ class Discord_Bot_JLG_Http_Client {
         );
 
         return $response;
+    }
+
+    /**
+     * Executes a single HTTP attempt, including preemption hooks.
+     *
+     * @param string $url
+     * @param array  $args
+     * @param string $context
+     * @param string $request_id
+     *
+     * @return array{response:array|WP_Error,duration_ms:int}
+     */
+    private function execute_request($url, array $args, $context, $request_id) {
+        $preempt = apply_filters(
+            'discord_bot_jlg_pre_http_request',
+            null,
+            $url,
+            $args,
+            $context,
+            $request_id
+        );
+
+        do_action('discord_bot_jlg_before_http_request', $url, $args, $context, $request_id);
+
+        if (null !== $preempt) {
+            return array(
+                'response'    => $preempt,
+                'duration_ms' => 0,
+            );
+        }
+
+        $start_time = microtime(true);
+        $response = wp_safe_remote_get($url, $args);
+
+        return array(
+            'response'    => $response,
+            'duration_ms' => $this->calculate_duration_ms($start_time),
+        );
+    }
+
+    /**
+     * @param array|WP_Error $response
+     * @param int            $attempt
+     * @param int            $max_retries
+     */
+    private function should_retry($response, $attempt, $max_retries) {
+        if ($attempt >= $max_retries) {
+            return false;
+        }
+
+        $status = 0;
+        $retry_after = $this->extract_retry_after_seconds($response);
+
+        if (is_wp_error($response)) {
+            $code = $response->get_error_code();
+            $retryable = in_array($code, array('http_request_failed', 'http_failure', 'http_request_timeout'), true);
+
+            return (bool) apply_filters(
+                'discord_bot_jlg_http_should_retry',
+                $retryable,
+                $response,
+                $attempt,
+                $retry_after
+            );
+        }
+
+        if (is_array($response) && function_exists('wp_remote_retrieve_response_code')) {
+            $status = (int) wp_remote_retrieve_response_code($response);
+        } elseif (is_array($response) && isset($response['response']['code'])) {
+            $status = (int) $response['response']['code'];
+        }
+
+        $retryable = (429 === $status || $status >= 500);
+
+        if ($retryable && $retry_after > 0) {
+            $max_immediate = (int) apply_filters('discord_bot_jlg_http_max_immediate_retry_seconds', 2, $status, $attempt);
+
+            if ($max_immediate < 0) {
+                $max_immediate = 0;
+            }
+
+            if ($retry_after > $max_immediate) {
+                $retryable = false;
+            }
+        }
+
+        return (bool) apply_filters(
+            'discord_bot_jlg_http_should_retry',
+            $retryable,
+            $response,
+            $attempt,
+            $retry_after
+        );
+    }
+
+    /**
+     * @param array|WP_Error $response
+     */
+    private function wait_before_retry($response, $attempt, $url, $context) {
+        $delay = $this->extract_retry_after_seconds($response);
+
+        if ($delay <= 0) {
+            $delay = (int) min(2, pow(2, max(0, $attempt)));
+        }
+
+        $sleep = (int) apply_filters(
+            'discord_bot_jlg_http_retry_sleep_seconds',
+            $delay,
+            $attempt,
+            $url,
+            $context
+        );
+
+        if ($sleep > 0) {
+            sleep($sleep);
+        }
+    }
+
+    /**
+     * @param array|WP_Error $response
+     *
+     * @return int
+     */
+    private function extract_retry_after_seconds($response) {
+        if (is_wp_error($response) || !is_array($response)) {
+            return 0;
+        }
+
+        $header = '';
+
+        if (function_exists('wp_remote_retrieve_header')) {
+            $header = (string) wp_remote_retrieve_header($response, 'Retry-After');
+        } elseif (isset($response['headers']['Retry-After'])) {
+            $header = (string) $response['headers']['Retry-After'];
+        } elseif (isset($response['headers']['retry-after'])) {
+            $header = (string) $response['headers']['retry-after'];
+        }
+
+        $header = trim($header);
+
+        if ('' === $header) {
+            return 0;
+        }
+
+        if (is_numeric($header)) {
+            $seconds = (int) ceil((float) $header);
+
+            return max(0, $seconds);
+        }
+
+        $timestamp = strtotime($header);
+
+        if (false === $timestamp) {
+            return 0;
+        }
+
+        return max(0, $timestamp - time());
     }
 
     private function generate_request_id($context) {

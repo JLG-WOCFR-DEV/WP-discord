@@ -43,6 +43,11 @@ class Discord_Bot_JLG_Site_Health {
             'test'  => array($this, 'run_site_health_test'),
         );
 
+        $tests['direct']['discord_bot_jlg_token_rotation'] = array(
+            'label' => __('Rotation des jetons Discord', 'discord-bot-jlg'),
+            'test'  => array($this, 'run_token_rotation_test'),
+        );
+
         return $tests;
     }
 
@@ -153,5 +158,127 @@ class Discord_Bot_JLG_Site_Health {
         $result['description'] = '<p>' . esc_html__('La connexion au serveur Discord fonctionne normalement.', 'discord-bot-jlg') . '</p>';
 
         return $result;
+    }
+
+    /**
+     * Checks whether Discord bot tokens are within the rotation window.
+     *
+     * @return array
+     */
+    public function run_token_rotation_test() {
+        $result = array(
+            'label'       => __('Rotation des jetons Discord', 'discord-bot-jlg'),
+            'status'      => 'good',
+            'badge'       => array(
+                'label' => __('Discord Bot JLG', 'discord-bot-jlg'),
+                'color' => 'blue',
+            ),
+            'description' => '<p>' . esc_html__('Aucun jeton Discord à surveiller, ou les rotations sont à jour.', 'discord-bot-jlg') . '</p>',
+            'test'        => 'discord_bot_jlg_token_rotation',
+        );
+
+        $options = $this->api->get_plugin_options();
+
+        if (!is_array($options)) {
+            $options = array();
+        }
+
+        $now = function_exists('current_time') ? (int) current_time('timestamp') : time();
+        $issues = array();
+
+        $this->collect_token_rotation_issue(
+            $issues,
+            __('configuration principale', 'discord-bot-jlg'),
+            isset($options['bot_token']) ? (string) $options['bot_token'] : '',
+            isset($options['bot_token_status']) ? (string) $options['bot_token_status'] : '',
+            isset($options['bot_token_rotated_at']) ? (int) $options['bot_token_rotated_at'] : 0,
+            isset($options['bot_token_expires_at']) ? (int) $options['bot_token_expires_at'] : 0,
+            $now
+        );
+
+        $profiles = isset($options['server_profiles']) && is_array($options['server_profiles'])
+            ? $options['server_profiles']
+            : array();
+
+        foreach ($profiles as $profile_key => $profile) {
+            if (!is_array($profile)) {
+                continue;
+            }
+
+            $label = isset($profile['label']) && is_string($profile['label']) && $profile['label'] !== ''
+                ? $profile['label']
+                : (string) $profile_key;
+
+            $this->collect_token_rotation_issue(
+                $issues,
+                $label,
+                isset($profile['bot_token']) ? (string) $profile['bot_token'] : '',
+                isset($profile['bot_token_status']) ? (string) $profile['bot_token_status'] : '',
+                isset($profile['bot_token_rotated_at']) ? (int) $profile['bot_token_rotated_at'] : 0,
+                isset($profile['bot_token_expires_at']) ? (int) $profile['bot_token_expires_at'] : 0,
+                $now
+            );
+        }
+
+        if (empty($issues)) {
+            return $result;
+        }
+
+        $has_expired = false;
+
+        foreach ($issues as $issue) {
+            if ('expired' === $issue['severity']) {
+                $has_expired = true;
+                break;
+            }
+        }
+
+        $result['status'] = $has_expired ? 'critical' : 'recommended';
+        $lines = array();
+
+        foreach ($issues as $issue) {
+            $lines[] = esc_html($issue['message']);
+        }
+
+        $result['description'] = '<p>' . implode('</p><p>', $lines) . '</p>';
+
+        return $result;
+    }
+
+    /**
+     * @param array  $issues
+     * @param string $label
+     * @param string $token
+     * @param string $status
+     * @param int    $rotated_at
+     * @param int    $expires_at
+     * @param int    $now
+     */
+    private function collect_token_rotation_issue(array &$issues, $label, $token, $status, $rotated_at, $expires_at, $now) {
+        if ('' === $token) {
+            return;
+        }
+
+        if ('expired' === $status || ($expires_at > 0 && $now >= $expires_at)) {
+            $issues[] = array(
+                'severity' => 'expired',
+                'message'  => sprintf(
+                    __('Le jeton Discord pour « %s » a dépassé la fenêtre de rotation.', 'discord-bot-jlg'),
+                    $label
+                ),
+            );
+
+            return;
+        }
+
+        if ($rotated_at <= 0 || 'unknown' === $status) {
+            $issues[] = array(
+                'severity' => 'unknown',
+                'message'  => sprintf(
+                    __('Le jeton Discord pour « %s » n’a pas d’horodatage de rotation. Enregistrez-le de nouveau ou utilisez `wp discord-bot rotate-token`.', 'discord-bot-jlg'),
+                    $label
+                ),
+            );
+        }
     }
 }
