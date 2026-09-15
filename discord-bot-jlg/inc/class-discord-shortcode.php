@@ -1025,6 +1025,10 @@ class Discord_Bot_JLG_Shortcode {
             $attributes[] = sprintf('data-refresh="%s"', esc_attr($refresh_interval));
         }
 
+        if (discord_bot_jlg_is_block_editor_preview_context()) {
+            $attributes[] = 'data-discord-bot-editor="true"';
+        }
+
         if ($cache_duration > 0) {
             $attributes[] = sprintf('data-cache-duration="%d"', (int) $cache_duration);
         }
@@ -2152,7 +2156,7 @@ class Discord_Bot_JLG_Shortcode {
         wp_enqueue_style('discord-bot-jlg');
         wp_enqueue_style('discord-bot-jlg-inline');
 
-        if ($needs_script) {
+        if ($needs_script && discord_bot_jlg_should_enqueue_frontend_script()) {
             wp_enqueue_script('discord-bot-jlg-frontend');
         }
 

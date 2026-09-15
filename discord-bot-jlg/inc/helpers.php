@@ -1258,3 +1258,107 @@ if (!function_exists('discord_bot_jlg_logger_debug')) {
         return true;
     }
 }
+
+if (!function_exists('discord_bot_jlg_is_block_editor_preview_context')) {
+    /**
+     * Detects Gutenberg canvas / block-renderer requests where front JS must not run.
+     *
+     * @return bool
+     */
+    function discord_bot_jlg_is_block_editor_preview_context() {
+        if (function_exists('wp_is_block_editor') && wp_is_block_editor()) {
+            return true;
+        }
+
+        if (function_exists('get_current_screen')) {
+            $screen = get_current_screen();
+            if ($screen && !empty($screen->is_block_editor)) {
+                return true;
+            }
+        }
+
+        if (isset($_GET['canvas'])) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+            $canvas = function_exists('wp_unslash') ? wp_unslash($_GET['canvas']) : $_GET['canvas']; // phpcs:ignore WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+            $canvas = is_string($canvas) ? strtolower($canvas) : '';
+            if ('edit' === $canvas || 0 === strpos($canvas, 'edit')) {
+                return true;
+            }
+        }
+
+        $context = '';
+        if (isset($_REQUEST['context'])) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+            $raw     = $_REQUEST['context']; // phpcs:ignore WordPress.Security.NonceVerification.Recommended, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+            $raw     = function_exists('wp_unslash') ? wp_unslash($raw) : $raw;
+            $context = function_exists('sanitize_key') ? sanitize_key($raw) : strtolower(preg_replace('/[^a-z0-9_\-]/', '', (string) $raw));
+        }
+
+        if ('edit' === $context) {
+            return true;
+        }
+
+        $route = '';
+        if (isset($GLOBALS['wp']) && is_object($GLOBALS['wp']) && isset($GLOBALS['wp']->query_vars['rest_route'])) {
+            $route = (string) $GLOBALS['wp']->query_vars['rest_route'];
+        } elseif (isset($_SERVER['REQUEST_URI'])) { // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized
+            $route = (string) $_SERVER['REQUEST_URI'];
+        }
+
+        if ('' !== $route && false !== strpos($route, 'block-renderer')) {
+            return true;
+        }
+
+        return false;
+    }
+}
+
+if (!function_exists('discord_bot_jlg_should_enqueue_frontend_script')) {
+    /**
+     * Whether the interactive front script should be enqueued.
+     *
+     * @return bool
+     */
+    function discord_bot_jlg_should_enqueue_frontend_script() {
+        if (discord_bot_jlg_is_block_editor_preview_context()) {
+            return false;
+        }
+
+        if (function_exists('is_admin') && is_admin()) {
+            return false;
+        }
+
+        return true;
+    }
+}
+
+if (!function_exists('discord_bot_jlg_enqueue_editor_canvas_guard')) {
+    /**
+     * Flags the WP 6.3+/7.1 iframed editor canvas so front JS stays inert.
+     *
+     * @return void
+     */
+    function discord_bot_jlg_enqueue_editor_canvas_guard() {
+        if (function_exists('is_admin') && !is_admin()) {
+            return;
+        }
+
+        if (!function_exists('wp_register_script') || !function_exists('wp_enqueue_script') || !function_exists('wp_add_inline_script')) {
+            return;
+        }
+
+        $version = defined('DISCORD_BOT_JLG_VERSION') ? DISCORD_BOT_JLG_VERSION : '1.0.1';
+
+        wp_register_script(
+            'discord-bot-jlg-editor-canvas-guard',
+            false,
+            array(),
+            $version,
+            true
+        );
+        wp_enqueue_script('discord-bot-jlg-editor-canvas-guard');
+        wp_add_inline_script(
+            'discord-bot-jlg-editor-canvas-guard',
+            'window.DISCORD_BOT_JLG_IS_EDITOR = true;',
+            'before'
+        );
+    }
+}

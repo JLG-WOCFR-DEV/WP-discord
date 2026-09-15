@@ -6,6 +6,7 @@ Plugin WordPress permettant d'afficher les statistiques d'un serveur Discord.
 - **Objectif** : afficher les statistiques d’un serveur Discord
 - **Auteur** : Jérôme Le Gousse
 - **Licence** : GPLv2
+- **Compatibilité** : WordPress 5.2+, testé jusqu’à 7.1 ; PHP 7.4+
 
 ## Installation
 1. Copier le dossier `discord-bot-jlg` dans `wp-content/plugins/`.

@@ -1890,7 +1890,7 @@ class Discord_Bot_JLG_Admin {
     private function render_api_previews() {
         ?>
         <div class="discord-preview-wrapper">
-            <p class="discord-preview-notice"><?php echo wp_kses_post(__('<strong>💡 Conseil :</strong> Après avoir rempli les champs ci-dessous, utilisez le bouton « Tester la connexion » pour vérifier que tout fonctionne !', 'discord-bot-jlg')); ?></p>
+            <div class="notice notice-info"><p><strong><?php esc_html_e('Conseil :', 'discord-bot-jlg'); ?></strong> <?php esc_html_e('Après avoir rempli les champs ci-dessous, utilisez le bouton « Tester la connexion » pour vérifier que tout fonctionne !', 'discord-bot-jlg'); ?></p></div>
             <div class="discord-preview-list">
                 <?php
                 $this->render_preview_block(
@@ -2889,7 +2889,6 @@ class Discord_Bot_JLG_Admin {
         $tabs = array(
             'connection'   => array(
                 'label'          => __('Connexion', 'discord-bot-jlg'),
-                'icon'           => '🔌',
                 'sections'       => array(
                     array(
                         'id'           => 'discord_stats_api_section',
@@ -2904,7 +2903,6 @@ class Discord_Bot_JLG_Admin {
             ),
             'appearance'   => array(
                 'label'          => __('Apparence', 'discord-bot-jlg'),
-                'icon'           => '🎨',
                 'sections'       => array(
                     array(
                         'id'           => 'discord_stats_display_section',
@@ -2923,7 +2921,6 @@ class Discord_Bot_JLG_Admin {
             ),
             'automation'   => array(
                 'label'          => __('Automatisation', 'discord-bot-jlg'),
-                'icon'           => '⚙️',
                 'sections'       => array(
                     array(
                         'id'           => 'discord_stats_automation_section',
@@ -2934,19 +2931,16 @@ class Discord_Bot_JLG_Admin {
             ),
             'api_keys'    => array(
                 'label'          => __('Clés API', 'discord-bot-jlg'),
-                'icon'           => '🔑',
                 'render_callback'=> array($this, 'render_api_keys_admin_tab'),
                 'sidebar_panels' => array('api_keys_help', 'quick_links'),
             ),
             'monitoring'   => array(
                 'label'          => __('Surveillance', 'discord-bot-jlg'),
-                'icon'           => '📊',
                 'render_callback'=> array($this, 'render_monitoring_dashboard'),
                 'sidebar_panels' => array('monitoring_help'),
             ),
             'guide'        => array(
                 'label'          => __('Guide & Démo', 'discord-bot-jlg'),
-                'icon'           => '',
                 'render_callback'=> array($this, 'demo_page'),
                 'sidebar_panels' => array('quick_links'),
             ),
@@ -3004,27 +2998,17 @@ class Discord_Bot_JLG_Admin {
         foreach ($tabs as $tab_key => $tab) {
             $tab_key   = sanitize_key($tab_key);
             $label     = isset($tab['label']) ? $tab['label'] : '';
-            $icon      = isset($tab['icon']) ? $tab['icon'] : '';
             $is_active = ($tab_key === $current_tab);
             $classes   = 'nav-tab' . ($is_active ? ' nav-tab-active' : '');
             $url       = add_query_arg('tab', $tab_key, $base_url);
 
             printf(
-                "<a class=\"%1\$s\" href=\"%2\$s\" role=\"tab\" aria-selected=\"%3\$s\">",
+                "<a class=\"%1\$s\" href=\"%2\$s\" role=\"tab\" aria-selected=\"%3\$s\">%4\$s</a>",
                 esc_attr($classes),
                 esc_url($url),
-                $is_active ? 'true' : 'false'
+                $is_active ? 'true' : 'false',
+                esc_html($label)
             );
-
-            if ('' !== $icon) {
-                printf(
-                    "<span class=\"discord-bot-tab-icon\" aria-hidden=\"true\">%s</span>",
-                    esc_html($icon)
-                );
-            }
-
-            printf("<span class=\"discord-bot-tab-label\">%s</span>", esc_html($label));
-            echo '</a>';
         }
 
         echo '</nav>';
@@ -4852,8 +4836,6 @@ class Discord_Bot_JLG_Admin {
         } elseif (!in_array($hook_suffix, $allowed_ids, true)) {
             return;
         }
-
-        wp_enqueue_style('wp-components');
 
         wp_enqueue_style(
             'discord-bot-jlg-admin',
