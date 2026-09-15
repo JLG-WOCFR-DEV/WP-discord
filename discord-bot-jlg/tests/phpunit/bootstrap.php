@@ -748,6 +748,34 @@ function wp_style_is($handle, $list = 'enqueued') {
     return false;
 }
 
+function wp_script_is($handle, $list = 'enqueued') {
+    if ('enqueued' === $list) {
+        return !empty($GLOBALS['wp_test_enqueued_scripts'][$handle]);
+    }
+
+    if ('registered' === $list) {
+        return !empty($GLOBALS['wp_test_registered_scripts'][$handle]);
+    }
+
+    return false;
+}
+
+function is_admin() {
+    return !empty($GLOBALS['wp_test_is_admin']);
+}
+
+function wp_is_block_editor() {
+    return !empty($GLOBALS['wp_test_is_block_editor']);
+}
+
+function get_current_screen() {
+    if (isset($GLOBALS['wp_test_current_screen'])) {
+        return $GLOBALS['wp_test_current_screen'];
+    }
+
+    return null;
+}
+
 function wp_print_styles($handle = '') {
     return true;
 }

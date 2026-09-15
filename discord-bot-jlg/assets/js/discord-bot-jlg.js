@@ -5428,9 +5428,30 @@
         });
     }
 
-    function isSiteEditorPreview() {
+    function isEditorCanvas() {
         if (typeof window === 'undefined') {
             return false;
+        }
+
+        if (window.DISCORD_BOT_JLG_IS_EDITOR) {
+            return true;
+        }
+
+        try {
+            if (window.parent && window.parent !== window && window.parent.DISCORD_BOT_JLG_IS_EDITOR) {
+                return true;
+            }
+        } catch (error) {
+            // Cross-origin parent access is ignored.
+        }
+
+        var body = typeof document !== 'undefined' ? document.body : null;
+        if (body && body.classList && body.classList.contains('block-editor-iframe__body')) {
+            return true;
+        }
+
+        if (typeof document !== 'undefined' && document.querySelector && document.querySelector('[data-discord-bot-editor]')) {
+            return true;
         }
 
         var frameElement = null;
@@ -5452,8 +5473,13 @@
                 return true;
             }
 
+            var frameClassName = frameElement.className || '';
+            if (typeof frameClassName === 'string' && frameClassName.indexOf('editor-canvas__iframe') !== -1) {
+                return true;
+            }
+
             var frameName = frameElement.getAttribute ? frameElement.getAttribute('name') : null;
-            if (frameName && frameName.indexOf('site-editor') !== -1) {
+            if (frameName === 'editor-canvas' || (frameName && frameName.indexOf('site-editor') !== -1)) {
                 return true;
             }
         }
@@ -5466,7 +5492,7 @@
             return true;
         }
 
-        if (typeof search === 'string' && search.indexOf('canvas=edit-site%2F') !== -1) {
+        if (typeof search === 'string' && (search.indexOf('canvas=edit') !== -1 || search.indexOf('context=edit') !== -1)) {
             return true;
         }
 
@@ -5478,12 +5504,16 @@
         globalConfig = config;
         var missingFeatures = [];
 
-        applyInitialOverlayClasses();
-
-        if (isSiteEditorPreview()) {
+        if (isEditorCanvas()) {
             config.autoRefreshDisabled = true;
+            if (typeof window !== 'undefined') {
+                window.discordBotJlg = config;
+                window.discordBotJlg.isEditorCanvas = isEditorCanvas;
+            }
             return;
         }
+
+        applyInitialOverlayClasses();
 
         if (typeof window.fetch !== 'function') {
             missingFeatures.push('fetch');
@@ -5823,6 +5853,7 @@
 
         window.discordBotJlgInit = initializeDiscordBot;
         window.discordBotJlg.init = initializeDiscordBot;
+        window.discordBotJlg.isEditorCanvas = isEditorCanvas;
     }
 
     if (document.readyState === 'loading') {

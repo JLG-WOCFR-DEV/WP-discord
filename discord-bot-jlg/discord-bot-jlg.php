@@ -3,8 +3,10 @@
  * Plugin Name: Discord Bot - JLG
  * Plugin URI: https://yourwebsite.com/
  * Description: Affiche les statistiques de votre serveur Discord (membres en ligne et total)
- * Version: 1.0
+ * Version: 1.0.1
  * Requires at least: 5.2
+ * Requires PHP: 7.4
+ * Tested up to: 7.1
  * Author: Jérôme Le Gousse
  * Text Domain: discord-bot-jlg
  * Domain Path: /languages
@@ -17,7 +19,7 @@ if (!defined('ABSPATH')) {
 
 if (!defined('DISCORD_BOT_JLG_VERSION')) {
     $plugin_data    = get_file_data(__FILE__, array('Version' => 'Version'));
-    $plugin_version = !empty($plugin_data['Version']) ? $plugin_data['Version'] : '1.0';
+    $plugin_version = !empty($plugin_data['Version']) ? $plugin_data['Version'] : '1.0.1';
 
     define('DISCORD_BOT_JLG_VERSION', $plugin_version);
 }
@@ -264,6 +266,7 @@ class DiscordServerStats {
         add_action('admin_menu', array($this->admin, 'add_admin_menu'));
         add_action('admin_init', array($this->admin, 'settings_init'));
         add_action('admin_enqueue_scripts', array($this->admin, 'enqueue_admin_styles'), 10, 1);
+        add_action('enqueue_block_assets', 'discord_bot_jlg_enqueue_editor_canvas_guard');
 
         add_shortcode('discord_stats', array($this->shortcode, 'render_shortcode'));
 
